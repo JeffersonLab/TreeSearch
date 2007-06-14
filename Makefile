@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 
-SRC  = THaTsMWDC.cxx
+SRC  = MWDC.cxx WirePlane.cxx
 
 PACKAGE = TreeSearch
 

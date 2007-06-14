@@ -2,7 +2,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 //                                                                           //
-// THaTsMWDC                                                                 //
+// TreeSearch::MWDC                                                          //
 //                                                                           //
 // Reconstruction class for horizontal drift chambers used in BigBite.       //
 // Tracking is done using a tree search algorithm (DellOrso et al.,          //
@@ -10,17 +10,16 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "THaTsMWDC.h"
+#include "MWDC.h"
 //#include "TreeSearch.h"
 
-using namespace std;
-//using namespace TreeSearch;
+//using namespace std;
+using namespace TreeSearch;
 
 //_____________________________________________________________________________
-THaTsMWDC::THaTsMWDC( const char* name, const char* description,
+MWDC::MWDC( const char* name, const char* description,
 		      THaApparatus* apparatus ) :
-  THaTrackingDetector(name,description,apparatus), fNtracks(0),
-  fDoBench(kTRUE)
+  THaTrackingDetector(name,description,apparatus)
 { 
   // Constructor
 
@@ -30,7 +29,7 @@ THaTsMWDC::THaTsMWDC( const char* name, const char* description,
   // readdatabase method
 
   // Since TCloneArrays can resize, the size here is fairly unimportant
-  fPlanes = new TClonesArray("THaTsMWDCPlane",0);
+  fPlanes = new TClonesArray("TreeSearch::WirePlane",0);
 
   // Default behavior for now
   // SetBit( kHardTDCcut );
@@ -39,10 +38,11 @@ THaTsMWDC::THaTsMWDC( const char* name, const char* description,
  
 
   fBench = new THaBenchmark;
+#endif
 }
 
 //_____________________________________________________________________________
-THaTsMWDC::~THaTsMWDC()
+MWDC::~MWDC()
 {
   // Destructor. Delete subdetectors and unregister variables
 #if 0 
@@ -55,99 +55,15 @@ THaTsMWDC::~THaTsMWDC()
 }
 
 //_____________________________________________________________________________
-THaAnalysisObject::EStatus THaTsMWDC::Init( const TDatime& date )
+THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 {
   // Initialize MWDC. Calls standard Init(), then initializes subdetectors.
 
-#if 0
-  Int_t useshowercuts;
-
-  fReconstructBits = 0;
-
-  if( IsZombie() ) {
-    return fStatus = kInitError;
-  }
-  EStatus status;
-  status = (THaTrackingDetector::Init( date )) ;
-  if (status!=0) return fStatus = status;
-
-  for (UInt_t i=0; i<GetNPlanes(); i++) {
-    status=GetPlane(i)->Init( date );
-    if (status!=0)return fStatus = status;
-    fReconstructBits |= (BIT(i)*GetPlane(i)->IsInReconstruction() );
-  }
-
-  // Need to pull quite a bit from THaBBe's database:
-  THaBBe* bbe = dynamic_cast<THaBBe*>(GetApparatus());
-  if( bbe ) {
-    fMaxGroups = (UInt_t) bbe->GetMaxGroups();
-    fHardMaxGroups =  (UInt_t) bbe->GetHardMaxGroups();
-    fMinimumPlanes = (UInt_t) bbe->GetMinimumPlanesInRecon();
-    fShowerXExt = bbe->GetShowerXExtension();
-    fShowerYExt = bbe->GetShowerYExtension();
-    fTargetXExt = bbe->GetTargetXExtension();
-    fTargetYExt = bbe->GetTargetYExtension();
-    fTargetWindowXOffset = bbe->GetTargetWindowXOffset();
-    useshowercuts = bbe->UseShowerCuts();
-    fMaxCallThreshold = bbe->GetMaxCallThreshold();
-  }
-  else {
-    fMaxGroups = 1000000;
-    fHardMaxGroups = 1000000;
-    fMinimumPlanes =4;
-    fShowerXExt = 0.0;
-    fShowerYExt = 0.0;
-    fTargetXExt = 0.0;
-    fTargetYExt = 0.0;
-    fTargetWindowXOffset = 0.0; 
-    useshowercuts = false;
-    fMaxCallThreshold = 1000000;
-  }
-
-  SetUseShowerCuts(useshowercuts);
-
-  // Generate transformation matrices
-  GenerateConstructMatrices();
-  cout << "Requiring at least " << fMinimumPlanes << " in reconstruction" << endl;
-  cout << "Only using planes ";
-  for( UInt_t i = 0; i < GetNPlanes(); i++ )
-    {
-      if( GetPlane(i)->IsInReconstruction() )
-	cout << GetPlane(i)->GetName() << " ";
-    }
-  cout << "in reconstruction" << endl;
-
-  cout << "Skipping tracking on events that will have more than " << fMaxCallThreshold 
-       << " estimated calls to consider."<< endl;
-
-
-  // If using shower cuts print out some useful information
-  if( UseShowerCuts() )
-    {      
-      cout << endl << "Shower cut specifications: " << endl 
-	   << "-------------------------------------------" << endl;
-      cout << "Shower X Range (+/- m):\t\t"   << fShowerXExt << endl;
-      cout << "Shower Y Range (+/- m):\t\t"   << fShowerYExt << endl;
-      cout << "Target X Extension (+/- m):\t" << fTargetXExt << endl;
-      cout << "Target Y Extension (+/- m):\t" << fTargetYExt << endl;
-
-      cout << "Target X Offset (m):\t\t"<< fTargetWindowXOffset << endl;
-      cout << "-------------------------------------------" << endl;
-    }
-  else
-    {
-      cout << endl << "*Not using cuts on shower*" << endl;
-    }
-
-  // Load up target information from THaBBe
-  LoadTargetData();
-
-#endif
   return fStatus = kOK;
 }
 
 //_____________________________________________________________________________
-Int_t THaTsMWDC::Decode( const THaEvData& evdata )
+Int_t MWDC::Decode( const THaEvData& evdata )
 {
 
 #if 0
@@ -161,19 +77,19 @@ Int_t THaTsMWDC::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
-Int_t THaTsMWDC::CoarseTrack( TClonesArray& tracks )
+Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   return 0;//fNtracks;
 }
 
 //_____________________________________________________________________________
-Int_t THaTsMWDC::FineTrack( TClonesArray& tracks )
+Int_t MWDC::FineTrack( TClonesArray& tracks )
 {
   return 0;//fNtracks;
 }
 
 //_____________________________________________________________________________
-Int_t THaTsMWDC::DefineVariables( EMode mode )
+Int_t MWDC::DefineVariables( EMode mode )
 {
   // Initialize global variables and lookup table for decoder
 
@@ -183,8 +99,8 @@ Int_t THaTsMWDC::DefineVariables( EMode mode )
 
   // Register variables in global list
   
-#if 0
   RVarDef vars[] = {
+#if 0
     { "trackskipped", "Tracking skipped or truncated", "fTooBusy"       },
     { "cproctime",    "Coarse Processing Time",        "fCoarseProcTime"},
     { "fproctime",    "Fine Processing Time",          "fFineProcTime"  },
@@ -192,15 +108,15 @@ Int_t THaTsMWDC::DefineVariables( EMode mode )
     { "estncall",     "Estimated Number of Calls",     "fEstNCalls"     },
     { "ngrp",         "Number of Groups",              "fNGroups"       },
     { "ncall",        "Number of recursive calls",     "fNCalls"        },
+#endif  
     { 0 }
   };
   DefineVarsFromList( vars, mode );
-#endif  
   return 0;
 }
 
 //_____________________________________________________________________________
-void THaTsMWDC::Print(const Option_t* opt) const
+void MWDC::Print(const Option_t* opt) const
 {
   THaTrackingDetector::Print(opt);
 
@@ -211,7 +127,7 @@ void THaTsMWDC::Print(const Option_t* opt) const
 
 
 //_____________________________________________________________________________
-void THaTsMWDC::SetDebug( Int_t level )
+void MWDC::SetDebug( Int_t level )
 {
   // Set debug level of this detector, including all wire planes (subdetectors)
 
@@ -219,20 +135,20 @@ void THaTsMWDC::SetDebug( Int_t level )
 
 #if 0
   for( UInt_t i = 0; i<GetNPlanes(); i++ ) {
-    THaTsMWDCPlane* thePlane = static_cast<THaTsMWDCPlane*>( fPlanes->At(i) );
+    WirePlane* thePlane = static_cast<WirePlane*>( fPlanes->At(i) );
     thePlane->SetDebug( level );
   }
 #endif
 }
 
 //_____________________________________________________________________________
-void THaTsMWDC::EnableBenchmarks( Bool_t b )
+void MWDC::EnableBenchmarks( Bool_t b )
 {
-  fDoBench = b;
+  //  fDoBench = b;
 }
 
 //_____________________________________________________________________________
-Int_t THaTsMWDC::ReadDatabase( const TDatime& date )
+Int_t MWDC::ReadDatabase( const TDatime& date )
 {
   // Read MWDC database
 
@@ -313,8 +229,8 @@ Int_t THaTsMWDC::ReadDatabase( const TDatime& date )
 	  planedescr = buff;
 	  if( planedescr.EndsWith("\n") ) planedescr.Chop();
 	  planedescr.ToLower();
-	  THaTsMWDCPlane* thePlane = 
-	    new((*fPlanes)[nPlanes]) THaTsMWDCPlane(planename,planedescr,this);
+	  WirePlane* thePlane = 
+	    new((*fPlanes)[nPlanes]) WirePlane(planename,planedescr,this);
 	  thePlane->SetDebug(fDebug);
 
 	  //	  EStatus status=thePlane->Init( date );
@@ -339,15 +255,15 @@ Int_t THaTsMWDC::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-void THaTsMWDC::Clear( Option_t* opt )
+void MWDC::Clear( Option_t* opt )
 {
   THaTrackingDetector::Clear(opt);
   
 
 }
 
-//_______________________________________________________________________________
-Int_t THaTsMWDC::End(THaRunBase *run)
+//_____________________________________________________________________________
+Int_t MWDC::End(THaRunBase *run)
 {
     //    fBench->Print();
     return THaTrackingDetector::End(run);
@@ -358,6 +274,6 @@ Int_t THaTsMWDC::End(THaRunBase *run)
 //_____________________________________________________________________________
 
 
-ClassImp(THaTsMWDC)
+ClassImp(TreeSearch::MWDC)
   
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
