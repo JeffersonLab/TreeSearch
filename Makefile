@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 
-SRC  = MWDC.cxx WirePlane.cxx
+SRC  = MWDC.cxx WirePlane.cxx Hit.cxx
 
 PACKAGE = TreeSearch
 
@@ -8,7 +8,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 
 #------------------------------------------------------------------------------
 # Compile debug version
-#export DEBUG = 1
+export DEBUG = 1
 
 # Architecture to compile for
 ARCH          = linux

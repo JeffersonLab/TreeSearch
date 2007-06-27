@@ -10,6 +10,6 @@
 
 #pragma link C++ class TreeSearch::MWDC+;
 #pragma link C++ class TreeSearch::WirePlane+;
-//#pragma link C++ class TreeSearch::WirePlane+;
+#pragma link C++ class TreeSearch::Hit+;
 
 #endif

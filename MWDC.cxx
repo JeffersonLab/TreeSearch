@@ -14,7 +14,7 @@
 //#include "TreeSearch.h"
 
 //using namespace std;
-using namespace TreeSearch;
+namespace TreeSearch {
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* description,
@@ -273,7 +273,8 @@ Int_t MWDC::End(THaRunBase *run)
 
 //_____________________________________________________________________________
 
+}  
 
 ClassImp(TreeSearch::MWDC)
-  
+
 ///////////////////////////////////////////////////////////////////////////////

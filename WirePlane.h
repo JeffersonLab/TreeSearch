@@ -9,6 +9,9 @@
 
 #include "THaSubDetector.h"
 #include "TClonesArray.h"
+#include <vector>
+
+using std::vector;
 
 class THaVDCTimeToDistanceConv;
 
@@ -16,7 +19,7 @@ namespace TreeSearch {
 
   class WirePlane : public THaSubDetector {
 
-    enum EType { kXPlane, kYPlane, kUPlane, kVPlane };
+    enum EType { kUndefinedType = 0, kXPlane, kYPlane, kUPlane, kVPlane };
 
   public:
     WirePlane( const char* name, const char* description = "", 
@@ -35,7 +38,6 @@ namespace TreeSearch {
     // Geometry, configuration
 
     EType     fType;         // Plane type (x,y,u,v)
-    Int_t     fNWires;       // Number of wires
     Double_t  fWireStart;    // Position of 1st wire (along wire coord) (m)
     Double_t  fWireSpacing;  // Wire spacing (assumed constant) (m)
     Double_t  fSinAngle;     // Sine of angle between dispersive direction (x)
@@ -50,11 +52,11 @@ namespace TreeSearch {
     Double_t  fMaxSlope;     // Max physical track slope in this plane (FIXME?)
 
     THaVDCTimeToDistanceConv* fTTDConv; // Drift time->distance converter
-    Double_t* fTDCOffset;    // [fNWires] TDC offsets for each wire
+    vector<double>  fTDCOffset;    // [fNelem] TDC offsets for each wire
 
     // Event data, hits etc.
 
-    TClonesArray*  fHits;    // Hit data
+    TClonesArray*   fHits;    // Hit data
 
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
