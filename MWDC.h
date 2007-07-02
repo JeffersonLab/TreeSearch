@@ -12,6 +12,7 @@
 class THaTrack;
 class THaBenchmark;
 class TClonesArray;
+class TList;
 
 namespace TreeSearch {
   class WirePlane;
@@ -44,6 +45,8 @@ namespace TreeSearch {
 
     virtual Int_t  ReadDatabase( const TDatime& date );
 
+
+    TList*  fPlanes;   // Wire planes
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };

@@ -12,25 +12,22 @@
 
 #include "MWDC.h"
 //#include "TreeSearch.h"
+#include "TList.h"
+#include "WirePlane.h"
 
 //using namespace std;
 namespace TreeSearch {
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* description,
-		      THaApparatus* apparatus ) :
-  THaTrackingDetector(name,description,apparatus)
+	    THaApparatus* apparatus ) :
+  THaTrackingDetector(name,description,apparatus), fPlanes(NULL)
 { 
   // Constructor
 
+  fPlanes = new TList;
+
 #if 0
-  // since the number of planes needs to be read in from
-  // the database, the detector is actually constructed in the 
-  // readdatabase method
-
-  // Since TCloneArrays can resize, the size here is fairly unimportant
-  fPlanes = new TClonesArray("TreeSearch::WirePlane",0);
-
   // Default behavior for now
   // SetBit( kHardTDCcut );
   //  ResetBit( kIgnoreNegDrift );
@@ -45,13 +42,15 @@ MWDC::MWDC( const char* name, const char* description,
 MWDC::~MWDC()
 {
   // Destructor. Delete subdetectors and unregister variables
-#if 0 
  if (fIsSetup)
-    RemoveVariables();
+   RemoveVariables();
   
+#if 0 
   delete fBench;
-  delete fPlanes;
 #endif
+
+  fPlanes->Delete();
+  delete fPlanes;
 }
 
 //_____________________________________________________________________________
@@ -59,6 +58,17 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 {
   // Initialize MWDC. Calls standard Init(), then initializes subdetectors.
 
+  EStatus status = THaTrackingDetector::Init(date);
+  if( status )
+    return fStatus = status;
+
+  TIter next(fPlanes);
+  WirePlane* thePlane;
+  while( (thePlane = static_cast<WirePlane*>(next())) ) {
+    status = thePlane->Init(date);
+    if( status )
+      return fStatus = status;
+  }
   return fStatus = kOK;
 }
 
@@ -122,6 +132,7 @@ void MWDC::Print(const Option_t* opt) const
 
   //  fBench->Print();
 
+  fPlanes->Print();
   return;
 }
 
@@ -151,6 +162,29 @@ void MWDC::EnableBenchmarks( Bool_t b )
 Int_t MWDC::ReadDatabase( const TDatime& date )
 {
   // Read MWDC database
+
+
+  //FIXME: quick test
+  fPlanes->Add( new WirePlane("u1", "U1 Plane", this));
+  fPlanes->Add( new WirePlane("u1p","U1p Plane",this));
+  fPlanes->Add( new WirePlane("u2", "U2 Plane", this));
+  fPlanes->Add( new WirePlane("u3", "U3 Plane", this));
+  fPlanes->Add( new WirePlane("u3p","U3p Plane",this));
+
+  fPlanes->Add( new WirePlane("x1", "X1 Plane", this));
+  fPlanes->Add( new WirePlane("x1p","X1p Plane",this));
+  fPlanes->Add( new WirePlane("x2", "X2 Plane", this));
+  fPlanes->Add( new WirePlane("x3", "X3 Plane", this));
+  fPlanes->Add( new WirePlane("x3p","X3p Plane",this));
+
+  fPlanes->Add( new WirePlane("v1", "V1 Plane", this));
+  fPlanes->Add( new WirePlane("v1p","V1p Plane",this));
+  fPlanes->Add( new WirePlane("v2", "V2 Plane", this));
+  fPlanes->Add( new WirePlane("v3", "V3 Plane", this));
+  fPlanes->Add( new WirePlane("v3p","V3p Plane",this));
+
+
+
 
 #if 0
   FILE* file = OpenFile( date );
