@@ -10,8 +10,9 @@
 #include "WirePlane.h"
 #include "Hit.h"
 #include "THaDetMap.h"
+#include <iostream>
 
-using std::vector;
+using namespace std;
 
 namespace TreeSearch {
 
@@ -20,6 +21,7 @@ WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fType(kUndefinedType),
     fWireStart(0.0), fWireSpacing(0.0), fSinAngle(0.0), fCosAngle(0.0),
+    fPartner(NULL),
     fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fMaxSlope(0.0),
     fTTDConv(NULL)
 {
@@ -74,13 +76,14 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "detmap",     &detmap, kIntV },
     { "nwires",     &fNelem, kInt },
     { "wire.pos",       &fWireStart },
-    { "wire.spacing",   &fWireSpacing },
+    { "wire.spacing",   &fWireSpacing, kDouble, 0, 0, -1 },
     { "wire.angle",     &wire_angle },
-    { "tdc.res",   &fTDCRes },
-    { "drift.v",   &fDriftVel },
-    //    { "resolution", &fResolution },
+    { "tdc.res",   &fTDCRes, kDouble, 0, 0, -1 },
+    { "drift.v",   &fDriftVel, kDouble, 0, 0, -1 },
+    { "xp.res",    &fResolution, kDouble, 0, 0, -1 },
     //    { "maxslope",   &fMaxSlope },
     { "tdc.offsets",     &fTDCOffset, kDoubleV },
+    { "description",     &fTitle, kTString, 0, 1 },
     { 0 }
   };
 
@@ -318,6 +321,55 @@ Int_t WirePlane::Decode( const THaEvData& evData)
   
 }
   
+//_____________________________________________________________________________
+void WirePlane::SetPartner( WirePlane* p )
+{    
+  // Partner this plane with plane 'p'. Partner planes are expected to
+  // be located close to each other and usually to have staggered wires.
+
+  fPartner = p;
+  if( p )
+    p->fPartner = this;
+
+  return;
+}
+
+//_____________________________________________________________________________
+void WirePlane::Print( Option_t* opt ) const
+{    
+  // Print plane info
+
+  cout << "WirePlane:  "
+       << GetName()   << "\t"
+    //       << GetTitle()        << "\t"
+       << fNelem << " wires\t"
+       << "z = " << GetZ();
+  if( fPartner ) {
+    cout << "\t partner = " 
+	 << fPartner->GetName();
+    //	 << fPartner->GetTitle();
+  }
+  cout << endl;
+}
+
+//_____________________________________________________________________________
+Int_t WirePlane::Compare( const TObject* obj ) const 
+{
+  // Used to sort planes in a TCollection/TList by z-position
+
+  // Fail if comparing to some other type of object
+  if( !obj || IsA() != obj->IsA() )
+    return -1;
+
+  if( obj == this )
+    return 0;
+
+  const WirePlane* other = static_cast<const WirePlane*>( obj );
+  if( GetZ() < other->GetZ() ) return -1;
+  if( GetZ() > other->GetZ() ) return  1;
+  return 0;
+}
+
 //_____________________________________________________________________________
 
 }

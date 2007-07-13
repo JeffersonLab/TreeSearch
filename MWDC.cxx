@@ -11,11 +11,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "MWDC.h"
+#include "WirePlane.h"
 //#include "TreeSearch.h"
 #include "TList.h"
-#include "WirePlane.h"
+#include "TString.h"
 
-//using namespace std;
+// FIXME: Decoding and pattern finding in the planes should be multi-threaded
+
+using namespace std;
+typedef string::size_type ssiz_t;
+
 namespace TreeSearch {
 
 //_____________________________________________________________________________
@@ -27,6 +32,7 @@ MWDC::MWDC( const char* name, const char* description,
 
   fPlanes = new TList;
 
+  THaDetector::SetDebug(1);
 #if 0
   // Default behavior for now
   // SetBit( kHardTDCcut );
@@ -69,20 +75,41 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     if( status )
       return fStatus = status;
   }
+
+  // Sort planes by increasing z-position. The sort order is defined 
+  // by WirePlane::Compare().
+  fPlanes->Sort();
+
+  //TODO: Maintain separate lists for planes of each orientation
+
+
+
+
   return fStatus = kOK;
+}
+
+//_____________________________________________________________________________
+void MWDC::Clear( Option_t* opt )
+{
+  THaTrackingDetector::Clear(opt);
+  
+  TIter next(fPlanes);
+  WirePlane* thePlane;
+  while( (thePlane = static_cast<WirePlane*>(next())) )
+    thePlane->Clear(opt);
+
 }
 
 //_____________________________________________________________________________
 Int_t MWDC::Decode( const THaEvData& evdata )
 {
-
-#if 0
   // Decode all planes
-  for (UInt_t i=0; i<GetNPlanes() ;i++) {
-    GetPlane(i)->Decode(evdata);
-  }
 
-#endif
+  TIter next(fPlanes);
+  WirePlane* thePlane;
+  while( (thePlane = static_cast<WirePlane*>(next())) )
+    thePlane->Decode( evdata );
+  
   return 0;
 }
 
@@ -144,12 +171,10 @@ void MWDC::SetDebug( Int_t level )
 
   THaTrackingDetector::SetDebug( level );
 
-#if 0
-  for( UInt_t i = 0; i<GetNPlanes(); i++ ) {
-    WirePlane* thePlane = static_cast<WirePlane*>( fPlanes->At(i) );
+  TIter next(fPlanes);
+  WirePlane* thePlane;
+  while( (thePlane = static_cast<WirePlane*>(next())) )
     thePlane->SetDebug( level );
-  }
-#endif
 }
 
 //_____________________________________________________________________________
@@ -163,144 +188,78 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 {
   // Read MWDC database
 
+  static const char* const here = "ReadDatabase";
 
-  //FIXME: quick test
-  fPlanes->Add( new WirePlane("u1", "U1 Plane", this));
-  fPlanes->Add( new WirePlane("u1p","U1p Plane",this));
-  fPlanes->Add( new WirePlane("u2", "U2 Plane", this));
-  fPlanes->Add( new WirePlane("u3", "U3 Plane", this));
-  fPlanes->Add( new WirePlane("u3p","U3p Plane",this));
-
-  fPlanes->Add( new WirePlane("x1", "X1 Plane", this));
-  fPlanes->Add( new WirePlane("x1p","X1p Plane",this));
-  fPlanes->Add( new WirePlane("x2", "X2 Plane", this));
-  fPlanes->Add( new WirePlane("x3", "X3 Plane", this));
-  fPlanes->Add( new WirePlane("x3p","X3p Plane",this));
-
-  fPlanes->Add( new WirePlane("v1", "V1 Plane", this));
-  fPlanes->Add( new WirePlane("v1p","V1p Plane",this));
-  fPlanes->Add( new WirePlane("v2", "V2 Plane", this));
-  fPlanes->Add( new WirePlane("v3", "V3 Plane", this));
-  fPlanes->Add( new WirePlane("v3p","V3p Plane",this));
-
-
-
-
-#if 0
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  // load global MWDC parameters
-  static const char* const here = "ReadDatabase";
-  const int LEN = 200;
-  char buff[LEN];
-  
-  // Look for the section [<prefix>.global] in the file, e.g. [ R.global ]
-  TString tag1(fPrefix);
-  TString tag2(fPrefix);
+  fIsInit = kFALSE;
 
-  Ssiz_t pos = tag1.Index("."); 
-  if( pos != kNPOS )
-    tag1 = tag1(0,pos+1);
-  else
-    tag1.Append(".");
-  tag1.Prepend("[");
-  tag1.Append("global]"); 
-  pos = tag2.Index("."); 
-  if( pos != kNPOS )
-    tag2 = tag2(0,pos+1);
-  else
-    tag2.Append(".");
-  tag2.Prepend("[");
-  tag2.Append("global.done]"); 
+  string planeconfig;
+  DBRequest request[] = {
+    { "planeconfig",    &planeconfig, kString },
+    { 0 }
+  };
 
+  Int_t err = LoadDB( file, date, request, fPrefix );
+  fclose(file);
+  if( err )
+    return kInitError;
 
-
-  TString line, tag3(tag1);
-  tag1.ToLower();
-  tag2.ToLower();
-
-
-  bool found = false;
-  while (!found && fgets (buff, LEN, file) != NULL) {
-    char* buf = ::Compress(buff);  //strip blanks
-    line = buf;
-    delete [] buf;
-    if( line.EndsWith("\n") ) line.Chop();
-    line.ToLower();
-     if ( tag1 == line ) 
-      found = true;
-  }
-  if( !found ) {
-    Error(Here(here), "Database entry %s not found!", tag3.Data() );
-    fclose(file);
+  // Set up the wire planes
+  vector<string> planes = vsplit(planeconfig);
+  if( planes.empty() ) {
+    Error( Here(here), "No planes defined. Fix database." );
     return kInitError;
   }
-
-  if( GetNPlanes()>0 || fIsInit ) {
-    Warning(Here(here), "Database has already be read in.  Using the planes we already have." );
-    Warning(Here(here), "Hope you have the same configureation in the databases." );
-    //fclose(file);
-    //return kInitError;
+  // Delete existing configuration if re-initializing
+  fPlanes->Delete();
+  for( ssiz_t i=0; i<planes.size(); i++ ) {
+    TString name(planes[i].c_str());
+    if( name.IsNull() )
+      continue;
+    if( fPlanes->FindObject(name) ) {
+      Error( Here(here), "Duplicate plane name: %s. Fix database.", 
+	     name.Data() );
+      return kInitError;
+    }
+    WirePlane* newplane = new WirePlane( name, name, this );
+    fPlanes->Add( newplane );
   }
 
-  // We found the section, now read the data
+  if( fDebug > 0 )
+    Info( Here(here), "Loaded %d planes", fPlanes->GetSize() );
 
-  // read in some basic constants first
-  else
-    {
-      TString planename = " ";
-      TString planedescr = " ";
-      Int_t nPlanes = 0;  
-      while ((planename!=tag2)&&(fgets(buff, LEN, file)!=NULL)) {
-	char* buf = ::Compress(buff);
-	planename = buf;
-	delete [] buf;
-	if( planename.EndsWith("\n") ) planename.Chop();
-	planename.ToLower();
-	if (planename!=tag2) {
-	  fgets(buff, LEN, file);
-	  planedescr = buff;
-	  if( planedescr.EndsWith("\n") ) planedescr.Chop();
-	  planedescr.ToLower();
-	  WirePlane* thePlane = 
-	    new((*fPlanes)[nPlanes]) WirePlane(planename,planedescr,this);
-	  thePlane->SetDebug(fDebug);
-
-	  //	  EStatus status=thePlane->Init( date );
-	  //	  if (status!=0)return fStatus = status;
-	  
-	  nPlanes++;
-	}
+  TIter next(fPlanes);
+  WirePlane* thePlane;
+  while( (thePlane = static_cast<WirePlane*>(next())) ) {
+    TString name( thePlane->GetName() );
+    if( name.EndsWith("p") ) {
+      TString other = name.Chop();
+      if( other.IsNull() )
+	continue;
+      WirePlane* partner = static_cast<WirePlane*>(fPlanes->FindObject(other));
+      if( partner ) {
+	if( fDebug > 0 )
+	  Info( Here(here), "Partnering plane %s with %s",
+		thePlane->GetName(), partner->GetName() );
+	partner->SetPartner( thePlane );
       }
     }
-
-  fclose(file);
-  // final sanity check
-  if (MAX_PLANES<GetNPlanes()) {
-    Error(Here(here),"More planes in database than permitted by MAX_PLANES!");
-    return kInitError;
   }
   
-#endif
+  
 
-  fIsInit = true;
+  fIsInit = kTRUE;
   return kOK;
 }
 
 //_____________________________________________________________________________
-void MWDC::Clear( Option_t* opt )
-{
-  THaTrackingDetector::Clear(opt);
-  
-
-}
-
-//_____________________________________________________________________________
-Int_t MWDC::End(THaRunBase *run)
+Int_t MWDC::End(THaRunBase* run)
 {
     //    fBench->Print();
-    return THaTrackingDetector::End(run);
+  return THaTrackingDetector::End(run);
+
 }
 
 

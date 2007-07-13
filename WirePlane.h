@@ -29,9 +29,15 @@ namespace TreeSearch {
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
+    virtual void    Print( Option_t* opt="" ) const;
 
-    EType   GetType() const { return fType; }
-  
+    Int_t           Compare ( const TObject* obj ) const;
+    Bool_t          IsSortable () const { return kTRUE; }
+
+    EType           GetType() const { return fType; }
+    Double_t        GetZ() const { return fOrigin.Z(); }
+    WirePlane*      GetPartner() const { return fPartner; }
+    void            SetPartner( WirePlane* p );
 
   protected:
 
@@ -43,6 +49,7 @@ namespace TreeSearch {
     Double_t  fSinAngle;     // Sine of angle between dispersive direction (x)
                              //  and direction of decreasing wire number (rad)
     Double_t  fCosAngle;     // Cosine of wire angle (rad)
+    WirePlane* fPartner;     // Partner plane with staggered wires
 
     // Parameters, calibration, flags
 

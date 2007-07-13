@@ -36,8 +36,9 @@ namespace TreeSearch {
     virtual Int_t   FindVertices(TClonesArray&) {return 0;}
     virtual void    Print(const Option_t* opt) const;
     virtual void    SetDebug( Int_t level );
-            void    EnableBenchmarks( Bool_t b = kTRUE );
+    void            EnableBenchmarks( Bool_t b = kTRUE );
 
+    TList*          GetListOfPlanes() { return fPlanes; }
 
   protected:
 
