@@ -1,6 +1,33 @@
 #-----------------------------------------------------------
+#  Chamber configuration
+#-----------------------------------------------------------
+
+# Plane configuration. One string of the all plane names.
+# The names are case sensitive. If the last character is
+# a "p", it indicates a staggered plane that is to be paired
+# with the correponding non-p one. Optional plane description
+# text may be put in each plane's section.
+
+B.mwdc.planeconfig = u1 u1p x1 x1p v1 v1p \
+                     u2 x2 v2 \
+                     u3 u3p x3 x3p v3 v3p
+
+#-----------------------------------------------------------
+#   Global defaults
+#    - can be overridden for individual planes
+#-----------------------------------------------------------
+
+B.mwdc.wire.spacing = 0.01
+B.mwdc.xp.res = 2.0e-03
+B.mwdc.drift.min = 0
+B.mwdc.drift.max = 200
+B.mwdc.drift.ttd = 2.550e-08
+B.mwdc.tdc.res = -0.5          # negative?
+
+#-----------------------------------------------------------
 #   U PLANES
 #-----------------------------------------------------------
+B.mwdc.u1.description = U1 plane
 B.mwdc.u1.detmap = \
   3  18  80  94  1877 \	
   4  5   80  95  1877 \	
@@ -15,14 +42,8 @@ B.mwdc.u1.nwires    = 141
 B.mwdc.u1.position  = 0.0 0.0 0.0
 B.mwdc.u1.size      = 1.4 0.35 0.0
 B.mwdc.u1.wire.pos  = -0.7025
-B.mwdc.u1.wire.spacing = 0.01
 B.mwdc.u1.wire.angle   = -60.0
-B.mwdc.u1.xp.res = 2.0e-03
-B.mwdc.u1.drift.min = 0
-B.mwdc.u1.drift.max = 200
 B.mwdc.u1.drift.v = 4.487e-05
-B.mwdc.u1.drift.ttd = 2.550e-08
-B.mwdc.u1.tdc.res = -0.5          # negative?
 B.mwdc.u1.tdc.offsets = \
  -758 \
  -758 -758 -758 -758 -758 -758 -758 -758 -758 -758 \
@@ -54,14 +75,8 @@ B.mwdc.u1p.nwires    = 141
 B.mwdc.u1p.position  = 0.0  0.0  0.0064
 B.mwdc.u1p.size      = 1.4  0.35 0.0
 B.mwdc.u1p.wire.pos  = -0.6975
-B.mwdc.u1p.wire.spacing = 0.01
 B.mwdc.u1p.wire.angle = -60.0
-B.mwdc.u1p.xp.res = 2.0e-03
-B.mwdc.u1p.drift.min = 0
-B.mwdc.u1p.drift.max = 200
 B.mwdc.u1p.drift.v = 4.506e-05
-B.mwdc.u1p.drift.ttd = 2.550e-08
-B.mwdc.u1p.tdc.res = -0.5
 B.mwdc.u1p.tdc.offsets = \
  -758 \
  -758 -758 -758 -758 -758 -758 -758 -758 -758 -758 \
@@ -97,14 +112,8 @@ B.mwdc.u2.nwires    = 200
 B.mwdc.u2.position  = 0.0  0.0  0.3598
 B.mwdc.u2.size      = 2.0  0.5  0.0
 B.mwdc.u2.wire.pos  = -0.99271
-B.mwdc.u2.wire.spacing = 0.01
 B.mwdc.u2.wire.angle = -60.0
-B.mwdc.u2.xp.res = 2.0e-03
-B.mwdc.u2.drift.min = 0
-B.mwdc.u2.drift.max = 200
 B.mwdc.u2.drift.v = 4.276e-05
-B.mwdc.u2.drift.ttd = 2.550e-08
-B.mwdc.u2.tdc.res = -0.5
 B.mwdc.u2.tdc.offsets = \
  -999 \
  -999 -999 -999 -999 -999 -999 -999 -999 -999 -999 \
@@ -146,14 +155,8 @@ B.mwdc.u3.nwires    = 200
 B.mwdc.u3.position  = 0.0  0.0  0.74435
 B.mwdc.u3.size      = 2.0  0.5  0.0
 B.mwdc.u3.wire.pos  = -1.0023
-B.mwdc.u3.wire.spacing = 0.01
 B.mwdc.u3.wire.angle = 60.0      # UURRRGH this is actually a V plane!
-B.mwdc.u3.xp.res = 2.0e-03
-B.mwdc.u3.drift.min = 0
-B.mwdc.u3.drift.max = 200
 B.mwdc.u3.drift.v = 4.306e-05
-B.mwdc.u3.drift.ttd = 2.550e-08
-B.mwdc.u3.tdc.res = -0.5
 B.mwdc.u3.tdc.offsets = \
  -780 \
  -780 -780 -780 -780 -780 -780 -780 -780 -780 -780 \
@@ -195,14 +198,8 @@ B.mwdc.u3p.nwires    = 200
 B.mwdc.u3p.position  = 0.0  0.0  0.73845   #ummm.. z(u3p) < z(u3)?!?
 B.mwdc.u3p.size      = 2.0  0.5  0.0
 B.mwdc.u3p.wire.pos  = -0.9973
-B.mwdc.u3p.wire.spacing = 0.01
 B.mwdc.u3p.wire.angle = 60.0      # UURRRGH this is actually a V plane!
-B.mwdc.u3p.xp.res = 2.0e-03
-B.mwdc.u3p.drift.min = 0
-B.mwdc.u3p.drift.max = 200
 B.mwdc.u3p.drift.v = 4.18e-05
-B.mwdc.u3p.drift.ttd = 2.550e-08
-B.mwdc.u3p.tdc.res = -0.5
 B.mwdc.u3p.tdc.offsets = \
  -775 \
  -775 -775 -775 -775 -775 -775 -775 -775 -775 -775 \
@@ -242,14 +239,8 @@ B.mwdc.x1.nwires    = 142
 B.mwdc.x1.position  = 0.0  0.0  0.0128
 B.mwdc.x1.size      = 1.4  0.35 0.0
 B.mwdc.x1.wire.pos  = -0.7025
-B.mwdc.x1.wire.spacing = 0.01
 B.mwdc.x1.wire.angle = 90.0
-B.mwdc.x1.xp.res = 2.0e-03
-B.mwdc.x1.drift.min = 0
-B.mwdc.x1.drift.max = 200
 B.mwdc.x1.drift.v = 4.726e-05
-B.mwdc.x1.drift.ttd = 2.550e-08
-B.mwdc.x1.tdc.res = -0.5
 B.mwdc.x1.tdc.offsets = \
  -754 \
  -754 -754 -754 -754 -754 -754 -754 -754 -754 -754 \
@@ -282,14 +273,8 @@ B.mwdc.x1p.nwires    = 142
 B.mwdc.x1p.position  = 0.0  0.0  0.022375
 B.mwdc.x1p.size      = 1.4  0.35 0.0
 B.mwdc.x1p.wire.pos  = -0.7075
-B.mwdc.x1p.wire.spacing = 0.01
 B.mwdc.x1p.wire.angle = 90.0
-B.mwdc.x1p.xp.res = 2.0e-03
-B.mwdc.x1p.drift.min = 0
-B.mwdc.x1p.drift.max = 200
 B.mwdc.x1p.drift.v = 4.627e-05
-B.mwdc.x1p.drift.ttd = 2.550e-08
-B.mwdc.x1p.tdc.res = -0.5
 B.mwdc.x1p.tdc.offsets = \
  -757 \
  -757 -757 -757 -757 -757 -757 -757 -757 -757 -757 \
@@ -326,14 +311,8 @@ B.mwdc.x2.nwires    = 202
 B.mwdc.x2.position  = 0.0  0.0  0.3662
 B.mwdc.x2.size      = 2.0  0.5  0.0
 B.mwdc.x2.wire.pos  = -0.9975
-B.mwdc.x2.wire.spacing = 0.01
 B.mwdc.x2.wire.angle = 90.0
-B.mwdc.x2.xp.res = 2.0e-03
-B.mwdc.x2.drift.min = 0
-B.mwdc.x2.drift.max = 200
 B.mwdc.x2.drift.v = 4.409e-05
-B.mwdc.x2.drift.ttd = 2.550e-08
-B.mwdc.x2.tdc.res = -0.5
 B.mwdc.x2.tdc.offsets = \
  -999 \
  -999 -999 -999 -999 -999 -999 -999 -999 -999 -999 \
@@ -376,14 +355,8 @@ B.mwdc.x3.nwires    = 202
 B.mwdc.x3.position  = 0.0  0.0  0.73155
 B.mwdc.x3.size      = 2.0  0.5  0.0
 B.mwdc.x3.wire.pos  = -1.01358
-B.mwdc.x3.wire.spacing = 0.01
 B.mwdc.x3.wire.angle = 90.0
-B.mwdc.x3.xp.res = 2.0e-03
-B.mwdc.x3.drift.min = 0
-B.mwdc.x3.drift.max = 200
 B.mwdc.x3.drift.v = 4.3e-05
-B.mwdc.x3.drift.ttd = 2.550e-08
-B.mwdc.x3.tdc.res = -0.5
 B.mwdc.x3.tdc.offsets = \
  -775 \
  -775 -775 -775 -775 -775 -775 -775 -775 -775 -775 \
@@ -426,14 +399,8 @@ B.mwdc.x3p.nwires    = 202
 B.mwdc.x3p.position  = 0.0  0.0  0.7178   # urgh:  z< z_previous!
 B.mwdc.x3p.size      = 2.0  0.5 0.0
 B.mwdc.x3p.wire.pos  = -1.00851
-B.mwdc.x3p.wire.spacing = 0.01
 B.mwdc.x3p.wire.angle = 90.0
-B.mwdc.x3p.xp.res = 2.0e-03
-B.mwdc.x3p.drift.min = 0
-B.mwdc.x3p.drift.max = 200
 B.mwdc.x3p.drift.v = 4.305e-05
-B.mwdc.x3p.drift.ttd = 2.550e-08
-B.mwdc.x3p.tdc.res = -0.5
 B.mwdc.x3p.tdc.offsets = \
  -769 \
  -769 -769 -769 -769 -769 -769 -769 -769 -769 -769 \
@@ -474,14 +441,8 @@ B.mwdc.v1.nwires    = 141
 B.mwdc.v1.position  = 0.0  0.0  0.028775
 B.mwdc.v1.size      = 1.4  0.35 0.0
 B.mwdc.v1.wire.pos  = -0.7025
-B.mwdc.v1.wire.spacing = 0.01
 B.mwdc.v1.wire.angle = 60.0
-B.mwdc.v1.xp.res = 2.0e-03
-B.mwdc.v1.drift.min = 0
-B.mwdc.v1.drift.max = 200
 B.mwdc.v1.drift.v = 4.464e-05
-B.mwdc.v1.drift.ttd = 2.550e-08
-B.mwdc.v1.tdc.res = -0.5
 B.mwdc.v1.tdc.offsets = \
  -762 \
  -762 -762 -762 -762 -762 -762 -762 -762 -762 -762 \
@@ -513,14 +474,8 @@ B.mwdc.v1p.nwires    = 141
 B.mwdc.v1p.position  = 0.0  0.0  0.035175
 B.mwdc.v1p.size      = 1.4  0.35 0.0
 B.mwdc.v1p.wire.pos  = -0.6975
-B.mwdc.v1p.wire.spacing = 0.01
 B.mwdc.v1p.wire.angle = 60.0
-B.mwdc.v1p.xp.res = 2.0e-03
-B.mwdc.v1p.drift.min = 0
-B.mwdc.v1p.drift.max = 200
 B.mwdc.v1p.drift.v = 4.609e-05
-B.mwdc.v1p.drift.ttd = 2.550e-08
-B.mwdc.v1p.tdc.res = -0.5
 B.mwdc.v1p.tdc.offsets = \
  -760 \
  -760 -760 -760 -760 -760 -760 -760 -760 -760 -760 \
@@ -556,14 +511,8 @@ B.mwdc.v2.nwires    = 200
 B.mwdc.v2.position  = 0.0  0.0  0.3825
 B.mwdc.v2.size      = 2.0  0.5  0.0
 B.mwdc.v2.wire.pos  = -0.9939
-B.mwdc.v2.wire.spacing = 0.01
 B.mwdc.v2.wire.angle = 60.0
-B.mwdc.v2.xp.res = 2.0e-03
-B.mwdc.v2.drift.min = 0
-B.mwdc.v2.drift.max = 200
 B.mwdc.v2.drift.v = 4.396e-05
-B.mwdc.v2.drift.ttd = 2.550e-08
-B.mwdc.v2.tdc.res = -0.5
 B.mwdc.v2.tdc.offsets = \
  -999 \
  -999 -999 -999 -999 -999 -999 -999 -999 -999 -999 \
@@ -605,14 +554,8 @@ B.mwdc.v3.nwires    = 200
 B.mwdc.v3.position  = 0.0  0.0  0.7109
 B.mwdc.v3.size      = 2.0  0.5  0.0
 B.mwdc.v3.wire.pos  = -1.00305
-B.mwdc.v3.wire.spacing = 0.01
 B.mwdc.v3.wire.angle = -60.0    #ARGH- actually a U plane
-B.mwdc.v3.xp.res = 2.0e-03
-B.mwdc.v3.drift.min = 0
-B.mwdc.v3.drift.max = 200
 B.mwdc.v3.drift.v = 4.37e-05
-B.mwdc.v3.drift.ttd = 2.550e-08
-B.mwdc.v3.tdc.res = -0.5
 B.mwdc.v3.tdc.offsets = \
  -780 \
  -780 -780 -780 -780 -780 -780 -780 -780 -780 -780 \
@@ -654,14 +597,8 @@ B.mwdc.v3p.nwires    = 200
 B.mwdc.v3p.position  = 0.0  0.0  0.705   #NB: z < z_previous
 B.mwdc.v3p.size      = 2.0  0.5  0.0
 B.mwdc.v3p.wire.pos  = -0.99805
-B.mwdc.v3p.wire.spacing = 0.01
 B.mwdc.v3p.wire.angle = -60.0    #ARGH- actually a U plane
-B.mwdc.v3p.xp.res = 2.0e-03
-B.mwdc.v3p.drift.min = 0
-B.mwdc.v3p.drift.max = 200
 B.mwdc.v3p.drift.v = 4.171e-05
-B.mwdc.v3p.drift.ttd = 2.550e-08
-B.mwdc.v3p.tdc.res = -0.5
 B.mwdc.v3p.tdc.offsets = \
  -773 \
  -773 -773 -773 -773 -773 -773 -773 -773 -773 -773 \
