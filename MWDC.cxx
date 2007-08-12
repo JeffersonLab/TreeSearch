@@ -23,6 +23,8 @@ typedef string::size_type ssiz_t;
 
 namespace TreeSearch {
 
+const Double_t kBig = 1e38;
+
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* description,
 	    THaApparatus* apparatus ) :

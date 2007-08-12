@@ -18,6 +18,7 @@ namespace TreeSearch {
   class WirePlane;
   class PlaneGroup;
   class Hit;
+  extern const Double_t kBig;
 
   class MWDC : public THaTrackingDetector {
 
