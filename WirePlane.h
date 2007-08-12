@@ -13,9 +13,9 @@
 
 using std::vector;
 
-class THaVDCTimeToDistanceConv;
-
 namespace TreeSearch {
+
+  class TimeToDistConv;
 
   class WirePlane : public THaSubDetector {
 
@@ -39,6 +39,10 @@ namespace TreeSearch {
     WirePlane*      GetPartner() const { return fPartner; }
     void            SetPartner( WirePlane* p );
 
+    Double_t        GetResolution() const { return fResolution; }
+    Double_t        GetMaxSlope() const { return fMaxSlope; }
+    TimeToDistConv* GetTTDConv() const { return fTTDConv; }
+
   protected:
 
     // Geometry, configuration
@@ -58,8 +62,8 @@ namespace TreeSearch {
     Double_t  fResolution;   // Drift distance resolution (sigma) (m)
     Double_t  fMaxSlope;     // Max physical track slope in this plane (FIXME?)
 
-    THaVDCTimeToDistanceConv* fTTDConv; // Drift time->distance converter
-    vector<double>  fTDCOffset;    // [fNelem] TDC offsets for each wire
+    TimeToDistConv* fTTDConv;   // Drift time->distance converter
+    vector<double>  fTDCOffset; // [fNelem] TDC offsets for each wire
 
     // Event data, hits etc.
 

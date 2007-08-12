@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 
-SRC  = MWDC.cxx WirePlane.cxx Hit.cxx
+SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx
 
 PACKAGE = TreeSearch
 
