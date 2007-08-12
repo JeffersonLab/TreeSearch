@@ -5,6 +5,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Hit.h"
+#include "TimeToDistConv.h"
 #include "TSeqCollection.h"
 
 #include <iostream>
@@ -14,6 +15,7 @@ using std::endl;
 using std::make_pair;
 
 ClassImp(TreeSearch::Hit)
+ClassImp(TreeSearch::MCHit)
 
 namespace TreeSearch {
 
@@ -21,24 +23,24 @@ namespace TreeSearch {
 Int_t Hit::Compare( const TObject* obj ) const 
 {
   // Used for sorting hits in a TSeqCollection (e.g. TList, TClonesArray).
-  // A hit is "less than" another hit if it occurred on a lower wire number.
+  // A hit is "less than" another hit if its position is smaller.
+
+  if( !obj || IsA() != obj->IsA() )
+    return -1;
+
+  const Hit* rhs = static_cast<const Hit*>( obj );
+ 
+  if( fPos < rhs->fPos ) return -1;
+  if( fPos > rhs->fPos ) return  1;
+  return 0;
+}
+
+#if 0
   // Also, for hits on the same wire, the first hit on the wire (the one with
   // the smallest time) is "less than" one with a higher time.  If the hits
   // are sorted according to this scheme, they will be in order of increasing
   // wire number and, for each wire, will be in the order in which they hit
   // the wire
-
-  if( !obj || IsA() != obj->IsA() )
-    return -1;
-
-  const Hit* hit = static_cast<const Hit*>( obj );
- 
-  if( fPos < hit->fPos ) return -1;
-  if( fPos > hit->fPos ) return  1;
-  return 0;
-}
-
-#if 0
   Int_t myWireNum = fWire->GetNum();
   Int_t hitWireNum = hit->GetWire()->GetNum();
   // Compare wire numbers
@@ -52,29 +54,58 @@ Int_t Hit::Compare( const TObject* obj ) const
   }
   return 0;
 }
+#endif
 
 
 //_____________________________________________________________________________
-Double_t THaVDCHit::ConvertTimeToDist(Double_t slope)
+Double_t Hit::ConvertTimeToDist( Double_t slope )
 {
-  // Converts TDC time to drift distance
-  // Takes the (estimated) slope of the track as an argument
-  
-  THaVDCTimeToDistConv* ttdConv = (fWire) ? fWire->GetTTDConv() : NULL;
-  
-  if (ttdConv) {
-    // If a time to distance algorithm exists, use it to convert the TDC time 
-    // to the drift distance
-    fDist = ttdConv->ConvertTimeToDist(fTime, slope, &fdDist);
-    return fDist;
+  // Convert drift time to drift distance. 'slope' is the approximate
+  // slope of the track.
+  // Updates the internal variables fPosL, fPosR and fResolution.
+  // Must be called before doing analysis of drift chamber hits.
+
+  TimeToDistConv* ttd;
+  Double_t dist;
+  if( fWirePlane && (ttd = fWirePlane->GetTTDConv()) ) {
+    dist = ttd->ConvertTimeToDist( fTime, slope );
+  } else {
+    dist = 0.0;
   }
-  
-  Error("ConvertTimeToDist()", "No Time to dist algorithm available");
-  return 0.0;
-
+  if( dist > 0.0 ) {
+    fPosL = fPos-dist;
+    fPosR = fPos+dist;
+  } else {
+    fPosL = fPosR = fPos;
+  }
+  return dist;
 }
-#endif
 
+//_____________________________________________________________________________
+void Hit::Print( Option_t* opt ) const
+{
+  // Print hit info
+
+  cout << "Hit: wnum=" << GetWireNum()
+       << " wpos=" << GetWirePos()
+       << " z=" << GetZ()
+       << " res=" << GetResolution()
+       << " time=" << GetDriftTime()
+       << " drift=" << GetDriftDist()
+       << " trk="  << GetTrackDist();
+  if( *opt != 'C' )
+    cout << endl;
+}
+
+//_____________________________________________________________________________
+void MCHit::Print( Option_t* opt ) const
+{
+  // Print hit info
+
+  Hit::Print("C");
+  cout << " MCpos=" << GetMCPos()
+       << endl;
+}
 
 //_____________________________________________________________________________
 
@@ -93,7 +124,6 @@ HitPairIter::HitPairIter( const TSeqCollection* collA,
     fScanning(kFALSE)
 {
   // Constructor
-
 }
 
 //_____________________________________________________________________________
@@ -104,8 +134,16 @@ HitPairIter::HitPairIter( const HitPairIter& rhs )
 {
   // Copy ctor
 
-  //FIXME: deal with fIterA, fIterB, fSaveIter
-
+  if( fCollA ) {
+    fIterA = fCollA->MakeIterator();
+    *fIterA = *rhs.fIterA;
+  }
+  if( fCollB ) {
+    fIterB = fCollA->MakeIterator();
+    *fIterB = *rhs.fIterB;
+    fSaveIter = fCollA->MakeIterator();
+    *fSaveIter = *rhs.fSaveIter;
+  }
 }
 
 //_____________________________________________________________________________
@@ -121,8 +159,19 @@ HitPairIter& HitPairIter::operator=( const HitPairIter& rhs )
     fScanning  = rhs.fScanning;
     fCurrent   = rhs.fCurrent;
     fNext      = rhs.fNext;
-    //FIXME: deal with fIterA fIterB fSaveIter
-    fIterA = fIterB = NULL;
+    delete fIterA;
+    delete fIterB;
+    delete fSaveIter;
+    if( fCollA ) {
+      fIterA = fCollA->MakeIterator();
+      *fIterA = *rhs.fIterA;
+    }
+    if( fCollB ) {
+      fIterB = fCollA->MakeIterator();
+      *fIterB = *rhs.fIterB;
+      fSaveIter = fCollA->MakeIterator();
+      *fSaveIter = *rhs.fSaveIter;
+    }
   }
   return *this;
 }
@@ -143,7 +192,7 @@ void HitPairIter::Reset()
 {
   // Reset the iterator to the start
 
-  fStarted = kFALSE;
+  fStarted = fScanning = kFALSE;
   if( fIterA )
     fIterA->Reset();
   if( fIterB )
@@ -155,7 +204,7 @@ void HitPairIter::Reset()
 ObjPair_t& HitPairIter::Next()
 {
   // Return next pair of hits along the wire plane. If a hit in either
-  // plane is unpaired (no matching hit on the other plane within maxdist
+  // plane is unpaired (no matching hit on the other plane within maxdist)
   // then only that hit is set in the returned pair object. If both
   // hits returned are zero, then there are no more hits in either plane.
 
@@ -200,28 +249,23 @@ ObjPair_t& HitPairIter::Next()
 	    // Advance to the next hit in A
 	    hitA = static_cast<Hit*>( fIterA->Next() );
 	    // Advance B until either B >= A or B == nextB (the hit in B that
-	    // ended the prior scan, whichever comes first.
+	    // ended the prior scan), whichever comes first.
 	    // The Bs for which saveB <= B < nextB have been paired with the 
 	    // prior A in the prior scan and so can't be considered unpaired,
-	    // but they might pair with the new A, too.
-
+	    // but they might pair with the new A, still.
 	    if( hitA ) {
-	      // NB: hitB < nextB guaranteed here, and if nextB is the end 
-	      // of the list (i.e. nextB == NULL) this loop will end there.
 	      while( hitB != nextB && hitB->Compare(hitA,fMaxDist) < 0 )
 		hitB = static_cast<Hit*>( fIterB->Next() );
 	    } else {
 	      // Of course, if there are no more hits in A, we only have to 
-	      // look at the rest of the Bs.
+	      // scan the rest of the Bs.
 	      hitB = nextB;
 	    }
 	    fNext = make_pair( hitA, hitB );
-	    // We are back to the same situation as at the start of the scan.
-	    return Next();
 
 	  } else {
-	    // This is the normal case: nextB > hitA (always true for 
-	    // maxdist = 0). So hitA/hitB are a pair, and
+	    // This is the normal case: nextB > hitA (usually true for 
+	    // small maxdist). So hitA/hitB are a pair, and
 	    // the next hits to consider are the next ones in each plane.
 	    fNext = make_pair( fIterA->Next(), nextB );
 	  }

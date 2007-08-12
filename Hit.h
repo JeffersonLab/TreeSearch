@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "TObject.h"
-
+#include "WirePlane.h"
 #include <utility>
 
 class TSeqCollection;
@@ -16,64 +16,82 @@ class TIterator;
 
 namespace TreeSearch {
 
-  class WirePlane;
+  class MCTrack;
+
+  extern const Double_t kBig;
 
   class Hit : public TObject {
 
   public:
-    Hit() {}
-    Hit( const Hit& );
-    Hit& operator=( const Hit& );
+    Hit() : fWirePlane(NULL) {}
+    Hit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
+	 const WirePlane* wp )
+      : fWireNum(wnum), fRawTDC(tdc), fTime(time), fPos(pos), fPosL(pos), 
+	fPosR(pos), fResolution(res), fTrackPos(kBig), fWirePlane(wp) {}
+    //    Hit( const Hit& );
+    //    Hit& operator=( const Hit& );
     virtual ~Hit() {}
 
     virtual Int_t Compare( const TObject* obj ) const;
-    Int_t Compare( const Hit* rhs, Double_t maxdist = 0.0 ) const;
+    Int_t  Compare( const Hit* rhs, Double_t maxdist ) const;
     Bool_t IsSortable () const { return kTRUE; }
+    virtual void Print( Option_t* opt="" ) const;
+ 
+    Double_t ConvertTimeToDist( Double_t slope );
+
+    Int_t    GetWireNum()    const { return fWireNum; }
+    Double_t GetWirePos()    const { return fPos; }
+    Double_t GetZ() const { return fWirePlane ? fWirePlane->GetZ() : kBig; }
+    Double_t GetRawTDC()     const { return fRawTDC; }
+    Double_t GetDriftTime()  const { return fTime; }
+    Double_t GetDriftDist()  const { return fPosR-fPos; }
+    Double_t GetPosL()       const { return fPosL; }
+    Double_t GetPosR()       const { return fPosR; }
+    Double_t GetTrackPos()   const { return fTrackPos; }
+    Double_t GetTrackDist()  const { return fTrackPos-fPos; }
+    Double_t GetResolution() const { return fResolution; }
 
   protected:
+    Int_t    fWireNum;     // Wire number
+    Int_t    fRawTDC;      // Raw TDC value (channels)
+    Double_t fTime;        // Hit time corrected for TDC offset (s)
+    Double_t fPos;         // Wire position along plane axis (m)
+    Double_t fPosL;        // fPos - raw drift distance (m)
+    Double_t fPosR;        // fPos + raw drift distance (m)
+    Double_t fResolution;  // Resolution of fPosR/fPosL (m)
+    Double_t fTrackPos;    // Track crossing position from track fit (m)
 
-    Double_t fPos;
-    Double_t fPosL;
-    Double_t fPosR;
+    const WirePlane* fWirePlane; //! Pointer to parent wire plane
 
-    WirePlane* fWirePlane;
-
-
-#if 0
-    virtual Double_t ConvertTimeToDist(Double_t slope);
-  
-    // Get and Set Functions
-    THaVDCWire* GetWire() const { return fWire; }
-    Int_t    GetWireNum() const { return fWire ? fWire->GetNum() : -1; }
-    Int_t    GetRawTime() const { return fRawTime; }
-    Double_t GetTime()    const { return fTime; }
-    Double_t GetDist()    const { return fDist; }
-    //Position of hit wire
-    Double_t GetPos()     const { return fWire ? fWire->GetPos() : 1e38; } 
-    Double_t GetdDist()   const { return fdDist; }
-
-    void     SetWire(THaVDCWire * wire) { fWire = wire; }
-    void     SetRawTime(Int_t time)     { fRawTime = time; }
-    void     SetTime(Double_t time)     { fTime = time; }
-    void     SetDist(Double_t dist)     { fDist = dist; }
-    void     SetdDist(Double_t ddist)   { fdDist = ddist; }
-    void     SetFitDist(Double_t dist)  { ftrDist = dist; }
-
-  
-  protected:
-    static const Double_t kBig;  //!
-  
-    THaVDCWire* fWire;     // Wire on which the hit occurred
-    Int_t       fRawTime;  // TDC value (channels)
-    Double_t    fTime;     // Time corrected for time offset of wire (s)
-    Double_t    fDist;     // (Perpendicular) Drift Distance
-    Double_t    fdDist;    // uncertainty in fDist (for chi2 calc)
-    Double_t    ftrDist;   // (Perpendicular) distance from the track
-#endif
-  
-    ClassDef(Hit,1)        // MWDC Hit class
+    ClassDef(Hit,1)        // Horizontal drift chamber hit
   };
 
+
+  //___________________________________________________________________________
+  // Monte Carlo hit class. Same as a hit plus the MC truth info.
+
+  class MCHit : public Hit {
+
+  public:
+    MCHit() : fMCTrack(NULL) {}
+    MCHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
+	   const WirePlane* wp, MCTrack* mctrk, Double_t mcpos )
+      : Hit(wnum, pos, tdc, time, res, wp), fMCTrack(mctrk), fMCPos(mcpos) {}
+    virtual ~MCHit() {}
+
+    virtual void Print( Option_t* opt="" ) const;
+
+    MCTrack* GetMCTrack() const { return fMCTrack; }
+    Double_t GetMCPos()   const { return fMCPos; }
+
+  protected:
+    MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
+    Double_t fMCPos;       // Exact MC track crossing position (m)
+
+    ClassDef(MCHit,1)      // Monte Carlo hit in horizontal drift chamber
+  };
+
+  //___________________________________________________________________________
   // Utility class for iterating over one or two collections of hits.
   // Used for generating hit patterns. If two collections are given, they
   // are assumed to contain hits from adjacent planes with parallel 
@@ -93,7 +111,7 @@ namespace TreeSearch {
 
     ObjPair_t& Next();
     ObjPair_t& operator() () { return Next(); }
-    ObjPair_t& Current()     { return fCurrent; }
+    const ObjPair_t& Current() const { return fCurrent; }
     const TSeqCollection* GetCollection( Int_t n=0 ) const 
     { return (n==0) ? fCollA : fCollB; }
     void Reset();
@@ -113,13 +131,16 @@ namespace TreeSearch {
 
     HitPairIter();
 
-    ClassDef(HitPairIter,0)  // Iterator over collections of hits
+    ClassDef(HitPairIter,0)  // Iterator over two lists of hits
   };
 
-//_____________________________________________________________________________
+  //___________________________________________________________________________
   inline
   Int_t Hit::Compare( const Hit* rhs, Double_t maxdist ) const {
-    // Compare if two hits are within maxdist of each other
+    // Determine if two hits are within maxdist of each other.
+    // Returns -1 if this<rhs, 0 if overlap, +1 if this>rhs.
+    // Overlap is necessary but NOT sufficient for two hits to be a pair;
+    // additional comparisons of the L/R positions are necessary for that.
     if( fPosR+maxdist < rhs->fPosL )
       // this hit is "smaller than" (to the left of) rhs
       return -1;
