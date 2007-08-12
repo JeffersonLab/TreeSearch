@@ -139,9 +139,9 @@ HitPairIter::HitPairIter( const HitPairIter& rhs )
     *fIterA = *rhs.fIterA;
   }
   if( fCollB ) {
-    fIterB = fCollA->MakeIterator();
+    fIterB = fCollB->MakeIterator();
     *fIterB = *rhs.fIterB;
-    fSaveIter = fCollA->MakeIterator();
+    fSaveIter = fCollB->MakeIterator();
     *fSaveIter = *rhs.fSaveIter;
   }
 }
@@ -167,9 +167,9 @@ HitPairIter& HitPairIter::operator=( const HitPairIter& rhs )
       *fIterA = *rhs.fIterA;
     }
     if( fCollB ) {
-      fIterB = fCollA->MakeIterator();
+      fIterB = fCollB->MakeIterator();
       *fIterB = *rhs.fIterB;
-      fSaveIter = fCollA->MakeIterator();
+      fSaveIter = fCollB->MakeIterator();
       *fSaveIter = *rhs.fSaveIter;
     }
   }
