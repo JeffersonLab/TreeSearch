@@ -11,6 +11,9 @@
 #pragma link C++ class TreeSearch::MWDC+;
 #pragma link C++ class TreeSearch::WirePlane+;
 #pragma link C++ class TreeSearch::Hit+;
+#pragma link C++ class TreeSearch::MCHit+;
 #pragma link C++ class TreeSearch::HitPairIter+;
+#pragma link C++ class TreeSearch::TimeToDistConv+;
+#pragma link C++ class TreeSearch::LinearTTD+;
 
 #endif
