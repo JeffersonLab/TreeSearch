@@ -15,5 +15,7 @@
 #pragma link C++ class TreeSearch::HitPairIter+;
 #pragma link C++ class TreeSearch::TimeToDistConv+;
 #pragma link C++ class TreeSearch::LinearTTD+;
+#pragma link C++ class TreeSearch::Bits+;
+#pragma link C++ class TreeSearch::Hitpattern+;
 
 #endif
