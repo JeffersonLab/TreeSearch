@@ -22,9 +22,9 @@ namespace TreeSearch {
       TBits::operator=(rhs); return *this;
     }
     virtual ~Bits() {}
+    void SetBitRange( UInt_t lo, UInt_t hi, Bool_t value = kTRUE );
     void FastClear() { memset(fAllBits,0,fNbytes); }
-    virtual void Clear( Option_t* opt="" ) { if (fAllBits) FastClear(); }
-    ClassDef(Bits,1)  // Bit container with memory-neutral Clear method
+    ClassDef(Bits,1)  // Bit container with additional methods over TBits
   };
 
   class PatternTree;
@@ -58,6 +58,40 @@ namespace TreeSearch {
 
     ClassDef(Hitpattern,0)  // Wire chamber hitpattern at multiple resolutions
   };
+
+}  // end namespace TreeSearch
+
+//_____________________________________________________________________________
+inline
+void TreeSearch::Bits::SetBitRange( UInt_t lo, UInt_t hi, Bool_t value )
+{
+  // Set range of bits from lo to hi to value.
+
+  if( hi<lo ) return;
+  SetBitNumber( hi, value ); // expand array if necessary
+  if( lo==hi ) return;
+  UInt_t  loc_lo = lo/8;
+  UChar_t bit_lo = lo%8;
+  UInt_t  loc_hi = hi/8;
+  UChar_t bit_hi = hi%8;
+  UChar_t mask_lo = ~((1<<bit_lo)-1);
+  if( loc_lo < loc_hi ) {
+    UChar_t mask = (1U<<bit_hi)-1;
+    if( value ) {
+      fAllBits[loc_hi] |= mask;
+      mask = 0xFF;
+    } else {
+      fAllBits[loc_hi] &= (0xFF ^ mask);
+      mask = 0;
+    }
+    memset( fAllBits+loc_lo+1, mask, loc_hi-loc_lo-1 );
+  } else {
+    mask_lo &= (1U<<bit_hi)-1;
+  }
+  if( value )
+    fAllBits[loc_lo] |= mask_lo;
+  else
+    fAllBits[loc_lo] &= (0xFF ^ mask_lo);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
