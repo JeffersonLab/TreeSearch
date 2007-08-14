@@ -10,6 +10,7 @@
 #include "WirePlane.h"
 #include "Hit.h"
 #include "THaDetMap.h"
+#include "TClonesArray.h"
 #include <iostream>
 
 using namespace std;
@@ -22,12 +23,13 @@ WirePlane::WirePlane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fType(kUndefinedType),
     fWireStart(0.0), fWireSpacing(0.0), fSinAngle(0.0), fCosAngle(0.0),
     fPartner(NULL),
-    fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fMaxSlope(0.0),
-    fTTDConv(NULL)
+    fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL)
 {
   // Constructor
 
-  fHits = new TClonesArray("TreeSearch::Hit", 50);
+  fHits = new TClonesArray("TreeSearch::Hit", 100);
+  if( !fHits )
+    MakeZombie();
 }
 
 //_____________________________________________________________________________
@@ -321,6 +323,14 @@ Int_t WirePlane::Decode( const THaEvData& evData)
   
 }
   
+//_____________________________________________________________________________
+Int_t WirePlane::GetNhits() const
+{    
+  // Number of hits in this plane
+
+  return fHits->GetSize();
+}
+
 //_____________________________________________________________________________
 void WirePlane::SetPartner( WirePlane* p )
 {    

@@ -8,8 +8,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaSubDetector.h"
-#include "TClonesArray.h"
 #include <vector>
+
+class TSeqCollection;
 
 using std::vector;
 
@@ -40,8 +41,10 @@ namespace TreeSearch {
     void            SetPartner( WirePlane* p );
 
     Double_t        GetResolution() const { return fResolution; }
-    Double_t        GetMaxSlope() const { return fMaxSlope; }
     TimeToDistConv* GetTTDConv() const { return fTTDConv; }
+
+    TSeqCollection* GetHits() const { return fHits; }
+    Int_t           GetNhits() const;
 
   protected:
 
@@ -53,21 +56,20 @@ namespace TreeSearch {
     Double_t  fSinAngle;     // Sine of angle between dispersive direction (x)
                              //  and direction of decreasing wire number (rad)
     Double_t  fCosAngle;     // Cosine of wire angle (rad)
-    WirePlane* fPartner;     // Partner plane with staggered wires
+    WirePlane* fPartner;     //! Partner plane with staggered wires
 
     // Parameters, calibration, flags
 
     Double_t  fTDCRes;       // TDC Resolution ( s / channel)
     Double_t  fDriftVel;     // Drift velocity in the wire plane (m/s)
     Double_t  fResolution;   // Drift distance resolution (sigma) (m)
-    Double_t  fMaxSlope;     // Max physical track slope in this plane (FIXME?)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
     vector<double>  fTDCOffset; // [fNelem] TDC offsets for each wire
 
     // Event data, hits etc.
 
-    TClonesArray*   fHits;    // Hit data
+    TSeqCollection*   fHits;    // Hit data
 
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
