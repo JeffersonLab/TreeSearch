@@ -22,7 +22,8 @@ namespace TreeSearch {
       TBits::operator=(rhs); return *this;
     }
     virtual ~Bits() {}
-    void SetBitRange( UInt_t lo, UInt_t hi, Bool_t value = kTRUE );
+    void ResetBitRange( UInt_t lo, UInt_t hi );
+    void SetBitRange( UInt_t lo, UInt_t hi );
     void FastClear() { memset(fAllBits,0,fNbytes); }
     ClassDef(Bits,1)  // Bit container with additional methods over TBits
   };
@@ -63,35 +64,49 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 inline
-void TreeSearch::Bits::SetBitRange( UInt_t lo, UInt_t hi, Bool_t value )
+void TreeSearch::Bits::SetBitRange( UInt_t lo, UInt_t hi )
 {
   // Set range of bits from lo to hi to value.
 
   if( hi<lo ) return;
-  SetBitNumber( hi, value ); // expand array if necessary
+  SetBitNumber( hi ); // expand array if necessary
   if( lo==hi ) return;
-  UInt_t  loc_lo = lo/8;
-  UChar_t bit_lo = lo%8;
-  UInt_t  loc_hi = hi/8;
-  UChar_t bit_hi = hi%8;
-  UChar_t mask_lo = ~((1<<bit_lo)-1);
-  if( loc_lo < loc_hi ) {
-    UChar_t mask = (1U<<bit_hi)-1;
-    if( value ) {
-      fAllBits[loc_hi] |= mask;
-      mask = 0xFF;
-    } else {
-      fAllBits[loc_hi] &= (0xFF ^ mask);
-      mask = 0;
-    }
-    memset( fAllBits+loc_lo+1, mask, loc_hi-loc_lo-1 );
+  UChar_t mask  = ~((1U<<(lo&7))-1);
+  UChar_t mask2 = (1U<<(hi&7))-1;
+  lo >>= 3;
+  hi >>= 3;
+  if( lo < hi ) {
+    fAllBits[hi] |= mask2;
+    memset( fAllBits+lo+1, 0xFF, hi-lo-1 );
   } else {
-    mask_lo &= (1U<<bit_hi)-1;
+    mask &= mask2;
   }
-  if( value )
-    fAllBits[loc_lo] |= mask_lo;
-  else
-    fAllBits[loc_lo] &= (0xFF ^ mask_lo);
+  fAllBits[lo] |= mask;
+}
+
+//_____________________________________________________________________________
+inline
+void TreeSearch::Bits::ResetBitRange( UInt_t lo, UInt_t hi )
+{
+  // Set range of bits from lo to hi to value.
+
+  if( hi<lo ) return;
+  UChar_t mask = ~((1U<<(lo&7))-1);
+  lo >>= 3;
+  if( lo >= fNbytes ) return;
+  UChar_t mask2 = (1U<<((hi&7)+1))-1;
+  hi >>= 3;
+  if( hi >= fNbytes ) {
+    hi = fNbytes-1;
+    mask2 = 0xFF;
+  }
+  if( lo < hi ) {
+    fAllBits[hi] &= (0xFF ^ mask2);
+    memset( fAllBits+lo+1, 0, hi-lo-1 );
+  } else {
+    mask &= mask2;
+  }
+  fAllBits[lo] &= (0xFF ^ mask);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
