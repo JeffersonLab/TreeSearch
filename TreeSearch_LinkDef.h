@@ -18,4 +18,6 @@
 #pragma link C++ class TreeSearch::Bits+;
 #pragma link C++ class TreeSearch::Hitpattern+;
 
+#pragma link C++ class std::pair<TObject*,TObject*>;
+
 #endif
