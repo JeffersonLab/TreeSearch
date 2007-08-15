@@ -109,12 +109,28 @@ namespace TreeSearch {
     HitPairIter& operator=( const HitPairIter& rhs );
     virtual ~HitPairIter();
 
-    ObjPair_t& Next();
-    ObjPair_t& operator() () { return Next(); }
-    const ObjPair_t& Current() const { return fCurrent; }
     const TSeqCollection* GetCollection( Int_t n=0 ) const 
     { return (n==0) ? fCollA : fCollB; }
     void Reset();
+
+    // Iterator functions. 
+    HitPairIter& Next();
+    HitPairIter& operator++() { return Next(); }
+    HitPairIter  operator++(int) {
+      HitPairIter clone(*this);  Next();  return clone;
+    }
+    // Current value. 
+    ObjPair_t  operator()() const  { return fCurrent; }
+    ObjPair_t& operator* ()        { return fCurrent; }
+    // Comparisons
+    bool operator==( const HitPairIter& rhs ) const { 
+      return( fCollA == rhs.fCollA && fCollB == rhs.fCollB && 
+	      fCurrent == rhs.fCurrent );
+    }
+    bool operator!=( const HitPairIter& rhs ) const { return !(*this==rhs); }
+    operator bool() const 
+    { return (fCurrent.first != NULL || fCurrent.second != NULL); }
+    bool operator!() const { return !((bool)*this); }
 
   private:
     const TSeqCollection* fCollA;
@@ -154,5 +170,6 @@ namespace TreeSearch {
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch
+
 
 #endif

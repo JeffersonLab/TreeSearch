@@ -124,11 +124,22 @@ HitPairIter::HitPairIter( const TSeqCollection* collA,
     fScanning(kFALSE)
 {
   // Constructor
+
+  if( !fIterA && fCollA )
+    fIterA = fCollA->MakeIterator();
+  if( !fIterB && fCollB ) {
+    fIterB = fCollB->MakeIterator();
+    if( !fSaveIter )
+      fSaveIter = fCollB->MakeIterator();
+  }
+  // Initialize our state so we point to the first item
+  Next();
 }
 
 //_____________________________________________________________________________
 HitPairIter::HitPairIter( const HitPairIter& rhs )
-  : fCollA(rhs.fCollA), fCollB(rhs.fCollB), fSaveHit(rhs.fSaveHit),
+  : fCollA(rhs.fCollA), fCollB(rhs.fCollB), fIterA(NULL), fIterB(NULL),
+    fSaveIter(NULL), fSaveHit(rhs.fSaveHit),
     fMaxDist(fMaxDist), fStarted(rhs.fStarted), fScanning(rhs.fScanning),
     fCurrent(rhs.fCurrent), fNext(rhs.fNext)
 {
@@ -197,24 +208,19 @@ void HitPairIter::Reset()
     fIterA->Reset();
   if( fIterB )
     fIterB->Reset();
+  // Our initial state is to point to the first object
+  Next();
 }
 
 
 //_____________________________________________________________________________
-ObjPair_t& HitPairIter::Next()
+HitPairIter& HitPairIter::Next()
 {
   // Return next pair of hits along the wire plane. If a hit in either
   // plane is unpaired (no matching hit on the other plane within maxdist)
   // then only that hit is set in the returned pair object. If both
   // hits returned are zero, then there are no more hits in either plane.
 
-  if( !fIterA && fCollA )
-    fIterA = fCollA->MakeIterator();
-  if( !fIterB && fCollB ) {
-    fIterB = fCollB->MakeIterator();
-    if( !fSaveIter )
-      fSaveIter = fCollB->MakeIterator();
-  }
   if( !fStarted ) {
     fNext = make_pair( fIterA ? fIterA->Next() : NULL, 
 		       fIterB ? fIterB->Next() : NULL );
@@ -294,7 +300,7 @@ ObjPair_t& HitPairIter::Next()
     fNext.second = fIterB->Next();
   }
 
-  return fCurrent;
+  return *this;
 }
 
 } // end namespace TreeSearch
