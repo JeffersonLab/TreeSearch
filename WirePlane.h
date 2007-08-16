@@ -45,11 +45,15 @@ namespace TreeSearch {
 
     TSeqCollection* GetHits() const { return fHits; }
     Int_t           GetNhits() const;
+    UInt_t          GetPlaneNum() const { return fPlaneNum; }
+
+    void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
 
   protected:
 
     // Geometry, configuration
 
+    UInt_t    fPlaneNum;     // Number of this plane (0..Nplanes)
     EType     fType;         // Plane type (x,y,u,v)
     Double_t  fWireStart;    // Position of 1st wire (along wire coord) (m)
     Double_t  fWireSpacing;  // Wire spacing (assumed constant) (m)

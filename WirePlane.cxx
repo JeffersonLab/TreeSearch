@@ -11,6 +11,7 @@
 #include "Hit.h"
 #include "THaDetMap.h"
 #include "TClonesArray.h"
+#include "TMath.h"
 #include <iostream>
 
 using namespace std;
@@ -20,9 +21,9 @@ namespace TreeSearch {
 //_____________________________________________________________________________
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
-  : THaSubDetector(name,description,parent), fType(kUndefinedType),
-    fWireStart(0.0), fWireSpacing(0.0), fSinAngle(0.0), fCosAngle(0.0),
-    fPartner(NULL),
+  : THaSubDetector(name,description,parent), fPlaneNum(-1),
+    fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
+    fSinAngle(0.0), fCosAngle(0.0), fPartner(NULL),
     fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL)
 {
   // Constructor
@@ -338,9 +339,10 @@ void WirePlane::SetPartner( WirePlane* p )
   // be located close to each other and usually to have staggered wires.
 
   fPartner = p;
-  if( p )
+  if( p ) {
     p->fPartner = this;
-
+    p->fPlaneNum = fPlaneNum;
+  }
   return;
 }
 
@@ -349,7 +351,7 @@ void WirePlane::Print( Option_t* opt ) const
 {    
   // Print plane info
 
-  cout << "WirePlane:  "
+  cout << "WirePlane:  #" << GetPlaneNum() << " "
        << GetName()   << "\t"
     //       << GetTitle()        << "\t"
        << fNelem << " wires\t"
