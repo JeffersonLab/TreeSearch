@@ -45,14 +45,12 @@ namespace TreeSearch {
     Double_t GetWidth() const { return fWidth; }
     UInt_t   GetDepth() const { return fDepth; }
     UInt_t   GetNplanes() const { return fNplanes; }
-    Double_t GetPosOffset() const { return fPosOffset; }
 
-    void     SetPosOffset( Double_t off ) { fPosOffset = off; }
     void     SetPositionRange( Double_t start, Double_t end, UInt_t plane )
     { if(plane<fNplanes && start<=end) uSetPositionRange(start,end,plane); }
     Int_t    ScanHits( WirePlane* hitsA, WirePlane* hitsB );
     Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth=32 ) const;
-    Bool_t   TestBin( UInt_t bin, UInt_t depth, UInt_t plane ) const;
+    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth=32 ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
@@ -65,7 +63,7 @@ namespace TreeSearch {
     UInt_t   fNplanes;  // Number of wire planes contained in the pattern
     Double_t fWidth;    // Physical width of region encompassing hitpattern (m)
     Double_t fScale;    // 1/(bin resolution) = 2^(fDepth-1)/fWidth
-    Double_t fPosOffset;// Offset of hit positions wrt left of detector (m)
+    Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
     Bits**   fPattern;  // [fNPlanes] pattern at all fDepth resolutions
 
     // More efficient "unchecked" versions of these routines for internal use
@@ -80,8 +78,8 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 inline
-Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t depth, 
-					UInt_t plane ) const
+Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane, 
+					UInt_t depth ) const
 {
   // Test if point is set at the given depth of the pattern tree in the
   // given plane.

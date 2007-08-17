@@ -8,7 +8,6 @@
 #include "Hit.h"
 #include "TError.h"
 #include "TMath.h"
-#include "MWDC.h"
 
 #include <iostream>
 
@@ -22,7 +21,7 @@ namespace TreeSearch {
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t depth, UInt_t nplanes, Double_t width )
   : fDepth(depth), fNplanes(0), fWidth(width), fScale(0.0), 
-    fPosOffset(0.5*fWidth), fPattern(NULL)
+    fOffset(0.5*width), fPattern(NULL)
 {
   // Constructor
 
@@ -46,7 +45,7 @@ Hitpattern::Hitpattern( UInt_t depth, UInt_t nplanes, Double_t width )
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const Hitpattern& orig ) 
   : fDepth(orig.fDepth), fNplanes(orig.fNplanes), fWidth(orig.fWidth),
-    fScale(orig.fScale), fPosOffset(orig.fPosOffset), fPattern(NULL)
+    fScale(orig.fScale), fOffset(orig.fOffset), fPattern(NULL)
 {
   // Copy ctor
 
@@ -63,11 +62,11 @@ Hitpattern& Hitpattern::operator=( const Hitpattern& rhs )
   // Assignment
 
   if( this != &rhs ) {
-    fDepth     = rhs.fDepth;
-    fNplanes   = rhs.fNplanes;
-    fWidth     = rhs.fWidth;
-    fScale     = rhs.fScale;
-    fPosOffset = rhs.fPosOffset;
+    fDepth   = rhs.fDepth;
+    fNplanes = rhs.fNplanes;
+    fWidth   = rhs.fWidth;
+    fScale   = rhs.fScale;
+    fOffset  = rhs.fOffset;
     delete fPattern; fPattern = NULL;
     if( fNplanes > 0 ) {
       fPattern = new Bits*[fNplanes];
@@ -149,10 +148,8 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 	       plane, fNplanes-1 );
     return 0;
   }
-  MWDC* mwdc = dynamic_cast<MWDC*>( A->GetDetector() );
-  if( !mwdc ) return 0;
   Double_t dz = B ? B->GetZ() - A->GetZ() : 0.0;
-  Double_t maxdist = mwdc->GetMaxSlope() * dz;
+  Double_t maxdist = A->GetMaxSlope() * dz;
   Double_t maxdist2 = 0.5*maxdist;
 
   Int_t nhits = 0;
@@ -168,8 +165,8 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
       // resolutions are similar):
       Double_t res = inv2sqrt2*(hitA->GetResolution()+hitB->GetResolution());
       for( int i=4; i--; ) {
-	Double_t posA = (i&2 ? hitA->GetPosL() : hitA->GetPosR()) + fPosOffset;
-	Double_t posB = (i&1 ? hitB->GetPosL() : hitB->GetPosR()) + fPosOffset;
+	Double_t posA = (i&2 ? hitA->GetPosL() : hitA->GetPosR()) + fOffset;
+	Double_t posB = (i&1 ? hitB->GetPosL() : hitB->GetPosR()) + fOffset;
 	if( TMath::Abs( posA-posB ) < maxdist ) {
 	  found = true;
 	  uSetPosition( 0.5*(posA+posB), res, plane );
@@ -195,8 +192,8 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 	  // The bigger issue with unpaired hits is that the LR-ambiguity
 	  // is not resolved, so two entries have to be made into the pattern.
 	  Double_t res = hit->GetResolution() + maxdist2;
-	  uSetPosition( hit->GetPosL() + fPosOffset, res, plane );
-	  uSetPosition( hit->GetPosR() + fPosOffset, res, plane );
+	  uSetPosition( hit->GetPosL() + fOffset, res, plane );
+	  uSetPosition( hit->GetPosR() + fOffset, res, plane );
 	}
       }
     }
@@ -207,8 +204,8 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 
 
 //_____________________________________________________________________________
-Bool_t TreeSearch::Hitpattern::TestPosition( Double_t pos, UInt_t plane,
-					     UInt_t depth ) const
+Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane, 
+				 UInt_t depth ) const
 {
   // Test if position 'pos' (in m) is marked in the hit pattern.
   // The pattern will be tested at the given depth (default: deepest level).
