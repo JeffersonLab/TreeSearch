@@ -22,7 +22,7 @@ namespace TreeSearch {
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
-    fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
+    fType(Projection::kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fSinAngle(0.0), fCosAngle(0.0), fPartner(NULL),
     fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL)
 {
@@ -76,17 +76,17 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   vector<int> detmap;
 
   DBRequest request[] = {
-    { "detmap",     &detmap, kIntV },
-    { "nwires",     &fNelem, kInt },
-    { "wire.pos",       &fWireStart },
-    { "wire.spacing",   &fWireSpacing, kDouble, 0, 0, -1 },
-    { "wire.angle",     &wire_angle },
-    { "tdc.res",   &fTDCRes, kDouble, 0, 0, -1 },
-    { "drift.v",   &fDriftVel, kDouble, 0, 0, -1 },
-    { "xp.res",    &fResolution, kDouble, 0, 0, -1 },
-    //    { "maxslope",   &fMaxSlope },
-    { "tdc.offsets",     &fTDCOffset, kDoubleV },
-    { "description",     &fTitle, kTString, 0, 1 },
+    { "detmap",       &detmap,       kIntV },
+    { "nwires",       &fNelem,       kInt },
+    { "wire.pos",     &fWireStart },
+    { "wire.spacing", &fWireSpacing, kDouble, 0, 0, -1 },
+    { "wire.angle",   &wire_angle },
+    { "tdc.res",      &fTDCRes,      kDouble, 0, 0, -1 },
+    { "drift.v",      &fDriftVel,    kDouble, 0, 0, -1 },
+    { "xp.res",       &fResolution,  kDouble, 0, 0, -1 },
+    //    { "maxslope",     &fMaxSlope },
+    { "tdc.offsets",  &fTDCOffset,   kDoubleV },
+    { "description",  &fTitle,       kTString, 0, 1 },
     { 0 }
   };
 
@@ -118,6 +118,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   wire_angle *= TMath::DegToRad();
   fSinAngle = TMath::Sin(wire_angle);
   fCosAngle = TMath::Cos(wire_angle);
+  fMaxSlope = TMath::Abs(fMaxSlope);
 
   //FIXME: determine fType
 
@@ -339,10 +340,9 @@ void WirePlane::SetPartner( WirePlane* p )
   // be located close to each other and usually to have staggered wires.
 
   fPartner = p;
-  if( p ) {
+  if( p )
     p->fPartner = this;
-    p->fPlaneNum = fPlaneNum;
-  }
+
   return;
 }
 
