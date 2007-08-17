@@ -8,20 +8,21 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaTrackingDetector.h"
+#include <vector>
 
 class THaTrack;
 class THaBenchmark;
 class TClonesArray;
-class TList;
+
+using std::vector;
 
 namespace TreeSearch {
   class WirePlane;
-  class PlaneGroup;
-  class Hit;
+  class Projection;
+
   extern const Double_t kBig;
 
   class MWDC : public THaTrackingDetector {
-
   public:
     MWDC( const char* name, const char* description = "", 
 	  THaApparatus* app = NULL );
@@ -39,18 +40,15 @@ namespace TreeSearch {
     virtual void    SetDebug( Int_t level );
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
-    Double_t        GetMaxSlope() const { return fMaxSlope; }
-    TList*          GetListOfPlanes() { return fPlanes; }
+    //FIXME: needed?
+    vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
 
   protected:
 
-  
+    vector<WirePlane*>   fPlanes;  // Wire planes
+    vector<Projection*>  fProj;    // Plane projections
 
     virtual Int_t  ReadDatabase( const TDatime& date );
-
-    Double_t  fMaxSlope;     // Max physical track slope
-
-    TList*  fPlanes;   // Wire planes
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
