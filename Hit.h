@@ -116,7 +116,7 @@ namespace TreeSearch {
     // Iterator functions. 
     HitPairIter& Next();
     HitPairIter& operator++() { return Next(); }
-    HitPairIter  operator++(int) {
+    const HitPairIter operator++(int) {
       HitPairIter clone(*this);  Next();  return clone;
     }
     // Current value. 
