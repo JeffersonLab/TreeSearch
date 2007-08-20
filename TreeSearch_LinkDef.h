@@ -21,5 +21,6 @@
 
 #pragma link C++ class std::pair<TObject*,TObject*>;
 #pragma link C++ class std::vector<TreeSearch::WirePlane*>;
+#pragma link C++ class std::vector<TreeSearch::Projection*>;
 
 #endif
