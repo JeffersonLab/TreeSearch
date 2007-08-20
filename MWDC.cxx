@@ -14,6 +14,7 @@
 #include "WirePlane.h"
 #include "Projection.h"
 #include "TString.h"
+#include "TMath.h"
 
 #include <algorithm>
 
@@ -93,7 +94,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 
   // Sort planes by increasing z-position. The sort order is defined 
   // by WirePlane::Compare().
-  sort( fPlanes.begin(), fPlanes.end(), WirePlane::ComparePlaneZ() );
+  sort( fPlanes.begin(), fPlanes.end(), WirePlane::ZIsLess() );
 
   // Determine per-projection plane parameters
   for( Projection::EProjType type = Projection::kTypeBegin; 
@@ -108,33 +109,36 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	// object for it
 	if( !theProj )
 	  fProj[type] = theProj = new Projection(type);
-	// Add _only_ non-"p" (partner) planes to the list and count them
-	TString name( thePlane->GetName() );
-	if( !name.EndsWith("p") ) {
+	// Add only primary planes (i.e. the first one of a partnered pair)
+	// to the list and count them
+	if( !thePlane->GetProjection() ) {
 	  theProj->GetListOfPlanes().push_back(thePlane);
 	  thePlane->SetPlaneNum(n);
+	  // Save pointer to the projection object with each plane and partner
+	  thePlane->SetProjection(theProj);
+	  if( thePlane->GetPartner() ) {
+	    WirePlane* partner = thePlane->GetPartner();
+	    partner->SetProjection(theProj);
+	    partner->SetPlaneNum(n);
+	  }
 	  ++n;
 	}
+
 	//TODO: determine the maximum physical width of this projection 
 	//if( max_width );
-
-	// Save pointer to the projection object with each plane
-	thePlane->SetProjection(theProj);
       }
     }
   }
 
-  // Update the partner planes with the parameters of the primary planes
+  //TODO: Make sure partner planes have consistent parameters 
+  //  (wire angle, maxslope etc.)
+  //	thePlane->
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
     WirePlane* thePlane = fPlanes[iplane];
     TString name( thePlane->GetName() );
     if( name.EndsWith("p") ) {
       WirePlane* partner = thePlane->GetPartner();
       if( !partner ) continue;
-      thePlane->SetPlaneNum( partner->GetPlaneNum() );
-      //TODO: Make sure partner planes have consistent parameters 
-      //  (wire angle, maxslope etc.)
-      //	thePlane->
     }
   }
 
@@ -241,6 +245,68 @@ void MWDC::EnableBenchmarks( Bool_t b )
 }
 
 //_____________________________________________________________________________
+Projection::EProjType MWDC::MakePlaneType( const char* name,
+					   Double_t& wire_angle )
+{
+  // Convert plane type name to a wire angle based on the uangle/vangle
+  // database info.
+  // Only the first character of name is used and must be one of "UVXY" in
+  // uppercase or lowercase.
+  // Returns the wire angle in degrees (90 = X, 0 = Y, uangle =, vangle = v).
+  // By normal conventions, uangle = -vangle < 0, but the two angles might
+  // in principle be different.
+  // The wire angle is measured with respect to the X-axis, which for a 
+  // magnetic spectrometer is along the dispersive direction in the direction
+  // of increasing particle momentum.
+  // Slight misalignments of individual chambers need to be handled in
+  // the calling routine (ReadDatabase).
+  // Also sets type to the plane type index defined in the Projection class.
+
+  
+  wire_angle = 0.0;
+  if( !name || !*name )
+    return Projection::kUndefinedType;
+
+  TString planeTypes("UVXY");
+  Ssiz_t pos = planeTypes.Index(name,1,0,TString::kIgnoreCase);
+  if( pos == kNPOS )
+    return Projection::kUndefinedType;
+
+  switch(pos) {
+  case 0:
+    wire_angle = fUangle;
+    return Projection::kUPlane;
+  case 1:
+    wire_angle = fVangle;
+    return Projection::kVPlane;
+  case 2:
+    wire_angle = 90.0;
+    return Projection::kXPlane;
+  case 3:
+    wire_angle = 0.0;
+    return Projection::kYPlane;
+  default:
+    break;
+  }
+  return Projection::kUndefinedType;
+}
+
+//_____________________________________________________________________________
+static void NormalizeAngle( Double_t& angle )
+{
+  // Put angle into [-90,90]
+  
+  if( angle > 0.0 )
+    angle -= 180.0*TMath::Floor(angle/180.0);
+  else if( angle < 0.0 )
+    angle -= 180.0*TMath::Ceil(angle/180.0);
+  if( angle > 90.0 )
+    angle -= 180.0;
+  else if( angle < -90.0 )
+    angle += 180.0;
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::ReadDatabase( const TDatime& date )
 {
   // Read MWDC database
@@ -255,6 +321,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   string planeconfig;
   DBRequest request[] = {
     { "planeconfig",    &planeconfig, kString },
+    { "uangle",         &fUangle },
+    { "vangle",         &fVangle },
     { 0 }
   };
 
@@ -262,6 +330,23 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   fclose(file);
   if( err )
     return kInitError;
+  
+  NormalizeAngle( fUangle );
+  NormalizeAngle( fVangle );
+
+  // Sanity checks of U and V angles
+  if( (fUangle < 0.0 && fVangle < 0.0) || (fUangle > 0.0 && fVangle > 0.0) ) {
+    Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and "
+	   "vangle (%6.2lf) have the same sign. Fix database",
+	   fUangle, fVangle );
+    return kInitError;
+  }
+  if( TMath::Abs(TMath::Abs(fUangle)-45.0) > 44.0 ||
+      TMath::Abs(TMath::Abs(fVangle)-45.0) > 44.0 ) {
+    Error( Here(here), "uangle (%6.2lf) and vangle (%6.2lf) must be between "
+	   "1-89 degrees. Fix database.", fUangle, fVangle );
+    return kInitError;
+  }
 
   // Set up the wire planes
   vector<string> planes = vsplit(planeconfig);
@@ -285,7 +370,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     if( name.IsNull() )
       continue;
     vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			   WirePlane::NameIs( name ) );
+			   WirePlane::NameEquals( name ) );
     if( it != fPlanes.end() ) {
       Error( Here(here), "Duplicate plane name: %s. Fix database.", 
 	     name.Data() );
@@ -306,7 +391,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       if( other.IsNull() )
 	continue;
       vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			     WirePlane::NameIs( other ) );
+			     WirePlane::NameEquals( other ) );
       if( it != fPlanes.end() ) {
 	WirePlane* partner = *it;
 	if( fDebug > 0 )

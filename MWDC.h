@@ -8,6 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaTrackingDetector.h"
+#include "Projection.h"
 #include <vector>
 
 class THaTrack;
@@ -40,13 +41,22 @@ namespace TreeSearch {
     virtual void    SetDebug( Int_t level );
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
-    //FIXME: needed?
+    Double_t        GetUangle() const { return fUangle; }
+    Double_t        GetVangle() const { return fVangle; }
+
+    //FIXME: for testing
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
+    vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
+
+    Projection::EProjType MakePlaneType( const char* name, Double_t& type );
 
   protected:
 
     vector<WirePlane*>   fPlanes;  // Wire planes
     vector<Projection*>  fProj;    // Plane projections
+
+    Double_t  fUangle;   // angle of U wires wrt X-axis (-180 .. +180 deg)
+    Double_t  fVangle;   // angle of V wires wrt X-axis (-180 .. +180 deg)
 
     virtual Int_t  ReadDatabase( const TDatime& date );
 

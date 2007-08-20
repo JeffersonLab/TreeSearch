@@ -16,11 +16,13 @@
 class TSeqCollection;
 
 using std::vector;
+using std::string;
 
 namespace TreeSearch {
 
   class TimeToDistConv;
   typedef Projection::EProjType EProjType;
+  extern const Double_t kBig;
 
   class WirePlane : public THaSubDetector {
 
@@ -44,7 +46,8 @@ namespace TreeSearch {
     void            SetPartner( WirePlane* p );
 
     Double_t        GetResolution() const { return fResolution; }
-    Double_t        GetMaxSlope() const { return fMaxSlope; }
+    Double_t        GetMaxSlope() const 
+    { return fProjection ? fProjection->GetMaxSlope() : kBig; }
 
     TimeToDistConv* GetTTDConv() const { return fTTDConv; }
 
@@ -56,22 +59,20 @@ namespace TreeSearch {
     void            SetProjection( Projection* p ) { fProjection = p; }
 
     // Helper functors for STL algorithms...
-    //    static bool     ComparePlaneZ( WirePlane* a, WirePlane* b )
-    //    { return ( a && a->Compare(b) < 0 ); }
-    struct ComparePlaneZ
+    struct ZIsLess
       : public std::binary_function< WirePlane*, WirePlane*, bool >
     {
       bool operator() ( const WirePlane* a, const WirePlane* b ) const
-      { return ( a && a->Compare(b) < 0 ); }
+      { return ( a && b && a->GetZ() < b->GetZ() ); }
     };
 
-    class NameIs : public std::unary_function< WirePlane*, bool > {
+    class NameEquals : public std::unary_function< WirePlane*, bool > {
     public:
-      NameIs( const char* s ) : name(s) {}
+      NameEquals( const char* s ) : name(s?s:"") {}
       bool operator() ( const WirePlane* wp ) const
       { return ( wp && name == wp->GetName() ); }
     private:
-      std::string name;
+      string name;
     };
 
   protected:
@@ -90,10 +91,10 @@ namespace TreeSearch {
 
     // Parameters, calibration, flags
 
+    //FIXME: per daq experts, the tdc res is per module not per plane
     Double_t   fTDCRes;       // TDC Resolution ( s / channel)
     Double_t   fDriftVel;     // Drift velocity in the wire plane (m/s)
     Double_t   fResolution;   // Drift distance resolution (sigma) (m)
-    Double_t   fMaxSlope;     // Maximum physical slope of track (0=perp)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
     vector<double>  fTDCOffset; // [fNelem] TDC offsets for each wire

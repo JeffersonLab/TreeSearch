@@ -12,6 +12,7 @@
 #include "THaDetMap.h"
 #include "TClonesArray.h"
 #include "TMath.h"
+#include "MWDC.h"
 #include <iostream>
 
 using namespace std;
@@ -23,7 +24,7 @@ WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(Projection::kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
-    fSinAngle(0.0), fCosAngle(0.0), fPartner(NULL),
+    fSinAngle(0.0), fCosAngle(1.0), fPartner(NULL), fProjection(NULL),
     fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL)
 {
   // Constructor
@@ -65,6 +66,13 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 
   static const char* const here = "ReadDatabase";
 
+  MWDC* mwdc = dynamic_cast<MWDC*>( GetDetector() );
+  if( !mwdc ) {
+    Error( Here(here), 
+	   "No parent detector (MWDC) defined. Can't initialize." );
+    return kInitError;
+  }
+
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
@@ -72,15 +80,15 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( err )
     return err;
 
-  Double_t wire_angle = 0.0;
+  TString plane_type;
   vector<int> detmap;
-
+  
   DBRequest request[] = {
     { "detmap",       &detmap,       kIntV },
     { "nwires",       &fNelem,       kInt },
+    { "type",         &plane_type,   kTString, 0, 1 },
     { "wire.pos",     &fWireStart },
     { "wire.spacing", &fWireSpacing, kDouble, 0, 0, -1 },
-    { "wire.angle",   &wire_angle },
     { "tdc.res",      &fTDCRes,      kDouble, 0, 0, -1 },
     { "drift.v",      &fDriftVel,    kDouble, 0, 0, -1 },
     { "xp.res",       &fResolution,  kDouble, 0, 0, -1 },
@@ -115,12 +123,20 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 	   "disagrees with number of wires (%d)", nchan, fNelem );
     return kInitError;
   }
-  wire_angle *= TMath::DegToRad();
-  fSinAngle = TMath::Sin(wire_angle);
-  fCosAngle = TMath::Cos(wire_angle);
-  fMaxSlope = TMath::Abs(fMaxSlope);
 
-  //FIXME: determine fType
+  // Determine the type of this plane. If the optional plane type variable is
+  // not in the database, use the first character of the plane name.
+  Double_t wire_angle;
+  fType = mwdc->MakePlaneType( plane_type.IsNull() ? fName.Data() : 
+			       plane_type.Data(), wire_angle );
+  if( fType == Projection::kUndefinedType ) {
+    Error( Here(here), "Illegal plane type (%s). Fix database.",
+	   plane_type.Data() );
+    return kInitError;
+  }
+  // FIXME: handle possible misalignment of individual chambers
+  fSinAngle = TMath::Sin(wire_angle*TMath::DegToRad());
+  fCosAngle = TMath::Cos(wire_angle*TMath::DegToRad());
 
   fIsInit = true;
   return kOK;
