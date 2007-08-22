@@ -12,8 +12,7 @@
 
 namespace TreeSearch {
 
-  // Modified version of TBits that clears the bits without deleting the
-  // reserved memory
+  // Extended version of TBits that supports setting and resetting bit ranges
   class Bits : public TBits {
   public:
     Bits( UInt_t nbits = 8 ) : TBits(nbits) {}
@@ -92,52 +91,6 @@ Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane,
   return fPattern[plane]->TestBitNumber( bin + offset );
 }
 
-//_____________________________________________________________________________
-inline
-void TreeSearch::Bits::ResetBitRange( UInt_t lo, UInt_t hi )
-{
-  // Set range of bits from lo to hi to value.
-
-  if( hi<lo ) return;
-  UChar_t mask = ~((1U<<(lo&7))-1);
-  lo >>= 3;
-  if( lo >= fNbytes ) return;
-  UChar_t mask2 = (1U<<((hi&7)+1))-1;
-  hi >>= 3;
-  if( hi >= fNbytes ) {
-    hi = fNbytes-1;
-    mask2 = 0xFF;
-  }
-  if( lo < hi ) {
-    fAllBits[hi] &= (0xFF ^ mask2);
-    memset( fAllBits+lo+1, 0, hi-lo-1 );
-  } else {
-    mask &= mask2;
-  }
-  fAllBits[lo] &= (0xFF ^ mask);
-}
-
-//_____________________________________________________________________________
-inline
-void TreeSearch::Bits::SetBitRange( UInt_t lo, UInt_t hi )
-{
-  // Set range of bits from lo to hi to value.
-
-  if( hi<lo ) return;
-  SetBitNumber( hi ); // expand array if necessary
-  if( lo==hi ) return;
-  UChar_t mask  = ~((1U<<(lo&7))-1);
-  UChar_t mask2 = (1U<<(hi&7))-1;
-  lo >>= 3;
-  hi >>= 3;
-  if( lo < hi ) {
-    fAllBits[hi] |= mask2;
-    memset( fAllBits+lo+1, 0xFF, hi-lo-1 );
-  } else {
-    mask &= mask2;
-  }
-  fAllBits[lo] |= mask;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
