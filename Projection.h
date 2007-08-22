@@ -42,6 +42,7 @@ namespace TreeSearch {
 
     void           SetMaxSlope( Double_t m ) { fMaxSlope = m; }
     void           SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
+    void           SetWidth( Double_t width ) { fWidth = width; }
 
     //FIXME: for testing
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }

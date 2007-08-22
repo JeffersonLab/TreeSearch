@@ -21,7 +21,7 @@
 // FIXME: Decoding and pattern finding in the planes should be multi-threaded
 
 //TODO:  Decode, sort hits
-//TODO:  Fill hitpatterns in CoarseTrack
+//TODO:  Fill hitpatterns
 
 using namespace std;
 typedef string::size_type ssiz_t;
@@ -100,7 +100,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* theProj = fProj[type];
     UInt_t n = 0;
-    //    Double_t max_width = 0.0;
+    Double_t max_width = 0.0;
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
       WirePlane* thePlane = fPlanes[iplane];
       if( thePlane->GetType() == type ) {
@@ -121,9 +121,13 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 
 	//TODO: determine the maximum physical width of this projection 
 	//if( max_width );
+
       }
     }
-  }
+    theProj->SetWidth( max_width );
+
+    //TODO: determine maxslope
+ }
 
   //TODO: Make sure partner planes have consistent parameters 
   //  (wire angle, maxslope etc.)
@@ -138,9 +142,9 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   }
 
   // Initialize hitpatterns for each projection plane etc.
-  for( vpsiz_t iproj = 0; iproj < fProj.size(); iproj++ ) {
-    if( fProj[iproj] )
-      fProj[iproj]->Init();
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    // FIXME: check for error
+    Int_t err = fProj[type]->Init();
   }
 
 

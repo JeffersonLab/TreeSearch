@@ -23,7 +23,7 @@ namespace TreeSearch {
 
   extern const Double_t kBig;
 
-  // Types of projection supported by the MWDC. See also operator++ below
+  // Types of projections supported by the MWDC. See also operator++ below
   enum EProjType { kUndefinedType = -1, kUPlane, kTypeBegin = kUPlane,
 		   kVPlane, kXPlane, kTypeEnd };
 

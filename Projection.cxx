@@ -100,6 +100,7 @@ Int_t Projection::Init( UInt_t depth )
     return -2;
 
   delete fHitpattern;
+  fHitpattern = NULL;
   
   if( depth > 0 )
     fHitpattern = new Hitpattern( depth, nplanes, fWidth );
