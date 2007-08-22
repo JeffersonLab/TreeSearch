@@ -13,20 +13,26 @@
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-Projection::Projection( EProjType type ) //, const PatternTree* pt )
-  : fType(type), fMaxSlope(0.0), fWidth(0.0), fHitpattern(NULL),
-    fPatternTree(NULL)
+Projection::Projection( Int_t type, const char* name, Double_t angle ) 
+  //, const PatternTree* pt )
+  : fType(type), fName(name?name:""), fMaxSlope(0.0), fWidth(0.0), 
+    fHitpattern(NULL), fPatternTree(NULL)
     //    fPatternTree(pt)
 {
   // Constructor
+
+  fSinAngle = TMath::Sin(angle);
+  fCosAngle = TMath::Cos(angle);
 
 }
 
 
 //_____________________________________________________________________________
 Projection::Projection( const Projection& orig )
-  : fType(orig.fType), fPlanes(orig.fPlanes), fMaxSlope(orig.fMaxSlope),
-    fWidth(orig.fWidth), fHitpattern(NULL), fPatternTree(NULL)
+  : fType(orig.fType), fName(orig.fName), fPlanes(orig.fPlanes), 
+    fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
+    fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
+    fHitpattern(NULL), fPatternTree(NULL)
 {
   // Copying
 
@@ -43,9 +49,12 @@ Projection& Projection::operator=( const Projection& rhs )
 
   if( this != &rhs ) {
     fType     = rhs.fType;
+    fName     = rhs.fName;
     fPlanes   = rhs.fPlanes;
     fMaxSlope = rhs.fMaxSlope;
     fWidth    = rhs.fWidth;
+    fSinAngle = rhs.fSinAngle;
+    fCosAngle = rhs.fCosAngle;
     delete fHitpattern;
     if( rhs.fHitpattern )
       fHitpattern = new Hitpattern(*rhs.fHitpattern);
