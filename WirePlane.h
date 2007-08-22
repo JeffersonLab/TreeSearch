@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaSubDetector.h"
-#include "Projection.h"
+#include "MWDC.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -21,7 +21,7 @@ using std::string;
 namespace TreeSearch {
 
   class TimeToDistConv;
-  typedef Projection::EProjType EProjType;
+  class Projection;
   extern const Double_t kBig;
 
   class WirePlane : public THaSubDetector {
@@ -79,13 +79,10 @@ namespace TreeSearch {
 
     // Geometry, configuration
 
-    UInt_t     fPlaneNum;     // Number of this plane (0..Nplanes)
+    UInt_t     fPlaneNum;     // Ordinal of this plane within its projection
     EProjType  fType;         // Plane type (x,y,u,v)
     Double_t   fWireStart;    // Position of 1st wire (along wire coord) (m)
     Double_t   fWireSpacing;  // Wire spacing (assumed constant) (m)
-    Double_t   fSinAngle;     // Sine of angle between dispersive direction (x)
-                              //  and direction of decreasing wire number
-    Double_t   fCosAngle;     // Cosine of wire angle
     WirePlane* fPartner;      //! Partner plane with staggered wires
     Projection* fProjection;  //! Parameters of this plane type
 

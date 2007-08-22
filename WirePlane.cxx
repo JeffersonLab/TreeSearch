@@ -14,6 +14,7 @@
 #include "TMath.h"
 #include "MWDC.h"
 #include <iostream>
+#include <string>
 
 using namespace std;
 
@@ -23,8 +24,8 @@ namespace TreeSearch {
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
-    fType(Projection::kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
-    fSinAngle(0.0), fCosAngle(1.0), fPartner(NULL), fProjection(NULL),
+    fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
+    fPartner(NULL), fProjection(NULL),
     fTDCRes(0.0), fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL)
 {
   // Constructor
@@ -92,7 +93,6 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "tdc.res",      &fTDCRes,      kDouble, 0, 0, -1 },
     { "drift.v",      &fDriftVel,    kDouble, 0, 0, -1 },
     { "xp.res",       &fResolution,  kDouble, 0, 0, -1 },
-    //    { "maxslope",     &fMaxSlope },
     { "tdc.offsets",  &fTDCOffset,   kDoubleV },
     { "description",  &fTitle,       kTString, 0, 1 },
     { 0 }
@@ -126,17 +126,14 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 
   // Determine the type of this plane. If the optional plane type variable is
   // not in the database, use the first character of the plane name.
-  Double_t wire_angle;
-  fType = mwdc->MakePlaneType( plane_type.IsNull() ? fName.Data() : 
-			       plane_type.Data(), wire_angle );
-  if( fType == Projection::kUndefinedType ) {
-    Error( Here(here), "Illegal plane type (%s). Fix database.",
-	   plane_type.Data() );
+  string name = plane_type.IsNull() ? fName.Data() : plane_type.Data();
+  name = name.substr(0,1);
+  fType = mwdc->NameToType( name.c_str() );
+  if( fType == kUndefinedType ) {
+    Error( Here(here), "Illegal plane type (%s). Fix database.", 
+	   name.c_str() );
     return kInitError;
   }
-  // FIXME: handle possible misalignment of individual chambers
-  fSinAngle = TMath::Sin(wire_angle*TMath::DegToRad());
-  fCosAngle = TMath::Cos(wire_angle*TMath::DegToRad());
 
   fIsInit = true;
   return kOK;

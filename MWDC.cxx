@@ -40,7 +40,7 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
 { 
   // Constructor
 
-  fProj.resize( Projection::kTypeEnd, NULL );
+  fProj.resize( kTypeEnd, NULL );
 
   //FIXME: test
   fDebug = 1;
@@ -97,18 +97,13 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   sort( fPlanes.begin(), fPlanes.end(), WirePlane::ZIsLess() );
 
   // Determine per-projection plane parameters
-  for( Projection::EProjType type = Projection::kTypeBegin; 
-       type < Projection::kTypeEnd; ++type ) {
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* theProj = fProj[type];
     UInt_t n = 0;
     //    Double_t max_width = 0.0;
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
       WirePlane* thePlane = fPlanes[iplane];
       if( thePlane->GetType() == type ) {
-	// If we have a plane of given type, make sure we have a Projection 
-	// object for it
-	if( !theProj )
-	  fProj[type] = theProj = new Projection(type);
 	// Add only primary planes (i.e. the first one of a partnered pair)
 	// to the list and count them
 	if( !thePlane->GetProjection() ) {
@@ -245,51 +240,26 @@ void MWDC::EnableBenchmarks( Bool_t b )
 }
 
 //_____________________________________________________________________________
-Projection::EProjType MWDC::MakePlaneType( const char* name,
-					   Double_t& wire_angle )
+EProjType MWDC::NameToType( const char* name )
 {
-  // Convert plane type name to a wire angle based on the uangle/vangle
-  // database info.
-  // Only the first character of name is used and must be one of "UVXY" in
-  // uppercase or lowercase.
-  // Returns the wire angle in degrees (90 = X, 0 = Y, uangle =, vangle = v).
-  // By normal conventions, uangle = -vangle < 0, but the two angles might
-  // in principle be different.
-  // The wire angle is measured with respect to the X-axis, which for a 
-  // magnetic spectrometer is along the dispersive direction in the direction
-  // of increasing particle momentum.
-  // Slight misalignments of individual chambers need to be handled in
-  // the calling routine (ReadDatabase).
-  // Also sets type to the plane type index defined in the Projection class.
+  // Return the index corresponding to the given plane name.
+  // The comparison is not case-sensitive.
 
-  
-  wire_angle = 0.0;
-  if( !name || !*name )
-    return Projection::kUndefinedType;
-
-  TString planeTypes("UVXY");
-  Ssiz_t pos = planeTypes.Index(name,1,0,TString::kIgnoreCase);
-  if( pos == kNPOS )
-    return Projection::kUndefinedType;
-
-  switch(pos) {
-  case 0:
-    wire_angle = fUangle;
-    return Projection::kUPlane;
-  case 1:
-    wire_angle = fVangle;
-    return Projection::kVPlane;
-  case 2:
-    wire_angle = 90.0;
-    return Projection::kXPlane;
-  case 3:
-    wire_angle = 0.0;
-    return Projection::kYPlane;
-  default:
-    break;
+  if( name && *name ) {
+    TString s(name);
+    s.ToLower();
+    for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+      if( !fProj[type] )
+	continue;
+      TString ps(fProj[type]->GetName().c_str());
+      ps.ToLower();
+      if( s == ps )
+	return type;
+    }
   }
-  return Projection::kUndefinedType;
+  return kUndefinedType;
 }
+
 
 //_____________________________________________________________________________
 static void NormalizeAngle( Double_t& angle )
@@ -319,10 +289,11 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   fIsInit = kFALSE;
 
   string planeconfig;
+  Double_t u_angle, v_angle;
   DBRequest request[] = {
     { "planeconfig",    &planeconfig, kString },
-    { "uangle",         &fUangle },
-    { "vangle",         &fVangle },
+    { "uangle",         &u_angle },
+    { "vangle",         &v_angle },
     { 0 }
   };
 
@@ -331,40 +302,49 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   if( err )
     return kInitError;
   
-  NormalizeAngle( fUangle );
-  NormalizeAngle( fVangle );
+  NormalizeAngle( u_angle );
+  NormalizeAngle( v_angle );
 
   // Sanity checks of U and V angles
-  if( (fUangle < 0.0 && fVangle < 0.0) || (fUangle > 0.0 && fVangle > 0.0) ) {
+  if( (u_angle < 0.0 && v_angle < 0.0) || (u_angle > 0.0 && v_angle > 0.0) ) {
     Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and "
 	   "vangle (%6.2lf) have the same sign. Fix database",
-	   fUangle, fVangle );
+	   u_angle, v_angle );
     return kInitError;
   }
-  if( TMath::Abs(TMath::Abs(fUangle)-45.0) > 44.0 ||
-      TMath::Abs(TMath::Abs(fVangle)-45.0) > 44.0 ) {
+  if( TMath::Abs(TMath::Abs(u_angle)-45.0) > 44.0 ||
+      TMath::Abs(TMath::Abs(v_angle)-45.0) > 44.0 ) {
     Error( Here(here), "uangle (%6.2lf) and vangle (%6.2lf) must be between "
-	   "1-89 degrees. Fix database.", fUangle, fVangle );
+	   "1-89 degrees. Fix database.", u_angle, v_angle );
     return kInitError;
   }
 
-  // Set up the wire planes
   vector<string> planes = vsplit(planeconfig);
   if( planes.empty() ) {
     Error( Here(here), "No planes defined. Fix database." );
     return kInitError;
   }
+
   // Delete existing configuration if re-initializing
-  for( vpsiz_t iproj = 0; iproj < fProj.size(); iproj++ ) {
-    // Clear previous projection parameter blocks
-    delete fProj[iproj];
-    fProj[iproj] = NULL;
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    // Clear previous projection objects
+    delete fProj[type];
+    fProj[type] = NULL;
   }
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
     delete fPlanes[iplane];
-    fPlanes.clear();
+  }
+  fPlanes.clear();
+
+  // Set up the definitions of the wire directions (track projections)
+  Double_t p_angle[]   = { u_angle, v_angle, 90.0 };
+  const char* p_name[] = { "u", "v", "x" };
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    fProj[type] = 
+      new Projection( type, p_name[type], p_angle[type]*TMath::DegToRad() );
   }
 
+  // Set up the wire planes
   for( ssiz_t i=0; i<planes.size(); i++ ) {
     TString name(planes[i].c_str());
     if( name.IsNull() )
@@ -401,8 +381,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       }
     }
   }
-  
-  
 
   fIsInit = kTRUE;
   return kOK;

@@ -23,6 +23,10 @@ namespace TreeSearch {
 
   extern const Double_t kBig;
 
+  // Types of projection supported by the MWDC. See also operator++ below
+  enum EProjType { kUndefinedType = -1, kUPlane, kTypeBegin = kUPlane,
+		   kVPlane, kXPlane, kTypeEnd };
+
   class MWDC : public THaTrackingDetector {
   public:
     MWDC( const char* name, const char* description = "", 
@@ -41,27 +45,37 @@ namespace TreeSearch {
     virtual void    SetDebug( Int_t level );
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
-    Double_t        GetUangle() const { return fUangle; }
-    Double_t        GetVangle() const { return fVangle; }
+    EProjType       NameToType( const char* name );
 
     //FIXME: for testing
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
     vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
-
-    Projection::EProjType MakePlaneType( const char* name, Double_t& type );
 
   protected:
 
     vector<WirePlane*>   fPlanes;  // Wire planes
     vector<Projection*>  fProj;    // Plane projections
 
-    Double_t  fUangle;   // angle of U wires wrt X-axis (-180 .. +180 deg)
-    Double_t  fVangle;   // angle of V wires wrt X-axis (-180 .. +180 deg)
-
     virtual Int_t  ReadDatabase( const TDatime& date );
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
+
+  // Overloaded operator++ allows us to iterate over the EProjType enum.
+  inline
+  EProjType& operator++( EProjType& e )
+  { switch(e) { 
+    case kUndefinedType: return e=kUPlane;
+    case kUPlane: return e=kVPlane;
+    case kVPlane: return e=kXPlane;
+    case kXPlane: return e=kTypeEnd;
+    case kTypeEnd: default: return e=kUndefinedType;
+    }
+  }
+  inline
+  const EProjType operator++( EProjType e, int )
+  { EProjType r(e); ++e; return r; }
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
