@@ -16,7 +16,7 @@ namespace TreeSearch {
 Projection::Projection( Int_t type, const char* name, Double_t angle ) 
   //, const PatternTree* pt )
   : fType(type), fName(name?name:""), fMaxSlope(0.0), fWidth(0.0), 
-    fHitpattern(NULL), fPatternTree(NULL)
+    fZmin(kBig), fZmax(-kBig), fHitpattern(NULL), fPatternTree(NULL)
     //    fPatternTree(pt)
 {
   // Constructor
@@ -30,8 +30,8 @@ Projection::Projection( Int_t type, const char* name, Double_t angle )
 //_____________________________________________________________________________
 Projection::Projection( const Projection& orig )
   : fType(orig.fType), fName(orig.fName), fPlanes(orig.fPlanes), 
-    fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
-    fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
+    fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth), fZmin(orig.fZmin),
+    fZmax(orig.fZmax), fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
     fHitpattern(NULL), fPatternTree(NULL)
 {
   // Copying
@@ -53,6 +53,8 @@ Projection& Projection::operator=( const Projection& rhs )
     fPlanes   = rhs.fPlanes;
     fMaxSlope = rhs.fMaxSlope;
     fWidth    = rhs.fWidth;
+    fZmin     = rhs.fZmin;
+    fZmax     = rhs.fZmax;
     fSinAngle = rhs.fSinAngle;
     fCosAngle = rhs.fCosAngle;
     delete fHitpattern;
@@ -75,6 +77,28 @@ Projection::~Projection()
 
   //  delete fPatternTree;
   delete fHitpattern;
+}
+
+//_____________________________________________________________________________
+void Projection::AddPlane( WirePlane* wp )
+{
+  // Add wire plane to this projection
+
+  if( !wp )
+    return;
+
+  const WirePlane* planes[] = { wp, wp->GetPartner(), 0 };
+  const WirePlane** p = planes;
+  while( *p ) {
+    Double_t z = (*p)->GetZ();
+    if( z < fZmin )
+      fZmin = z;
+    if( z > fZmax )
+      fZmax = z;
+    ++p;
+  }
+  
+  fPlanes.push_back( wp );
 }
 
 //_____________________________________________________________________________

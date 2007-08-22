@@ -31,9 +31,13 @@ namespace TreeSearch {
     void  Reset();
     Int_t Init( UInt_t depth = 0 );
 
+    void           AddPlane( WirePlane* wp );
     Int_t          GetType() const { return fType; }
-    const string&  GetName() const { return fName; }
+    const char*    GetName() const { return fName.c_str(); }
     Double_t       GetMaxSlope() const { return fMaxSlope; }
+    Double_t       GetDepth() const { return fZmax - fZmin; }
+    Double_t       GetZmin()  const { return fZmin; }
+    Double_t       GetZmax()  const { return fZmax; }
     Double_t       GetWidth() const { return fWidth; }
     Double_t       GetAngle() const;
     Double_t       GetSinAngle() const { return fSinAngle; }
@@ -53,6 +57,8 @@ namespace TreeSearch {
     vector<WirePlane*>  fPlanes;      // Wire planes of this type
     Double_t            fMaxSlope;    // Maximum physical track slope (0=perp)
     Double_t            fWidth;       // Width of tracking region (m)
+    Double_t            fZmin;        // z-position of first wire plane
+    Double_t            fZmax;        // z-position of last wire plane
     Double_t            fSinAngle;    // Sine of wire angle
     Double_t            fCosAngle;    // Cosine of wire angle
 
