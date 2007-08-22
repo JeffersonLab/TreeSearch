@@ -138,7 +138,7 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   //
   // Returns number of hits processed
 
-  static const Double_t inv2sqrt2 = 1.0/(2.0*TMath::Sqrt2());
+  static const Double_t inv2sqrt2 = 1.0/(2.0*TMath::Sqrt(2.0));
 
   if( !A ) return 0;
   UInt_t plane = A->GetPlaneNum();
