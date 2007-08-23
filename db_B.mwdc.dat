@@ -11,8 +11,11 @@
 B.mwdc.planeconfig = u1 u1p x1 x1p v1 v1p \
                      u2 x2 v2 \
                      u3 u3p x3 x3p v3 v3p
-B.mwdc.uangle = -60.0;
-B.mwdc.vangle = 60.0;
+B.mwdc.search_depth = 11
+B.mwdc.maxslope = 2.5
+B.mwdc.u.angle = -60.0
+B.mwdc.v.angle = 60.0
+B.mwdc.x.maxslope = 4.0
 
 #-----------------------------------------------------------
 #   Global defaults
