@@ -191,13 +191,15 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     Double_t dz = TMath::Abs(theProj->GetZsize());
     if( dz > 0.01 ) {
       Double_t maxslope = width/dz;
-      if( maxslope < theProj->GetMaxSlope() ) {
+      if( theProj->GetMaxSlope() < 0.01 ) {  // Consider unset
+	theProj->SetMaxSlope( maxslope );
+      } else if( theProj->GetMaxSlope() > maxslope ) {
 	Warning( Here(here), "For plane type \"%s\", maxslope from database "
 		 "= %lf larger than geometric maximum = %lf. Using smaller "
-		 "value.", theProj->GetName(),
-		 theProj->GetMaxSlope(), maxslope );
+		 "value.", theProj->GetName(), theProj->GetMaxSlope(), 
+		 maxslope );
+	theProj->SetMaxSlope( maxslope );
       }
-      theProj->SetMaxSlope( maxslope );
     } else {
       Error( Here(here), "Error calculating geometric maxslope for plane "
 	     "type \"%s\". z-range of planes too small. Fix database.",
