@@ -35,7 +35,7 @@ namespace TreeSearch {
 
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
-    virtual Int_t   End(THaRunBase* run);
+    //    virtual Int_t   End(THaRunBase* run);
     virtual EStatus Init( const TDatime& date );
     virtual Int_t   CoarseTrack( TClonesArray& tracks );
     virtual Int_t   FineTrack( TClonesArray& tracks );

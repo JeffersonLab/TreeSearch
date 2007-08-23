@@ -7,12 +7,14 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
+#include "THaAnalysisObject.h"
 #include "TMath.h"
 #include <vector>
-#include <string>
 
 using std::vector;
 using std::string;
+
+class THaDetectorBase;
 
 namespace TreeSearch {
 
@@ -20,22 +22,24 @@ namespace TreeSearch {
   class PatternTree;
   class WirePlane;
 
-  class Projection {
+  class Projection : public THaAnalysisObject {
   public:
 
-    Projection( Int_t type, const char* name, Double_t angle );
+    Projection( Int_t type, const char* name, Double_t angle,
+		THaDetectorBase* parent = NULL );
     Projection( const Projection& orig );
     Projection& operator=( const Projection& rhs );
     virtual ~Projection();
 
+    virtual EStatus Init( const TDatime& date );
+    virtual void    Print( Option_t* opt="" ) const;
     void  Reset();
-    Int_t Init( UInt_t depth = 0 );
 
     void           AddPlane( WirePlane* wp );
     Int_t          GetType() const { return fType; }
-    const char*    GetName() const { return fName.c_str(); }
+    UInt_t         GetDepth() const { return fDepth; }
     Double_t       GetMaxSlope() const { return fMaxSlope; }
-    Double_t       GetDepth() const { return fZmax - fZmin; }
+    Double_t       GetZsize() const { return fZmax - fZmin; }
     Double_t       GetZmin()  const { return fZmin; }
     Double_t       GetZmax()  const { return fZmax; }
     Double_t       GetWidth() const { return fWidth; }
@@ -51,10 +55,10 @@ namespace TreeSearch {
     //FIXME: for testing
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
 
-  private:
+  protected:
     Int_t               fType;        // Type of plane (u,v,x,y...)
-    string              fName;        // Type name ('u', 'v', etc.)
     vector<WirePlane*>  fPlanes;      // Wire planes of this type
+    UInt_t              fDepth;       // Depth of search tree (bin resolution)
     Double_t            fMaxSlope;    // Maximum physical track slope (0=perp)
     Double_t            fWidth;       // Width of tracking region (m)
     Double_t            fZmin;        // z-position of first wire plane
@@ -64,6 +68,15 @@ namespace TreeSearch {
 
     Hitpattern*         fHitpattern;  // Hitpattern of current event
     PatternTree*        fPatternTree; // Precomputed template database
+
+    THaDetectorBase*    fDetector;    //! Parent detector
+
+    virtual Int_t ReadDatabase( const TDatime& date );
+    void          SetAngle( Double_t a );
+    //    virtual Int_t DefineVariables( EMode mode = kDefine );
+
+    virtual const char* GetDBFileName() const;
+    virtual void MakePrefix();
 
     ClassDef(Projection,1)  // A track projection plane
   };

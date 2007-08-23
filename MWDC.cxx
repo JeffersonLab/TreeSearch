@@ -87,7 +87,34 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   if( status )
     return fStatus = status;
 
-  // Next, initialize each plane in turn
+  // Initialize the plane type "subdetector" - i.e. read database
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    status = fProj[type]->Init(date);
+    if( status )
+      return fStatus = status;
+  }
+
+  // Sanity checks of U and V angles
+  Double_t u_angle = fProj[kUPlane]->GetAngle()*TMath::RadToDeg();
+  Double_t v_angle = fProj[kVPlane]->GetAngle()*TMath::RadToDeg();
+  Int_t qu = TMath::FloorNint( u_angle/90.0 );
+  Int_t qv = TMath::FloorNint( v_angle/90.0 );
+  if( qu&1 == qv&1 ) {
+    Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and "
+	   "vangle (%6.2lf) are in the same quadrant. Fix database.",
+	   u_angle, v_angle );
+    return fStatus = kInitError;
+  }
+  Double_t du = u_angle - 90.0*qu;
+  Double_t dv = v_angle - 90.0*qv;
+  if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 ||
+      TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
+    Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
+	   "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
+    return kInitError;
+  }
+
+  // Iinitialize the wire planes
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
     status = fPlanes[iplane]->Init(date);
     if( status )
@@ -130,8 +157,8 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	// tree search is the resolution of the roads.
 	// Of course, this will become inefficient for grotesque geometries.
 	Double_t sina = theProj->GetSinAngle(), cosa = theProj->GetCosAngle();
-	const TVector3& wp_org = thePlane->GetOrigin();
-	Double_t off = wp_org.X()*sina - wp_org.Y()*cosa;
+	TVector3 wp_off = thePlane->GetOrigin() - fOrigin;
+	Double_t off = wp_off.X()*sina - wp_off.Y()*cosa;
 	Double_t s = thePlane->GetWireStart();
 	Double_t d = thePlane->GetWireSpacing();
 	Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
@@ -144,7 +171,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     }
     // Require at least 3 planes per projection
     if( n < 3 ) {
-      Error( Here(here), "Not enough planes of type \"%s\" defined. "
+      Error( Here(here), "Too few planes of type \"%s\" defined. "
 	     "Need >= 3, have %u. Fix database.", theProj->GetName(), n );
       return fStatus = kInitError;
     }
@@ -153,7 +180,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     if( width > 0.01 )
       theProj->SetWidth( width );
     else {
-      Error( Here(here), "Error calculating width for plane type \"%s\". "
+      Error( Here(here), "Error calculating width of projection plane \"%s\". "
 	     "Wire spacing too small. Fix database.", theProj->GetName() );
       return fStatus = kInitError;
     }
@@ -161,24 +188,23 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     // width/depth is the maximum geometrically possible slope. It may be
     // further limited by the trigger acceptance, optics, etc.
     // TODO: read optional per-projectiion maxslope from database
-    Double_t dz = TMath::Abs(theProj->GetDepth());
-    if( dz > 0.01 )
-      theProj->SetMaxSlope( width/dz );
-    else {
-      Error( Here(here), "Error calculating maxslope of plane type \"%s\". "
-	     "z-range of planes too small. Fix database.", theProj->GetName());
-      return fStatus = kInitError;
+    Double_t dz = TMath::Abs(theProj->GetZsize());
+    if( dz > 0.01 ) {
+      Double_t maxslope = width/dz;
+      if( maxslope < theProj->GetMaxSlope() ) {
+	Warning( Here(here), "For plane type \"%s\", maxslope from database "
+		 "= %lf larger than geometric maximum = %lf. Using smaller "
+		 "value.", theProj->GetName(),
+		 theProj->GetMaxSlope(), maxslope );
+      }
+      theProj->SetMaxSlope( maxslope );
+    } else {
+      Error( Here(here), "Error calculating geometric maxslope for plane "
+	     "type \"%s\". z-range of planes too small. Fix database.",
+	     theProj->GetName() );
+	return fStatus = kInitError;
     }
   }
-
-  // Initialize hitpatterns for each projection plane etc.
-  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    // FIXME: check for error
-    //Int_t err = 
-    fProj[type]->Init();
-  }
-
-
 
   return fStatus = kOK;
 }
@@ -297,17 +323,6 @@ EProjType MWDC::NameToType( const char* name )
 
 
 //_____________________________________________________________________________
-static void NormalizeAngle( Double_t& angle )
-{
-  // Put angle into [-180,180]
-  
-  if( angle > 0.0 )
-    angle -= 180.0*TMath::Floor(angle/180.0);
-  else if( angle < 0.0 )
-    angle -= 180.0*TMath::Ceil(angle/180.0);
-}
-
-//_____________________________________________________________________________
 Int_t MWDC::ReadDatabase( const TDatime& date )
 {
   // Read MWDC database
@@ -320,11 +335,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   fIsInit = kFALSE;
 
   string planeconfig;
-  Double_t u_angle, v_angle;
   DBRequest request[] = {
     { "planeconfig",    &planeconfig, kString },
-    { "uangle",         &u_angle },
-    { "vangle",         &v_angle },
     { 0 }
   };
 
@@ -333,27 +345,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   if( err )
     return kInitError;
   
-  NormalizeAngle( u_angle );
-  NormalizeAngle( v_angle );
-
-  // Sanity checks of U and V angles
-  Int_t qu = TMath::FloorNint( u_angle/90.0 );
-  Int_t qv = TMath::FloorNint( v_angle/90.0 );
-  if( qu&1 == qv&1 ) {
-    Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and "
-	   "vangle (%6.2lf) are in the same quadrant. Fix database.",
-	   u_angle, v_angle );
-    return kInitError;
-  }
-  Double_t du = u_angle - 90.0*qu;
-  Double_t dv = u_angle - 90.0*qv;
-  if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 ||
-      TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
-    Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
-	   "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
-    return kInitError;
-  }
-
   vector<string> planes = vsplit(planeconfig);
   if( planes.empty() ) {
     Error( Here(here), "No planes defined. Fix database." );
@@ -372,11 +363,15 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   fPlanes.clear();
 
   // Set up the definitions of the wire directions (track projections)
-  Double_t p_angle[]   = { u_angle, v_angle, 90.0 };
+  // The angles are default values that can be overridden via the database
+  Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
   const char* p_name[] = { "u", "v", "x" };
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    fProj[type] = 
-      new Projection( type, p_name[type], p_angle[type]*TMath::DegToRad() );
+    fProj[type] = new Projection( type, 
+				  p_name[type], 
+				  p_angle[type]*TMath::DegToRad(),
+				  this 
+				  );
   }
 
   // Set up the wire planes
@@ -422,12 +417,12 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-Int_t MWDC::End(THaRunBase* run)
-{
-    //    fBench->Print();
-  return THaTrackingDetector::End(run);
+// Int_t MWDC::End(THaRunBase* run)
+// {
+//     //    fBench->Print();
+//   return THaTrackingDetector::End(run);
 
-}
+// }
 
 
 
