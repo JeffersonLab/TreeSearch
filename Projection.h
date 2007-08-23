@@ -31,9 +31,12 @@ namespace TreeSearch {
     Projection& operator=( const Projection& rhs );
     virtual ~Projection();
 
+    virtual void    Clear( Option_t* opt="" );
     virtual EStatus Init( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
-    void  Reset();
+    //    void            Reset();
+
+    Int_t          FillHitpattern();
 
     void           AddPlane( WirePlane* wp );
     Int_t          GetType() const { return fType; }
@@ -47,6 +50,8 @@ namespace TreeSearch {
     Double_t       GetSinAngle() const { return fSinAngle; }
     Double_t       GetCosAngle() const { return fCosAngle; }
     Hitpattern*    GetHitpattern() const { return fHitpattern; }
+    UInt_t         GetNplanes() const
+    { return static_cast<UInt_t>( fPlanes.size() ); }
 
     void           SetMaxSlope( Double_t m ) { fMaxSlope = m; }
     void           SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
@@ -71,10 +76,12 @@ namespace TreeSearch {
 
     THaDetectorBase*    fDetector;    //! Parent detector
 
-    virtual Int_t ReadDatabase( const TDatime& date );
-    void          SetAngle( Double_t a );
-    //    virtual Int_t DefineVariables( EMode mode = kDefine );
+    Int_t InitHitpattern();
+    void  SetAngle( Double_t a );
 
+    // Podd interface
+    virtual Int_t ReadDatabase( const TDatime& date );
+    //    virtual Int_t DefineVariables( EMode mode = kDefine );
     virtual const char* GetDBFileName() const;
     virtual void MakePrefix();
 

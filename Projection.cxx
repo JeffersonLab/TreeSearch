@@ -17,8 +17,8 @@ using namespace std;
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-  Projection::Projection( Int_t type, const char* name, Double_t angle,
-			  THaDetectorBase* parent )
+Projection::Projection( Int_t type, const char* name, Double_t angle,
+			THaDetectorBase* parent )
   //, const PatternTree* pt )
   : THaAnalysisObject( name, name ), fType(type), fDepth(0),
     fMaxSlope(0.0), fWidth(0.0), fZmin(kBig), fZmax(-kBig), 
@@ -73,7 +73,7 @@ Projection& Projection::operator=( const Projection& rhs )
 //     if( rhs.fPatternTree )
 //       fPatternTree = new PatternTree(*rhs.fPatternTree);
 //     else
-//       fPatternTree = NULL;
+    fPatternTree = NULL;
   }
   return *this;
 }
@@ -110,6 +110,15 @@ void Projection::AddPlane( WirePlane* wp )
 }
 
 //_____________________________________________________________________________
+void Projection::Clear( Option_t* opt )
+{    
+  // Clear event-by-event data
+
+  if( fHitpattern )
+    fHitpattern->Clear();
+}
+
+//_____________________________________________________________________________
 void Projection::SetAngle( Double_t angle )
 {
   // Set wire angle (rad)
@@ -119,76 +128,63 @@ void Projection::SetAngle( Double_t angle )
 }
 
 //_____________________________________________________________________________
-void Projection::Reset()
-{
-  // Reset parameters, clear list of planes, delete Hitpattern
+// void Projection::Reset()
+// {
+//   // Reset parameters, clear list of planes, delete Hitpattern
   
-  fPlanes.clear();
-  fMaxSlope = fWidth = 0.0;
-  fZmin = kBig;
-  fZmax = -kBig;
-  delete fHitpattern; fHitpattern = NULL;
-  //  delete fPatternTree; fPatternTree = NULL;
-}
+//   fPlanes.clear();
+//   fMaxSlope = fWidth = 0.0;
+//   fZmin = kBig;
+//   fZmax = -kBig;
+//   delete fHitpattern; fHitpattern = NULL;
+//   //  delete fPatternTree; fPatternTree = NULL;
+// }
 
 //_____________________________________________________________________________
 THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 {
-  // Initialize hitpattern
+  // Initialize plane type parameters. Reads database.
 
-  //  static const char* const here = "Init";
-
-  // Initialize ourselves. This calls our ReadDatabase().
   EStatus status = THaAnalysisObject::Init(date);
-  if( status )
-    return fStatus = status;
+  if( status != kOK )
+    return status;
 
-//   if( depth == 0 && !fPatternTree )
-//     return -1;
-//   Int_t nplanes = fPlanes.size();
-//   if( nplanes == 0 )
-//     return -2;
+  // TODO: load pattern database for given type, nplanes, depth.
 
-//   delete fHitpattern;
-//   fHitpattern = NULL;
-  
-//   if( depth > 0 )
-//     fHitpattern = new Hitpattern( depth, nplanes, fWidth );
-  //Fixme:
-//   else
-//     fHitpattern = new Hitpattern( *fPatternTree );
+  // We cannot initialize the hitpattern here because we don't know fWidth yet
 
   return fStatus = kOK;
 }
 
 //_____________________________________________________________________________
-void Projection::MakePrefix()
+Int_t Projection::InitHitpattern()
 {
-  // Set up name prefix for global variables. 
+  // Initialize the hitpattern if not already done
 
-  TString basename;
-  if( fDetector ) {
-    basename = fDetector->GetPrefix();
-    basename.Chop();  // delete trailing dot
-  } else
-    Warning( Here("MakePrefix"), "No parent detector defined. "
-	     "Using \"%s\".", fName.Data() );
+  if( fHitpattern ) {
+    if( fHitpattern->GetDepth() == fDepth &&
+	fHitpattern->GetNplanes() == GetNplanes() &&
+	fHitpattern->GetWidth() == fWidth ) {
+      fIsInit = kTRUE;
+      return 0;
+    }
 
-  THaAnalysisObject::MakePrefix( basename.Data() );
-}
+    delete fHitpattern; fHitpattern = NULL;
+  }
 
-//_____________________________________________________________________________
-const char* Projection::GetDBFileName() const
-{
-  // Return database file name prefix. We want the same database file
-  // as our parent detector.
-
-  return fDetector ? fDetector->GetDBFileName() : GetPrefix();
+  fHitpattern = new Hitpattern( fDepth, GetNplanes(), fWidth );
+  if( !fHitpattern || fHitpattern->IsError() )
+    return -1;
+    
+  fIsInit = kTRUE;
+  return 0;
 }
 
 //_____________________________________________________________________________
 Int_t Projection::ReadDatabase( const TDatime& date )
 {
+  // Read parameters from database
+
   static const char* const here = "ReadDatabase";
 
   FILE* file = OpenFile( date );
@@ -214,6 +210,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     return kInitError;
   }
 
+  // If angle read, set it, otherwise keep default from call to constructor
   if( angle < kBig )
     SetAngle( angle*TMath::DegToRad() );
 
@@ -223,7 +220,52 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     fMaxSlope = -fMaxSlope;
   }
 
+  fIsInit = kFALSE;  // Force check of hitpattern parameters
   return kOK;
+}
+
+//_____________________________________________________________________________
+Int_t Projection::FillHitpattern()
+{
+  // Fill this projection's hitpattern with hits from the wire planes.
+  // Returns the total number of hits processed (where hit pairs on plane
+  // and partner plane count as one). Returns < 0 if error.
+
+  // (Re)create hitpattern if necessary
+  if( !fIsInit && InitHitpattern() != 0 )
+    return 0;
+
+  Int_t ntot = 0;
+  vector<WirePlane*>::iterator it;
+  for( it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
+    ntot += fHitpattern->ScanHits( *it, (*it)->GetPartner() );
+  }
+  return ntot;
+}
+
+//_____________________________________________________________________________
+void Projection::MakePrefix()
+{
+  // Set up name prefix for global variables. 
+
+  TString basename;
+  if( fDetector ) {
+    basename = fDetector->GetPrefix();
+    basename.Chop();  // delete trailing dot
+  } else
+    Warning( Here("MakePrefix"), "No parent detector defined. "
+	     "Using \"%s\".", fName.Data() );
+
+  THaAnalysisObject::MakePrefix( basename.Data() );
+}
+
+//_____________________________________________________________________________
+const char* Projection::GetDBFileName() const
+{
+  // Return database file name prefix. We want the same database file
+  // as our parent detector.
+
+  return fDetector ? fDetector->GetDBFileName() : GetPrefix();
 }
 
 //_____________________________________________________________________________
