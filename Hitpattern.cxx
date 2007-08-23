@@ -88,15 +88,6 @@ Hitpattern::~Hitpattern()
 }
 
 //_____________________________________________________________________________
-void Hitpattern::Clear( Option_t* opt )
-{
-  // Clear the hitpattern
-
-  for( UInt_t i=fNplanes; i; )
-    fPattern[--i]->FastClear();
-}
-
-//_____________________________________________________________________________
 void Hitpattern::uSetPositionRange( Double_t start, Double_t end,
 				    UInt_t plane )
 {
@@ -225,6 +216,7 @@ void Hitpattern::Print( Option_t* opt ) const
 {
   // Print basic info about hitpattern.
 
+  //TODO
 }
 
 

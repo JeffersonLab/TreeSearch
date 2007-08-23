@@ -45,9 +45,11 @@ namespace TreeSearch {
     UInt_t   GetDepth() const { return fDepth; }
     UInt_t   GetNplanes() const { return fNplanes; }
 
+    Bool_t   IsError() const { return (fNplanes == 0); }
+
     void     SetPositionRange( Double_t start, Double_t end, UInt_t plane )
     { if(plane<fNplanes && start<=end) uSetPositionRange(start,end,plane); }
-    Int_t    ScanHits( WirePlane* hitsA, WirePlane* hitsB );
+    Int_t    ScanHits( WirePlane* A, WirePlane* B );
     Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth=32 ) const;
     Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth=32 ) const;
 
@@ -74,6 +76,16 @@ namespace TreeSearch {
   };
 
 }  // end namespace TreeSearch
+
+//_____________________________________________________________________________
+inline
+void TreeSearch::Hitpattern::Clear( Option_t* opt )
+{
+  // Clear the hitpattern
+
+  for( UInt_t i=fNplanes; i; )
+    fPattern[--i]->FastClear();
+}
 
 //_____________________________________________________________________________
 inline
