@@ -8,12 +8,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaSubDetector.h"
+#include "TClonesArray.h"
 #include "MWDC.h"
 #include <vector>
 #include <string>
 #include <functional>
-
-class TSeqCollection;
 
 using std::vector;
 using std::string;
@@ -54,7 +53,7 @@ namespace TreeSearch {
     TimeToDistConv* GetTTDConv() const { return fTTDConv; }
 
     TSeqCollection* GetHits() const { return fHits; }
-    Int_t           GetNhits() const;
+    Int_t           GetNhits() const { return fHits->GetLast()+1; }
     UInt_t          GetPlaneNum() const { return fPlaneNum; }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
@@ -81,26 +80,34 @@ namespace TreeSearch {
 
     // Geometry, configuration
 
-    UInt_t     fPlaneNum;     // Ordinal of this plane within its projection
-    EProjType  fType;         // Plane type (x,y,u,v)
-    Double_t   fWireStart;    // Position of 1st wire (along wire coord) (m)
-    Double_t   fWireSpacing;  // Wire spacing (assumed constant) (m)
-    WirePlane* fPartner;      //! Partner plane with staggered wires
-    Projection* fProjection;  //! Parameters of this plane type
+    UInt_t      fPlaneNum;     // Ordinal of this plane within its projection
+    EProjType   fType;         // Plane type (x,y,u,v)
+    Double_t    fWireStart;    // Position of 1st wire (along wire coord) (m)
+    Double_t    fWireSpacing;  // Wire spacing (assumed constant) (m)
+    WirePlane*  fPartner;      //! Partner plane (usually with staggered wires)
+    Projection* fProjection;   //! The projection that we belong to
+    MWDC*       fMWDC;         //! Our parent detector
 
     // Parameters, calibration, flags
 
     //FIXME: per daq experts, the tdc res is per module not per plane
-    Double_t   fTDCRes;       // TDC Resolution ( s / channel)
-    Double_t   fDriftVel;     // Drift velocity in the wire plane (m/s)
-    Double_t   fResolution;   // Drift distance resolution (sigma) (m)
+    Double_t    fTDCRes;       // TDC Resolution ( s / channel)
+    Double_t    fDriftVel;     // Drift velocity in the wire plane (m/s)
+    Double_t    fResolution;   // Drift distance resolution (sigma) (m)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
-    vector<double>  fTDCOffset; // [fNelem] TDC offsets for each wire
+    vector<float>   fTDCOffset; // [fNelem] TDC offsets for each wire
+    THaDetMap*      fRefMap;    // Map of reference channels, if any
 
     // Event data, hits etc.
 
-    TSeqCollection* fHits;      // Hit data
+    TClonesArray*   fHits;      // Hit data
+    Double_t*       fRefTime;   // [fRefMap->GetSize()] reference channel data
+    UInt_t          fNmiss;     // Statistics: Decoder channel misses
+    UInt_t          fNrej;      // Statistics: Rejected hits
+    Int_t           fWasSorted; // Statistics: hits were sorted fwd/rev (1/-1)
+    UInt_t          fNhitwires; // Statistics: number of _wires_ hit
+    UInt_t          fNnohits;   // Statistics: channels without hits
 
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
