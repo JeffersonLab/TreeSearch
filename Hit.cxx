@@ -20,44 +20,6 @@ ClassImp(TreeSearch::MCHit)
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-Int_t Hit::Compare( const TObject* obj ) const 
-{
-  // Used for sorting hits in a TSeqCollection (e.g. TList, TClonesArray).
-  // A hit is "less than" another hit if its position is smaller.
-
-  if( !obj || IsA() != obj->IsA() )
-    return -1;
-
-  const Hit* rhs = static_cast<const Hit*>( obj );
- 
-  if( fPos < rhs->fPos ) return -1;
-  if( fPos > rhs->fPos ) return  1;
-  return 0;
-}
-
-#if 0
-  // Also, for hits on the same wire, the first hit on the wire (the one with
-  // the smallest time) is "less than" one with a higher time.  If the hits
-  // are sorted according to this scheme, they will be in order of increasing
-  // wire number and, for each wire, will be in the order in which they hit
-  // the wire
-  Int_t myWireNum = fWire->GetNum();
-  Int_t hitWireNum = hit->GetWire()->GetNum();
-  // Compare wire numbers
-  if (myWireNum < hitWireNum) return -1;
-  if (myWireNum > hitWireNum) return  1;
-  if (myWireNum == hitWireNum) {
-    // If wire numbers are the same, compare times
-    Double_t hitTime = hit->GetTime();
-    if (fTime < hitTime) return -1;
-    if (fTime > hitTime) return  1;
-  }
-  return 0;
-}
-#endif
-
-
-//_____________________________________________________________________________
 Double_t Hit::ConvertTimeToDist( Double_t slope )
 {
   // Convert drift time to drift distance. 'slope' is the approximate

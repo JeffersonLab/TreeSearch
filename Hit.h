@@ -152,6 +152,30 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
+  Int_t Hit::Compare( const TObject* obj ) const 
+  {
+    // Used for sorting hits in a TSeqCollection (e.g. TList, TClonesArray).
+    // A hit is "less than" another hit if its position is smaller.
+    // Returns -1 if this is smaller than rhs, 0 if equal, +1 if greater.
+    // Also, for hits on the same wire, the first hit on the wire (the one with
+    // the smallest time) is "less than" one with a higher time.  If the hits
+    // are sorted according to this scheme, they will be in order of increasing
+    // wire number and, for each wire, will be in the order in which they hit
+    // the wire
+
+    // For dissimilar objects, compare addresses for lack of anything better
+//     if( !obj || IsA() != obj->IsA() )
+//       return (this<obj) ? -1 : (this==obj) ? 0 : 1;
+
+    if( fPos  < static_cast<const Hit*>(obj)->fPos )  return -1;
+    if( fPos  > static_cast<const Hit*>(obj)->fPos )  return  1;
+    if( fTime < static_cast<const Hit*>(obj)->fTime ) return -1;
+    if( fTime > static_cast<const Hit*>(obj)->fTime ) return  1;
+    return 0;
+  }
+
+  //___________________________________________________________________________
+  inline
   Int_t Hit::Compare( const Hit* rhs, Double_t maxdist ) const {
     // Determine if two hits are within maxdist of each other.
     // Returns -1 if this<rhs, 0 if overlap, +1 if this>rhs.
