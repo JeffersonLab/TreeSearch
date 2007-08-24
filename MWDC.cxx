@@ -18,11 +18,6 @@
 
 #include <algorithm>
 
-// FIXME: Decoding and pattern finding in the planes should be multi-threaded
-
-//TODO:  Decode, sort hits
-//TODO:  Fill hitpatterns
-
 using namespace std;
 typedef string::size_type ssiz_t;
 
@@ -68,9 +63,9 @@ MWDC::~MWDC()
   delete fBench;
 #endif
 
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ )
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     delete fPlanes[iplane];
-  for( vpsiz_t type = 0; type < fProj.size(); type++ )
+  for( vpsiz_t type = 0; type < fProj.size(); ++type )
     delete fProj[type];
 
 }
@@ -100,8 +95,8 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   Int_t qu = TMath::FloorNint( u_angle/90.0 );
   Int_t qv = TMath::FloorNint( v_angle/90.0 );
   if( qu&1 == qv&1 ) {
-    Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and "
-	   "vangle (%6.2lf) are in the same quadrant. Fix database.",
+    Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and vangle "
+	   "(%6.2lf) are in equivalent quadrants. Fix database.",
 	   u_angle, v_angle );
     return fStatus = kInitError;
   }
@@ -115,7 +110,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   }
 
   // Iinitialize the wire planes
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
     status = fPlanes[iplane]->Init(date);
     if( status )
       return fStatus = status;
@@ -129,7 +124,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     Projection* theProj = fProj[type];
     UInt_t n = 0;
     Double_t width = 0.0;
-    for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
+    for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
       WirePlane* thePlane = fPlanes[iplane];
       if( thePlane->GetType() == type ) {
 	// Add only primary planes (i.e. the first one of a partnered pair)
@@ -175,7 +170,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	     "Need >= 3, have %u. Fix database.", theProj->GetName(), n );
       return fStatus = kInitError;
     }
-    // Set width and maxslope for this plane type
+    // Set width of this projection plane
     width *= 2.0;
     if( width > 0.01 )
       theProj->SetWidth( width );
@@ -187,17 +182,15 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     // maxslope is the maximum expected track slope in the projection.
     // width/depth is the maximum geometrically possible slope. It may be
     // further limited by the trigger acceptance, optics, etc.
-    // TODO: read optional per-projectiion maxslope from database
     Double_t dz = TMath::Abs(theProj->GetZsize());
     if( dz > 0.01 ) {
       Double_t maxslope = width/dz;
       if( theProj->GetMaxSlope() < 0.01 ) {  // Consider unset
 	theProj->SetMaxSlope( maxslope );
       } else if( theProj->GetMaxSlope() > maxslope ) {
-	Warning( Here(here), "For plane type \"%s\", maxslope from database "
-		 "= %lf larger than geometric maximum = %lf. Using smaller "
-		 "value.", theProj->GetName(), theProj->GetMaxSlope(), 
-		 maxslope );
+	Warning( Here(here), "For plane type \"%s\", maxslope from database = "
+		 "%lf exceeds geometric maximum = %lf. Using smaller value.",
+		 theProj->GetName(), theProj->GetMaxSlope(), maxslope );
 	theProj->SetMaxSlope( maxslope );
       }
     } else {
@@ -216,19 +209,26 @@ void MWDC::Clear( Option_t* opt )
 {
   THaTrackingDetector::Clear(opt);
   
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ )
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     fPlanes[iplane]->Clear(opt);
 
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
+    fProj[type]->Clear(opt);
 }
 
 //_____________________________________________________________________________
 Int_t MWDC::Decode( const THaEvData& evdata )
 {
-  // Decode all planes
+  // Decode all planes and fill hitpatterns per projection
 
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ )
+  // TODO: this can be multithreaded
+
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     fPlanes[iplane]->Decode( evdata );
-  
+
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
+    fProj[type]->FillHitpattern();
+
   return 0;
 }
 
@@ -278,7 +278,7 @@ void MWDC::Print(const Option_t* opt) const
 
   //  fBench->Print();
 
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ )
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     fPlanes[iplane]->Print();
 
   return;
@@ -292,7 +292,7 @@ void MWDC::SetDebug( Int_t level )
 
   THaTrackingDetector::SetDebug( level );
 
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ )
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     fPlanes[iplane]->SetDebug( level );
 }
 
@@ -359,7 +359,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     delete fProj[type];
     fProj[type] = NULL;
   }
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
     delete fPlanes[iplane];
   }
   fPlanes.clear();
@@ -369,15 +369,22 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
   const char* p_name[] = { "u", "v", "x" };
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    fProj[type] = new Projection( type, 
-				  p_name[type], 
-				  p_angle[type]*TMath::DegToRad(),
-				  this 
-				  );
+    Projection* proj = new Projection( type, 
+				       p_name[type], 
+				       p_angle[type]*TMath::DegToRad(),
+				       this 
+				       );
+    if( !proj || proj->IsZombie() ) {
+      // Urgh. Something is very bad
+      Error( Here(here), "Error creating projection %s. Call expert.", 
+	     p_name[type] );
+      return kInitError;
+    }
+    fProj[type] = proj;
   }
 
   // Set up the wire planes
-  for( ssiz_t i=0; i<planes.size(); i++ ) {
+  for( ssiz_t i=0; i<planes.size(); ++i ) {
     TString name(planes[i].c_str());
     if( name.IsNull() )
       continue;
@@ -389,13 +396,19 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       return kInitError;
     }
     WirePlane* newplane = new WirePlane( name, name, this );
+    if( !newplane || newplane->IsZombie() ) {
+      // Urgh. Something is very bad
+      Error( Here(here), "Error creating wire plane %s. Call expert.", 
+	     name.Data() );
+      return kInitError;
+    }
     fPlanes.push_back( newplane );
   }
 
   if( fDebug > 0 )
     Info( Here(here), "Loaded %u planes", fPlanes.size() );
 
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); iplane++ ) {
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
     WirePlane* thePlane = fPlanes[iplane];
     TString name( thePlane->GetName() );
     if( name.EndsWith("p") ) {

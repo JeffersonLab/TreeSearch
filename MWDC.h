@@ -51,6 +51,10 @@ namespace TreeSearch {
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
     vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
 
+  enum {
+    kIgnoreNegDrift = BIT(17) // Ignore negative drift times
+  };
+
   protected:
 
     vector<WirePlane*>   fPlanes;  // Wire planes
