@@ -90,8 +90,6 @@ namespace TreeSearch {
 
     // Parameters, calibration, flags
 
-    //FIXME: per daq experts, the tdc res is per module not per plane
-    Double_t    fTDCRes;       // TDC Resolution ( s / channel)
     Double_t    fDriftVel;     // Drift velocity in the wire plane (m/s)
     Double_t    fResolution;   // Drift distance resolution (sigma) (m)
 

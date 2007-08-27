@@ -27,7 +27,7 @@ WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
-    fPartner(NULL), fProjection(NULL), fMWDC(NULL), fTDCRes(0.0), 
+    fPartner(NULL), fProjection(NULL), fMWDC(NULL), 
     fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL), fRefTime(NULL),
     fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNnohits(0)
 {
@@ -82,6 +82,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 
   TString plane_type;
   vector<int> detmap, refmap;
+  Double_t tdc_res = 1e-9;  // 1ns/ch default resolution
   delete [] fRefTime; fRefTime = NULL;
 
   DBRequest request[] = {
@@ -92,7 +93,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "wire.pos",     &fWireStart },
     { "wire.spacing", &fWireSpacing, kDouble,  0, 0, -1 },
     //FIXME: remove?
-    { "tdc.res",      &fTDCRes,      kDouble,  0, 0, -1 },
+    { "tdc.res",      &tdc_res,      kDouble,  0, 1, -1 },
     { "drift.v",      &fDriftVel,    kDouble,  0, 0, -1 },
     { "xp.res",       &fResolution,  kDouble,  0, 0, -1 },
     { "tdc.offsets",  &fTDCOffset,   kFloatV,  0, 1 },
@@ -145,8 +146,8 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   Int_t nrefchan = fRefMap->GetTotNumChan();
   if( nrefchan > 0 ) {
     if( dmin < 0 && dmax < 0 ) {
-      Warning( Here(here), "Reference channels defined but not used. "
-	       "Check database." );
+      Warning( Here(here), "Reference channels defined but not used. Check "
+	       "database." );
       fRefMap->Clear();
     } else {
       Int_t rmin, rmax;
@@ -159,7 +160,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
       }
       fRefTime = new Double_t[ nrefchan ];
     }
-  } else if ( fRefMap->GetSize() > 0 ) {
+  } else if( fRefMap->GetSize() > 0 ) {
     Error( Here(here), "Total number of reference channels = %d <= 0? "
 	   "Fix database.", nrefchan );
     fRefMap->Clear();
@@ -168,6 +169,19 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     Error( Here(here), "detmap specifies refindex, but no refmap defined. "
 	   "Fix database." );
     return kInitError;
+  }
+
+  // Fill in default TDC resolution if no resolution given in module database
+  // FIXME: remove?
+  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fRefMap->GetModule(imod);
+    if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
+      d->resolution = tdc_res;
+  }
+  for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fDetMap->GetModule(imod);
+    if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
+      d->resolution = tdc_res;
   }
 
   // Determine the type of this plane. If the optional plane type variable is
@@ -268,9 +282,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 		 "Event decoding failed.", chan, imod );
 	  return -1;
 	}
-	// FIXME: separate resolution for reference channels
-	//	fRefTime[nref] = d->resolution * data;
-	fRefTime[nref] = fTDCRes * data;
+	fRefTime[nref] = d->resolution * data;
 	++nref;
       }
     }
@@ -313,9 +325,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	Int_t data = evData.GetData( d->crate, d->slot, chan, hit );
 	
 	// Convert the TDC value to the drift time
-	//FIXME: implement resolution in THaDetMap
-	//Double_t time = d->resolution * (data+0.5) - tdc_offset - ref_offset;
-	Double_t time = fTDCRes * (data+0.5) - tdc_offset - ref_offset;
+	Double_t time = d->resolution * (data+0.5) - tdc_offset - ref_offset;
 	if( !pos_only || time > 0.0 ) {
 	  Hit* theHit = 
 	    new( (*fHits)[nHits++] ) Hit( iw, 
