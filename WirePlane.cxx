@@ -28,13 +28,14 @@ WirePlane::WirePlane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fPartner(NULL), fProjection(NULL), fMWDC(NULL), fTDCRes(0.0), 
-    fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL), fRefMap(NULL),
-    fRefTime(NULL),
+    fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL), fRefTime(NULL),
     fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNnohits(0)
 {
   // Constructor
 
   static const char* const here = "WirePlane";
+
+  fRefMap = new THaDetMap;
 
   fHits = new TClonesArray("TreeSearch::Hit", 200);
   if( !fHits ) {
@@ -81,6 +82,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 
   TString plane_type;
   vector<int> detmap, refmap;
+  delete [] fRefTime; fRefTime = NULL;
 
   DBRequest request[] = {
     { "detmap",       &detmap,       kIntV },
@@ -103,14 +105,27 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( err )
     return kInitError;
 
-  UInt_t flags = THaDetMap::kFillModel|THaDetMap::kAutoCount;
-  if( FillDetMap( detmap, flags, here ) <= 0 )
-    return kInitError;
-
   if( fNelem <= 0 ) {
     Error( Here(here), "Invalid number of wires: %d", fNelem );
     return kInitError;
   }
+
+  // Fill the reference channel detector map, if given
+  UInt_t flags;
+  if( refmap.size() > 0 ) {
+    flags = THaDetMap::kFillModel;
+    if( fRefMap->Fill( refmap, flags ) <= 0 ) {
+      Error( Here(here), "Invalid reference channel map. Fix database." );
+      fRefMap->Clear();
+      return kInitError;
+    }
+  }
+
+  // Fill the detector map for the data channels
+  flags = ( THaDetMap::kFillModel | THaDetMap::kFillRefIndex );
+  if( FillDetMap( detmap, flags, here ) <= 0 )
+    return kInitError;
+  
   Int_t nchan = fDetMap->GetTotNumChan();
   if( nchan != fNelem ) {
     Error( Here(here), "Number of detector map channels (%d) "
@@ -121,6 +136,37 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( nchan > 0 && nchan != fNelem ) {
     Error( Here(here), "Number of TDC offset values (%d) "
 	   "disagrees with number of wires (%d)", nchan, fNelem );
+    return kInitError;
+  }
+
+  // Check consistency of reference channels and data channels
+  Int_t dmin, dmax;
+  fDetMap->GetMinMaxChan( dmin, dmax, THaDetMap::kRefIndex );
+  Int_t nrefchan = fRefMap->GetTotNumChan();
+  if( nrefchan > 0 ) {
+    if( dmin < 0 && dmax < 0 ) {
+      Warning( Here(here), "Reference channels defined but not used. "
+	       "Check database." );
+      fRefMap->Clear();
+    } else {
+      Int_t rmin, rmax;
+      fRefMap->GetMinMaxChan( rmin, rmax );
+      if( (dmin >= 0 && dmin < rmin) || dmax > rmax ) {
+	Error( Here(here), "Reference channel(s) out of range: min/max=%d/%d, "
+	       "requested=%d/%d. Fix database.", rmin, rmax, dmin, dmax );
+	fRefMap->Clear();
+	return kInitError;
+      }
+      fRefTime = new Double_t[ nrefchan ];
+    }
+  } else if ( fRefMap->GetSize() > 0 ) {
+    Error( Here(here), "Total number of reference channels = %d <= 0? "
+	   "Fix database.", nrefchan );
+    fRefMap->Clear();
+    return kInitError;
+  } else if( dmax >= 0 ) {
+    Error( Here(here), "detmap specifies refindex, but no refmap defined. "
+	   "Fix database." );
     return kInitError;
   }
 
@@ -170,9 +216,9 @@ THaAnalysisObject::EStatus WirePlane::Init( const TDatime& date )
     return fStatus = status;
 
   //FIXME:
-  THaDetectorBase *parent = GetDetector();
-  if( parent )
-    fOrigin += parent->GetOrigin();
+//   THaDetectorBase *parent = GetDetector();
+//   if( parent )
+//     fOrigin += parent->GetOrigin();
 
   return fStatus = kOK;
 }
@@ -202,7 +248,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   // They use a separate detector map, which has the same structure as the
   // one for the data channels.
   UInt_t nref = 0;
-  if( fRefMap ) {
+  if( fRefMap->GetSize() > 0 ) {
     for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
       THaDetMap::Module* d = fRefMap->GetModule(imod);	
 
@@ -282,9 +328,9 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	  // We can test the order of the hits on the fly - they should
 	  // come in sorted or reverse-sorted. If they are, we can avoid
 	  // trying to sort an already-sorted array - which would be expensive
-	  if( sorted && prevHit && theHit->Compare(prevHit) < 0 )
+	  if( sorted && prevHit && theHit->Hit::Compare(prevHit) < 0 )
 	    sorted = false;
-	  if( revsorted && prevHit && theHit->Compare(prevHit) > 0 )
+	  if( revsorted && prevHit && theHit->Hit::Compare(prevHit) > 0 )
 	    revsorted = false;
 	  prevHit = theHit;
 	}
@@ -300,7 +346,9 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   fWasSorted = sorted ? 1 : revsorted ? -1 : 0;
   if( !sorted ) {
     if( revsorted ) {
-      // reverse array ...  TODO: check if faster than qsort on revsorted data
+      // reverse array ...
+      // TODO: check if faster than qsort on revsorted data
+      // TODO: can't we just leave it revsorted?
       TClonesArray* copy = new TClonesArray( fHits->GetClass(), 
 					     fHits->GetSize() );
       Int_t end = fHits->GetLast();
@@ -308,8 +356,9 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	new((*copy)[end-i]) Hit( *static_cast<Hit*>((*fHits)[i]) );
       delete fHits;
       fHits = copy;
-    } else
+    } else {
       fHits->Sort();
+    }
   }
 
   return nHits;

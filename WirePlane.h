@@ -102,7 +102,7 @@ namespace TreeSearch {
     // Event data, hits etc.
 
     TClonesArray*   fHits;      // Hit data
-    Double_t*       fRefTime;   // [fRefMap->GetSize()] reference channel data
+    Double_t*       fRefTime;   // [fRefMap->GetTotNumChan()] ref channel data
     UInt_t          fNmiss;     // Statistics: Decoder channel misses
     UInt_t          fNrej;      // Statistics: Rejected hits
     Int_t           fWasSorted; // Statistics: hits were sorted fwd/rev (1/-1)
