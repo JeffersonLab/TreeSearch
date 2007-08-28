@@ -45,6 +45,10 @@ namespace TreeSearch {
     virtual void    SetDebug( Int_t level );
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
+    Double_t        GetRefTime( UInt_t i ) const 
+    { return (i<fNrefchan) ? fRefTime[i] : kBig; }
+    UInt_t          GetNrefchan() const { return fNrefchan; }
+
     EProjType       NameToType( const char* name );
 
     //FIXME: for testing
@@ -60,7 +64,11 @@ namespace TreeSearch {
     vector<WirePlane*>   fPlanes;  // Wire planes
     vector<Projection*>  fProj;    // Plane projections
 
-    virtual Int_t  ReadDatabase( const TDatime& date );
+    THaDetMap*      fRefMap;    // Map of reference channels for VME readout
+    UInt_t          fNrefchan;  // Number of logical reference channels
+    vector<float>   fRefTime;   // [fNrefchan] ref channel data
+
+    virtual Int_t   ReadDatabase( const TDatime& date );
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };

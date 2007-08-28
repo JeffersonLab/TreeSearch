@@ -15,6 +15,8 @@
 #include "Projection.h"
 #include "TString.h"
 #include "TMath.h"
+#include "THaDetMap.h"
+#include "THaEvData.h"
 
 #include <algorithm>
 
@@ -36,6 +38,8 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   // Constructor
 
   fProj.resize( kTypeEnd, NULL );
+
+  fRefMap = new THaDetMap;
 
   //FIXME: test
   fDebug = 1;
@@ -68,6 +72,7 @@ MWDC::~MWDC()
   for( vpsiz_t type = 0; type < fProj.size(); ++type )
     delete fProj[type];
 
+  delete fRefMap;
 }
 
 //_____________________________________________________________________________
@@ -214,20 +219,58 @@ void MWDC::Clear( Option_t* opt )
 
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
     fProj[type]->Clear(opt);
+
+  if( fNrefchan > 0 )
+    fRefTime.assign( fNrefchan, kBig );  // not strictly necessary
 }
 
 //_____________________________________________________________________________
 Int_t MWDC::Decode( const THaEvData& evdata )
 {
   // Decode all planes and fill hitpatterns per projection
+  
+  static const char* const here = "Decode";
 
-  // TODO: this can be multithreaded
+  // Decode reference channels of the VME readout (if defined)
+  UInt_t iref = 0;
+  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fRefMap->GetModule(imod);	
 
+    // Since we expect all channels to have a hit, we can efficiently loop
+    // over the defined channel range
+    for( Int_t chan = d->lo; chan <= d->hi; ++chan ) {
+      Int_t data;
+      Int_t nhits = evdata.GetNumHits( d->crate, d->slot, chan );
+      if( nhits > 0 ) {
+	data = evdata.GetData( d->crate, d->slot, chan, nhits-1 );
+	if( nhits > 1 ) {
+	  Warning( Here(here), "%d hits on reference channel %d module %d", 
+		   nhits, chan, imod );
+	}
+	fRefTime[iref] = d->resolution * data;
+      } else {
+	// TODO: At this point, one could look for backup reference channels
+	// to recover the data. Left for later, if needed.
+	Warning( Here(here), "No hits on reference channel %d module %d.",
+		 chan, imod );
+	fRefTime[iref] = kBig;
+      }
+      ++iref;
+    } // chans
+  }   // modules
+
+
+  // Decode the individual planes
+  //TODO: multithread this
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     fPlanes[iplane]->Decode( evdata );
 
-  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
-    fProj[type]->FillHitpattern();
+  //TODO: check for excessive plane occupancy here and abort if too full
+  // (via "max occupancy" parameter or similar)
+
+  //TODO: for this to work, we need the drift distances first!
+//   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
+//     fProj[type]->FillHitpattern();
 
   return 0;
 }
@@ -331,26 +374,37 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 
   static const char* const here = "ReadDatabase";
 
+  fIsInit = kFALSE;
+
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  fIsInit = kFALSE;
+  Int_t status = kInitError;
+  // Default plane angles and names
+  // The angles can be overridden via the database
+  Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
+  const char* p_name[] = { "u", "v", "x" };
+
+  vector<string> planes;
+  // Putting this container on the stack may cause a stack overflow!
+  vector<int>* refmap = new vector<int>;
 
   string planeconfig;
   DBRequest request[] = {
-    { "planeconfig",    &planeconfig, kString },
+    { "planeconfig",  &planeconfig, kString },
+    { "refmap",       refmap,       kIntV,    0, 1 },
     { 0 }
   };
 
   Int_t err = LoadDB( file, date, request, fPrefix );
   fclose(file);
   if( err )
-    return kInitError;
+    goto err;
   
-  vector<string> planes = vsplit(planeconfig);
+  planes = vsplit(planeconfig);
   if( planes.empty() ) {
     Error( Here(here), "No planes defined. Fix database." );
-    return kInitError;
+    goto err;
   }
 
   // Delete existing configuration if re-initializing
@@ -363,11 +417,41 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     delete fPlanes[iplane];
   }
   fPlanes.clear();
+  fRefTime.clear();
+
+  // Fill the reference channel detector map, if given
+  if( refmap->size() > 0 ) {
+    UInt_t flags = THaDetMap::kFillModel;
+    if( fRefMap->Fill( *refmap, flags ) <= 0 ) {
+      Error( Here(here), "Invalid reference channel map. Fix database." );
+      goto err;
+    }
+  }
+  // Consistency checks of the reference channel map
+  fNrefchan = fRefMap->GetTotNumChan();
+  if( fNrefchan > 0 ) {
+    Int_t rmin, rmax;
+    fRefMap->GetMinMaxChan( rmin, rmax );
+    if( rmin < 0 || rmax != static_cast<Int_t>(fNrefchan) ) {
+      Error( Here(here), "Reference channel number inconsistency. "
+	     "min/max/tot = %d %d %u.  Fix database.", rmin, rmax, fNrefchan );
+      goto err;
+    }
+    // All ok - grow and fill the refchan data array with kBigs
+    fRefTime.assign( fNrefchan, kBig );
+  } else if( fRefMap->GetSize() > 0 ) {
+    Error( Here(here), "Total number of reference channels = 0? "
+	   "Fix database." );
+    goto err;
+  }
+  // Set default resolution of channels if not already given
+  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fRefMap->GetModule(imod);
+    if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
+      d->resolution = 1e-9;
+  }
 
   // Set up the definitions of the wire directions (track projections)
-  // The angles are default values that can be overridden via the database
-  Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
-  const char* p_name[] = { "u", "v", "x" };
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* proj = new Projection( type, 
 				       p_name[type], 
@@ -378,7 +462,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       // Urgh. Something is very bad
       Error( Here(here), "Error creating projection %s. Call expert.", 
 	     p_name[type] );
-      return kInitError;
+      goto err;
     }
     fProj[type] = proj;
   }
@@ -393,14 +477,14 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     if( it != fPlanes.end() ) {
       Error( Here(here), "Duplicate plane name: %s. Fix database.", 
 	     name.Data() );
-      return kInitError;
+      goto err;
     }
     WirePlane* newplane = new WirePlane( name, name, this );
     if( !newplane || newplane->IsZombie() ) {
       // Urgh. Something is very bad
       Error( Here(here), "Error creating wire plane %s. Call expert.", 
 	     name.Data() );
-      return kInitError;
+      goto err;
     }
     fPlanes.push_back( newplane );
   }
@@ -427,8 +511,11 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     }
   }
 
+  status = kOK;
   fIsInit = kTRUE;
-  return kOK;
+ err:
+  delete refmap;
+  return status;
 }
 
 //_____________________________________________________________________________

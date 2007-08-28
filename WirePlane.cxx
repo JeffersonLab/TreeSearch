@@ -20,6 +20,9 @@
 
 using namespace std;
 
+// Database uses ns for TDC offsets
+static const float kTDCscale = 1e-9;
+
 namespace TreeSearch {
 
 //_____________________________________________________________________________
@@ -28,14 +31,12 @@ WirePlane::WirePlane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fPartner(NULL), fProjection(NULL), fMWDC(NULL), 
-    fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL), fRefTime(NULL),
+    fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL),
     fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNnohits(0)
 {
   // Constructor
 
   static const char* const here = "WirePlane";
-
-  fRefMap = new THaDetMap;
 
   fHits = new TClonesArray("TreeSearch::Hit", 200);
   if( !fHits ) {
@@ -61,8 +62,6 @@ WirePlane::~WirePlane()
     RemoveVariables();
 
   delete fHits;
-  delete [] fRefTime;
-  delete fRefMap;
 }
 
 //_____________________________________________________________________________
@@ -72,6 +71,8 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 
   static const char* const here = "ReadDatabase";
 
+  // TODO: the refmap might be better in the MWDC class since, presumably,
+  // we only need to read those channels once
 
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
@@ -80,14 +81,20 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( err )
     return err;
 
+  Int_t status = kInitError;
+
   TString plane_type;
-  vector<int> detmap, refmap;
-  Double_t tdc_res = 1e-9;  // 1ns/ch default resolution
-  delete [] fRefTime; fRefTime = NULL;
+  Int_t tdc_res = 1000;  // 1ns/ch default resolution
+  // Putting this on the stack may cause a stack overflow
+  vector<int>* detmap = new vector<int>;
+
+  UInt_t flags, nrefchan;
+  Int_t nchan;
+  TString name;
+  Int_t dmin, dmax;
 
   DBRequest request[] = {
-    { "detmap",       &detmap,       kIntV },
-    { "refmap",       &refmap,       kIntV,    0, 1 },
+    { "detmap",       detmap,        kIntV },
     { "nwires",       &fNelem,       kInt },
     { "type",         &plane_type,   kTString, 0, 1 },
     { "wire.pos",     &fWireStart },
@@ -96,7 +103,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "tdc.res",      &tdc_res,      kDouble,  0, 1, -1 },
     { "drift.v",      &fDriftVel,    kDouble,  0, 0, -1 },
     { "xp.res",       &fResolution,  kDouble,  0, 0, -1 },
-    { "tdc.offsets",  &fTDCOffset,   kFloatV,  0, 1 },
+    { "tdc.offsets",  &fTDCOffset,   kFloatV,  0, 0 },
     { "description",  &fTitle,       kTString, 0, 1 },
     { 0 }
   };
@@ -104,98 +111,73 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   err = LoadDB( file, date, request, fPrefix );
   fclose(file);
   if( err )
-    return kInitError;
+    goto err;
 
   if( fNelem <= 0 ) {
     Error( Here(here), "Invalid number of wires: %d", fNelem );
-    return kInitError;
-  }
-
-  // Fill the reference channel detector map, if given
-  UInt_t flags;
-  if( refmap.size() > 0 ) {
-    flags = THaDetMap::kFillModel;
-    if( fRefMap->Fill( refmap, flags ) <= 0 ) {
-      Error( Here(here), "Invalid reference channel map. Fix database." );
-      fRefMap->Clear();
-      return kInitError;
-    }
+    goto err;
   }
 
   // Fill the detector map for the data channels
   flags = ( THaDetMap::kFillModel | THaDetMap::kFillRefIndex );
-  if( FillDetMap( detmap, flags, here ) <= 0 )
-    return kInitError;
-  
-  Int_t nchan = fDetMap->GetTotNumChan();
+  if( FillDetMap( *detmap, flags, here ) <= 0 )
+    goto err;
+
+  nchan = fDetMap->GetTotNumChan();
   if( nchan != fNelem ) {
     Error( Here(here), "Number of detector map channels (%d) "
 	   "disagrees with number of wires (%d)", nchan, fNelem );
-    return kInitError;
+    goto err;
   }
   nchan = fTDCOffset.size();
   if( nchan > 0 && nchan != fNelem ) {
     Error( Here(here), "Number of TDC offset values (%d) "
 	   "disagrees with number of wires (%d)", nchan, fNelem );
-    return kInitError;
+    goto err;
+  }
+  // Convert units of TDC offsets
+  for( vector<float>::size_type i = 0; i < fTDCOffset.size(); ++i ) {
+    fTDCOffset[i] *= kTDCscale;
   }
 
   // Check consistency of reference channels and data channels
-  Int_t dmin, dmax;
   fDetMap->GetMinMaxChan( dmin, dmax, THaDetMap::kRefIndex );
-  Int_t nrefchan = fRefMap->GetTotNumChan();
+  nrefchan = fMWDC->GetNrefchan();
   if( nrefchan > 0 ) {
-    if( dmin < 0 && dmax < 0 ) {
-      Warning( Here(here), "Reference channels defined but not used. Check "
-	       "database." );
-      fRefMap->Clear();
-    } else {
-      Int_t rmin, rmax;
-      fRefMap->GetMinMaxChan( rmin, rmax );
-      if( (dmin >= 0 && dmin < rmin) || dmax > rmax ) {
-	Error( Here(here), "Reference channel(s) out of range: min/max=%d/%d, "
-	       "requested=%d/%d. Fix database.", rmin, rmax, dmin, dmax );
-	fRefMap->Clear();
-	return kInitError;
-      }
-      fRefTime = new Double_t[ nrefchan ];
+    if( dmax >= static_cast<Int_t>(nrefchan) ) {
+      Error( Here(here), "Reference channel out of range: requested = %d, "
+	     "max = %u. Fix database.", dmax, nrefchan );
+      goto err;
     }
-  } else if( fRefMap->GetSize() > 0 ) {
-    Error( Here(here), "Total number of reference channels = %d <= 0? "
-	   "Fix database.", nrefchan );
-    fRefMap->Clear();
-    return kInitError;
+    //TODO: check if reference channel crate/slot/resolution consistent
   } else if( dmax >= 0 ) {
     Error( Here(here), "detmap specifies refindex, but no refmap defined. "
 	   "Fix database." );
-    return kInitError;
+    goto err;
   }
 
   // Fill in default TDC resolution if no resolution given in module database
   // FIXME: remove?
-  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
-    THaDetMap::Module* d = fRefMap->GetModule(imod);
-    if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
-      d->resolution = tdc_res;
-  }
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module* d = fDetMap->GetModule(imod);
     if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
-      d->resolution = tdc_res;
+      d->resolution = tdc_res * kTDCscale;
   }
 
   // Determine the type of this plane. If the optional plane type variable is
   // not in the database, use the first character of the plane name.
-  string name = plane_type.IsNull() ? fName.Data() : plane_type.Data();
-  name = name.substr(0,1);
-  fType = fMWDC->NameToType( name.c_str() );
+  name = plane_type.IsNull() ? fName[0] : plane_type[0];
+  fType = fMWDC->NameToType( name );
   if( fType == kUndefinedType ) {
-    Error( Here(here), "Illegal plane type (%s). Fix database.", name.c_str());
-    return kInitError;
+    Error( Here(here), "Illegal plane type (%s). Fix database.", name.Data() );
+    goto err;
   }
 
+  status = kOK;
   fIsInit = true;
-  return kOK;
+ err:
+  delete detmap;
+  return status;
 }
 
 //_____________________________________________________________________________
@@ -252,41 +234,16 @@ void WirePlane::Clear( Option_t* opt )
 Int_t WirePlane::Decode( const THaEvData& evData )
 {    
   // Extract this plane's hit data from the raw evData.
+  //
+  // This routine can handle both the old Fastbus readout and the new CAEN
+  // VME pipeline TDCs. The latter require a reference channel map and
+  // cross-references to reference channels in the regular detector map
+  // of the plane.
 
-  static const char* const here = "Decode";
+  //  static const char* const here = "Decode";
 
   UInt_t nHits = 0;
-  bool pos_only = fMWDC->TestBit(MWDC::kIgnoreNegDrift);
-
-  // If any reference channels are specified, we need to read them first.
-  // They use a separate detector map, which has the same structure as the
-  // one for the data channels.
-  UInt_t nref = 0;
-  if( fRefMap->GetSize() > 0 ) {
-    for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
-      THaDetMap::Module* d = fRefMap->GetModule(imod);	
-
-      // Since we expect all channels to have a hit, we can efficiently loop
-      // over the defined channel range
-      for( Int_t chan = d->lo; chan <= d->hi; ++chan ) {
-	Int_t data;
-	Int_t nhits = evData.GetNumHits( d->crate, d->slot, chan );
-	if( nhits > 0 ) {
-	  data = evData.GetData( d->crate, d->slot, chan, nhits-1 );
-	  if( nhits > 1 ) {
-	    Warning( Here(here), "%d hits on reference channel %d module %d", 
-		     nhits, chan, imod );
-	  }
-	} else {
-	  Error( Here(here), "No hits on reference channel %d module %d. "
-		 "Event decoding failed.", chan, imod );
-	  return -1;
-	}
-	fRefTime[nref] = d->resolution * data;
-	++nref;
-      }
-    }
-  }
+  bool positive_only = fMWDC->TestBit(MWDC::kIgnoreNegDrift);
 
   // Decode data. This is done fairly efficiently by looping over only the 
   // channels with hits on each module. 
@@ -298,7 +255,8 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   Hit* prevHit = NULL;
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module * d = fDetMap->GetModule(imod);
-    Double_t ref_offset = (d->refindex >= 0) ? fRefTime[d->refindex] : 0.0;
+    Double_t ref_offset = 
+      (d->refindex >= 0) ? fMWDC->GetRefTime(d->refindex) : 0.0;
 
     // Get number of channels with hits and loop over them, skipping channels
     // that are not part of this module
@@ -311,7 +269,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	++fNmiss;
 	continue; //Not part of this detector
       }
-      // Get the wire number. Assumes that detector map is defined in order
+      // Get the wire number. Assumes that the detector map is defined in order
       // of ascending wire numbers.
       Int_t iw = d->first + chan - d->lo;
       Double_t tdc_offset = fTDCOffset[iw];
@@ -324,9 +282,10 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	// Get the TDC data for this hit
 	Int_t data = evData.GetData( d->crate, d->slot, chan, hit );
 	
-	// Convert the TDC value to the drift time
-	Double_t time = d->resolution * (data+0.5) - tdc_offset - ref_offset;
-	if( !pos_only || time > 0.0 ) {
+	// Convert the TDC value to the drift time. The readout uses 
+	// common-stop TDCs, so drift_time = tdc_time(drift=0)-tdc_time(data).
+	Double_t time = tdc_offset+ref_offset - d->resolution*(data+0.5);
+	if( !positive_only || time > 0.0 ) {
 	  Hit* theHit = 
 	    new( (*fHits)[nHits++] ) Hit( iw, 
 					  fWireStart + iw * fWireSpacing,
@@ -351,24 +310,21 @@ Int_t WirePlane::Decode( const THaEvData& evData )
     }   // chans
   }     // modules
    
-  // Sort the hits in order of increasing wire position and, for the same wire
-  // position) increasing time
+  // If ncessary, sort the hits
   fWasSorted = sorted ? 1 : revsorted ? -1 : 0;
-  if( !sorted ) {
-    if( revsorted ) {
-      // reverse array ...
-      // TODO: check if faster than qsort on revsorted data
-      // TODO: can't we just leave it revsorted?
-      TClonesArray* copy = new TClonesArray( fHits->GetClass(), 
-					     fHits->GetSize() );
-      Int_t end = fHits->GetLast();
-      for( Int_t i = 0; i < end+1; ++i )
-	new((*copy)[end-i]) Hit( *static_cast<Hit*>((*fHits)[i]) );
-      delete fHits;
-      fHits = copy;
-    } else {
-      fHits->Sort();
-    }
+  if( fWasSorted == 0 ) {
+//   if( !sorted ) {
+//     if( revsorted ) {
+//       // reverse array ... urgh
+//       TClonesArray* copy = new TClonesArray( fHits->GetClass(), 
+// 					     fHits->GetSize() );
+//       Int_t end = fHits->GetLast();
+//       for( Int_t i = 0; i < end+1; ++i )
+// 	new((*copy)[end-i]) Hit( *static_cast<Hit*>((*fHits)[i]) );
+//       delete fHits;
+//       fHits = copy;
+//     } else {
+    fHits->Sort();
   }
 
   return nHits;
