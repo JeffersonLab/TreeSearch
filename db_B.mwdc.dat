@@ -17,6 +17,19 @@ B.mwdc.maxslope = 2.5
 B.mwdc.u.angle = -60.0
 B.mwdc.v.angle = 60.0
 
+
+# "Crate map" for the MWDC. Specifies DAQ module configuration.
+# Allows mixing of Fastbus/VME and modules with different resolutions.
+# Since usually a range of slots is filled with identical modules, we define
+# slot ranges. If individual modules within a range are different, append their
+# definition at the end; they will override earlier definitions w/o warning.
+# FIXME: naturally, this should be part of the decoder's crate map
+#
+# Each rows is:    crate slot_lo slot_hi model# resolution (ps/chan)
+B.mwdc.cratemap =  3     6       21      1877   500 \
+                   4     4       11      1877   500 \
+                   4     17      24      1877   500
+
 #-----------------------------------------------------------
 #   Global defaults
 #    - can be overridden for individual planes
@@ -29,7 +42,6 @@ B.mwdc.xp.res = 2.0e-03
 B.mwdc.drift.min = 0
 B.mwdc.drift.max = 200
 B.mwdc.drift.ttd = 2.550e-08
-B.mwdc.tdc.res = 0.5e-9       # 0.5 ns/channel
 
 #-----------------------------------------------------------
 #   U PLANES
