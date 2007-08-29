@@ -17,8 +17,10 @@
 #include "TMath.h"
 #include "THaDetMap.h"
 #include "THaEvData.h"
+#include "THashTable.h"
 
 #include <algorithm>
+#include <iostream>
 
 using namespace std;
 typedef string::size_type ssiz_t;
@@ -28,8 +30,53 @@ namespace TreeSearch {
 typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<WirePlane*>::iterator vwiter_t;
+typedef vector<vector<Int_t> >::iterator vviter_t;
 
 const Double_t kBig = 1e38;
+
+// Helper class for describing a DAQ hardware module and using it with a
+// THashTable.
+//TODO: replace in favor or retrieving the information from db_cratemap
+class DAQmodule : public TObject {
+public:
+  DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, Double_t res )
+    : fCrate(crate), fSlot(slot), fModel(model), fResolution(res) {}
+  virtual ~DAQmodule() {}
+  static UInt_t MakeHash( UShort_t crate, UShort_t slot ) {
+    return static_cast<UInt_t>(crate)<<16 + static_cast<UInt_t>(slot);
+  }
+  virtual void Copy( TObject& obj ) const {
+    TObject::Copy(obj);
+    if( obj.IsA() != Class() ) return;
+    DAQmodule& m = static_cast<DAQmodule&>(obj);
+    m.fCrate = fCrate; m.fSlot = fSlot; m.fModel = fModel;
+    m.fResolution = fResolution;
+  }
+  virtual ULong_t Hash() const {
+    UInt_t cs = MakeHash( fCrate, fSlot );
+    return TString::Hash( &cs, sizeof(cs) );
+  }
+  virtual Bool_t IsEqual( const TObject* obj ) const {
+    if( !obj || obj->IsA() != Class() ) return kFALSE;
+    const DAQmodule* m = static_cast<const DAQmodule*>(obj);
+    return ( fCrate == m->fCrate && fSlot == m->fSlot );
+  }
+  virtual void Print( Option_t* opt="" ) const {
+    cout << "DAQmodule: "
+	 << " crate = " << fCrate
+	 << " slot = "  << fSlot
+	 << " model = " << fModel
+	 << " res = "   << fResolution
+	 << endl;
+  }
+  void Set( UShort_t crate, UShort_t slot, UInt_t model, Double_t res ) {
+    fCrate = crate; fSlot = slot; fModel = model; fResolution = res;
+  }
+  UShort_t  fCrate;
+  UShort_t  fSlot;
+  UInt_t    fModel;
+  Double_t  fResolution;
+};
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
@@ -40,6 +87,8 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   fProj.resize( kTypeEnd, NULL );
 
   fRefMap = new THaDetMap;
+  fCrateMap = new THashTable(50);
+  fCrateMap->SetOwner();
 
   //FIXME: test
   fDebug = 1;
@@ -72,6 +121,7 @@ MWDC::~MWDC()
   for( vpsiz_t type = 0; type < fProj.size(); ++type )
     delete fProj[type];
 
+  delete fCrateMap;
   delete fRefMap;
 }
 
@@ -386,12 +436,14 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   const char* p_name[] = { "u", "v", "x" };
 
   vector<string> planes;
-  // Putting this container on the stack may cause a stack overflow!
-  vector<int>* refmap = new vector<int>;
+  // Putting these containers on the stack may cause a stack overflow!
+  vector<Int_t>* refmap = new vector<Int_t>;
+  vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
   string planeconfig;
   DBRequest request[] = {
     { "planeconfig",  &planeconfig, kString },
+    { "cratemap",     cmap,         kIntM,    5 },
     { "refmap",       refmap,       kIntV,    0, 1 },
     { 0 }
   };
@@ -407,7 +459,12 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     goto err;
   }
 
-  // Delete existing configuration if re-initializing
+  if( cmap->empty() ) {
+    Error( Here(here), "No cratemap defined. Fix database." );
+    goto err;
+  }
+
+  // Delete existing configuration (in case we are re-initializing)
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     // Clear previous projection objects
     delete fProj[type];
@@ -418,14 +475,40 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   }
   fPlanes.clear();
   fRefTime.clear();
+  fCrateMap->Delete();
+
+  // Build the list of crate map elements
+  for( vviter_t it = cmap->begin(); it != cmap->end(); ++it ) {
+    vector<int>& row = *it;
+    for( Int_t slot = row[1]; slot <= row[2]; ++slot ) {
+      DAQmodule* m = new DAQmodule( row[0], slot, row[3], row[4]*1e-12 );
+      DAQmodule* found = static_cast<DAQmodule*>(fCrateMap->FindObject(m));
+      if( found ) { 
+ 	m->Copy(*found);  // Later entries override earlier ones
+	delete m;
+      }
+      else
+	fCrateMap->Add(m);
+    }
+  }
+  delete cmap; cmap = NULL;
 
   // Fill the reference channel detector map, if given
   if( refmap->size() > 0 ) {
-    UInt_t flags = THaDetMap::kFillModel;
-    if( fRefMap->Fill( *refmap, flags ) <= 0 ) {
+    if( fRefMap->Fill( *refmap ) <= 0 ) {
       Error( Here(here), "Invalid reference channel map. Fix database." );
       goto err;
     }
+  }
+  delete refmap; refmap = NULL;
+  // Once the refmap is in, load the module parameters (model, resolution)
+  // from the cratemap (the simple one we loaded from our own database)
+  // TODO: use the actual db_cratemap and THaCrateMap interface for this
+  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fRefMap->GetModule(imod);
+    //TODO: fill it    
+    if( d->IsTDC() && d->resolution < 0.0 )
+      d->resolution = 1e-9;
   }
   // Consistency checks of the reference channel map
   fNrefchan = fRefMap->GetTotNumChan();
@@ -443,12 +526,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     Error( Here(here), "Total number of reference channels = 0? "
 	   "Fix database." );
     goto err;
-  }
-  // Set default resolution of channels if not already given
-  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
-    THaDetMap::Module* d = fRefMap->GetModule(imod);
-    if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
-      d->resolution = 1e-9;
   }
 
   // Set up the definitions of the wire directions (track projections)
@@ -492,6 +569,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   if( fDebug > 0 )
     Info( Here(here), "Loaded %u planes", fPlanes.size() );
 
+  // Associate planes and partners (names identical except trailing "p")
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
     WirePlane* thePlane = fPlanes[iplane];
     TString name( thePlane->GetName() );
@@ -514,6 +592,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   status = kOK;
   fIsInit = kTRUE;
  err:
+  delete cmap;
   delete refmap;
   return status;
 }
@@ -529,6 +608,30 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 
 
 //_____________________________________________________________________________
+#if 0
+// TEST
+  {
+    // Print all defined detector map items
+    string prefix = "B.mwdc.";
+    THaDetMap* map = new THaDetMap;
+    vector<Int_t>* vi = new vector<Int_t>;
+    UInt_t flags = THaDetMap::kDoNotClear|THaDetMap::kFillModel|
+      THaDetMap::kFillRefIndex;
+    for( ssiz_t i=0; i<planes.size(); ++i ) {
+      string key = prefix + planes[i];
+      key += ".detmap";
+      if( LoadDBarray(file,date,key.c_str(),*vi) == 0 ) {
+	map->Fill(*vi,flags);
+      }
+      vi->clear();
+    }
+    map->Sort();
+    map->Print();
+    delete map;
+    delete vi;
+  }
+#endif	  
+
 
 }  
 

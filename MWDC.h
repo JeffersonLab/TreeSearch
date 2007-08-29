@@ -14,6 +14,7 @@
 class THaTrack;
 class THaBenchmark;
 class TClonesArray;
+class THashTable;
 
 using std::vector;
 
@@ -67,6 +68,8 @@ namespace TreeSearch {
     THaDetMap*      fRefMap;    // Map of reference channels for VME readout
     UInt_t          fNrefchan;  // Number of logical reference channels
     vector<float>   fRefTime;   // [fNrefchan] ref channel data
+
+    THashTable*     fCrateMap;  // Map of MWDC DAQ modules
 
     virtual Int_t   ReadDatabase( const TDatime& date );
 
