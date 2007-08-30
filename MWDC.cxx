@@ -39,12 +39,9 @@ const Double_t kBig = 1e38;
 //TODO: replace in favor or retrieving the information from db_cratemap
 class DAQmodule : public TObject {
 public:
-  DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, Double_t res )
+  DAQmodule( UShort_t crate, UShort_t slot, UInt_t model=0, Double_t res=0.0 )
     : fCrate(crate), fSlot(slot), fModel(model), fResolution(res) {}
   virtual ~DAQmodule() {}
-  static UInt_t MakeHash( UShort_t crate, UShort_t slot ) {
-    return static_cast<UInt_t>(crate)<<16 + static_cast<UInt_t>(slot);
-  }
   virtual void Copy( TObject& obj ) const {
     TObject::Copy(obj);
     if( obj.IsA() != Class() ) return;
@@ -53,7 +50,7 @@ public:
     m.fResolution = fResolution;
   }
   virtual ULong_t Hash() const {
-    UInt_t cs = MakeHash( fCrate, fSlot );
+    UInt_t cs = static_cast<UInt_t>(fCrate)<<16 + static_cast<UInt_t>(fSlot);
     return TString::Hash( &cs, sizeof(cs) );
   }
   virtual Bool_t IsEqual( const TObject* obj ) const {
@@ -80,15 +77,13 @@ public:
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
-  : THaTrackingDetector(name,desc,app)
+  : THaTrackingDetector(name,desc,app), fCrateMap(NULL)
 { 
   // Constructor
 
   fProj.resize( kTypeEnd, NULL );
 
   fRefMap = new THaDetMap;
-  fCrateMap = new THashTable(50);
-  fCrateMap->SetOwner();
 
   //FIXME: test
   fDebug = 1;
@@ -121,7 +116,6 @@ MWDC::~MWDC()
   for( vpsiz_t type = 0; type < fProj.size(); ++type )
     delete fProj[type];
 
-  delete fCrateMap;
   delete fRefMap;
 }
 
@@ -132,19 +126,93 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 
   static const char* const here = "Init";
 
-  // Initialize ourselves. This calls our ReadDatabase().
+  fStatus = kNotinit;
+
+  // The "cratemap" is only needed during Init
+  fCrateMap = new THashTable(100);
+  fCrateMap->SetOwner();
+
+  // Initialize ourselves. This calls our ReadDatabase() and DefineVariables()
   EStatus status = THaTrackingDetector::Init(date);
   if( status )
-    return fStatus = status;
+    goto delcmap;
 
-  // Initialize the plane type "subdetector" - i.e. read database
+  // Iinitialize the wire planes
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+    status = fPlanes[iplane]->Init(date);
+    if( status )
+      goto delcmap;
+  }
+
+  // Initialize the projections
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     status = fProj[type]->Init(date);
     if( status )
       return fStatus = status;
   }
 
-  // Sanity checks of U and V angles
+  //TODO: Auto-discover refmap from the detmaps of the planes
+  // Load the module parameters (model, resolution)
+  // from the cratemap (the simple one we loaded from our own database)
+  // TODO: use the actual db_cratemap and THaCrateMap interface for this
+  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fRefMap->GetModule(imod);
+    GetDAQmodel(d);
+    GetDAQresolution(d);
+    d->MakeTDC();
+  }
+
+  //FIXME: not needed
+  // Consistency checks of the reference channel map
+  fNrefchan = fRefMap->GetTotNumChan();
+  if( fNrefchan > 0 ) {
+    Int_t rmin, rmax;
+    fRefMap->GetMinMaxChan( rmin, rmax );
+    if( rmin < 0 || rmax != static_cast<Int_t>(fNrefchan) ) {
+      Error( Here(here), "Reference channel number inconsistency. "
+	     "min/max/tot = %d %d %u.  Fix database.", rmin, rmax, fNrefchan );
+      status = kInitError;
+      goto delcmap;
+    }
+    // All ok - grow and fill the refchan data array with kBigs
+    fRefTime.assign( fNrefchan, kBig );
+  } else if( fRefMap->GetSize() > 0 ) {
+    Error( Here(here), "Total number of reference channels = 0? "
+	   "Fix database." );
+    status = kInitError;
+    goto delcmap;
+  }
+
+ delcmap:
+  delete fCrateMap; fCrateMap = NULL;
+  if( status )
+    return fStatus = status;
+
+  // Sort planes by increasing z-position
+  sort( fPlanes.begin(), fPlanes.end(), WirePlane::ZIsLess() );
+
+  // Associate planes and partners (names identical except trailing "p")
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+    WirePlane* thePlane = fPlanes[iplane];
+    TString name( thePlane->GetName() );
+    if( name.EndsWith("p") ) {
+      TString other = name.Chop();
+      if( other.IsNull() )
+	continue;
+      vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
+			     WirePlane::NameEquals( other ) );
+      if( it != fPlanes.end() ) {
+	WirePlane* partner = *it;
+	if( fDebug > 0 )
+	  Info( Here(here), "Partnering plane %s with %s",
+		thePlane->GetName(), partner->GetName() );
+	//TODO: check whether plane types match!
+	partner->SetPartner( thePlane );
+      }
+    }
+  }
+
+  // Sanity checks of U and V angles which the projections read via Init
   Double_t u_angle = fProj[kUPlane]->GetAngle()*TMath::RadToDeg();
   Double_t v_angle = fProj[kVPlane]->GetAngle()*TMath::RadToDeg();
   Int_t qu = TMath::FloorNint( u_angle/90.0 );
@@ -161,24 +229,15 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
       TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
     Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
 	   "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
-    return kInitError;
+    return fStatus = kInitError;
   }
-
-  // Iinitialize the wire planes
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    status = fPlanes[iplane]->Init(date);
-    if( status )
-      return fStatus = status;
-  }
-
-  // Sort planes by increasing z-position
-  sort( fPlanes.begin(), fPlanes.end(), WirePlane::ZIsLess() );
 
   // Determine per-projection plane parameters
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* theProj = fProj[type];
     UInt_t n = 0;
     Double_t width = 0.0;
+    // Associate planes with plane types
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
       WirePlane* thePlane = fPlanes[iplane];
       if( thePlane->GetType() == type ) {
@@ -418,6 +477,28 @@ EProjType MWDC::NameToType( const char* name )
 
 
 //_____________________________________________________________________________
+UInt_t MWDC::GetDAQmodel( THaDetMap::Module* mod ) const
+{
+  if( !fCrateMap ) return 0;
+  DAQmodule m( mod->crate, mod->slot );
+  DAQmodule* found = static_cast<DAQmodule*>( fCrateMap->FindObject(&m) );
+  UInt_t num = found ? found->fModel : 0;
+  mod->SetModel( num );
+  return num;
+}
+
+//_____________________________________________________________________________
+Double_t MWDC::GetDAQresolution( THaDetMap::Module* mod ) const
+{
+  if( !fCrateMap ) return 0.0;
+  DAQmodule m( mod->crate, mod->slot );
+  DAQmodule* found = static_cast<DAQmodule*>( fCrateMap->FindObject(&m) );
+  Double_t res = found ? found->fResolution : 0.0;
+  mod->SetResolution( res );
+  return res;
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::ReadDatabase( const TDatime& date )
 {
   // Read MWDC database
@@ -425,18 +506,23 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   static const char* const here = "ReadDatabase";
 
   fIsInit = kFALSE;
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+    delete fPlanes[iplane];
+  }
+  // Delete existing configuration (in case we are re-initializing)
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    delete fProj[type];
+    fProj[type] = NULL;
+  }
+  fPlanes.clear();
+  fRefTime.clear();
 
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  Int_t status = kInitError;
-  // Default plane angles and names
-  // The angles can be overridden via the database
-  Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
-  const char* p_name[] = { "u", "v", "x" };
-
-  vector<string> planes;
   // Putting these containers on the stack may cause a stack overflow!
+  // FIXME: reading refmap from the database is not necessary -
+  // auto-discover it from the refindexes of the detector maps
   vector<Int_t>* refmap = new vector<Int_t>;
   vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
@@ -448,6 +534,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     { 0 }
   };
 
+  vector<string> planes;
+  Int_t status = kInitError;
   Int_t err = LoadDB( file, date, request, fPrefix );
   fclose(file);
   if( err )
@@ -464,19 +552,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     goto err;
   }
 
-  // Delete existing configuration (in case we are re-initializing)
-  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    // Clear previous projection objects
-    delete fProj[type];
-    fProj[type] = NULL;
-  }
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    delete fPlanes[iplane];
-  }
-  fPlanes.clear();
-  fRefTime.clear();
-  fCrateMap->Delete();
-
   // Build the list of crate map elements
   for( vviter_t it = cmap->begin(); it != cmap->end(); ++it ) {
     vector<int>& row = *it;
@@ -491,7 +566,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 	fCrateMap->Add(m);
     }
   }
-  delete cmap; cmap = NULL;
 
   // Fill the reference channel detector map, if given
   if( refmap->size() > 0 ) {
@@ -500,49 +574,12 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       goto err;
     }
   }
+  status = kOK;
+ err:
+  delete cmap; cmap = NULL;
   delete refmap; refmap = NULL;
-  // Once the refmap is in, load the module parameters (model, resolution)
-  // from the cratemap (the simple one we loaded from our own database)
-  // TODO: use the actual db_cratemap and THaCrateMap interface for this
-  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
-    THaDetMap::Module* d = fRefMap->GetModule(imod);
-    //TODO: fill it    
-    if( d->IsTDC() && d->resolution < 0.0 )
-      d->resolution = 1e-9;
-  }
-  // Consistency checks of the reference channel map
-  fNrefchan = fRefMap->GetTotNumChan();
-  if( fNrefchan > 0 ) {
-    Int_t rmin, rmax;
-    fRefMap->GetMinMaxChan( rmin, rmax );
-    if( rmin < 0 || rmax != static_cast<Int_t>(fNrefchan) ) {
-      Error( Here(here), "Reference channel number inconsistency. "
-	     "min/max/tot = %d %d %u.  Fix database.", rmin, rmax, fNrefchan );
-      goto err;
-    }
-    // All ok - grow and fill the refchan data array with kBigs
-    fRefTime.assign( fNrefchan, kBig );
-  } else if( fRefMap->GetSize() > 0 ) {
-    Error( Here(here), "Total number of reference channels = 0? "
-	   "Fix database." );
-    goto err;
-  }
-
-  // Set up the definitions of the wire directions (track projections)
-  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    Projection* proj = new Projection( type, 
-				       p_name[type], 
-				       p_angle[type]*TMath::DegToRad(),
-				       this 
-				       );
-    if( !proj || proj->IsZombie() ) {
-      // Urgh. Something is very bad
-      Error( Here(here), "Error creating projection %s. Call expert.", 
-	     p_name[type] );
-      goto err;
-    }
-    fProj[type] = proj;
-  }
+  if( status != kOK )
+    return status;
 
   // Set up the wire planes
   for( ssiz_t i=0; i<planes.size(); ++i ) {
@@ -554,14 +591,14 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     if( it != fPlanes.end() ) {
       Error( Here(here), "Duplicate plane name: %s. Fix database.", 
 	     name.Data() );
-      goto err;
+      return kInitError;
     }
     WirePlane* newplane = new WirePlane( name, name, this );
     if( !newplane || newplane->IsZombie() ) {
       // Urgh. Something is very bad
       Error( Here(here), "Error creating wire plane %s. Call expert.", 
 	     name.Data() );
-      goto err;
+      return kInitError;
     }
     fPlanes.push_back( newplane );
   }
@@ -569,32 +606,28 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   if( fDebug > 0 )
     Info( Here(here), "Loaded %u planes", fPlanes.size() );
 
-  // Associate planes and partners (names identical except trailing "p")
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    WirePlane* thePlane = fPlanes[iplane];
-    TString name( thePlane->GetName() );
-    if( name.EndsWith("p") ) {
-      TString other = name.Chop();
-      if( other.IsNull() )
-	continue;
-      vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			     WirePlane::NameEquals( other ) );
-      if( it != fPlanes.end() ) {
-	WirePlane* partner = *it;
-	if( fDebug > 0 )
-	  Info( Here(here), "Partnering plane %s with %s",
-		thePlane->GetName(), partner->GetName() );
-	partner->SetPartner( thePlane );
-      }
+  // Set up the projection objects (describing wire planes of same type)
+
+  // Default plane angles and names. Angles can be overridden via the database
+  Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
+  const char* p_name[] = { "u", "v", "x" };
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    Projection* proj = new Projection( type, 
+				       p_name[type], 
+				       p_angle[type]*TMath::DegToRad(),
+				       this 
+				       );
+    if( !proj || proj->IsZombie() ) {
+      // Urgh. Something bad is going on
+      Error( Here(here), "Error creating projection %s. Call expert.", 
+	     p_name[type] );
+      return kInitError;
     }
+    fProj[type] = proj;
   }
 
-  status = kOK;
   fIsInit = kTRUE;
- err:
-  delete cmap;
-  delete refmap;
-  return status;
+  return kOK;
 }
 
 //_____________________________________________________________________________

@@ -9,6 +9,7 @@
 
 #include "THaTrackingDetector.h"
 #include "Projection.h"
+#include "THaDetMap.h"
 #include <vector>
 
 class THaTrack;
@@ -29,6 +30,8 @@ namespace TreeSearch {
 		   kVPlane, kXPlane, kTypeEnd };
 
   class MWDC : public THaTrackingDetector {
+    friend class WirePlane;
+
   public:
     MWDC( const char* name, const char* description = "", 
 	  THaApparatus* app = NULL );
@@ -72,6 +75,10 @@ namespace TreeSearch {
     THashTable*     fCrateMap;  // Map of MWDC DAQ modules
 
     virtual Int_t   ReadDatabase( const TDatime& date );
+
+    // Helper functions for getting DAQ module parameters - used by Init
+    UInt_t GetDAQmodel( THaDetMap::Module* m ) const;
+    Double_t GetDAQresolution( THaDetMap::Module* m ) const;
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };

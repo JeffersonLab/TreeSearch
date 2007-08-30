@@ -81,17 +81,9 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( err )
     return err;
 
-  Int_t status = kInitError;
-
   TString plane_type;
-  Int_t tdc_res = 1000;  // 1ns/ch default resolution
   // Putting this on the stack may cause a stack overflow
-  vector<int>* detmap = new vector<int>;
-
-  UInt_t flags, nrefchan;
-  Int_t nchan;
-  TString name;
-  Int_t dmin, dmax;
+  vector<Int_t>* detmap = new vector<Int_t>;
 
   DBRequest request[] = {
     { "detmap",       detmap,        kIntV },
@@ -99,8 +91,6 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "type",         &plane_type,   kTString, 0, 1 },
     { "wire.pos",     &fWireStart },
     { "wire.spacing", &fWireSpacing, kDouble,  0, 0, -1 },
-    //FIXME: remove?
-    { "tdc.res",      &tdc_res,      kDouble,  0, 1, -1 },
     { "drift.v",      &fDriftVel,    kDouble,  0, 0, -1 },
     { "xp.res",       &fResolution,  kDouble,  0, 0, -1 },
     { "tdc.offsets",  &fTDCOffset,   kFloatV,  0, 0 },
@@ -108,76 +98,93 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { 0 }
   };
 
+  Int_t status = kOK;
+  UInt_t flags;
   err = LoadDB( file, date, request, fPrefix );
   fclose(file);
-  if( err )
-    goto err;
-
-  if( fNelem <= 0 ) {
-    Error( Here(here), "Invalid number of wires: %d", fNelem );
+  if( err ) {
+    status = kInitError;
     goto err;
   }
 
-  // Fill the detector map for the data channels
+  // Parse the detector map of the data channels
   flags = ( THaDetMap::kFillModel | THaDetMap::kFillRefIndex );
   if( FillDetMap( *detmap, flags, here ) <= 0 )
-    goto err;
+    status = kInitError;
+ err:
+  delete detmap; detmap = NULL;
+  if( status != kOK )
+    return status;
 
-  nchan = fDetMap->GetTotNumChan();
+  // Retrieve TDC resolution and model number for our crateslots
+  for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fDetMap->GetModule(imod);
+    fMWDC->GetDAQmodel(d);
+    fMWDC->GetDAQresolution(d);
+    d->MakeTDC();
+    ;
+  }
+
+  // Sanity checks
+  if( fNelem <= 0 ) {
+    Error( Here(here), "Invalid number of wires: %d", fNelem );
+    return kInitError;
+  }
+
+  Int_t nchan = fDetMap->GetTotNumChan();
   if( nchan != fNelem ) {
     Error( Here(here), "Number of detector map channels (%d) "
 	   "disagrees with number of wires (%d)", nchan, fNelem );
-    goto err;
+    return kInitError;
   }
   nchan = fTDCOffset.size();
-  if( nchan > 0 && nchan != fNelem ) {
+  if( nchan != fNelem ) {
     Error( Here(here), "Number of TDC offset values (%d) "
 	   "disagrees with number of wires (%d)", nchan, fNelem );
-    goto err;
+    return kInitError;
   }
-  // Convert units of TDC offsets
+  // Convert TDC offsets to seconds
   for( vector<float>::size_type i = 0; i < fTDCOffset.size(); ++i ) {
     fTDCOffset[i] *= kTDCscale;
   }
 
+  //FIXME: this is unnecessary
   // Check consistency of reference channels and data channels
+  Int_t dmin, dmax;
   fDetMap->GetMinMaxChan( dmin, dmax, THaDetMap::kRefIndex );
-  nrefchan = fMWDC->GetNrefchan();
+  UInt_t nrefchan = fMWDC->GetNrefchan();
   if( nrefchan > 0 ) {
     if( dmax >= static_cast<Int_t>(nrefchan) ) {
       Error( Here(here), "Reference channel out of range: requested = %d, "
 	     "max = %u. Fix database.", dmax, nrefchan );
-      goto err;
+      return kInitError;
     }
-    //TODO: check if reference channel crate/slot/resolution consistent
+    // Check if reference channel crate/slot consistent
+    for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
+      THaDetMap::Module* d = fDetMap->GetModule(imod);
+      if( *d != *(fMWDC->fRefMap->GetModule(d->refindex)) ) {
+	Error( Here(here), "Reference channel index %d points to "
+	       "wrong crateslot. Fix database.", d->refindex );
+	return kInitError;
+      }
+    }
   } else if( dmax >= 0 ) {
     Error( Here(here), "detmap specifies refindex, but no refmap defined. "
 	   "Fix database." );
-    goto err;
-  }
-
-  // Fill in default TDC resolution if no resolution given in module database
-  // FIXME: remove?
-  for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
-    THaDetMap::Module* d = fDetMap->GetModule(imod);
-    if( THaDetMap::IsTDC(d) && d->resolution < 0.0 )
-      d->resolution = tdc_res * kTDCscale;
+    return kInitError;
   }
 
   // Determine the type of this plane. If the optional plane type variable is
   // not in the database, use the first character of the plane name.
-  name = plane_type.IsNull() ? fName[0] : plane_type[0];
+  TString name = plane_type.IsNull() ? fName[0] : plane_type[0];
   fType = fMWDC->NameToType( name );
   if( fType == kUndefinedType ) {
     Error( Here(here), "Illegal plane type (%s). Fix database.", name.Data() );
-    goto err;
+    return kInitError;
   }
 
-  status = kOK;
   fIsInit = true;
- err:
-  delete detmap;
-  return status;
+  return kOK;
 }
 
 //_____________________________________________________________________________
@@ -203,9 +210,6 @@ THaAnalysisObject::EStatus WirePlane::Init( const TDatime& date )
 {
   // Calls its own Init(), then initializes subdetectors, then calculates
   // some local geometry data.
-
-  if( IsZombie() )
-    return fStatus = kNotinit;
 
   EStatus status = THaSubDetector::Init( date );
   if( status ) 
