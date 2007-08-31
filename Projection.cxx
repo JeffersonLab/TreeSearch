@@ -10,11 +10,14 @@
 #include "Hitpattern.h"
 #include "WirePlane.h"
 #include "THaDetectorBase.h"
+#include "TString.h"
 #include <iostream>
 
 using namespace std;
 
 namespace TreeSearch {
+
+typedef vector<WirePlane*>::size_type vwsiz_t;
 
 //_____________________________________________________________________________
 Projection::Projection( Int_t type, const char* name, Double_t angle,
@@ -106,6 +109,8 @@ void Projection::AddPlane( WirePlane* wp )
     ++p;
   }
   
+  // Only add the primary plane; partner planes are linked within the
+  // plane objects
   fPlanes.push_back( wp );
 }
 
@@ -144,6 +149,8 @@ void Projection::SetAngle( Double_t angle )
 THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 {
   // Initialize plane type parameters. Reads database.
+
+  fPlanes.clear();
 
   EStatus status = THaAnalysisObject::Init(date);
   if( status != kOK )
@@ -190,8 +197,9 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  Double_t angle = kBig;
+  fIsInit = kFALSE;  // Force check of hitpattern parameters
 
+  Double_t angle = kBig;
   DBRequest request[] = {
     { "angle",        &angle,        kDouble, 0, 1 },
     { "maxslope",     &fMaxSlope,    kDouble, 0, 1, -1 },
@@ -220,7 +228,6 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     fMaxSlope = -fMaxSlope;
   }
 
-  fIsInit = kFALSE;  // Force check of hitpattern parameters
   return kOK;
 }
 
@@ -273,6 +280,13 @@ void Projection::Print( Option_t* opt ) const
 {    
   // Print plane type info
 
+  Int_t verbose = 0;
+  if( opt ) {
+    TString opt_s(opt);
+    opt_s.ToLower();
+    verbose = opt_s.CountChar('v');
+  }
+
   cout << "Projection:  " 
        << GetName()
        << " type=" << GetType()
@@ -284,7 +298,15 @@ void Projection::Print( Option_t* opt ) const
        << " angle=" << GetAngle()*TMath::RadToDeg();
   cout << endl;
 
-  //TODO: print plane details
+  if( verbose > 0 ) {
+    for( vwsiz_t i = 0; i < fPlanes.size(); ++i ) {
+      WirePlane* wp = fPlanes[i];
+      wp->Print(opt);
+      wp = wp->GetPartner();
+      if( wp )
+	wp->Print();
+    }
+  }
 }
 
 //_____________________________________________________________________________
