@@ -50,8 +50,7 @@ namespace TreeSearch {
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
     Double_t        GetRefTime( UInt_t i ) const 
-    { return (i<fNrefchan) ? fRefTime[i] : kBig; }
-    UInt_t          GetNrefchan() const { return fNrefchan; }
+    { return (i<(UInt_t)fRefMap->GetSize()) ? fRefTime[i] : kBig; }
 
     EProjType       NameToType( const char* name );
 
@@ -69,8 +68,7 @@ namespace TreeSearch {
     vector<Projection*>  fProj;    // Plane projections
 
     THaDetMap*      fRefMap;    // Map of reference channels for VME readout
-    UInt_t          fNrefchan;  // Number of logical reference channels
-    vector<float>   fRefTime;   // [fNrefchan] ref channel data
+    vector<float>   fRefTime;   // [fRefMap->GetSize()] ref channel data
 
     THashTable*     fCrateMap;  // Map of MWDC DAQ modules
 
@@ -78,7 +76,11 @@ namespace TreeSearch {
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t GetDAQmodel( THaDetMap::Module* m ) const;
+    UInt_t GetDAQnchan( THaDetMap::Module* m ) const;
     Double_t GetDAQresolution( THaDetMap::Module* m ) const;
+
+    // Utility function for error messages - used by WirePlane::Init
+    vector<TString> GetProjectionNames() const;
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
