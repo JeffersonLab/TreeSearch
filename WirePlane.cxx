@@ -98,20 +98,16 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { 0 }
   };
 
-  Int_t status = kOK;
+  Int_t status = kInitError;
   UInt_t flags;
   err = LoadDB( file, date, request, fPrefix );
   fclose(file);
-  if( err ) {
-    status = kInitError;
-    goto err;
+  if( !err ) {
+    // Parse the detector map of the data channels
+    flags = THaDetMap::kFillRefIndex;
+    if( FillDetMap( *detmap, flags, here ) > 0 )
+      status = kOK;
   }
-
-  // Parse the detector map of the data channels
-  flags = ( THaDetMap::kFillModel | THaDetMap::kFillRefIndex );
-  if( FillDetMap( *detmap, flags, here ) <= 0 )
-    status = kInitError;
- err:
   delete detmap; detmap = NULL;
   if( status != kOK )
     return status;
@@ -122,7 +118,19 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     fMWDC->GetDAQmodel(d);
     fMWDC->GetDAQresolution(d);
     d->MakeTDC();
-    ;
+    UInt_t nchan = fMWDC->GetDAQnchan(d);
+    if( d->hi >= nchan ) {
+      Error( Here(here), "Detector map channel out of range for module "
+	     "cr/sl/lo/hi = %u/%u/%u/%u. Must be < %u. Fix database.",
+	     d->crate, d->slot, d->lo, d->hi, nchan );
+      return kInitError;
+    }
+    if( d->refindex >= static_cast<Int_t>(nchan) ) {
+      Error( Here(here), "Detector map reference channel %d out of range for "
+	     "module cr/sl/lo/hi = %u/%u/%u/%u. Must be < %u. Fix database.",
+	     d->refindex, d->crate, d->slot, d->lo, d->hi, nchan );
+      return kInitError;
+    }
   }
 
   // Sanity checks
@@ -148,6 +156,24 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     fTDCOffset[i] *= kTDCscale;
   }
 
+  // Determine the type of this plane. If the optional plane type variable is
+  // not given, use the first character of the plane name.
+  TString name = plane_type.IsNull() ? fName[0] : plane_type[0];
+  fType = fMWDC->NameToType( name );
+  if( fType == kUndefinedType ) {
+    vector<TString> name_list = fMWDC->GetProjectionNames();
+    TString names;
+    for( vector<string>::size_type i = 0; i<name_list.size(); ++i ) {
+      names += name_list[i];
+      if( i+1 != name_list.size() ) 
+	names += " ";
+    }
+    Error( Here(here), "Unsupported plane type \"%s\". Must be one of "
+	   "%s. Fix database.", name.Data(), names.Data() );
+    return kInitError;
+  }
+
+#if 0
   //FIXME: this is unnecessary
   // Check consistency of reference channels and data channels
   Int_t dmin, dmax;
@@ -173,15 +199,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 	   "Fix database." );
     return kInitError;
   }
-
-  // Determine the type of this plane. If the optional plane type variable is
-  // not in the database, use the first character of the plane name.
-  TString name = plane_type.IsNull() ? fName[0] : plane_type[0];
-  fType = fMWDC->NameToType( name );
-  if( fType == kUndefinedType ) {
-    Error( Here(here), "Illegal plane type (%s). Fix database.", name.Data() );
-    return kInitError;
-  }
+#endif
 
   fIsInit = true;
   return kOK;
