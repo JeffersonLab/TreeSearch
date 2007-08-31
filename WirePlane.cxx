@@ -104,7 +104,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   fclose(file);
   if( !err ) {
     // Parse the detector map of the data channels
-    flags = THaDetMap::kFillRefIndex;
+    flags = THaDetMap::kFillRefChan;
     if( FillDetMap( *detmap, flags, here ) > 0 )
       status = kOK;
   }
@@ -125,10 +125,10 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 	     d->crate, d->slot, d->lo, d->hi, nchan );
       return kInitError;
     }
-    if( d->refindex >= static_cast<Int_t>(nchan) ) {
+    if( d->refchan >= static_cast<Int_t>(nchan) ) {
       Error( Here(here), "Detector map reference channel %d out of range for "
 	     "module cr/sl/lo/hi = %u/%u/%u/%u. Must be < %u. Fix database.",
-	     d->refindex, d->crate, d->slot, d->lo, d->hi, nchan );
+	     d->refchan, d->crate, d->slot, d->lo, d->hi, nchan );
       return kInitError;
     }
   }
@@ -172,34 +172,6 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 	   "%s. Fix database.", name.Data(), names.Data() );
     return kInitError;
   }
-
-#if 0
-  //FIXME: this is unnecessary
-  // Check consistency of reference channels and data channels
-  Int_t dmin, dmax;
-  fDetMap->GetMinMaxChan( dmin, dmax, THaDetMap::kRefIndex );
-  UInt_t nrefchan = fMWDC->GetNrefchan();
-  if( nrefchan > 0 ) {
-    if( dmax >= static_cast<Int_t>(nrefchan) ) {
-      Error( Here(here), "Reference channel out of range: requested = %d, "
-	     "max = %u. Fix database.", dmax, nrefchan );
-      return kInitError;
-    }
-    // Check if reference channel crate/slot consistent
-    for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
-      THaDetMap::Module* d = fDetMap->GetModule(imod);
-      if( *d != *(fMWDC->fRefMap->GetModule(d->refindex)) ) {
-	Error( Here(here), "Reference channel index %d points to "
-	       "wrong crateslot. Fix database.", d->refindex );
-	return kInitError;
-      }
-    }
-  } else if( dmax >= 0 ) {
-    Error( Here(here), "detmap specifies refindex, but no refmap defined. "
-	   "Fix database." );
-    return kInitError;
-  }
-#endif
 
   fIsInit = true;
   return kOK;
@@ -334,8 +306,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
    
   // If ncessary, sort the hits
   fWasSorted = sorted ? 1 : revsorted ? -1 : 0;
-  if( fWasSorted == 0 ) {
-//   if( !sorted ) {
+  if( !sorted ) {
 //     if( revsorted ) {
 //       // reverse array ... urgh
 //       TClonesArray* copy = new TClonesArray( fHits->GetClass(), 
