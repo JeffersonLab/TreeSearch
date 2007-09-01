@@ -43,7 +43,11 @@ public:
   CSpair( UShort_t crate, UShort_t slot ) : fCrate(crate), fSlot(slot) {}
   virtual ULong_t Hash() const {
     UInt_t cs = static_cast<UInt_t>(fCrate)<<16 + static_cast<UInt_t>(fSlot);
+#if ROOT_VERSION_CODE >= ROOT_VERSION(5,16,0)
     return TString::Hash( &cs, sizeof(cs) );
+#else
+    return TMath::Hash( &cs, sizeof(cs) );
+#endif
   }
   virtual Bool_t IsEqual( const TObject* obj ) const {
     const CSpair* m;
@@ -110,7 +114,7 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   }
 
   //FIXME: test
-  fDebug = 1;
+  //  fDebug = 1;
 
 
   // Default behavior for now
@@ -195,6 +199,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	// been determined when the plane's detector map was filled. Also,
 	// refindex was checked to be a vaid channel number for this model.
 	refmod->SetResolution( d->resolution );
+	refmod->MakeTDC();
       }
     }
   }
@@ -526,22 +531,30 @@ EProjType MWDC::NameToType( const char* name )
 
 
 //_____________________________________________________________________________
-UInt_t MWDC::GetDAQmodel( THaDetMap::Module* mod ) const
+inline
+static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot, 
+				 const THashTable* table )
 {
-  if( !fCrateMap ) return 0;
-  CSpair m( mod->crate, mod->slot );
-  DAQmodule* found = static_cast<DAQmodule*>( fCrateMap->FindObject(&m) );
+  if( !table ) return NULL;
+  CSpair m( crate, slot );
+  return static_cast<DAQmodule*>( table->FindObject(&m) );
+}
+
+//_____________________________________________________________________________
+UInt_t MWDC::LoadDAQmodel( THaDetMap::Module* mod ) const
+{
+  // Update detector map module 'mod' with the model number from the cratemap
+  DAQmodule* found = FindDAQmodule( mod->crate, mod->slot, fCrateMap );
   UInt_t num = found ? found->fModel : 0;
   mod->SetModel( num );
   return num;
 }
 
 //_____________________________________________________________________________
-Double_t MWDC::GetDAQresolution( THaDetMap::Module* mod ) const
+Double_t MWDC::LoadDAQresolution( THaDetMap::Module* mod ) const
 {
-  if( !fCrateMap ) return 0.0;
-  CSpair m( mod->crate, mod->slot );
-  DAQmodule* found = static_cast<DAQmodule*>( fCrateMap->FindObject(&m) );
+  // Update detector map module 'mod' with the resolution from the cratemap
+  DAQmodule* found = FindDAQmodule( mod->crate, mod->slot, fCrateMap );
   Double_t res = found ? found->fResolution : 0.0;
   mod->SetResolution( res );
   return res;
@@ -550,9 +563,8 @@ Double_t MWDC::GetDAQresolution( THaDetMap::Module* mod ) const
 //_____________________________________________________________________________
 UInt_t MWDC::GetDAQnchan( THaDetMap::Module* mod ) const
 {
-  if( !fCrateMap ) return 0;
-  CSpair m( mod->crate, mod->slot );
-  DAQmodule* found = static_cast<DAQmodule*>( fCrateMap->FindObject(&m) );
+  // Return number of channels for detector map module 'mod' from cratemap
+  DAQmodule* found = FindDAQmodule( mod->crate, mod->slot, fCrateMap );
   return found ? found->fNchan : 0;
 }
 
@@ -560,7 +572,7 @@ UInt_t MWDC::GetDAQnchan( THaDetMap::Module* mod ) const
 vector<TString> MWDC::GetProjectionNames() const
 {
   // Utility function. Returns names of all defined Projections in 
-  // an array of strings
+  // an array of strings in the order of EProjType
   vector<TString> name_list;
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     TString s = fProj[type]->GetName();

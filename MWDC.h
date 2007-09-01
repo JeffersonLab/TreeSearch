@@ -75,9 +75,9 @@ namespace TreeSearch {
     virtual Int_t   ReadDatabase( const TDatime& date );
 
     // Helper functions for getting DAQ module parameters - used by Init
-    UInt_t GetDAQmodel( THaDetMap::Module* m ) const;
-    UInt_t GetDAQnchan( THaDetMap::Module* m ) const;
-    Double_t GetDAQresolution( THaDetMap::Module* m ) const;
+    UInt_t   LoadDAQmodel( THaDetMap::Module* m ) const;
+    Double_t LoadDAQresolution( THaDetMap::Module* m ) const;
+    UInt_t   GetDAQnchan( THaDetMap::Module* m ) const;
 
     // Utility function for error messages - used by WirePlane::Init
     vector<TString> GetProjectionNames() const;

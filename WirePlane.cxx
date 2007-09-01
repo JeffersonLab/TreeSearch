@@ -115,8 +115,8 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   // Retrieve TDC resolution and model number for our crateslots
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module* d = fDetMap->GetModule(imod);
-    fMWDC->GetDAQmodel(d);
-    fMWDC->GetDAQresolution(d);
+    fMWDC->LoadDAQmodel(d);
+    fMWDC->LoadDAQresolution(d);
     d->MakeTDC();
     UInt_t nchan = fMWDC->GetDAQnchan(d);
     if( d->hi >= nchan ) {
@@ -288,9 +288,9 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 					  fResolution,
 					  this
 					  );
-	  // We can test the order of the hits on the fly - they should
+	  // We can test the ordering of the hits on the fly - they should
 	  // come in sorted or reverse-sorted. If they are, we can avoid
-	  // trying to sort an already-sorted array - which would be expensive
+	  // trying to qsort an already-sorted array ;)
 	  if( sorted && prevHit && theHit->Hit::Compare(prevHit) < 0 )
 	    sorted = false;
 	  if( revsorted && prevHit && theHit->Hit::Compare(prevHit) > 0 )
