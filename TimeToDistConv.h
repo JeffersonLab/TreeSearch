@@ -10,21 +10,32 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Rtypes.h"
+#include <vector>
+
+using std::vector;
 
 namespace TreeSearch {
+
+  extern const Double_t kBig;
 
   class TimeToDistConv {
 
   public:
     virtual ~TimeToDistConv() {}
 
-    virtual Double_t ConvertTimeToDist( Double_t time, Double_t slope ) = 0;
+    virtual Double_t ConvertTimeToDist( Double_t time, 
+					Double_t slope ) const = 0;
+            Int_t    GetNparam() const { return fNparam; }
+    virtual Double_t GetParameter( UInt_t i ) const { return kBig; }
+    virtual Int_t    SetParameters( const vector<double>& param ) { return 0; }
 
   protected:
 
-    TimeToDistConv() {}
+    TimeToDistConv() : fNparam(0) {}
     TimeToDistConv( const TimeToDistConv& );
     TimeToDistConv& operator=( const TimeToDistConv& );
+
+    Int_t  fNparam;    // Number of parameters
 
     ClassDef(TimeToDistConv,0)     // Drift time to diatance converter ABC
   };
@@ -34,17 +45,18 @@ namespace TreeSearch {
   // LinearTTD
   //
   // Simple linear conversion of drit time (s) and drift distance (m).
-  // dist = drift_velocity * time.
   
   class LinearTTD : public TimeToDistConv {
 
   public:
-    LinearTTD( Double_t drift_velocity );
-    virtual ~LinearTTD();
+    LinearTTD();
+    virtual ~LinearTTD() {}
 
-    virtual Double_t ConvertTimeToDist( Double_t time, Double_t slope );
+    virtual Double_t ConvertTimeToDist( Double_t time, Double_t slope ) const;
+    virtual Int_t    SetParameters( const vector<double>& param );
 
-    Double_t GetDriftVel() { return fDriftVel; }
+            Double_t GetDriftVel() const { return fDriftVel; }
+    virtual Double_t GetParameter( UInt_t i ) const;
 
 protected:
 

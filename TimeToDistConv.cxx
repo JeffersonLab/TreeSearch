@@ -12,8 +12,6 @@ ClassImp(TreeSearch::LinearTTD)
 
 namespace TreeSearch {
 
-//FIXME: flesh out these skeleton functions
-
 ///////////////////////////////////////////////////////////////////////////////
 //                                                                           //
 // LinearTTD                                                                 //
@@ -21,24 +19,45 @@ namespace TreeSearch {
 ///////////////////////////////////////////////////////////////////////////////
 
 //_____________________________________________________________________________
-LinearTTD::LinearTTD( Double_t drift_velocity ) : fDriftVel(drift_velocity)
+LinearTTD::LinearTTD() : fDriftVel(kBig)
 {
-  // Constructor. Set drift velocity (m/s).
+  // Constructor.
+  fNparam = 1;
 }
 
 //_____________________________________________________________________________
-LinearTTD::~LinearTTD()
+Double_t LinearTTD::GetParameter( UInt_t i ) const
 {
-  // Destructor
+  // Get i-th parameter
+
+  return i==0 ? GetDriftVel() : kBig;
 }
 
 //_____________________________________________________________________________
-Double_t LinearTTD::ConvertTimeToDist( Double_t time, Double_t slope )
+Int_t LinearTTD::SetParameters( const vector<double>& parameters )
 {
-  // Time in s. Return distance in m. 
+  // Set parameters. The first element of parameter array is interpreted as
+  // the drift velocity in m/s. Further elements are ignored.
+
+  if( parameters.empty() )
+    return -1;
+
+  fDriftVel = parameters[0];
+  return 0;
+}
+
+//_____________________________________________________________________________
+Double_t LinearTTD::ConvertTimeToDist( Double_t time, Double_t slope ) const
+{
+  // Time in s. Return distance in m. slope is used to project the distance
+  // of closest approach onto the wire plane (1/cos correction).
+  
+  // Don't bother with very small slopes
+  if( TMath::Abs(slope) < 1e-2 )
+    return fDriftVel * time;
   
   // NB: 1/cos = sqrt(1+tan^2)
-  return fDriftVel * time * TMath::Sqrt( 1.0 + slope*slope );
+  return fDriftVel * time *  TMath::Sqrt( 1.0 + slope*slope );
 }
 
 
