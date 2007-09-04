@@ -90,8 +90,6 @@ namespace TreeSearch {
 
     // Parameters, calibration, flags
 
-    // FIXME: the drift velocity goes into the TTD converter
-    Double_t    fDriftVel;     // Drift velocity in the wire plane (m/s)
     Double_t    fResolution;   // Drift distance resolution (sigma) (m)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter

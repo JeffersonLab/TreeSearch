@@ -31,7 +31,7 @@ WirePlane::WirePlane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fPartner(NULL), fProjection(NULL), fMWDC(NULL), 
-    fDriftVel(0.0), fResolution(0.0), fTTDConv(NULL),
+    fResolution(0.0), fTTDConv(NULL),
     fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNnohits(0)
 {
   // Constructor
@@ -81,20 +81,22 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( err )
     return err;
 
-  TString plane_type;
+ TString plane_type, ttd_conv;
   // Putting this on the stack may cause a stack overflow
   vector<Int_t>* detmap = new vector<Int_t>;
+  vector<double>* ttd_param = new vector<double>;
 
   DBRequest request[] = {
-    { "detmap",       detmap,        kIntV },
-    { "nwires",       &fNelem,       kInt },
-    { "type",         &plane_type,   kTString, 0, 1 },
-    { "wire.pos",     &fWireStart },
-    { "wire.spacing", &fWireSpacing, kDouble,  0, 0, -1 },
-    { "drift.v",      &fDriftVel,    kDouble,  0, 0, -1 },
-    { "xp.res",       &fResolution,  kDouble,  0, 0, -1 },
-    { "tdc.offsets",  &fTDCOffset,   kFloatV,  0, 0 },
-    { "description",  &fTitle,       kTString, 0, 1 },
+    { "detmap",        detmap,        kIntV },
+    { "nwires",        &fNelem,       kInt },
+    { "type",          &plane_type,   kTString, 0, 1 },
+    { "wire.pos",      &fWireStart },
+    { "wire.spacing",  &fWireSpacing, kDouble,  0, 0, -1 },
+    { "ttd.converter", &ttd_conv,     kTString, 0, 0, -1 },
+    { "ttd.param",     ttd_param,     kDoubleV, 0, 0, -1 },
+    { "xp.res",        &fResolution,  kDouble,  0, 0, -1 },
+    { "tdc.offsets",   &fTDCOffset,   kFloatV,  0, 0 },
+    { "description",   &fTitle,       kTString, 0, 1 },
     { 0 }
   };
 
@@ -109,6 +111,11 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
       status = kOK;
   }
   delete detmap; detmap = NULL;
+  if( status == kOK ) {
+    // Create time-to-distance converter
+    ;
+  }
+  delete ttd_param; ttd_param = NULL;
   if( status != kOK )
     return status;
 

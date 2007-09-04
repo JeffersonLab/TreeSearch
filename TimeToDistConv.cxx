@@ -5,7 +5,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "TimeToDistConv.h"
-
+#include "TMath.h"
 
 ClassImp(TreeSearch::TimeToDistConv)
 ClassImp(TreeSearch::LinearTTD)
@@ -37,10 +37,8 @@ Double_t LinearTTD::ConvertTimeToDist( Double_t time, Double_t slope )
 {
   // Time in s. Return distance in m. 
   
-  // OK, this _is_ simple... 
-  // A slightly better version could apply a slope correction.
- 
-  return fDriftVel * time;
+  // NB: 1/cos = sqrt(1+tan^2)
+  return fDriftVel * time * TMath::Sqrt( 1.0 + slope*slope );
 }
 
 
