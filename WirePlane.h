@@ -91,6 +91,8 @@ namespace TreeSearch {
     // Parameters, calibration, flags
 
     Double_t    fResolution;   // Drift distance resolution (sigma) (m)
+    Double_t    fMinTime;      // Minimum drift time for a hit (s)
+    Double_t    fMaxTime;      // Maximum drift time for a hit (s)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
     vector<float>   fTDCOffset; // [fNelem] TDC offsets for each wire
@@ -98,12 +100,19 @@ namespace TreeSearch {
     // Event data, hits etc.
 
     TClonesArray*   fHits;      // Hit data
+#ifdef TESTCODE
     UInt_t          fNmiss;     // Statistics: Decoder channel misses
     UInt_t          fNrej;      // Statistics: Rejected hits
-    Int_t           fWasSorted; // Statistics: hits were sorted fwd/rev (1/-1)
-    UInt_t          fNhitwires; // Statistics: number of _wires_ hit
-    UInt_t          fNnohits;   // Statistics: channels without hits
+    Int_t           fWasSorted; // Statistics: hits were sorted (0/1)
+    UInt_t          fNhitwires; // Statistics: wires with one or more hits
+    UInt_t          fNmultihit; // Statistics: wires with multiple hits
+    UInt_t          fNmaxmul;   // Statistics: largest num hits on any wire
+    UInt_t          fNcl;       // Statistics: number of hit "clusters"
+    UInt_t          fNdbl;      // Statistics: num wires with neighboring hits
+    UInt_t          fClsiz;     // Statistics: max cluster size
 
+    void CheckCrosstalk();
+#endif
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
 

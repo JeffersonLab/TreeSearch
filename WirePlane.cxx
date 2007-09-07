@@ -14,7 +14,9 @@
 #include "THaEvData.h"
 #include "TClonesArray.h"
 #include "TMath.h"
+#include "TClass.h"
 #include "MWDC.h"
+#include "TimeToDistConv.h"
 #include <iostream>
 #include <string>
 
@@ -30,20 +32,16 @@ WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
-    fPartner(NULL), fProjection(NULL), fMWDC(NULL), 
-    fResolution(0.0), fTTDConv(NULL),
-    fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNnohits(0)
+    fPartner(NULL), fProjection(NULL), fMWDC(NULL), fResolution(0.0),
+    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(NULL), fHits(NULL)
+#ifdef TESTCODE
+  , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
+    fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
+#endif
 {
   // Constructor
 
   static const char* const here = "WirePlane";
-
-  fHits = new TClonesArray("TreeSearch::Hit", 200);
-  if( !fHits ) {
-    Fatal( Here(here), "Allocating hit array failed. Call expert." );
-    MakeZombie();
-    return;
-  }
 
   fMWDC = dynamic_cast<MWDC*>( GetDetector() );
   if( !fMWDC ) {
@@ -51,6 +49,19 @@ WirePlane::WirePlane( const char* name, const char* description,
     MakeZombie();
     return;
   }
+
+  if( fMWDC->TestBit(MWDC::kMCdata) ) // Monte Carlo data mode?
+    fHits = new TClonesArray("TreeSearch::MCHit", 200);
+  else
+    fHits = new TClonesArray("TreeSearch::Hit", 200);
+
+  if( !fHits ) {
+    Fatal( Here(here), "Allocating hit array failed. Call expert." );
+    MakeZombie();
+    return;
+  }
+  
+
 }
 
 //_____________________________________________________________________________
@@ -63,6 +74,260 @@ WirePlane::~WirePlane()
 
   delete fHits;
 }
+
+//_____________________________________________________________________________
+void WirePlane::Clear( Option_t* opt )
+{    
+  // Clear event-by-event data (hits)
+
+  fHits->Clear();
+#ifdef TESTCODE
+  fWasSorted = 0;
+  fNmiss = fNrej = fNhitwires = fNmultihit = fNmaxmul = 0;
+  fNcl = fNdbl = fClsiz = 0;
+#endif
+}
+
+//_____________________________________________________________________________
+#ifdef TESTCODE
+void WirePlane::CheckCrosstalk()
+{
+  // Utility function to check crosstalk statistics.
+  // Counts number of wire pairs (=adjacent hits) and max "cluster" size.
+  // Also, marks mulithits and calculates their time differences
+
+  UInt_t cursiz = 1;
+  fClsiz = 1;
+  Int_t prev_iw = -(1<<16);
+  Hit* prev_hit = NULL;
+  for( Int_t i = 0; i < GetNhits(); ++i ) {
+    Hit* hit = (Hit*)fHits->At(i);
+    Int_t iw = hit->GetWireNum();
+    Int_t dw = TMath::Abs(iw - prev_iw);
+    if( dw == 0 ) {
+      hit->fMulti = 1;
+      prev_hit->fMulti = 1;
+      hit->fTdiff = hit->GetDriftTime() - prev_hit->GetDriftTime();
+    } else if( dw == 1 ) {
+      if( cursiz == 1 ) {
+	++fNcl;
+	++fNdbl;
+	prev_hit->fCl = 1;
+      }
+      ++cursiz;
+      ++fNdbl;
+      hit->fCl = 1;
+      if( cursiz > fClsiz )
+	fClsiz = cursiz;
+    } else {
+      cursiz = 1;
+    }
+    prev_iw = iw;
+    prev_hit = hit;
+  }
+}
+#endif
+
+//_____________________________________________________________________________
+Int_t WirePlane::Decode( const THaEvData& evData )
+{    
+  // Extract this plane's hit data from the raw evData.
+  //
+  // This routine can handle both the old Fastbus readout and the new CAEN
+  // VME pipeline TDCs. The latter require a reference channel map and
+  // cross-references to reference channels in the regular detector map
+  // of the plane.
+
+  //  static const char* const here = "Decode";
+
+  UInt_t nHits = 0;
+  bool no_time_cut = fMWDC->TestBit(MWDC::kDoTimeCut) == kFALSE;
+  bool mc_data     = fMWDC->TestBit(MWDC::kMCdata);
+
+  // Decode data. This is done fairly efficiently by looping over only the 
+  // channels with hits on each module. 
+  // FIXME: If a module is shared with another plane (common here), we waste
+  // time skipping hits that don't belong to us.
+  // NB: certain indices below are guaranteed to be in range by construction
+  // in ReadDatabase, so we can avoid unneeded checks.
+  bool sorted = true;
+  Hit* prevHit = NULL;
+  for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
+    THaDetMap::Module * d = fDetMap->GetModule(imod);
+    Double_t ref_time =
+      (d->refindex >= 0) ? fMWDC->GetRefTime(d->refindex) : 0.0;
+
+    // Get number of channels with hits and loop over them, skipping channels
+    // that are not part of this module
+    // FIXME: this becomes very inefficient if several modules with the 
+    // same crate/slot are defined - e.g. one "module" per channel...ouch
+    Int_t nchan = evData.GetNumChan( d->crate, d->slot );
+    // For "reversed" detector map modules, loop backwards over the channels
+    // to preserve the ordering of the hits by wire number
+    Int_t ichan, incr;
+    if( d->reverse ) {
+      ichan = nchan-1;
+      incr = -1;
+    } else {
+      ichan = 0;
+      incr = 1;
+    }
+    for( ; ichan < nchan && ichan >= 0; ichan += incr ) {
+      Int_t chan = evData.GetNextChan( d->crate, d->slot, ichan );
+      if( chan < d->lo || chan > d->hi ) {
+#ifdef TESTCODE
+	++fNmiss;
+#endif
+	continue; //Not part of this detector
+      }
+      // Get the wire number. Assumes that the logical channels in the detector
+      // map are defined in order of ascending wire numbers.
+      Int_t iw = d->first + ( (d->reverse) ? d->hi-chan : chan-d->lo );
+      Double_t tdc_offset = fTDCOffset[iw];
+
+      // Get number of hits on this wire and loop over hits
+      Int_t nhits = evData.GetNumHits( d->crate, d->slot, chan );
+#ifdef TESTCODE
+      if( nhits > 0 ) {
+	++fNhitwires; 
+	if( nhits > 1 )
+	  ++fNmultihit;
+	if( (UInt_t)nhits > fNmaxmul )
+	  fNmaxmul = nhits;
+      }
+#endif
+      for( Int_t hit = 0; hit < nhits; hit++ ) {
+	
+	// Get the TDC data for this hit
+	Int_t data = evData.GetData( d->crate, d->slot, chan, hit );
+	
+	// Convert the TDC value to the drift time. The readout is assumed to
+	// use common-stop TDCs, so t_drift = t_tdc(drift=0)-t_tdc(data).
+	Double_t time = tdc_offset+ref_time - d->resolution*(data+0.5);
+	if( no_time_cut || (fMinTime < time && time < fMaxTime) ) {
+	  Hit* theHit;
+	  if( mc_data ) {
+	    theHit = new( (*fHits)[nHits++] ) 
+	      MCHit( iw, 
+		     fWireStart + iw * fWireSpacing,
+		     data,
+		     time,
+		     fResolution,
+		     this,
+		     // TODO: fill MC info here
+		     NULL, 0.0
+		     );
+	  } else
+	    theHit = new( (*fHits)[nHits++] )
+	      Hit( iw, 
+		   fWireStart + iw * fWireSpacing,
+		   data,
+		   time,
+		   fResolution,
+		   this
+		   );
+	  // Preliminary calculation of drift distance. Once tracks are known,
+	  // the distance can be recomputed using the track slope.
+	  theHit->ConvertTimeToDist( 0.0 );
+
+	  // We can test the ordering of the hits on the fly - they should
+	  // come in sorted if the lowest logical channel corresponds to
+	  // the smallest wire positiion. If they do, we can skip 
+	  // quicksorting an already-sorted array ;)
+	  if( sorted && prevHit && theHit->Hit::Compare(prevHit) < 0 )
+	    sorted = false;
+	  prevHit = theHit;
+	}
+#ifdef TESTCODE
+	else
+	  ++fNrej;
+#endif
+      } // hits
+    }   // chans
+  }     // modules
+   
+  // If ncessary, sort the hits by wire position
+  if( !sorted )
+    fHits->Sort();
+
+#ifdef TESTCODE
+  fWasSorted = sorted;
+  CheckCrosstalk();
+#endif
+
+  return nHits;
+}
+  
+//_____________________________________________________________________________
+Int_t WirePlane::DefineVariables( EMode mode )
+{
+  // initialize global variables
+
+
+  if( mode == kDefine && fIsSetup ) return kOK;
+  fIsSetup = ( mode == kDefine );
+
+  // Register variables in global list
+
+  RVarDef vars[] = {
+    { "nhits",       "Num accepted hits",  "GetNhits()" },
+    { "hit.wire",    "Hit wire number",    "fHits.TreeSearch::Hit.fWireNum" },
+    { "hit.tdc",     "Hit TDC value",      "fHits.TreeSearch::Hit.fRawTDC" },
+    { "hit.time",    "Hit time (s)",       "fHits.TreeSearch::Hit.fTime" },
+    { "hit.dist",    "Drift distance (m)",
+                                    "fHits.TreeSearch::Hit.GetDriftDist()" },
+    { "hit.trkdist", "Track distance (m)",
+                                    "fHits.TreeSearch::Hit.GetTrackDist()"},
+    { "hit.trkpos",  "Track position (m)",
+                                     "fHits.TreeSearch::Hit.fTrackPos"},
+#ifdef TESTCODE
+    { "nmiss",       "Decoder misses",     "fNmiss" },
+    { "nrej",        "Time cut nopass",    "fNrej" },
+    { "sorted",      "Wires were ordered", "fWasSorted" },
+    { "nwhit",       "Num wires w/hits>0", "fNhitwires" },
+    { "nmulti",      "Num wires w/hits>1", "fNmultihit" },
+    { "maxmul",      "Max num hits/wire",  "fNmaxmul" },
+    { "ncl",         "Num clusters",       "fNcl" },
+    { "ndbl",        "Num double hits ",   "fNdbl" },
+    { "maxclsiz",    "Max cluster size",   "fClsiz" },
+    { "hit.iscl",    "Hit has neighbor",   "fHits.TreeSearch::Hit.fCl" },
+    { "hit.ismulti", "Wire has multihits", "fHits.TreeSearch::Hit.fMulti" },
+    { "hit.tdiff",   "multi hits tdiff",   "fHits.TreeSearch::Hit.fTdiff" },
+#endif
+    { 0 }
+  };
+  Int_t ret = DefineVarsFromList( vars, mode );
+
+  if( fMWDC->TestBit(MWDC::kMCdata) && ret == kOK ) {
+    // Additional variables for Monte Carlo data
+    RVarDef mcvars[] = {
+      { "mcpos", "MC track position (m)", "fHits.TreeSearch::MCHit.fMCPos" },
+      { 0 }
+    };
+    ret = DefineVarsFromList( mcvars, mode );
+  }
+  return ret;
+}
+
+//_____________________________________________________________________________
+THaAnalysisObject::EStatus WirePlane::Init( const TDatime& date )
+{
+  // Calls its own Init(), then initializes subdetectors, then calculates
+  // some local geometry data.
+
+  EStatus status = THaSubDetector::Init( date );
+  if( status ) 
+    return fStatus = status;
+
+  //FIXME:
+//   THaDetectorBase *parent = GetDetector();
+//   if( parent )
+//     fOrigin += parent->GetOrigin();
+
+  return fStatus = kOK;
+}
+
+
 
 //_____________________________________________________________________________
 Int_t WirePlane::ReadDatabase( const TDatime& date )
@@ -81,10 +346,13 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( err )
     return err;
 
- TString plane_type, ttd_conv;
-  // Putting this on the stack may cause a stack overflow
+  TString plane_type, ttd_conv;
+  // Putting these containers on the stack may cause a stack overflow
   vector<Int_t>* detmap = new vector<Int_t>;
   vector<double>* ttd_param = new vector<double>;
+  // Default values for optional parameters
+  fMinTime = -kBig;
+  fMaxTime =  kBig;
 
   DBRequest request[] = {
     { "detmap",        detmap,        kIntV },
@@ -97,6 +365,9 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "xp.res",        &fResolution,  kDouble,  0, 0, -1 },
     { "tdc.offsets",   &fTDCOffset,   kFloatV,  0, 0 },
     { "description",   &fTitle,       kTString, 0, 1 },
+    { "drift.min",     &fMinTime,     kDouble,  0, 1, -1 },
+    { "drift.max",     &fMaxTime,     kDouble,  0, 1, -1 },
+    //    { "maxhits",       &fMaxHits,     kInt,     0, 1, -1 },
     { 0 }
   };
 
@@ -111,10 +382,39 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
       status = kOK;
   }
   delete detmap; detmap = NULL;
+
+  // Create time-to-distance converter
   if( status == kOK ) {
-    // Create time-to-distance converter
-    ;
+    if( !ttd_conv.Contains("::") )
+      ttd_conv.Prepend("TreeSearch::");
+    const char* s = ttd_conv.Data();
+    TClass* cl = TClass::GetClass( s );
+    if( !cl ) {
+      Error( Here(here), "Drift time-to-distance converter \"%s\" not "
+	     "available. Load library or fix database.", s?s:"" );
+      status = kInitError;
+      goto ttderr;
+    }
+    if( !cl->InheritsFrom( TreeSearch::TimeToDistConv::Class() )) {
+      Error( Here(here), "Class \"%s\" is not a drift time-to-distance "
+	     "converter. Fix database.", s );
+      status = kInitError;
+      goto ttderr;
+    }
+    fTTDConv = static_cast<TimeToDistConv*>( cl->New() );
+    if( !fTTDConv ) {
+      Error( Here(here), "Unexpected error creating drift time-to-distance "
+	     "converter object \"%s\". Call expert.", s );
+      status = kInitError;
+      goto ttderr;
+    } 
+    if( fTTDConv->SetParameters( *ttd_param ) != 0 ) {
+      Error( Here(here), "Error initializing drift time-to-distance converter "
+	     "\"%s\". Check ttd.param in database.", s );
+      status = kInitError;
+    }
   }
+ttderr:
   delete ttd_param; ttd_param = NULL;
   if( status != kOK )
     return status;
@@ -158,21 +458,22 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 	   "disagrees with number of wires (%d)", nchan, fNelem );
     return kInitError;
   }
-  // Convert TDC offsets to seconds
+  // Convert TDC offsets and timing cuts to seconds
   for( vector<float>::size_type i = 0; i < fTDCOffset.size(); ++i ) {
     fTDCOffset[i] *= kTDCscale;
   }
+  if( fMinTime > -kBig )  fMinTime *= kTDCscale;
+  if( fMaxTime <  kBig )  fMaxTime *= kTDCscale;
 
   // Determine the type of this plane. If the optional plane type variable is
   // not given, use the first character of the plane name.
   TString name = plane_type.IsNull() ? fName[0] : plane_type[0];
   fType = fMWDC->NameToType( name );
   if( fType == kUndefinedType ) {
-    vector<TString> name_list = fMWDC->GetProjectionNames();
     TString names;
-    for( vector<string>::size_type i = 0; i<name_list.size(); ++i ) {
-      names += name_list[i];
-      if( i+1 != name_list.size() ) 
+    for( EProjType i = kTypeBegin; i < kTypeEnd; ++i ) {
+      names += fMWDC->fProj[i]->GetName();
+      if( i+1 != kTypeEnd ) 
 	names += " ";
     }
     Error( Here(here), "Unsupported plane type \"%s\". Must be one of "
@@ -184,152 +485,6 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   return kOK;
 }
 
-//_____________________________________________________________________________
-Int_t WirePlane::DefineVariables( EMode mode )
-{
-  // initialize global variables
-
-
-  if( mode == kDefine && fIsSetup ) return kOK;
-  fIsSetup = ( mode == kDefine );
-
-  // Register variables in global list
-
-  RVarDef vars[] = {
-    { 0 }
-  };
-  return DefineVarsFromList( vars, mode );
-
-}
-
-//_____________________________________________________________________________
-THaAnalysisObject::EStatus WirePlane::Init( const TDatime& date )
-{
-  // Calls its own Init(), then initializes subdetectors, then calculates
-  // some local geometry data.
-
-  EStatus status = THaSubDetector::Init( date );
-  if( status ) 
-    return fStatus = status;
-
-  //FIXME:
-//   THaDetectorBase *parent = GetDetector();
-//   if( parent )
-//     fOrigin += parent->GetOrigin();
-
-  return fStatus = kOK;
-}
-
-
-
-//_____________________________________________________________________________
-void WirePlane::Clear( Option_t* opt )
-{    
-  // Clear event-by-event data (hits)
-
-  fHits->Clear();
-  fNmiss = fNrej = fWasSorted = fNhitwires = fNnohits = 0;
-}
-
-//_____________________________________________________________________________
-Int_t WirePlane::Decode( const THaEvData& evData )
-{    
-  // Extract this plane's hit data from the raw evData.
-  //
-  // This routine can handle both the old Fastbus readout and the new CAEN
-  // VME pipeline TDCs. The latter require a reference channel map and
-  // cross-references to reference channels in the regular detector map
-  // of the plane.
-
-  //  static const char* const here = "Decode";
-
-  UInt_t nHits = 0;
-  bool positive_only = fMWDC->TestBit(MWDC::kIgnoreNegDrift);
-
-  // Decode data. This is done fairly efficiently by looping over only the 
-  // channels with hits on each module. 
-  // FIXME: If a module is shared with another plane (common here), we waste
-  // time skipping hits that don't belong to us.
-  // NB: certain indices below are guaranteed to be in range by construction
-  // in ReadDatabase, so we can avoid unneeded checks.
-  bool sorted = true, revsorted = true;
-  Hit* prevHit = NULL;
-  for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
-    THaDetMap::Module * d = fDetMap->GetModule(imod);
-    Double_t ref_offset = 
-      (d->refindex >= 0) ? fMWDC->GetRefTime(d->refindex) : 0.0;
-
-    // Get number of channels with hits and loop over them, skipping channels
-    // that are not part of this module
-    // FIXME: this becomes very inefficient if several modules with the 
-    // same crate/slot are defined - e.g. one "module" per channel...ouch
-    Int_t nchan = evData.GetNumChan( d->crate, d->slot );
-    for( Int_t ichan = 0; ichan < nchan; ++ichan ) {
-      Int_t chan = evData.GetNextChan( d->crate, d->slot, ichan );
-      if( chan < d->lo || chan > d->hi ) {
-	++fNmiss;
-	continue; //Not part of this detector
-      }
-      // Get the wire number. Assumes that the detector map is defined in order
-      // of ascending wire numbers.
-      Int_t iw = d->first + chan - d->lo;
-      Double_t tdc_offset = fTDCOffset[iw];
-
-      // Get number of hits on this channel and loop over hits
-      Int_t nhits = evData.GetNumHits( d->crate, d->slot, chan );
-      if( nhits > 0 ) ++fNhitwires; else ++fNnohits;
-      for( Int_t hit = 0; hit < nhits; hit++ ) {
-	
-	// Get the TDC data for this hit
-	Int_t data = evData.GetData( d->crate, d->slot, chan, hit );
-	
-	// Convert the TDC value to the drift time. The readout uses 
-	// common-stop TDCs, so drift_time = tdc_time(drift=0)-tdc_time(data).
-	Double_t time = tdc_offset+ref_offset - d->resolution*(data+0.5);
-	if( !positive_only || time > 0.0 ) {
-	  Hit* theHit = 
-	    new( (*fHits)[nHits++] ) Hit( iw, 
-					  fWireStart + iw * fWireSpacing,
-					  data,
-					  time,
-					  fResolution,
-					  this
-					  );
-	  // We can test the ordering of the hits on the fly - they should
-	  // come in sorted or reverse-sorted. If they are, we can avoid
-	  // trying to qsort an already-sorted array ;)
-	  if( sorted && prevHit && theHit->Hit::Compare(prevHit) < 0 )
-	    sorted = false;
-	  if( revsorted && prevHit && theHit->Hit::Compare(prevHit) > 0 )
-	    revsorted = false;
-	  prevHit = theHit;
-	}
-	else
-	  ++fNrej;
-
-      } // hits
-    }   // chans
-  }     // modules
-   
-  // If ncessary, sort the hits
-  fWasSorted = sorted ? 1 : revsorted ? -1 : 0;
-  if( !sorted ) {
-//     if( revsorted ) {
-//       // reverse array ... urgh
-//       TClonesArray* copy = new TClonesArray( fHits->GetClass(), 
-// 					     fHits->GetSize() );
-//       Int_t end = fHits->GetLast();
-//       for( Int_t i = 0; i < end+1; ++i )
-// 	new((*copy)[end-i]) Hit( *static_cast<Hit*>((*fHits)[i]) );
-//       delete fHits;
-//       fHits = copy;
-//     } else {
-    fHits->Sort();
-  }
-
-  return nHits;
-}
-  
 //_____________________________________________________________________________
 void WirePlane::SetPartner( WirePlane* p )
 {    
