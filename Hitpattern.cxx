@@ -6,6 +6,7 @@
 
 #include "Hitpattern.h"
 #include "Hit.h"
+#include "WirePlane.h"
 #include "TError.h"
 #include "TMath.h"
 
@@ -123,7 +124,7 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   // Set the points at all depths of the hit pattern that correspond to
   // the hits in plane A. The plane number is extracted from A.
   // The second, optional plane B represents an optional partner
-  // plane of A, usually a nearby plane with staggered wires. 
+  // plane of A, i.e. a nearby plane with (usually) staggered wires. 
   // If B is present, test for pairs of hits in A and B.
   // Naturally, the two planes and their wires must be parallel.
   //
@@ -142,6 +143,8 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   Double_t dz = B ? B->GetZ() - A->GetZ() : 0.0;
   Double_t maxdist = A->GetMaxSlope() * dz;
   Double_t maxdist2 = 0.5*maxdist;
+  bool do_single_hits =
+    ( A->GetDetector()->TestBit(MWDC::kPairsOnly) == kFALSE || B == NULL );
 
   Int_t nhits = 0;
 
@@ -164,7 +167,7 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 	}
       }
     }
-    if( !found ) {
+    if( !found && do_single_hits ) {
       // Here, we have either an unpaired hit or a pair whose positions do
       // not match within maxdist (probably rare unless maxdist is very small).
       // Either way, we set the hits individually by projecting their left
