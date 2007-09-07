@@ -32,6 +32,7 @@ namespace TreeSearch {
     virtual ~Projection();
 
     virtual void    Clear( Option_t* opt="" );
+    virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
     //    void            Reset();

@@ -124,6 +124,28 @@ void Projection::Clear( Option_t* opt )
 }
 
 //_____________________________________________________________________________
+Int_t Projection::Decode( const THaEvData& evdata )
+{
+  // Decode all planes belonging to this projection
+
+  Int_t sum = 0;
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+    WirePlane* wp = fPlanes[iplane];
+    Int_t nhits = wp->Decode( evdata );
+    sum += nhits;
+    if( (wp = wp->GetPartner()) ) {
+      Int_t nhits2 = wp->Decode( evdata );
+      sum += nhits2;
+      if( nhits2 > nhits )
+	nhits = nhits2;
+    }
+    //TODO: nhits now holds the occupancy of this plane or plane pair,
+    // use it for occupancy test
+  }
+  return sum;
+}
+
+//_____________________________________________________________________________
 void Projection::SetAngle( Double_t angle )
 {
   // Set wire angle (rad)
@@ -304,7 +326,7 @@ void Projection::Print( Option_t* opt ) const
       wp->Print(opt);
       wp = wp->GetPartner();
       if( wp )
-	wp->Print();
+	wp->Print(opt);
     }
   }
 }
