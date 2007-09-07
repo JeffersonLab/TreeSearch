@@ -9,14 +9,13 @@
 
 #include "TObject.h"
 #include "WirePlane.h"
+#include "TimeToDistConv.h"
 #include <utility>
 
 class TSeqCollection;
 class TIterator;
 
 namespace TreeSearch {
-
-  class MCTrack;
 
   extern const Double_t kBig;
 
@@ -25,9 +24,12 @@ namespace TreeSearch {
   public:
     Hit() : fWirePlane(NULL) {}
     Hit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
-	 const WirePlane* wp )
-      : fWireNum(wnum), fRawTDC(tdc), fTime(time), fPos(pos), fPosL(pos), 
-	fPosR(pos), fResolution(res), fTrackPos(kBig), fWirePlane(wp) {}
+	 const WirePlane* wp ) :
+#ifdef TESTCODE
+      fCl(0), fMulti(0), fTdiff(0.0),
+#endif
+      fWireNum(wnum), fRawTDC(tdc), fTime(time), fPos(pos), fPosL(pos), 
+      fPosR(pos), fResolution(res), fTrackPos(kBig), fWirePlane(wp) {}
     //    Hit( const Hit& );
     //    Hit& operator=( const Hit& );
     virtual ~Hit() {}
@@ -51,6 +53,12 @@ namespace TreeSearch {
     Double_t GetTrackDist()  const { return fTrackPos-fPos; }
     Double_t GetResolution() const { return fResolution; }
 
+#ifdef TESTCODE
+    Int_t    fCl;          // Neighboring wire also fired
+    Int_t    fMulti;       // Additional hits present on same wire
+    Double_t fTdiff;       // Time difference to previous multihit
+#endif
+
   protected:
     Int_t    fWireNum;     // Wire number
     Int_t    fRawTDC;      // Raw TDC value (channels)
@@ -63,13 +71,15 @@ namespace TreeSearch {
 
     const WirePlane* fWirePlane; //! Pointer to parent wire plane
 
-    ClassDef(Hit,1)        // Horizontal drift chamber hit
+    ClassDef(Hit,0)        // Horizontal drift chamber hit
   };
 
 
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
+  //TODO: Skeleton version - to be fleshed out
 
+  class MCTrack;
   class MCHit : public Hit {
 
   public:
@@ -88,7 +98,7 @@ namespace TreeSearch {
     MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
     Double_t fMCPos;       // Exact MC track crossing position (m)
 
-    ClassDef(MCHit,1)      // Monte Carlo hit in horizontal drift chamber
+    ClassDef(MCHit,0)      // Monte Carlo hit in horizontal drift chamber
   };
 
   //___________________________________________________________________________
@@ -190,6 +200,20 @@ namespace TreeSearch {
     // The hits overlap within the maxdist tolerance
     return 0;
   }
+
+  //___________________________________________________________________________
+  inline
+  Double_t Hit::ConvertTimeToDist( Double_t slope )
+  {
+    // Convert drift time to drift distance. 'slope' is the approximate
+    // slope of the track.
+    // Updates the internal variables fPosL and fPosR.
+    // Must be called before doing analysis of drift chamber hits.
+    Double_t dist = fWirePlane->GetTTDConv()->ConvertTimeToDist(fTime, slope);
+    fPosL = fPos-dist;
+    fPosR = fPos+dist;
+    return dist;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 

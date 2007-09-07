@@ -5,7 +5,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Hit.h"
-#include "TimeToDistConv.h"
 #include "TSeqCollection.h"
 
 #include <iostream>
@@ -16,32 +15,9 @@ using std::make_pair;
 
 ClassImp(TreeSearch::Hit)
 ClassImp(TreeSearch::MCHit)
+ClassImp(TreeSearch::HitPairIter)
 
 namespace TreeSearch {
-
-//_____________________________________________________________________________
-Double_t Hit::ConvertTimeToDist( Double_t slope )
-{
-  // Convert drift time to drift distance. 'slope' is the approximate
-  // slope of the track.
-  // Updates the internal variables fPosL, fPosR and fResolution.
-  // Must be called before doing analysis of drift chamber hits.
-
-  TimeToDistConv* ttd;
-  Double_t dist;
-  if( fWirePlane && (ttd = fWirePlane->GetTTDConv()) ) {
-    dist = ttd->ConvertTimeToDist( fTime, slope );
-  } else {
-    dist = 0.0;
-  }
-  if( dist > 0.0 ) {
-    fPosL = fPos-dist;
-    fPosR = fPos+dist;
-  } else {
-    fPosL = fPosR = fPos;
-  }
-  return dist;
-}
 
 //_____________________________________________________________________________
 void Hit::Print( Option_t* opt ) const
@@ -49,12 +25,12 @@ void Hit::Print( Option_t* opt ) const
   // Print hit info
 
   cout << "Hit: wnum=" << GetWireNum()
-       << " wpos=" << GetWirePos()
-       << " z=" << GetZ()
-       << " res=" << GetResolution()
-       << " time=" << GetDriftTime()
-       << " drift=" << GetDriftDist()
-       << " trk="  << GetTrackDist();
+       << " wpos="     << GetWirePos()
+       << " z="        << GetZ()
+       << " res="      << GetResolution()
+       << " time="     << GetDriftTime()
+       << " drift="    << GetDriftDist()
+       << " trk="      << GetTrackDist();
   if( *opt != 'C' )
     cout << endl;
 }
@@ -72,8 +48,6 @@ void MCHit::Print( Option_t* opt ) const
 //_____________________________________________________________________________
 
 }
-
-ClassImp(TreeSearch::HitPairIter)
 
 namespace TreeSearch {
 
