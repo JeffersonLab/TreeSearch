@@ -32,6 +32,7 @@ typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<WirePlane*>::iterator vwiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
 
+// Global constant indicating invalid/uninitialized data
 const Double_t kBig = 1e38;
 
 // Helper classes for describing a DAQ hardware module and using it with a
@@ -113,15 +114,6 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
     fProj[type] = proj;
   }
 
-  //FIXME: test
-  //  fDebug = 1;
-
-
-  // Default behavior for now
-  // SetBit( kHardTDCcut );
-  //  ResetBit( kIgnoreNegDrift );
-  SetBit( kIgnoreNegDrift );
- 
   //  fBench = new THaBenchmark;
 }
 
@@ -140,6 +132,108 @@ MWDC::~MWDC()
     delete fProj[type];
 
   delete fRefMap;
+}
+
+//_____________________________________________________________________________
+void MWDC::Clear( Option_t* opt )
+{
+  // Clear event-by-event data, including those of wire planes and projections
+  THaTrackingDetector::Clear(opt);
+  
+  // Clear the planes and projections, but only if we're not called from Init()
+  if( !opt || *opt != 'I' ) {
+    for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
+      fPlanes[iplane]->Clear(opt);
+
+    for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
+      fProj[type]->Clear(opt);
+
+    if( fRefMap->GetSize() > 0 )
+      fRefTime.assign( fRefMap->GetSize(), kBig );  // not strictly necessary
+  }
+}
+
+//_____________________________________________________________________________
+Int_t MWDC::Decode( const THaEvData& evdata )
+{
+  // Decode all planes and fill hitpatterns per projection
+  
+  static const char* const here = "Decode";
+
+  // Decode reference channels of the VME readout (if any)
+  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
+    THaDetMap::Module* d = fRefMap->GetModule(imod);
+    // By construction, this map has one channel per module
+    Int_t chan = d->lo;
+    Int_t nhits = evdata.GetNumHits( d->crate, d->slot, chan );
+    if( nhits > 0 ) {
+      Int_t data = evdata.GetData( d->crate, d->slot, chan, nhits-1 );
+      if( nhits > 1 ) {
+	Warning( Here(here), "%d hits on reference channel %d module %d", 
+		 nhits, chan, imod );
+      }
+      fRefTime[imod] = d->resolution * data;
+    } else {
+      // TODO: At this point, one could look for backup reference channels
+      // to recover the data. Left for later, if needed.
+      Warning( Here(here), "No hits on reference channel %d module %d.",
+	       chan, imod );
+      fRefTime[imod] = kBig;
+    }
+  }   // modules
+
+
+  // Decode the planes, then fill the hitpatterns in the projections
+  //TODO: multithread
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    fProj[type]->Decode( evdata );
+
+  //TODO: check for excessive plane occupancy here and abort if too full
+  // (via "max occupancy" parameter or similar)
+
+    fProj[type]->FillHitpattern();
+  }
+
+  return 0;
+}
+
+//_____________________________________________________________________________
+Int_t MWDC::CoarseTrack( TClonesArray& tracks )
+{
+  return 0;//fNtracks;
+}
+
+//_____________________________________________________________________________
+Int_t MWDC::FineTrack( TClonesArray& tracks )
+{
+  return 0;//fNtracks;
+}
+
+//_____________________________________________________________________________
+Int_t MWDC::DefineVariables( EMode mode )
+{
+  // Initialize global variables and lookup table for decoder
+
+
+  if( mode == kDefine && fIsSetup ) return kOK;
+  fIsSetup = ( mode == kDefine );
+
+  // Register variables in global list
+  
+  RVarDef vars[] = {
+#if 0
+    { "trackskipped", "Tracking skipped or truncated", "fTooBusy"       },
+    { "cproctime",    "Coarse Processing Time",        "fCoarseProcTime"},
+    { "fproctime",    "Fine Processing Time",          "fFineProcTime"  },
+    { "estngrp",      "Estimated Number of Groups",    "fEstNGroups"    },
+    { "estncall",     "Estimated Number of Calls",     "fEstNCalls"     },
+    { "ngrp",         "Number of Groups",              "fNGroups"       },
+    { "ncall",        "Number of recursive calls",     "fNCalls"        },
+#endif  
+    { 0 }
+  };
+  DefineVarsFromList( vars, mode );
+  return 0;
 }
 
 //_____________________________________________________________________________
@@ -362,106 +456,104 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-void MWDC::Clear( Option_t* opt )
+Int_t MWDC::ReadDatabase( const TDatime& date )
 {
-  // Clear event-by-event data, including those of wire planes and projections
-  THaTrackingDetector::Clear(opt);
-  
-  // Clear the planes and projections, but only if we're not called from Init()
-  if( !opt || *opt != 'I' ) {
-    for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
-      fPlanes[iplane]->Clear(opt);
+  // Read MWDC database
 
-    for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
-      fProj[type]->Clear(opt);
+  static const char* const here = "ReadDatabase";
 
-    if( fRefMap->GetSize() > 0 )
-      fRefTime.assign( fRefMap->GetSize(), kBig );  // not strictly necessary
+  fIsInit = kFALSE;
+  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+    delete fPlanes[iplane];
   }
-}
+  // Delete existing configuration (in case we are re-initializing)
+  fPlanes.clear();
 
-//_____________________________________________________________________________
-Int_t MWDC::Decode( const THaEvData& evdata )
-{
-  // Decode all planes and fill hitpatterns per projection
-  
-  static const char* const here = "Decode";
+  FILE* file = OpenFile( date );
+  if( !file ) return kFileError;
 
-  // Decode reference channels of the VME readout (if defined)
-  for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
-    THaDetMap::Module* d = fRefMap->GetModule(imod);
-    // By construction, this map has one channel per module
-    Int_t chan = d->lo;
-    Int_t nhits = evdata.GetNumHits( d->crate, d->slot, chan );
-    if( nhits > 0 ) {
-      Int_t data = evdata.GetData( d->crate, d->slot, chan, nhits-1 );
-      if( nhits > 1 ) {
-	Warning( Here(here), "%d hits on reference channel %d module %d", 
-		 nhits, chan, imod );
-      }
-      fRefTime[imod] = d->resolution * data;
-    } else {
-      // TODO: At this point, one could look for backup reference channels
-      // to recover the data. Left for later, if needed.
-      Warning( Here(here), "No hits on reference channel %d module %d.",
-	       chan, imod );
-      fRefTime[imod] = kBig;
-    }
-  }   // modules
+  // Putting this container on the stack may cause a stack overflow!
+  vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
-
-  // Decode the individual planes
-  //TODO: multithread this
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
-    fPlanes[iplane]->Decode( evdata );
-
-  //TODO: check for excessive plane occupancy here and abort if too full
-  // (via "max occupancy" parameter or similar)
-
-  //TODO: for this to work, we need the drift distances first!
-//   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
-//     fProj[type]->FillHitpattern();
-
-  return 0;
-}
-
-//_____________________________________________________________________________
-Int_t MWDC::CoarseTrack( TClonesArray& tracks )
-{
-  return 0;//fNtracks;
-}
-
-//_____________________________________________________________________________
-Int_t MWDC::FineTrack( TClonesArray& tracks )
-{
-  return 0;//fNtracks;
-}
-
-//_____________________________________________________________________________
-Int_t MWDC::DefineVariables( EMode mode )
-{
-  // Initialize global variables and lookup table for decoder
-
-
-  if( mode == kDefine && fIsSetup ) return kOK;
-  fIsSetup = ( mode == kDefine );
-
-  // Register variables in global list
-  
-  RVarDef vars[] = {
-#if 0
-    { "trackskipped", "Tracking skipped or truncated", "fTooBusy"       },
-    { "cproctime",    "Coarse Processing Time",        "fCoarseProcTime"},
-    { "fproctime",    "Fine Processing Time",          "fFineProcTime"  },
-    { "estngrp",      "Estimated Number of Groups",    "fEstNGroups"    },
-    { "estncall",     "Estimated Number of Calls",     "fEstNCalls"     },
-    { "ngrp",         "Number of Groups",              "fNGroups"       },
-    { "ncall",        "Number of recursive calls",     "fNCalls"        },
-#endif  
+  string planeconfig;
+  Int_t time_cut = 1, pairs_only = 0, mc_data = 0;
+  DBRequest request[] = {
+    { "planeconfig",  &planeconfig, kString },
+    { "cratemap",     cmap,         kIntM,    6 },
+    { "timecut",      &time_cut,    kInt,     0, 1 },
+    { "pairsonly",    &pairs_only,  kInt,     0, 1 },
+    { "MCdata",       &mc_data,     kInt,     0, 1 },
     { 0 }
   };
-  DefineVarsFromList( vars, mode );
-  return 0;
+
+  Int_t status = kInitError;
+  Int_t err = LoadDB( file, date, request, fPrefix );
+  fclose(file);
+
+  if( !err ) {
+    if( cmap->empty() ) {
+      Error(Here(here), "No cratemap defined. Set \"cratemap\" in database.");
+    } else {
+      // Build the list of crate map elements
+      for( vviter_t it = cmap->begin(); it != cmap->end(); ++it ) {
+	vector<int>& row = *it;
+	for( Int_t slot = row[1]; slot <= row[2]; ++slot ) {
+	  DAQmodule* m =
+	    new DAQmodule( row[0], slot, row[3], row[4]*1e-12, row[5] );
+	  DAQmodule* found = static_cast<DAQmodule*>(fCrateMap->FindObject(m));
+	  if( found ) { 
+	    m->Copy(*found);  // Later entries override earlier ones
+	    delete m;
+	  }
+	  else
+	    fCrateMap->Add(m);
+	}
+      }
+      status = kOK;
+    }
+  }
+  delete cmap; cmap = NULL;
+  if( status != kOK )
+    return status;
+
+  vector<string> planes = vsplit(planeconfig);
+  if( planes.empty() ) {
+    Error( Here(here), "No planes defined. Set \"planeconfig\" in database." );
+    return kInitError;
+  }
+
+  // Set analysis control flags
+  SetBit( kDoTimeCut, time_cut );
+  SetBit( kPairsOnly, pairs_only );
+  SetBit( kMCdata,    mc_data );
+
+  // Set up the wire planes
+  for( ssiz_t i=0; i<planes.size(); ++i ) {
+    TString name(planes[i].c_str());
+    if( name.IsNull() )
+      continue;
+    vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
+			   WirePlane::NameEquals( name ) );
+    if( it != fPlanes.end() ) {
+      Error( Here(here), "Duplicate plane name: %s. Fix database.", 
+	     name.Data() );
+      return kInitError;
+    }
+    WirePlane* newplane = new WirePlane( name, name, this );
+    if( !newplane || newplane->IsZombie() ) {
+      // Urgh. Something is very bad
+      Error( Here(here), "Error creating wire plane %s. Call expert.", 
+	     name.Data() );
+      return kInitError;
+    }
+    fPlanes.push_back( newplane );
+  }
+
+  if( fDebug > 0 )
+    Info( Here(here), "Loaded %u planes", fPlanes.size() );
+
+  fIsInit = kTRUE;
+  return kOK;
 }
 
 //_____________________________________________________________________________
@@ -566,111 +658,6 @@ UInt_t MWDC::GetDAQnchan( THaDetMap::Module* mod ) const
   // Return number of channels for detector map module 'mod' from cratemap
   DAQmodule* found = FindDAQmodule( mod->crate, mod->slot, fCrateMap );
   return found ? found->fNchan : 0;
-}
-
-//_____________________________________________________________________________
-vector<TString> MWDC::GetProjectionNames() const
-{
-  // Utility function. Returns names of all defined Projections in 
-  // an array of strings in the order of EProjType
-  vector<TString> name_list;
-  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    TString s = fProj[type]->GetName();
-    name_list.push_back(s);
-  }
-  return name_list;
-}
-
-//_____________________________________________________________________________
-Int_t MWDC::ReadDatabase( const TDatime& date )
-{
-  // Read MWDC database
-
-  static const char* const here = "ReadDatabase";
-
-  fIsInit = kFALSE;
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    delete fPlanes[iplane];
-  }
-  // Delete existing configuration (in case we are re-initializing)
-  fPlanes.clear();
-
-  FILE* file = OpenFile( date );
-  if( !file ) return kFileError;
-
-  // Putting this container on the stack may cause a stack overflow!
-  vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
-
-  string planeconfig;
-  DBRequest request[] = {
-    { "planeconfig",  &planeconfig, kString },
-    { "cratemap",     cmap,         kIntM,    6 },
-    { 0 }
-  };
-
-  Int_t status = kInitError;
-  Int_t err = LoadDB( file, date, request, fPrefix );
-  fclose(file);
-
-  if( !err ) {
-    if( cmap->empty() ) {
-      Error(Here(here), "No cratemap defined. Set \"cratemap\" in database.");
-    } else {
-      // Build the list of crate map elements
-      for( vviter_t it = cmap->begin(); it != cmap->end(); ++it ) {
-	vector<int>& row = *it;
-	for( Int_t slot = row[1]; slot <= row[2]; ++slot ) {
-	  DAQmodule* m =
-	    new DAQmodule( row[0], slot, row[3], row[4]*1e-12, row[5] );
-	  DAQmodule* found = static_cast<DAQmodule*>(fCrateMap->FindObject(m));
-	  if( found ) { 
-	    m->Copy(*found);  // Later entries override earlier ones
-	    delete m;
-	  }
-	  else
-	    fCrateMap->Add(m);
-	}
-      }
-      status = kOK;
-    }
-  }
-  delete cmap; cmap = NULL;
-  if( status != kOK )
-    return status;
-
-  vector<string> planes = vsplit(planeconfig);
-  if( planes.empty() ) {
-    Error( Here(here), "No planes defined. Set \"planeconfig\" in database." );
-    return kInitError;
-  }
-
-  // Set up the wire planes
-  for( ssiz_t i=0; i<planes.size(); ++i ) {
-    TString name(planes[i].c_str());
-    if( name.IsNull() )
-      continue;
-    vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			   WirePlane::NameEquals( name ) );
-    if( it != fPlanes.end() ) {
-      Error( Here(here), "Duplicate plane name: %s. Fix database.", 
-	     name.Data() );
-      return kInitError;
-    }
-    WirePlane* newplane = new WirePlane( name, name, this );
-    if( !newplane || newplane->IsZombie() ) {
-      // Urgh. Something is very bad
-      Error( Here(here), "Error creating wire plane %s. Call expert.", 
-	     name.Data() );
-      return kInitError;
-    }
-    fPlanes.push_back( newplane );
-  }
-
-  if( fDebug > 0 )
-    Info( Here(here), "Loaded %u planes", fPlanes.size() );
-
-  fIsInit = kTRUE;
-  return kOK;
 }
 
 //_____________________________________________________________________________

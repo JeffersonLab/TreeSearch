@@ -58,9 +58,12 @@ namespace TreeSearch {
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
     vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
 
-  enum {
-    kIgnoreNegDrift = BIT(17) // Ignore negative drift times
-  };
+    // Analysis control flags. Set via database. Defaults are usually fine.
+    enum {
+      kDoTimeCut  = BIT(14), // Use TDC time cut in decoder (defined in planes)
+      kPairsOnly  = BIT(15), // Accept only pairs of hits from plane pairs
+      kMCdata     = BIT(16)  // Assume input is Monte Carlo data
+    };
 
   protected:
 
@@ -78,9 +81,6 @@ namespace TreeSearch {
     UInt_t   LoadDAQmodel( THaDetMap::Module* m ) const;
     Double_t LoadDAQresolution( THaDetMap::Module* m ) const;
     UInt_t   GetDAQnchan( THaDetMap::Module* m ) const;
-
-    // Utility function for error messages - used by WirePlane::Init
-    vector<TString> GetProjectionNames() const;
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
