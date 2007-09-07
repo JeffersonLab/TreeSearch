@@ -10,6 +10,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version
 export DEBUG = 1
+export TESTCODE = 1
 
 # Architecture to compile for
 ARCH          = linux
@@ -54,6 +55,7 @@ else
   CXXFLAGS    = -O
   LDFLAGS     = -O
 endif
+DEFINES       = -DSUNVERS -DHAS_SSTREAM
 CXXFLAGS     += -KPIC
 LD            = CC
 SOFLAGS       = -G
@@ -69,6 +71,7 @@ else
   CXXFLAGS    = -O
   LDFLAGS     = -O
 endif
+DEFINES       = -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
 LD            = g++
 SOFLAGS       = -shared
@@ -78,15 +81,15 @@ ifeq ($(CXX),)
 $(error $(ARCH) invalid architecture)
 endif
 
-CXXFLAGS     += $(INCLUDES)
+ifdef TESTCODE
+DEFINES      += -DTESTCODE
+endif
+
+CXXFLAGS     += $(DEFINES) $(INCLUDES)
 LIBS         += $(ROOTLIBS) $(SYSLIBS)
 GLIBS        += $(ROOTGLIBS) $(SYSLIBS)
 
 MAKEDEPEND    = gcc
-
-ifdef WITH_DEBUG
-CXXFLAGS     += -DWITH_DEBUG
-endif
 
 ifdef PROFILE
 CXXFLAGS     += -pg
@@ -115,7 +118,7 @@ $(USERLIB):	$(HDR) $(OBJS)
 
 $(USERDICT).cxx: $(HDR) $(LINKDEF)
 	@echo "Generating dictionary $(USERDICT)..."
-	$(ROOTSYS)/bin/rootcint -f $@ -c $(INCLUDES) $^
+	$(ROOTSYS)/bin/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
 install:	all
 		$(error Please define install yourself)
