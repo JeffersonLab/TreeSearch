@@ -3,10 +3,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 //                                                                           //
-// TreeSearch::MWDC                                                          //
+// TreeSearch::Projection                                                    //
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
-
+#
 #include "THaAnalysisObject.h"
 #include "TMath.h"
 #include <vector>
@@ -43,9 +43,7 @@ namespace TreeSearch {
     Int_t          GetType() const { return fType; }
     UInt_t         GetDepth() const { return fDepth; }
     Double_t       GetMaxSlope() const { return fMaxSlope; }
-    Double_t       GetZsize() const { return fZmax - fZmin; }
-    Double_t       GetZmin()  const { return fZmin; }
-    Double_t       GetZmax()  const { return fZmax; }
+    Double_t       GetZsize() const;
     Double_t       GetWidth() const { return fWidth; }
     Double_t       GetAngle() const;
     Double_t       GetSinAngle() const { return fSinAngle; }
@@ -67,8 +65,6 @@ namespace TreeSearch {
     UInt_t              fDepth;       // Depth of search tree (bin resolution)
     Double_t            fMaxSlope;    // Maximum physical track slope (0=perp)
     Double_t            fWidth;       // Width of tracking region (m)
-    Double_t            fZmin;        // z-position of first wire plane
-    Double_t            fZmax;        // z-position of last wire plane
     Double_t            fSinAngle;    // Sine of wire angle
     Double_t            fCosAngle;    // Cosine of wire angle
 

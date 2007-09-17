@@ -11,6 +11,7 @@
 #include "WirePlane.h"
 #include "THaDetectorBase.h"
 #include "TString.h"
+#include "PatternTree.h"
 #include <iostream>
 
 using namespace std;
@@ -24,7 +25,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   //, const PatternTree* pt )
   : THaAnalysisObject( name, name ), fType(type), fDepth(0),
-    fMaxSlope(0.0), fWidth(0.0), fZmin(kBig), fZmax(-kBig), 
+    fMaxSlope(0.0), fWidth(0.0),
     fHitpattern(NULL), fPatternTree(NULL), fDetector(parent)
     //    fPatternTree(pt)
 {
@@ -40,8 +41,8 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 //_____________________________________________________________________________
 Projection::Projection( const Projection& orig )
   : fType(orig.fType), fPlanes(orig.fPlanes), fDepth(orig.fDepth),
-    fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth), fZmin(orig.fZmin),
-    fZmax(orig.fZmax), fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
+    fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
+    fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
     fHitpattern(NULL), fPatternTree(NULL), fDetector(orig.fDetector)
 {
   // Copying
@@ -63,8 +64,6 @@ Projection& Projection::operator=( const Projection& rhs )
     fPlanes   = rhs.fPlanes;
     fMaxSlope = rhs.fMaxSlope;
     fWidth    = rhs.fWidth;
-    fZmin     = rhs.fZmin;
-    fZmax     = rhs.fZmax;
     fSinAngle = rhs.fSinAngle;
     fCosAngle = rhs.fCosAngle;
     fDetector = rhs.fDetector;
@@ -98,16 +97,16 @@ void Projection::AddPlane( WirePlane* wp )
   if( !wp )
     return;
 
-  const WirePlane* planes[] = { wp, wp->GetPartner(), 0 };
-  const WirePlane** p = planes;
-  while( *p ) {
-    Double_t z = (*p)->GetZ();
-    if( z < fZmin )
-      fZmin = z;
-    if( z > fZmax )
-      fZmax = z;
-    ++p;
-  }
+//   const WirePlane* planes[] = { wp, wp->GetPartner(), 0 };
+//   const WirePlane** p = planes;
+//   while( *p ) {
+//     Double_t z = (*p)->GetZ();
+//     if( z < fZmin )
+//       fZmin = z;
+//     if( z > fZmax )
+//       fZmax = z;
+//     ++p;
+//   }
   
   // Only add the primary plane; partner planes are linked within the
   // plane objects
@@ -143,15 +142,6 @@ Int_t Projection::Decode( const THaEvData& evdata )
     // use it for occupancy test
   }
   return sum;
-}
-
-//_____________________________________________________________________________
-void Projection::SetAngle( Double_t angle )
-{
-  // Set wire angle (rad)
-  
-  fSinAngle = TMath::Sin( angle );
-  fCosAngle = TMath::Cos( angle );
 }
 
 //_____________________________________________________________________________
@@ -234,8 +224,8 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   if( err )
     return kInitError;
 
-  if( fDepth > 20 ) {
-    Error( Here(here), "Illegal search_depth = %u. Must be <= 20. "
+  if( fDepth > 16 ) {
+    Error( Here(here), "Illegal search_depth = %u. Must be <= 16. "
 	     "Fix database.", fDepth );
     return kInitError;
   }
@@ -295,6 +285,26 @@ const char* Projection::GetDBFileName() const
   // as our parent detector.
 
   return fDetector ? fDetector->GetDBFileName() : GetPrefix();
+}
+
+//_____________________________________________________________________________
+Double_t Projection::GetZsize() const
+{
+  // Get z_max - z_min of the planes.
+  
+  if( fPlanes.empty() )
+    return 0.0;
+
+  return fPlanes[fPlanes.size()-1]->GetZ() - fPlanes[0]->GetZ();
+}
+
+//_____________________________________________________________________________
+void Projection::SetAngle( Double_t angle )
+{
+  // Set wire angle (rad)
+  
+  fSinAngle = TMath::Sin( angle );
+  fCosAngle = TMath::Cos( angle );
 }
 
 //_____________________________________________________________________________
