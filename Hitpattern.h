@@ -8,7 +8,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "TBits.h"
+#include "TMath.h"
 #include <cstring>
+#include <cassert>
 
 namespace TreeSearch {
 
@@ -39,22 +41,28 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    Bits*  GetRow( UInt_t i ) const { return i<fNplanes ? fPattern[i] : 0; }
+    Bits*    GetRow( UInt_t i ) const { return i<fNplanes ? fPattern[i] : 0; }
 
-    Double_t GetWidth() const { return fWidth; }
+    Double_t GetWidth() const { return (1U<<(fDepth-1))/fScale; }
     UInt_t   GetDepth() const { return fDepth; }
     UInt_t   GetNplanes() const { return fNplanes; }
+    Double_t GetOffset() const { return fOffset; }
 
     Bool_t   IsError() const { return (fNplanes == 0); }
 
-    void     SetPositionRange( Double_t start, Double_t end, UInt_t plane )
-    { if(plane<fNplanes && start<=end) uSetPositionRange(start,end,plane); }
+    void     SetPositionRange( Double_t start, Double_t end, UInt_t plane );
+    void     SetPosition( Double_t pos, Double_t res, UInt_t plane )
+    { SetPositionRange( pos-res, pos+res, plane ); }
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
-    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth=32 ) const;
-    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth=32 ) const;
+    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
+    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
+    Int_t    ContainsPattern( UShort_t bins[], UInt_t shift, Bool_t mirrored, 
+			      UInt_t depth ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
+
+    void     SetOffset( Double_t off ) { fOffset = off; }
 
 //FIXME: add Draw() (=event display)
 
@@ -62,48 +70,89 @@ namespace TreeSearch {
 
     UInt_t   fDepth;    // Depth of the pattern tree (e.g. 10: max 2^9 bits)
     UInt_t   fNplanes;  // Number of wire planes contained in the pattern
-    Double_t fWidth;    // Physical width of region encompassing hitpattern (m)
-    Double_t fScale;    // 1/(bin resolution) = 2^(fDepth-1)/fWidth
+    Double_t fScale;    // 1/(bin resolution) = 2^(fDepth-1)/width (1/m)
     Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
     Bits**   fPattern;  // [fNPlanes] pattern at all fDepth resolutions
 
-    // More efficient "unchecked" versions of these routines for internal use
-    void   uSetPositionRange( Double_t start, Double_t end, UInt_t plane );
-    void   uSetPosition( Double_t pos, Double_t res, UInt_t plane )
-    { uSetPositionRange( pos-res, pos+res, plane ); }
 
     ClassDef(Hitpattern,0)  // Wire chamber hitpattern at multiple resolutions
   };
 
-}  // end namespace TreeSearch
+  //___________________________________________________________________________
+  inline
+  void Hitpattern::Clear( Option_t* opt )
+  {
+    // Clear the hitpattern
 
-//_____________________________________________________________________________
-inline
-void TreeSearch::Hitpattern::Clear( Option_t* opt )
-{
-  // Clear the hitpattern
+    for( UInt_t i=fNplanes; i; )
+      fPattern[--i]->FastClear();
+  }
 
-  for( UInt_t i=fNplanes; i; )
-    fPattern[--i]->FastClear();
-}
+  //___________________________________________________________________________
+  inline
+  Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane, 
+					  UInt_t depth ) const
+  {
+    // Test if point is set at the given depth and plane.
 
-//_____________________________________________________________________________
-inline
-Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane, 
-					UInt_t depth ) const
-{
-  // Test if point is set at the given depth of the pattern tree in the
-  // given plane.
+    assert( depth < fDepth && plane < fNplanes );
+    UInt_t offset = 1U<<depth;
+    assert( bin < offset );
+    return fPattern[plane]->TestBitNumber( bin + offset );
+  }
 
-  if( depth >= fDepth )
-    depth = fDepth-1;
-  UInt_t offset = 1U<<depth;
-  if ( plane >= fNplanes || bin >= offset )
-    return kFALSE;
-  return fPattern[plane]->TestBitNumber( bin + offset );
-}
+  //___________________________________________________________________________
+  inline
+  Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane, 
+				   UInt_t depth ) const
+  {
+    // Test if position 'pos' (in m) is marked in the hit pattern.
+    // The pattern will be tested at the given depth.
+
+    assert( depth < fDepth && plane < fNplanes );
+    Int_t bin = TMath::FloorNint( fScale*pos );
+    if( bin < 0 || bin >= 1<<(fDepth-1) )
+      return kFALSE;
+    return 
+      fPattern[plane]->TestBitNumber( (bin>>(fDepth-depth-1))+(1U<<depth) );
+  }
+
+  //___________________________________________________________________________
+  inline
+  Int_t Hitpattern::ContainsPattern( UShort_t bins[], UInt_t shift,
+				     Bool_t mirrored, UInt_t depth ) const
+  {
+    // Check if the hitpattern contains the pattern described by the 'bins' 
+    // array at the given depth. 'shift' is a common offset to be added to 
+    // all numbers in bins[]. 'mirrored' indicates a mirrored pattern.
+    // Returns the count of planes where the corresponding bin in bins[]
+    // was found set.
+    // Used to compare with the patterns stored in the PatternTree class.
+  
+    assert( bins && depth < fDepth );
+    UInt_t nbins = 1U<<depth; // Start position of pattern at this depth
+    assert( shift < nbins );
+    Int_t n_found = 0;
+    Int_t startpos = nbins + shift;
+    UShort_t* theBin = bins+fNplanes;
+    if( mirrored ) {
+      for( UInt_t i=fNplanes; i; ) {
+	if( fPattern[--i]->TestBitNumber(startpos - *--theBin) )
+	  ++n_found;
+      }
+    } else {
+      for( UInt_t i=fNplanes; i; ) {
+	if( fPattern[--i]->TestBitNumber(startpos + *--theBin) )
+	  ++n_found;
+      }
+    }
+    return n_found;
+  }
 
 
 ///////////////////////////////////////////////////////////////////////////////
+
+}  // end namespace TreeSearch
+
 
 #endif

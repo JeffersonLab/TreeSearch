@@ -8,7 +8,6 @@
 #include "Hit.h"
 #include "WirePlane.h"
 #include "TError.h"
-#include "TMath.h"
 
 #include <iostream>
 
@@ -21,31 +20,30 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t depth, UInt_t nplanes, Double_t width )
-  : fDepth(depth), fNplanes(0), fWidth(width), fScale(0.0), 
-    fOffset(0.5*width), fPattern(NULL)
+  : fDepth(depth), fNplanes(0), fScale(0.0), fOffset(0.5*width), fPattern(NULL)
 {
   // Constructor
 
   static const char* const here = "TreeSearch::Hitpattern";
   
-  if( nplanes == 0 || nplanes > 100 || fDepth == 0 || fDepth > 20 ) {
+  if( nplanes == 0 || nplanes > 100 || fDepth == 0 || fDepth > 16 ) {
     ::Error( here, "Illegal number of planes or depth: %d %d.\n"
-	     "Both > 0, nplanes <= 100, depth <= 20.", nplanes, depth );
-  } else if( fWidth < 1e-2 ) { // Negative or very small width?
-    ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", fWidth );
+	     "Both > 0, nplanes <= 100, depth <= 16.", nplanes, depth );
+  } else if( width < 1e-2 ) { // Negative or very small width?
+    ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", width );
   } else {
     fNplanes = nplanes;
     fPattern = new Bits*[fNplanes];
     UInt_t nbins = 1U<<fDepth;
     for( UInt_t i=0; i<fNplanes; i++ )
       fPattern[i] = new Bits( nbins );
-    fScale = static_cast<Double_t>(nbins>>1) / fWidth;
+    fScale = static_cast<Double_t>(nbins>>1) / width;
   }
 }
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const Hitpattern& orig ) 
-  : fDepth(orig.fDepth), fNplanes(orig.fNplanes), fWidth(orig.fWidth),
+  : fDepth(orig.fDepth), fNplanes(orig.fNplanes),
     fScale(orig.fScale), fOffset(orig.fOffset), fPattern(NULL)
 {
   // Copy ctor
@@ -65,7 +63,6 @@ Hitpattern& Hitpattern::operator=( const Hitpattern& rhs )
   if( this != &rhs ) {
     fDepth   = rhs.fDepth;
     fNplanes = rhs.fNplanes;
-    fWidth   = rhs.fWidth;
     fScale   = rhs.fScale;
     fOffset  = rhs.fOffset;
     delete fPattern; fPattern = NULL;
@@ -89,13 +86,14 @@ Hitpattern::~Hitpattern()
 }
 
 //_____________________________________________________________________________
-void Hitpattern::uSetPositionRange( Double_t start, Double_t end,
-				    UInt_t plane )
+void Hitpattern::SetPositionRange( Double_t start, Double_t end,
+				   UInt_t plane )
 {
   // Set pattern bins corresponding to the exact physical positions
   // between start and end (in m) in the given plane. 
-  // Positions may range from 0.0 to fWidth.
+  // Positions may range from 0.0 to width.
 
+  assert( plane<fNplanes && start<=end );
   Int_t hi = TMath::FloorNint( fScale*end );
   if( hi < 0 ) return;
   Int_t lo = TMath::FloorNint( fScale*start );
@@ -163,7 +161,7 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 	Double_t posB = (i&1 ? hitB->GetPosL() : hitB->GetPosR()) + fOffset;
 	if( TMath::Abs( posA-posB ) < maxdist ) {
 	  found = true;
-	  uSetPosition( 0.5*(posA+posB), res, plane );
+	  SetPosition( 0.5*(posA+posB), res, plane );
 	}
       }
     }
@@ -186,8 +184,8 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 	  // The bigger issue with unpaired hits is that the LR-ambiguity
 	  // is not resolved, so two entries have to be made into the pattern.
 	  Double_t res = hit->GetResolution() + maxdist2;
-	  uSetPosition( hit->GetPosL() + fOffset, res, plane );
-	  uSetPosition( hit->GetPosR() + fOffset, res, plane );
+	  SetPosition( hit->GetPosL() + fOffset, res, plane );
+	  SetPosition( hit->GetPosR() + fOffset, res, plane );
 	}
       }
     }
@@ -196,23 +194,6 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   return nhits;
 }
 
-
-//_____________________________________________________________________________
-Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane, 
-				 UInt_t depth ) const
-{
-  // Test if position 'pos' (in m) is marked in the hit pattern.
-  // The pattern will be tested at the given depth (default: deepest level).
-
-  if( plane >= fNplanes )
-    return kFALSE;
-  Int_t bin = TMath::FloorNint( fScale*pos );
-  if( bin < 0 || bin >= 1<<(fDepth-1) )
-    return kFALSE;
-  if( depth >= fDepth )
-    depth = fDepth-1;
-  return fPattern[plane]->TestBitNumber( (bin>>(fDepth-depth-1))+(1<<depth) );
-}
 
 //_____________________________________________________________________________
 void Hitpattern::Print( Option_t* opt ) const
