@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 
 SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx Hitpattern.cxx \
-	Projection.cxx
+	Projection.cxx PatternTree.cxx
 
 PACKAGE = TreeSearch
 
