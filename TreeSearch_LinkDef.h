@@ -19,6 +19,7 @@
 #pragma link C++ class TreeSearch::Hitpattern+;
 #pragma link C++ class TreeSearch::Projection+;
 #pragma link C++ class TreeSearch::PatternTree+;
+#pragma link C++ class TreeSearch::PatternGenerator+;
 
 #pragma link C++ class std::pair<TObject*,TObject*>;
 #pragma link C++ class std::vector<TreeSearch::WirePlane*>;
