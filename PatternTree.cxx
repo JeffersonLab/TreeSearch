@@ -19,7 +19,7 @@ namespace TreeSearch {
 // The bits of suitable patterns must monotonically increase.
 // bit[0] is always zero (otherwise the pattern could be shifted).
 // Note that type() is an important part of the result.
-// type & 1 indicates a pattern shifted right by one
+// type & 1 indicates a pattern shifted by one to the right
 // type & 2 indicates a mirrored pattern 
 // To recover the pattern, mirror first, then shift left, as approriate.
 class ChildIter {
@@ -80,8 +80,8 @@ public:
 };
 
 //_____________________________________________________________________________
-Pattern::Pattern( UInt_t nplanes )
-  : fChild(0), fNbits(nplanes), fMinDepth(-1), fMaxDepth(0), fRefIndex(-1)
+Pattern::Pattern( UInt_t size )
+  : fChild(0), fNbits(size), fMinDepth(-1), fMaxDepth(0), fRefIndex(-1)
 {
   // Constructor. Puts bit array on heap.
 
@@ -125,14 +125,15 @@ Pattern& Pattern::operator=( const Pattern& rhs )
 }
 
 //_____________________________________________________________________________
-ListNode* Pattern::AddChild( Pattern& child, Int_t type )
+ListNode* Pattern::AddChild( Pattern* child, Int_t type )
 {
-  return (fChild = new ListNode( &child, fChild, type ));
+  assert(child);
+  return (fChild = new ListNode( child, fChild, type ));
 }
 
 
 //_____________________________________________________________________________
-Pattern* Pattern::FindChild( const Pattern& pat, Int_t type )
+Pattern* Pattern::FindChild( const Pattern* pat, Int_t type )
 {
   // Search for the given pattern with the given type in the list of child
   // nodes of this pattern
@@ -141,7 +142,7 @@ Pattern* Pattern::FindChild( const Pattern& pat, Int_t type )
   while( child ) {
     Pattern* rhs = child->fPattern;
     assert(rhs);
-    if( child->fOp == type && pat == *rhs )
+    if( child->fOp == type && *pat == *rhs )
       return rhs;
     child = child->Next();
   }
@@ -212,10 +213,10 @@ Int_t PatternTree::Init()
   // Initialize the pattern tree
 
   // TODO: try to read from disk first. If not successful, then do this:
-  Pattern root( fNplanes );
+  Pattern* root = new Pattern( fNplanes );
   fHashTable.clear();
   fHashTable.resize( 1<<(fDepth-1), 0 );
-  AddHash( &root );
+  AddHash( root );
 
   MakeChildNodes( root, 1 );
 
@@ -229,16 +230,52 @@ Int_t PatternTree::Init()
 //_____________________________________________________________________________
 bool PatternTree::TestSlope( const Pattern& pat, UInt_t depth )
 {
-
-
-  return true;
+  UInt_t width = pat.GetWidth();
+  return ( width < 2 ||
+	   TMath::Abs((double)(width-1) / (double)(1<<depth)) <= fMaxSlope );
 }
 
 //_____________________________________________________________________________
 bool PatternTree::LineCheck( const Pattern& pat )
 {
+  // Check if the gievn bit pattern is consistent with a straight line.
+  // The intersection plane positions are given by fZ[].
+  // Assumes a normalized pattern, for which pat[0] is always zero.
 
+  assert(fNplanes);
+  Double_t xL   = pat[fNplanes-1];
+  Double_t xRm1 = xL;               // xR-1
+  Double_t zL   = fZ[fNplanes-1];
+  Double_t zR   = zL;
 
+  for( Int_t i = fNplanes-2; i > 0; --i ) {
+    // Compare the intersection point with the i-th plane of the left edge 
+    // of the band, (xL-x0) * z[i]/zL, to the left edge of the bin, pat[i]-x0. 
+    // If the difference is larger than one bin width (=1), the bin is
+    // outside of the allowed band.
+    // Multiply with zL (to avoid division) and recall x0 = 0.
+    Double_t dL = xL*fZ[i] - pat[i]*zL;
+    if( TMath::Abs(dL) >= zL )
+      return false;
+    // Likewise for the right edge
+    Double_t dR = xRm1*fZ[i] - pat[i]*zR;
+    if( TMath::Abs(dR) >= zR )
+      return false;
+
+    if( i > 1 ) {
+      // If dL>0, the right edge of the bin is inside the band, so set a
+      // new right-side limit.
+      if( dL > 0 ) {
+	xRm1 = pat[i];
+	zR   = fZ[i];
+      }
+      // Likewise for the left-side limit
+      if( dR < 0 ) {
+	xL = pat[i];
+	zL = fZ[i];
+      }
+    }
+  } // planes
   return true;
 }
 
@@ -261,29 +298,23 @@ Pattern* PatternTree::Find( const Pattern& pat )
 }
 
 //_____________________________________________________________________________
-void PatternTree::MakeChildNodes( Pattern& parent, UInt_t depth )
+void PatternTree::MakeChildNodes( Pattern* parent, UInt_t depth )
 {
   // Generate child nodes for the given parent pattern
 
   // Requesting child nodes for the parent at this depth implies that the 
   // parent is being used at the level above
   if( depth > 0 )
-    parent.UsedAtDepth( depth-1 );
+    parent->UsedAtDepth( depth-1 );
 
   // Base case of the recursion: no child nodes beyond fDepth-1
   if( depth >= fDepth )
     return;
 
   // Iterate over child patterns of the parent
-  ChildIter it( parent );
+  ChildIter it( *parent );
   while( it ) {
     Pattern& child = *it;
-
-    cout << "*(" << it.type() << ") ";
-    for( UInt_t i = 0; i<fNplanes; i++ )
-      cout << child[i] << " ";
-    cout << endl;
-
     bool insert = true;
 
     // Pattern already exists?
@@ -300,7 +331,7 @@ void PatternTree::MakeChildNodes( Pattern& parent, UInt_t depth )
 	is_lower = is_lower && TestSlope( *node, depth );
 
       if( is_higher || is_lower )
-	MakeChildNodes( *node, depth+1 );
+	MakeChildNodes( node, depth+1 );
 
     } else {
       // If the pattern is new, check it for consistency with maxslope
@@ -313,7 +344,7 @@ void PatternTree::MakeChildNodes( Pattern& parent, UInt_t depth )
 	// or below as a child node of the current parent. Therefore, we
 	// can add it to the hashtable here.
 	AddHash( node );
-	MakeChildNodes( *node, depth+1 );
+	MakeChildNodes( node, depth+1 );
 	
       } else
 	insert = false;
@@ -321,8 +352,8 @@ void PatternTree::MakeChildNodes( Pattern& parent, UInt_t depth )
     // If this candidate child pattern was found suitable, add it as a
     // child node to the parent - provided, it isn't already there.
     // (How could it get there?!?)
-    if( insert && !parent.FindChild(*node, it.type()) )
-      parent.AddChild(*node, it.type());
+    if( insert && !parent->FindChild(node, it.type()) )
+      parent->AddChild(node, it.type());
 
     ++it;
   }
