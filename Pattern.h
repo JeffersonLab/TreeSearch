@@ -47,9 +47,7 @@ namespace TreeSearch {
     UInt_t     GetMinDepth() const  { return fMinDepth; }
     UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
     UInt_t     GetNbits()    const  { return fNbits; }
-    Int_t      Hash() const { 
-      return fNbits>0 ? fBits[fNbits-1]-fBits[1] : 0;
-    }
+    Int_t      Hash()        const  { return GetWidth(); }
     UShort_t&  operator[](UInt_t i) { 
       assert(i<fNbits);
       return fBits[i];
