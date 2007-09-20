@@ -7,6 +7,9 @@
 #include "PatternGenerator.h"
 #include "PatternTree.h"
 #include "TMath.h"
+#include <iostream>
+
+using namespace std;
 
 ClassImp(TreeSearch::PatternGenerator)
 
@@ -65,7 +68,7 @@ PatternGenerator::ChildIter& PatternGenerator::ChildIter::operator++()
 }
 
 //_____________________________________________________________________________
-PatternGenerator::PatternGenerator() : fDepth(0), fNplanes(0), fMaxSlope(0)
+PatternGenerator::PatternGenerator() : fNlevels(0), fNplanes(0), fMaxSlope(0)
 {
   // Constructor. 
 
@@ -86,6 +89,7 @@ Int_t PatternGenerator::DoTree( EOperation op )
   // Execute given operation on all unique Pattern nodes of the build tree.
   // Internal utility function.
 
+  // TODO: add feature to get all statistics at once (optional Statistics_t*)
   Int_t result = 0;
   if( op == kBytesRequired ) {
     Int_t npatt = DoTree( kCountPatterns );
@@ -113,16 +117,23 @@ Int_t PatternGenerator::DoTree( EOperation op )
 	case kCountPatterns:
 	  ++result;
 	  break;
+	case kMaxChildlistLength:
+	  count = 0;
 	case kCountChildNodes:
 	  {
 	    Pattern* pat = cur_node->GetPattern();
 	    assert(pat);
 	    ListNode* ln = pat->fChild;
 	    while( ln ) {
-	      ++result;
+	      if( op == kCountChildNodes )
+		++result;
+	      else
+		++count;
 	      ln = ln->Next();
 	    }
 	  }
+	  if( op == kMaxChildlistLength && count > result )
+	    result = count;
 	  break;
 	case kMaxHashDepth:
 	  ++count;
@@ -141,9 +152,31 @@ Int_t PatternGenerator::DoTree( EOperation op )
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::Print( Option_t* opt ) const
+void PatternGenerator::Print( Option_t* opt )
 {
   // Print information about the tree, depending on option
+
+  // TODO: Print() should be const!
+
+  // Basic info
+  cout << "tree: nlevels = " << fNlevels
+       << ", nplanes = " << fNplanes
+       << ", zpos = ";
+  for( UInt_t i=0; i<fZ.size(); i++ ) {
+    cout << fZ[i];
+    if( i+1 != fZ.size() )
+      cout << ",";
+  }
+  cout << endl;
+  cout << "patterns = " << DoTree(kCountPatterns)
+       << ", links = "   << DoTree(kCountChildNodes)
+       << ", bytes = " << DoTree(kBytesRequired)
+       << endl;
+  cout << "maxhash = " << DoTree(kMaxHashDepth)
+       << ", maxlinklen = " << DoTree(kMaxChildlistLength)
+       << endl;
+ 
+ //TODO: add more features
 
 }
 
@@ -161,7 +194,7 @@ void PatternGenerator::AddHash( Pattern* pat )
 }
 
 //_____________________________________________________________________________
-PatternTree* PatternGenerator::Generate( UInt_t depth, Double_t width,
+PatternTree* PatternGenerator::Generate( UInt_t nlevels, Double_t width,
 					 const vector<double>& zpos,
 					 Double_t maxslope )
 {
@@ -173,7 +206,7 @@ PatternTree* PatternGenerator::Generate( UInt_t depth, Double_t width,
 
   // Set parameters for the new build.
   //TODO: normalize zpos and maxslope
-  fDepth    = depth;
+  fNlevels  = nlevels;
   fZ        = zpos;
   fNplanes  = fZ.size();
   fMaxSlope = maxslope;
@@ -182,7 +215,7 @@ PatternTree* PatternGenerator::Generate( UInt_t depth, Double_t width,
   // 2^(depth-1) * 2^(nplanes-2) is the upper limit for the number of patterns.
   // The following table size should give decent speed. Anything larger would
   // require a cleverer hash function.
-  fHashTable.resize( 1<<(fDepth-1), 0 );
+  fHashTable.resize( 1<<(fNlevels-1), 0 );
 
   // Start with the trivial all-zero root node at depth 0. 
   Pattern* root = new Pattern( fNplanes );
@@ -275,8 +308,8 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
   if( depth > 0 )
     parent->UsedAtDepth( depth-1 );
 
-  // Base case of the recursion: no child nodes beyond fDepth-1
-  if( depth >= fDepth )
+  // Base case of the recursion: no child nodes beyond fNlevels-1
+  if( depth >= fNlevels )
     return;
 
   // Iterate over child patterns of the parent
@@ -309,8 +342,8 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
 	node = new Pattern( child );
 	// This pattern is guaranteed to be a added as a child node at
 	// this depth or below, either here through the recursive call
-	// or below as a child node of the current parent. Therefore, we
-	// can add it to the hashtable here.
+	// or below as a child node of the current parent. Therefore, it
+	// can be added to the hashtable here.
 	AddHash( node );
 	MakeChildNodes( node, depth+1 );
 	

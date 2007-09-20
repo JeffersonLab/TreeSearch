@@ -22,18 +22,18 @@ namespace TreeSearch {
     PatternGenerator();
     virtual ~PatternGenerator();
 
-    PatternTree* Generate( UInt_t depth, Double_t detector_width, 
+    PatternTree* Generate( UInt_t nlevels, Double_t detector_width, 
 			   const vector<double>& zpos, Double_t maxslope );
 
-    void Print( Option_t* opt="" ) const;
+    void Print( Option_t* opt="" );
 
   private:
-    UInt_t         fDepth;       // Depth of tree (levels = 0 - depth-1)
+    UInt_t         fNlevels;     // Number of levels of the tree (0-nlevels-1)
     UInt_t         fNplanes;     // Number of hitpattern planes
     Double_t       fMaxSlope;    // Max allowed slope, normalized units (0-1)
     vector<double> fZ;           // z positions of planes, normalized (0-1)
 
-    vector<ListNode*> fHashTable;// Hashtable of patterns
+    vector<ListNode*> fHashTable;// Hashtab for indexing patterns during build
 
     void     AddHash( Pattern* pat );
     Pattern* Find( const Pattern& pat );
@@ -42,7 +42,8 @@ namespace TreeSearch {
     void     MakeChildNodes( Pattern* parent, UInt_t depth );
 
     enum EOperation { kDelete, kResetRefIndex, kCountPatterns,
-		      kCountChildNodes, kMaxHashDepth, kBytesRequired };
+		      kCountChildNodes, kMaxChildlistLength, 
+		      kMaxHashDepth, kBytesRequired };
     Int_t    DoTree( EOperation op );
 
     // Utility class for iterating over child patterns
