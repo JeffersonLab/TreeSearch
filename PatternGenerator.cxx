@@ -179,9 +179,10 @@ PatternTree* PatternGenerator::Generate( UInt_t depth, Double_t width,
   fMaxSlope = maxslope;
   // TODO: check for unreasonable input
 
-  // 2^(depth-1) * 2^(nplanes-2) is the expected upper limit for the number of
-  // patterns. 1/2 that size is a good space/time tradeoff.
-  fHashTable.resize( 1<<(fDepth+fNplanes-4), 0 );
+  // 2^(depth-1) * 2^(nplanes-2) is the upper limit for the number of patterns.
+  // The following table size should give decent speed. Anything larger would
+  // require a cleverer hash function.
+  fHashTable.resize( 1<<(fDepth-1), 0 );
 
   // Start with the trivial all-zero root node at depth 0. 
   Pattern* root = new Pattern( fNplanes );
