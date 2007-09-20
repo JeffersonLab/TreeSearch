@@ -12,8 +12,10 @@ namespace TreeSearch {
 Pattern::Pattern( UInt_t size )
   : fChild(0), fNbits(size), fMinDepth(-1), fMaxDepth(0), fRefIndex(-1)
 {
-  // Constructor. Puts bit array on heap.
+  // Constructor. Puts bit array on heap. Minimum size is 1.
 
+  if( fNbits == 0 )
+    ++fNbits;
   fBits = new UShort_t[fNbits];
   memset( fBits, 0, fNbits*sizeof(UShort_t) );
 }
