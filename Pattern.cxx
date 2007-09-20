@@ -69,9 +69,9 @@ Pattern* Pattern::FindChild( const Pattern* pat, Int_t type )
 
   ListNode* child = fChild;
   while( child ) {
-    Pattern* rhs = child->fPattern;
+    Pattern* rhs = child->GetPattern();
     assert(rhs);
-    if( child->fOp == type && *pat == *rhs )
+    if( child->Type() == type && *pat == *rhs )
       return rhs;
     child = child->Next();
   }

@@ -16,7 +16,7 @@ namespace TreeSearch {
   class ListNode;
 
   class Pattern {
-    friend class PatternTree;
+    friend class PatternGenerator;
   private:
     UShort_t*  fBits;        // [fNbits] Bit pattern array
     ListNode*  fChild;       // Linked list of child patterns
@@ -24,6 +24,11 @@ namespace TreeSearch {
     UChar_t    fMinDepth;    // Minimum valid depth for this pattern
     UChar_t    fMaxDepth;    // Maximum valid depth (used during building)
     Int_t      fRefIndex;    // Reference index for serializing the tree
+
+    ListNode*  AddChild( Pattern* child, Int_t type );
+    Pattern*   FindChild( const Pattern* pat, Int_t type );
+    void       UsedAtDepth( UInt_t depth );
+
   public:
     Pattern( UInt_t size );
     Pattern( const Pattern& orig );
@@ -37,11 +42,9 @@ namespace TreeSearch {
     bool operator!=( const Pattern& rhs ) const { 
       return !(*this == rhs );
     }
-    ListNode*  AddChild( Pattern* child, Int_t type );
-    Pattern*   FindChild( const Pattern* pat, Int_t type );
+    ListNode*  GetChild()    const  { return fChild; }
     UShort_t*  GetBits()            { return fBits; }
     UInt_t     GetMinDepth() const  { return fMinDepth; }
-    UInt_t     GetMaxDepth() const  { return fMaxDepth; }
     UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
     UInt_t     GetNbits()    const  { return fNbits; }
     Int_t      Hash() const { 
@@ -55,12 +58,9 @@ namespace TreeSearch {
       assert(i<fNbits);
       return fBits[i];
     }
-    void       UsedAtDepth( UInt_t depth );
   }; // end class Pattern
 
   class ListNode {
-    friend class PatternTree;
-    friend class Pattern;
   private:
     Pattern*   fPattern;    // Bit pattern treenode
     ListNode*  fNext;       // Next list element
@@ -70,6 +70,7 @@ namespace TreeSearch {
       : fPattern(pat), fNext(next), fOp(op) {}
     Pattern*   GetPattern() const { return fPattern; }
     ListNode*  Next() const { return fNext; }
+    Int_t      Type() const { return fOp; }
   }; // end class ListNode
 
   //___________________________________________________________________________
