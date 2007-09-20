@@ -14,7 +14,7 @@ using std::vector;
 
 namespace TreeSearch {
 
-  class Pattern;
+  class PatternTree;
   class ListNode;
 
   class PatternGenerator {
@@ -22,8 +22,10 @@ namespace TreeSearch {
     PatternGenerator();
     virtual ~PatternGenerator();
 
-    Pattern* Generate( UInt_t depth, const vector<double>& zpos,
-		       Double_t maxslope );
+    PatternTree* Generate( UInt_t depth, Double_t detector_width, 
+			   const vector<double>& zpos, Double_t maxslope );
+
+    void Print( Option_t* opt="" ) const;
 
   private:
     UInt_t         fDepth;       // Depth of tree (levels = 0 - depth-1)
@@ -34,11 +36,14 @@ namespace TreeSearch {
     vector<ListNode*> fHashTable;// Hashtable of patterns
 
     void     AddHash( Pattern* pat );
-    void     DeleteBuildTree();
     Pattern* Find( const Pattern& pat );
     bool     TestSlope( const Pattern& pat, UInt_t depth );
     bool     LineCheck( const Pattern& pat );
     void     MakeChildNodes( Pattern* parent, UInt_t depth );
+
+    enum EOperation { kDelete, kResetRefIndex, kCountPatterns,
+		      kCountChildNodes, kMaxHashDepth, kBytesRequired };
+    Int_t    DoTree( EOperation op );
 
     // Utility class for iterating over child patterns
     class ChildIter {

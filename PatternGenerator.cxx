@@ -5,7 +5,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "PatternGenerator.h"
-#include "Pattern.h"
+#include "PatternTree.h"
 #include "TMath.h"
 
 ClassImp(TreeSearch::PatternGenerator)
@@ -76,24 +76,75 @@ PatternGenerator::~PatternGenerator()
 {
   // Destructor
 
-  DeleteBuildTree();
+  DoTree( kDelete );
 
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::DeleteBuildTree()
+Int_t PatternGenerator::DoTree( EOperation op )
 {
-  for( vector<ListNode*>::iterator it = fHashTable.begin();
-       it != fHashTable.end(); ++it ) {
-    ListNode* listnode = *it;
-    while( listnode ) {
-      delete listnode->GetPattern();
-      ListNode* prev_node = listnode;
-      listnode = listnode->Next();
-      delete prev_node;
-    }
+  // Execute given operation on all unique Pattern nodes of the build tree.
+  // Internal utility function.
+
+  Int_t result = 0;
+  if( op == kBytesRequired ) {
+    Int_t npatt = DoTree( kCountPatterns );
+    result += sizeof(Pattern) * npatt;
+    result += sizeof(UShort_t) * npatt * fNplanes;
+    result += sizeof(ListNode) * DoTree( kCountChildNodes );
+  } else {
+    for( vector<ListNode*>::iterator it = fHashTable.begin();
+	 it != fHashTable.end(); ++it ) {
+      // Each hashnode points to a unique pattern by construction of the table
+      ListNode* hashnode = *it;
+      Int_t count = 0;
+      while( hashnode ) {
+	ListNode* cur_node = hashnode;
+	hashnode = hashnode->Next();
+	assert( cur_node->GetPattern() );
+	switch( op ) {
+	case kDelete:
+	  delete cur_node->GetPattern();
+	  delete cur_node;
+	  break;
+	case kResetRefIndex:
+	  cur_node->GetPattern()->fRefIndex = -1;
+	  break;
+	case kCountPatterns:
+	  ++result;
+	  break;
+	case kCountChildNodes:
+	  {
+	    Pattern* pat = cur_node->GetPattern();
+	    assert(pat);
+	    ListNode* ln = pat->fChild;
+	    while( ln ) {
+	      ++result;
+	      ln = ln->Next();
+	    }
+	  }
+	  break;
+	case kMaxHashDepth:
+	  ++count;
+	  break;
+	default:
+	  break;
+	}
+      } // while hashnode
+      if( op == kMaxHashDepth && count > result )
+	result = count;
+    } // for hashtable elements
+    if( op == kDelete )
+      fHashTable.clear();
   }
-  fHashTable.clear();
+  return result;
+}
+
+//_____________________________________________________________________________
+void PatternGenerator::Print( Option_t* opt ) const
+{
+  // Print information about the tree, depending on option
+
 }
 
 //_____________________________________________________________________________
@@ -110,23 +161,27 @@ void PatternGenerator::AddHash( Pattern* pat )
 }
 
 //_____________________________________________________________________________
-Pattern* PatternGenerator::Generate( UInt_t depth, const vector<double>& zpos,
-				     Double_t maxslope )
+PatternTree* PatternGenerator::Generate( UInt_t depth, Double_t width,
+					 const vector<double>& zpos,
+					 Double_t maxslope )
 {
   // Generate a new pattern tree for the given parameters. Returns a pointer
-  // to the root of the generated tree, or zero if error
+  // to the generated tree, or zero if error
 
   // Clear out previous build, if any
-  DeleteBuildTree();
+  DoTree( kDelete );
 
   // Set parameters for the new build.
+  //TODO: normalize zpos and maxslope
   fDepth    = depth;
   fZ        = zpos;
   fNplanes  = fZ.size();
   fMaxSlope = maxslope;
   // TODO: check for unreasonable input
 
-  fHashTable.resize( 1<<(fDepth-1), 0 );
+  // 2^(depth-1) * 2^(nplanes-2) is the expected upper limit for the number of
+  // patterns. 1/2 that size is a good space/time tradeoff.
+  fHashTable.resize( 1<<(fDepth+fNplanes-4), 0 );
 
   // Start with the trivial all-zero root node at depth 0. 
   Pattern* root = new Pattern( fNplanes );
@@ -135,9 +190,8 @@ Pattern* PatternGenerator::Generate( UInt_t depth, const vector<double>& zpos,
   // Generate the tree recursively
   MakeChildNodes( root, 1 );
 
-  //TODO: Copy or cache the build tree, otherwise it will only live for 
-  // as long as this object!!
-  return root;
+  
+  return 0;
 }
 
 //_____________________________________________________________________________
@@ -195,7 +249,7 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
 //_____________________________________________________________________________
 Pattern* PatternGenerator::Find( const Pattern& pat )
 {
-  // Search for the given pattern in the hash table (used during build)
+  // Search for the given pattern in the current database
 
   UInt_t hashsize = fHashTable.size();
   assert(hashsize);
@@ -235,8 +289,8 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
     if( node ) {
       // If this pattern exists, but has not been used at this depth before,
       // mark it for this depth and generate child nodes for it
-      bool is_lower  = depth < node->GetMinDepth();
-      bool is_higher = depth > node->GetMaxDepth();
+      bool is_lower  = depth < node->fMinDepth;
+      bool is_higher = depth > node->fMaxDepth;
       // If the pattern has only been tested at a higher depth, we need 
       // to redo the slope test since the absolute slope increases with
       // decreasing depth
