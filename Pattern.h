@@ -10,22 +10,23 @@
 #include "Rtypes.h"
 #include <cassert>
 #include <cstring>
+#include <iostream>
 
 namespace TreeSearch {
 
-  class ListNode;
+  class Link;
 
   class Pattern {
     friend class PatternGenerator;
   private:
     UShort_t*  fBits;        // [fNbits] Bit pattern array
-    ListNode*  fChild;       // Linked list of child patterns
+    Link*      fChild;       // Linked list of child patterns
     UChar_t    fNbits;       // Bit count
     UChar_t    fMinDepth;    // Minimum valid depth for this pattern
     UChar_t    fMaxDepth;    // Maximum valid depth (used during building)
     Int_t      fRefIndex;    // Reference index for serializing the tree
 
-    ListNode*  AddChild( Pattern* child, Int_t type );
+    Link*      AddChild( Pattern* child, Int_t type );
     Pattern*   FindChild( const Pattern* pat, Int_t type );
     void       UsedAtDepth( UInt_t depth );
 
@@ -42,7 +43,7 @@ namespace TreeSearch {
     bool operator!=( const Pattern& rhs ) const { 
       return !(*this == rhs );
     }
-    ListNode*  GetChild()    const  { return fChild; }
+    Link*      GetChild()    const  { return fChild; }
     UShort_t*  GetBits()            { return fBits; }
     UInt_t     GetMinDepth() const  { return fMinDepth; }
     UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
@@ -56,20 +57,23 @@ namespace TreeSearch {
       assert(i<fNbits);
       return fBits[i];
     }
+    void print( bool print_links = true, std::ostream& os = std::cout,
+		bool end_line = true ) const;
   }; // end class Pattern
 
-  class ListNode {
+  class Link {
   private:
     Pattern*   fPattern;    // Bit pattern treenode
-    ListNode*  fNext;       // Next list element
+    Link*      fNext;       // Next list element
     Int_t      fOp;         // Operation to be applied to pattern
   public:
-    ListNode( Pattern* pat, ListNode* next, Int_t op )
+    Link( Pattern* pat, Link* next, Int_t op )
       : fPattern(pat), fNext(next), fOp(op) {}
     Pattern*   GetPattern() const { return fPattern; }
-    ListNode*  Next() const { return fNext; }
+    Link*      Next() const { return fNext; }
     Int_t      Type() const { return fOp; }
-  }; // end class ListNode
+    void print( std::ostream& os = std::cout, bool end_line = true ) const;
+  }; // end class Link
 
   //___________________________________________________________________________
   inline

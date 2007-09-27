@@ -6,6 +6,9 @@
 
 #include "Pattern.h"
 
+#include <iostream>
+using namespace std;
+
 namespace TreeSearch {
 
 //_____________________________________________________________________________
@@ -56,10 +59,10 @@ Pattern& Pattern::operator=( const Pattern& rhs )
 }
 
 //_____________________________________________________________________________
-ListNode* Pattern::AddChild( Pattern* child, Int_t type )
+Link* Pattern::AddChild( Pattern* child, Int_t type )
 {
   assert(child);
-  return (fChild = new ListNode( child, fChild, type ));
+  return (fChild = new Link( child, fChild, type ));
 }
 
 
@@ -69,7 +72,7 @@ Pattern* Pattern::FindChild( const Pattern* pat, Int_t type )
   // Search for the given pattern with the given type in the list of child
   // nodes of this pattern
 
-  ListNode* child = fChild;
+  Link* child = fChild;
   while( child ) {
     Pattern* rhs = child->GetPattern();
     assert(rhs);
@@ -87,13 +90,38 @@ Pattern::~Pattern()
   // they point to)
 
   while( fChild ) {
-    ListNode* child = fChild;
+    Link* child = fChild;
     fChild = fChild->Next();
     delete child;
   }
   delete [] fBits;
 }
 
+void Pattern::print( bool print_links, ostream& os, bool end_line ) const 
+{
+  for( UInt_t i=0; i<fNbits; i++ ) {
+    os << fBits[i] << " ";
+  }
+  os << "=" << (UInt_t)fMinDepth;
+  if( print_links ) {
+    os << ":  ";
+    Link* ln = fChild;
+    while( ln ) {
+      ln->print( os, false );
+      ln = ln->Next();
+      if( ln )
+	os << ", ";
+    }
+  }
+  if( end_line )
+    os << endl;
+}
+
+void Link::print( ostream& os, bool end_line  ) const 
+{
+  os << "(" << fOp << ") ";
+  fPattern->print( false, os, end_line );
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
