@@ -19,8 +19,6 @@ ClassImp(TreeSearch::PatternGenerator)
 
 namespace TreeSearch {
 
-  //typedef PatternGenerator::ChildIter chldIter_t;
-
 //_____________________________________________________________________________
 inline
 PatternGenerator::ChildIter& PatternGenerator::ChildIter::operator++()
@@ -158,7 +156,8 @@ void PatternGenerator::GetTreeStatistics( Statistics_t& stats ) const
     stats.nPatterns * sizeof(Pattern)
     + stats.nPatterns * fNplanes * sizeof(UShort_t)
     + stats.nLinks * sizeof(Link);
-
+  stats.nHashBytes = fHashTable.size() * sizeof(Link*)
+    + stats.nPatterns * sizeof(Link);
 }
 
 //_____________________________________________________________________________
@@ -173,7 +172,7 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
       Link* hashnode = *it;
       while( hashnode ) {
 	Pattern* pat = hashnode->GetPattern();
-	pat->print( true, os );
+	pat->Print( true, os );
 	hashnode = hashnode->Next();
       }
     }
@@ -197,8 +196,9 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
      << ", links = "   << stats.nLinks
      << ", bytes = " << stats.nBytes
      << endl;
-  os << "maxhash = " << stats.MaxHashDepth
-     << ", maxlinklen = " << stats.MaxChildListLength
+  os << "maxlinklen = " << stats.MaxChildListLength
+     << ", maxhash = " << stats.MaxHashDepth
+     << ", hashbytes = " << stats.nHashBytes
      << endl;
  
  //TODO: add more features
@@ -222,8 +222,7 @@ void PatternGenerator::AddHash( Pattern* pat )
     hashsize = fHashTable.size();
   }
   Int_t hash = pat->Hash()%hashsize;
-  Link* prev_node = fHashTable[hash];
-  fHashTable[hash] = new Link( pat, prev_node, 0 );
+  fHashTable[hash] = new Link( pat, fHashTable[hash], 0 );
 }
 
 //_____________________________________________________________________________
@@ -263,26 +262,7 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth, Double_t width,
   Print();
   cout << "time = " << cpu_secs << " s" << endl;
   // Dump the entire database for inspection
-  ofstream outfile("nodes1.txt");
-  if( outfile ) {
-    Print("D",outfile);
-    outfile.close();
-  }
-
-  DoTree( kDelete );
-
-  start = clock();
-  root = new Pattern( fNplanes );
-  root->UsedAtDepth(0);
-  AddHash( root );
-
-  // Generate the tree recursively
-  MakeChildNodes2( root, 1 );
-  cpu_secs = ((double)(clock()-start))/CLOCKS_PER_SEC;
-
-  Print();
-  cout << "time = " << cpu_secs << " s" << endl;
-  outfile.open("nodes2.txt");
+  ofstream outfile("nodes.txt");
   if( outfile ) {
     Print("D",outfile);
     outfile.close();
@@ -352,78 +332,18 @@ Pattern* PatternGenerator::Find( const Pattern& pat )
   UInt_t hashsize = fHashTable.size();
   assert(hashsize);
   Int_t hash = pat.Hash()%hashsize;
-  Link* listnode = fHashTable[hash];
-  while( listnode ) {
-    Pattern* rhs = listnode->GetPattern();
+  Link* link = fHashTable[hash];
+  while( link ) {
+    Pattern* rhs = link->GetPattern();
     if( pat == *rhs )
       return rhs;
-    listnode = listnode->Next();
+    link = link->Next();
   }
   return 0;
 }
 
 //_____________________________________________________________________________
 void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
-{
-  // Generate child nodes for the given parent pattern
-
-  // Requesting child nodes for the parent at this depth implies that the 
-  // parent is being used at the level above
-  if( depth > 0 )
-    parent->UsedAtDepth( depth-1 );
-
-  // Base case of the recursion: no child nodes beyond fNlevels-1
-  if( depth >= fNlevels )
-    return;
-
-  // Iterate over child patterns of the parent
-  ChildIter it( *parent );
-  while( it ) {
-    Pattern& child = *it;
-    bool insert = true;
-
-    // Pattern already exists?
-    Pattern* node = Find( child );
-    if( node ) {
-      // If this pattern exists, but has not been used at this depth before,
-      // mark it for this depth and generate child nodes for it
-      bool is_lower  = depth < node->fMinDepth;
-      bool is_higher = depth > node->fMaxDepth;
-      // If the pattern has only been tested at a higher depth, we need to
-      // redo the slope test since the slope is larger now at this lower depth
-      if( is_lower )
-	is_lower = is_lower && TestSlope(*node, depth);
-
-      if( is_higher || is_lower )
-	MakeChildNodes( node, depth+1 );
-
-    } else {
-      // If the pattern is new, check it for consistency with maxslope
-      // and the straight line condition. If good, add it to the database
-      // and generate its child nodes.
-      if( TestSlope(child, depth) && LineCheck(child) ) {
-	node = new Pattern( child );
-	// This pattern is guaranteed to be a added as a child node at
-	// this depth or below, either here through the recursive call
-	// or below as a child node of the current parent. Therefore, it
-	// can be added to the hashtable here.
-	AddHash( node );
-	MakeChildNodes( node, depth+1 );
-	
-      } else
-	insert = false;
-    }
-    // If this candidate child pattern was found suitable, add it as a
-    // child node of the parent, unless it is already there.
-    if( insert && !parent->FindChild(node, it.type()) )
-      parent->AddChild(node, it.type());
-
-    ++it;
-  }
-}
-
-//_____________________________________________________________________________
-void PatternGenerator::MakeChildNodes2( Pattern* parent, UInt_t depth )
 {
   // Generate child nodes for the given parent pattern
 
@@ -471,7 +391,7 @@ void PatternGenerator::MakeChildNodes2( Pattern* parent, UInt_t depth )
     // deeper location in the tree and so this pattern's subtree needs to be
     // extended deeper down now.
     if( !node->fChild || node->fMinDepth > depth )
-      MakeChildNodes2( node, depth+1 );
+      MakeChildNodes( node, depth+1 );
     ln = ln->Next();
   }
 }

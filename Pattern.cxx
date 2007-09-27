@@ -13,7 +13,7 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 Pattern::Pattern( UInt_t size )
-  : fChild(0), fNbits(size), fMinDepth(-1), fMaxDepth(0), fRefIndex(-1)
+  : fChild(0), fNbits(size), fMinDepth(-1), fRefIndex(-1)
 {
   // Constructor. Puts bit array on heap. Minimum size is 1.
 
@@ -25,14 +25,14 @@ Pattern::Pattern( UInt_t size )
 
 //_____________________________________________________________________________
 // Pattern::Pattern( UShort_t* loc )
-//: fBits(loc), fChild(0), fNbits(0), fMinDepth(0), fMaxDepth(0), fRefIndex(-1)
+//: fBits(loc), fChild(0), fNbits(0), fMinDepth(0), fRefIndex(-1)
 // {
 //   // Constructor. Puts bit array at loc, a location managed by the caller.
 // }
 
 //_____________________________________________________________________________
 Pattern::Pattern( const Pattern& orig )
-  : fChild(0), fNbits(orig.fNbits), fMinDepth(-1), fMaxDepth(0), fRefIndex(-1)
+  : fChild(0), fNbits(orig.fNbits), fMinDepth(-1), fRefIndex(-1)
 {
   // Copy constructor. Copy has same bits, no children
 
@@ -49,38 +49,12 @@ Pattern& Pattern::operator=( const Pattern& rhs )
     fChild = 0;
     fNbits = rhs.fNbits;
     fMinDepth = -1;
-    fMaxDepth = 0;
     fRefIndex = -1;
     delete fBits;
     fBits = new UShort_t[fNbits];
     memcpy( fBits, rhs.fBits, fNbits*sizeof(UShort_t) );
   }
   return *this;
-}
-
-//_____________________________________________________________________________
-Link* Pattern::AddChild( Pattern* child, Int_t type )
-{
-  assert(child);
-  return (fChild = new Link( child, fChild, type ));
-}
-
-
-//_____________________________________________________________________________
-Pattern* Pattern::FindChild( const Pattern* pat, Int_t type )
-{
-  // Search for the given pattern with the given type in the list of child
-  // nodes of this pattern
-
-  Link* child = fChild;
-  while( child ) {
-    Pattern* rhs = child->GetPattern();
-    assert(rhs);
-    if( child->Type() == type && *pat == *rhs )
-      return rhs;
-    child = child->Next();
-  }
-  return 0;
 }
 
 //_____________________________________________________________________________
@@ -97,17 +71,22 @@ Pattern::~Pattern()
   delete [] fBits;
 }
 
-void Pattern::print( bool print_links, ostream& os, bool end_line ) const 
+//_____________________________________________________________________________
+void Pattern::Print( bool print_links, ostream& os, bool end_line ) const 
 {
+  // Print this pattern and, if requested, its child patterns
+
   for( UInt_t i=0; i<fNbits; i++ ) {
     os << fBits[i] << " ";
   }
-  os << "=" << (UInt_t)fMinDepth;
+  os << "=" << fMinDepth;
   if( print_links ) {
     os << ":  ";
     Link* ln = fChild;
     while( ln ) {
-      ln->print( os, false );
+      // Print each link
+      os << "(" << ln->Type() << ") ";
+      ln->GetPattern()->Print( false, os, false );
       ln = ln->Next();
       if( ln )
 	os << ", ";
@@ -115,12 +94,6 @@ void Pattern::print( bool print_links, ostream& os, bool end_line ) const
   }
   if( end_line )
     os << endl;
-}
-
-void Link::print( ostream& os, bool end_line  ) const 
-{
-  os << "(" << fOp << ") ";
-  fPattern->print( false, os, end_line );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

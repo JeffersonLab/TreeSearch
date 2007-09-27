@@ -14,21 +14,37 @@
 
 namespace TreeSearch {
 
-  class Link;
+  class Pattern;
+
+  class Link {
+  private:
+    Pattern*   fPattern;    // Bit pattern treenode
+    Link*      fNext;       // Next list element
+    Int_t      fOp;         // Operation to be applied to pattern
+  public:
+    Link( Pattern* pat, Link* next, Int_t op )
+      : fPattern(pat), fNext(next), fOp(op) {}
+    Pattern*   GetPattern() const { return fPattern; }
+    Link*      Next() const { return fNext; }
+    Int_t      Type() const { return fOp; }
+  }; // end class Link
 
   class Pattern {
     friend class PatternGenerator;
   private:
     UShort_t*  fBits;        // [fNbits] Bit pattern array
     Link*      fChild;       // Linked list of child patterns
-    UChar_t    fNbits;       // Bit count
-    UChar_t    fMinDepth;    // Minimum valid depth for this pattern
-    UChar_t    fMaxDepth;    // Maximum valid depth (used during building)
+    UShort_t   fNbits;       // Bit count (size of fBits array, <=16)
+    UShort_t   fMinDepth;    // Minimum valid depth for this pattern (<=16)
     Int_t      fRefIndex;    // Reference index for serializing the tree
 
-    Link*      AddChild( Pattern* child, Int_t type );
-    Pattern*   FindChild( const Pattern* pat, Int_t type );
-    void       UsedAtDepth( UInt_t depth );
+    Link*      AddChild( Pattern* child, Int_t type ) {
+      assert(child);
+      return (fChild = new Link( child, fChild, type ));
+    }
+    void       UsedAtDepth( UInt_t depth ) {
+      if( depth < fMinDepth ) fMinDepth = depth;
+    }
 
   public:
     Pattern( UInt_t size );
@@ -57,34 +73,9 @@ namespace TreeSearch {
       assert(i<fNbits);
       return fBits[i];
     }
-    void print( bool print_links = true, std::ostream& os = std::cout,
-		bool end_line = true ) const;
+    void       Print( bool print_links = true, std::ostream& os = std::cout,
+		      bool end_line = true ) const;
   }; // end class Pattern
-
-  class Link {
-  private:
-    Pattern*   fPattern;    // Bit pattern treenode
-    Link*      fNext;       // Next list element
-    Int_t      fOp;         // Operation to be applied to pattern
-  public:
-    Link( Pattern* pat, Link* next, Int_t op )
-      : fPattern(pat), fNext(next), fOp(op) {}
-    Pattern*   GetPattern() const { return fPattern; }
-    Link*      Next() const { return fNext; }
-    Int_t      Type() const { return fOp; }
-    void print( std::ostream& os = std::cout, bool end_line = true ) const;
-  }; // end class Link
-
-  //___________________________________________________________________________
-  inline
-  void Pattern::UsedAtDepth( UInt_t depth )
-  {
-    // Mark pattern as having been used at given depth
-
-    if( depth < fMinDepth ) fMinDepth = depth;
-    if( depth > fMaxDepth ) fMaxDepth = depth;
-  }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 

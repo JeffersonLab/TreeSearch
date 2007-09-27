@@ -41,11 +41,11 @@ namespace TreeSearch {
     bool     TestSlope( const Pattern& pat, UInt_t depth );
     bool     LineCheck( const Pattern& pat );
     void     MakeChildNodes( Pattern* parent, UInt_t depth );
-    void     MakeChildNodes2( Pattern* parent, UInt_t depth );
 
     enum EOperation { kDelete, kResetRefIndex };
     struct Statistics_t {
-      UInt_t nPatterns, nLinks, nBytes, MaxChildListLength, MaxHashDepth;
+      UInt_t nPatterns, nLinks, nBytes, MaxChildListLength,
+	MaxHashDepth, nHashBytes;
       ULong64_t nAllPatterns;
     };
     void     DoTree( EOperation op );
