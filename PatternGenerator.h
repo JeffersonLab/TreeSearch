@@ -9,23 +9,24 @@
 
 #include "Pattern.h"
 #include <vector>
+#include <iostream>
 
 using std::vector;
 
 namespace TreeSearch {
 
   class PatternTree;
-  class ListNode;
+  class Link;
 
   class PatternGenerator {
   public:
     PatternGenerator();
     virtual ~PatternGenerator();
 
-    PatternTree* Generate( UInt_t nlevels, Double_t detector_width, 
+    PatternTree* Generate( UInt_t maxdepth, Double_t detector_width, 
 			   const vector<double>& zpos, Double_t maxslope );
 
-    void Print( Option_t* opt="" );
+    void Print( Option_t* opt="", std::ostream& os = std::cout ) const;
 
   private:
     UInt_t         fNlevels;     // Number of levels of the tree (0-nlevels-1)
@@ -33,18 +34,22 @@ namespace TreeSearch {
     Double_t       fMaxSlope;    // Max allowed slope, normalized units (0-1)
     vector<double> fZ;           // z positions of planes, normalized (0-1)
 
-    vector<ListNode*> fHashTable;// Hashtab for indexing patterns during build
+    vector<Link*>  fHashTable;// Hashtab for indexing patterns during build
 
     void     AddHash( Pattern* pat );
     Pattern* Find( const Pattern& pat );
     bool     TestSlope( const Pattern& pat, UInt_t depth );
     bool     LineCheck( const Pattern& pat );
     void     MakeChildNodes( Pattern* parent, UInt_t depth );
+    void     MakeChildNodes2( Pattern* parent, UInt_t depth );
 
-    enum EOperation { kDelete, kResetRefIndex, kCountPatterns,
-		      kCountChildNodes, kMaxChildlistLength, 
-		      kMaxHashDepth, kBytesRequired };
-    Int_t    DoTree( EOperation op );
+    enum EOperation { kDelete, kResetRefIndex };
+    struct Statistics_t {
+      UInt_t nPatterns, nLinks, nBytes, MaxChildListLength, MaxHashDepth;
+      ULong64_t nAllPatterns;
+    };
+    void     DoTree( EOperation op );
+    void     GetTreeStatistics( Statistics_t& stats ) const;
 
     // Utility class for iterating over child patterns
     class ChildIter {

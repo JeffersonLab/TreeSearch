@@ -8,6 +8,10 @@
 #include "PatternTree.h"
 #include "TMath.h"
 #include <iostream>
+#include <fstream>
+
+//FIXME: TEST
+#include <ctime>
 
 using namespace std;
 
@@ -84,97 +88,118 @@ PatternGenerator::~PatternGenerator()
 }
 
 //_____________________________________________________________________________
-Int_t PatternGenerator::DoTree( EOperation op )
+void PatternGenerator::DoTree( EOperation op )
 {
   // Execute given operation on all unique Pattern nodes of the build tree.
   // Internal utility function.
 
-  // TODO: add feature to get all statistics at once (optional Statistics_t*)
-  Int_t result = 0;
-  if( op == kBytesRequired ) {
-    Int_t npatt = DoTree( kCountPatterns );
-    result += sizeof(Pattern) * npatt;
-    result += sizeof(UShort_t) * npatt * fNplanes;
-    result += sizeof(ListNode) * DoTree( kCountChildNodes );
-  } else {
-    for( vector<ListNode*>::iterator it = fHashTable.begin();
-	 it != fHashTable.end(); ++it ) {
-      // Each hashnode points to a unique pattern by construction of the table
-      ListNode* hashnode = *it;
-      Int_t count = 0;
-      while( hashnode ) {
-	ListNode* cur_node = hashnode;
-	hashnode = hashnode->Next();
-	assert( cur_node->GetPattern() );
-	switch( op ) {
-	case kDelete:
-	  delete cur_node->GetPattern();
-	  delete cur_node;
-	  break;
-	case kResetRefIndex:
-	  cur_node->GetPattern()->fRefIndex = -1;
-	  break;
-	case kCountPatterns:
-	  ++result;
-	  break;
-	case kMaxChildlistLength:
-	  count = 0;
-	case kCountChildNodes:
-	  {
-	    Pattern* pat = cur_node->GetPattern();
-	    assert(pat);
-	    ListNode* ln = pat->fChild;
-	    while( ln ) {
-	      if( op == kCountChildNodes )
-		++result;
-	      else
-		++count;
-	      ln = ln->Next();
-	    }
-	  }
-	  if( op == kMaxChildlistLength && count > result )
-	    result = count;
-	  break;
-	case kMaxHashDepth:
-	  ++count;
-	  break;
-	default:
-	  break;
-	}
-      } // while hashnode
-      if( op == kMaxHashDepth && count > result )
-	result = count;
-    } // for hashtable elements
-    if( op == kDelete )
-      fHashTable.clear();
+  for( vector<Link*>::iterator it = fHashTable.begin();
+       it != fHashTable.end(); ++it ) {
+    Link* hashnode = *it;
+    while( hashnode ) {
+      Link* cur_node = hashnode;
+      hashnode = hashnode->Next();
+      assert( cur_node->GetPattern() );
+      switch( op ) {
+      case kDelete:
+	delete cur_node->GetPattern();
+	delete cur_node;
+	break;
+      case kResetRefIndex:
+	cur_node->GetPattern()->fRefIndex = -1;
+	break;
+      }
+    }
   }
-  return result;
+  if( op == kDelete )
+    fHashTable.clear();
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::Print( Option_t* opt )
+void PatternGenerator::GetTreeStatistics( Statistics_t& stats ) const
+{
+  // Collect statistics on the build tree. Used by Print().
+
+  memset( &stats, 0, sizeof(Statistics_t) );
+
+  for( vector<Link*>::const_iterator it = fHashTable.begin();
+       it != fHashTable.end(); ++it ) {
+    // Each hashnode points to a unique pattern by construction of the table
+    Link* hashnode = *it;
+    UInt_t hash_length = 0;
+    while( hashnode ) {
+      // Count patterns
+      stats.nPatterns++;
+      // Count child nodes and length of child list
+      Pattern* pat = hashnode->GetPattern();
+      assert(pat);
+      Link* ln = pat->fChild;
+      UInt_t list_length = 0;
+      while( ln ) {
+	stats.nLinks++;
+	list_length++;
+	ln = ln->Next();
+      }
+      if( list_length > stats.MaxChildListLength )
+	stats.MaxChildListLength = list_length;
+      // Count collision list depth
+      hash_length++;
+
+      hashnode = hashnode->Next();
+
+    } // while hashnode
+
+    if( hash_length > stats.MaxHashDepth )
+      stats.MaxHashDepth = hash_length;
+
+  } // hashtable elements
+
+  stats.nBytes = 
+    stats.nPatterns * sizeof(Pattern)
+    + stats.nPatterns * fNplanes * sizeof(UShort_t)
+    + stats.nLinks * sizeof(Link);
+
+}
+
+//_____________________________________________________________________________
+void PatternGenerator::Print( Option_t* opt, ostream& os ) const
 {
   // Print information about the tree, depending on option
 
-  // TODO: Print() should be const!
+  // Dump all nodes
+  if( *opt == 'D' ) {
+    for( vector<Link*>::const_iterator it = fHashTable.begin();
+	 it != fHashTable.end(); ++it ) {
+      Link* hashnode = *it;
+      while( hashnode ) {
+	Pattern* pat = hashnode->GetPattern();
+	pat->print( true, os );
+	hashnode = hashnode->Next();
+      }
+    }
+    return;
+  }
 
   // Basic info
-  cout << "tree: nlevels = " << fNlevels
-       << ", nplanes = " << fNplanes
-       << ", zpos = ";
+  os << "tree: nlevels = " << fNlevels
+     << ", nplanes = " << fNplanes
+     << ", zpos = ";
   for( UInt_t i=0; i<fZ.size(); i++ ) {
-    cout << fZ[i];
+    os << fZ[i];
     if( i+1 != fZ.size() )
-      cout << ",";
+      os << ",";
   }
-  cout << endl;
-  cout << "patterns = " << DoTree(kCountPatterns)
-       << ", links = "   << DoTree(kCountChildNodes)
-       << ", bytes = " << DoTree(kBytesRequired)
-       << endl;
-  cout << "maxhash = " << DoTree(kMaxHashDepth)
-       << ", maxlinklen = " << DoTree(kMaxChildlistLength)
-       << endl;
+  os << endl;
+
+  Statistics_t stats;
+  GetTreeStatistics( stats );
+  os << "patterns = " << stats.nPatterns
+     << ", links = "   << stats.nLinks
+     << ", bytes = " << stats.nBytes
+     << endl;
+  os << "maxhash = " << stats.MaxHashDepth
+     << ", maxlinklen = " << stats.MaxChildListLength
+     << endl;
  
  //TODO: add more features
 
@@ -183,18 +208,26 @@ void PatternGenerator::Print( Option_t* opt )
 //_____________________________________________________________________________
 void PatternGenerator::AddHash( Pattern* pat )
 {
-  // Add given pattern to the hash table (used during database generation)
+  // Add given pattern to the hash table
 
-  UInt_t hashsize = fHashTable.size();
   assert(pat);
-  assert(hashsize);
+  UInt_t hashsize = fHashTable.size();
+  if( hashsize == 0 ) {
+    // Set the size of the hash table.
+    // 2^(nlevels-1)*2^(nplanes-2) is the upper limit for the number of
+    // patterns, so a size of 2^(nlevels-1) will give 2^(nplanes-2) collisions
+    // per entry (i.e. 2, 4, 8), with which we can live. Anything better would
+    // require a cleverer hash function.
+    fHashTable.resize( 1<<(fNlevels-1), 0 );
+    hashsize = fHashTable.size();
+  }
   Int_t hash = pat->Hash()%hashsize;
-  ListNode* prev_node = fHashTable[hash];
-  fHashTable[hash] = new ListNode( pat, prev_node, 0 );
+  Link* prev_node = fHashTable[hash];
+  fHashTable[hash] = new Link( pat, prev_node, 0 );
 }
 
 //_____________________________________________________________________________
-PatternTree* PatternGenerator::Generate( UInt_t nlevels, Double_t width,
+PatternTree* PatternGenerator::Generate( UInt_t maxdepth, Double_t width,
 					 const vector<double>& zpos,
 					 Double_t maxslope )
 {
@@ -206,16 +239,16 @@ PatternTree* PatternGenerator::Generate( UInt_t nlevels, Double_t width,
 
   // Set parameters for the new build.
   //TODO: normalize zpos and maxslope
-  fNlevels  = nlevels;
+  fNlevels  = maxdepth+1;
   fZ        = zpos;
   fNplanes  = fZ.size();
   fMaxSlope = maxslope;
   // TODO: check for unreasonable input
 
-  // 2^(depth-1) * 2^(nplanes-2) is the upper limit for the number of patterns.
-  // The following table size should give decent speed. Anything larger would
-  // require a cleverer hash function.
-  fHashTable.resize( 1<<(fNlevels-1), 0 );
+
+  // FIXME: test
+  clock_t start = clock();
+  double cpu_secs;
 
   // Start with the trivial all-zero root node at depth 0. 
   Pattern* root = new Pattern( fNplanes );
@@ -223,8 +256,38 @@ PatternTree* PatternGenerator::Generate( UInt_t nlevels, Double_t width,
 
   // Generate the tree recursively
   MakeChildNodes( root, 1 );
-
   
+  // FIXME: TEST TEST
+  cpu_secs = ((double)(clock()-start))/CLOCKS_PER_SEC;
+
+  Print();
+  cout << "time = " << cpu_secs << " s" << endl;
+  // Dump the entire database for inspection
+  ofstream outfile("nodes1.txt");
+  if( outfile ) {
+    Print("D",outfile);
+    outfile.close();
+  }
+
+  DoTree( kDelete );
+
+  start = clock();
+  root = new Pattern( fNplanes );
+  root->UsedAtDepth(0);
+  AddHash( root );
+
+  // Generate the tree recursively
+  MakeChildNodes2( root, 1 );
+  cpu_secs = ((double)(clock()-start))/CLOCKS_PER_SEC;
+
+  Print();
+  cout << "time = " << cpu_secs << " s" << endl;
+  outfile.open("nodes2.txt");
+  if( outfile ) {
+    Print("D",outfile);
+    outfile.close();
+  }
+
   return 0;
 }
 
@@ -242,6 +305,7 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
   // Check if the gievn bit pattern is consistent with a straight line.
   // The intersection plane positions are given by fZ[].
   // Assumes a normalized pattern, for which pat[0] is always zero.
+  // Assumes identical bin sizes and positions in each plane.
 
   assert(fNplanes);
   Double_t xL   = pat[fNplanes-1];
@@ -288,7 +352,7 @@ Pattern* PatternGenerator::Find( const Pattern& pat )
   UInt_t hashsize = fHashTable.size();
   assert(hashsize);
   Int_t hash = pat.Hash()%hashsize;
-  ListNode* listnode = fHashTable[hash];
+  Link* listnode = fHashTable[hash];
   while( listnode ) {
     Pattern* rhs = listnode->GetPattern();
     if( pat == *rhs )
@@ -325,11 +389,10 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
       // mark it for this depth and generate child nodes for it
       bool is_lower  = depth < node->fMinDepth;
       bool is_higher = depth > node->fMaxDepth;
-      // If the pattern has only been tested at a higher depth, we need 
-      // to redo the slope test since the absolute slope increases with
-      // decreasing depth
+      // If the pattern has only been tested at a higher depth, we need to
+      // redo the slope test since the slope is larger now at this lower depth
       if( is_lower )
-	is_lower = is_lower && TestSlope( *node, depth );
+	is_lower = is_lower && TestSlope(*node, depth);
 
       if( is_higher || is_lower )
 	MakeChildNodes( node, depth+1 );
@@ -351,12 +414,65 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
 	insert = false;
     }
     // If this candidate child pattern was found suitable, add it as a
-    // child node to the parent - provided, it isn't already there.
-    // (How could it get there?!?)
+    // child node of the parent, unless it is already there.
     if( insert && !parent->FindChild(node, it.type()) )
       parent->AddChild(node, it.type());
 
     ++it;
+  }
+}
+
+//_____________________________________________________________________________
+void PatternGenerator::MakeChildNodes2( Pattern* parent, UInt_t depth )
+{
+  // Generate child nodes for the given parent pattern
+
+  // Requesting child nodes for the parent at this depth implies that the 
+  // parent is being used at the level above
+  if( depth > 0 )
+    parent->UsedAtDepth( depth-1 );
+
+  // Base case of the recursion: no child nodes beyond fNlevels-1
+  if( depth >= fNlevels )
+    return;
+
+  // If not already done, generate the child patterns of the parent
+  if( !parent->fChild ) {
+    ChildIter it( *parent );
+    while( it ) {
+      Pattern& child = *it;
+
+      // Pattern already exists?
+      Pattern* node = Find( child );
+      if( node ) {
+	// If the pattern has only been tested at a higher depth, we need to
+	// redo the slope test since the slope is larger now at lower depth
+	if( depth >= node->fMinDepth || TestSlope(*node, depth)) {
+	  // Only add a reference to the existing pattern
+	  parent->AddChild( node, it.type() );
+	}
+      } else if( TestSlope(child, depth) && LineCheck(child) ) {
+	// If the pattern is new, check it for consistency with maxslope and 
+	// the straight line condition.
+	node = new Pattern( child );
+	AddHash( node );
+	parent->AddChild( node, it.type() );
+      }
+      ++it;
+    }
+  }
+
+  // Recursively generate child nodes down the tree
+  Link* ln = parent->GetChild();
+  while( ln ) {
+    Pattern* node = ln->GetPattern();
+    // We only need to go deeper if either this pattern does not have children
+    // yet OR (important!), children were previously generated only from a 
+    // deeper location in the tree and so this pattern's subtree needs to be
+    // extended deeper down now.
+    if( !node->fChild || node->fMinDepth > depth )
+      MakeChildNodes2( node, depth+1 );
+    ln = ln->Next();
   }
 }
 
