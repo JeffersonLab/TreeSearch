@@ -51,11 +51,13 @@ CXX           = CC
 ifdef DEBUG
   CXXFLAGS    = -g
   LDFLAGS     = -g
+  DEFINES     =
 else
   CXXFLAGS    = -O
   LDFLAGS     = -O
+  DEFINES     = -DNDEBUG
 endif
-DEFINES       = -DSUNVERS -DHAS_SSTREAM
+DEFINES      += -DSUNVERS -DHAS_SSTREAM
 CXXFLAGS     += -KPIC
 LD            = CC
 SOFLAGS       = -G
@@ -67,11 +69,13 @@ CXX           = g++
 ifdef DEBUG
   CXXFLAGS    = -g -O0
   LDFLAGS     = -g -O0
+  DEFINES     =
 else
   CXXFLAGS    = -O
   LDFLAGS     = -O
+  DEFINES     = -DNDEBUG
 endif
-DEFINES       = -DLINUXVERS -DHAS_SSTREAM
+DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
 LD            = g++
 SOFLAGS       = -shared
