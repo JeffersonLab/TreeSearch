@@ -11,8 +11,8 @@ ClassImp(TreeSearch::PatternTree)
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-PatternTree::PatternTree( UInt_t depth, UInt_t nplanes, ListNode* root )
-  : fDepth(depth), fNplanes(nplanes), fRoot(root)
+PatternTree::PatternTree( UInt_t nlevels, UInt_t nplanes, Link* root )
+  : fNlevels(nlevels), fNplanes(nplanes), fRoot(root)
 {
   // Constructor. 
 

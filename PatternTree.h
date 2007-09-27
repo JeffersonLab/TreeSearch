@@ -11,21 +11,21 @@
 
 namespace TreeSearch {
 
-  class ListNode;
+  class Link;
 
   class PatternTree {
   public:
-    PatternTree( UInt_t depth, UInt_t nplanes, ListNode* root );
+    PatternTree( UInt_t nlevels, UInt_t nplanes, Link* root );
     virtual ~PatternTree();
 
-    ListNode* GetRoot() const { return fRoot; }
+    Link* GetRoot() const { return fRoot; }
 
 
   private:
-    UInt_t         fDepth;       // Depth of tree (levels = 0 - depth-1)
-    UInt_t         fNplanes;     // Number of hitpattern planes
+    UInt_t     fNlevels;     // Number of levels of the tree (0-nlevels-1)
+    UInt_t     fNplanes;     // Number of hitpattern planes
 
-    ListNode*      fRoot;        // Root node 
+    Link*      fRoot;        // Root node 
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
