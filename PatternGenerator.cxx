@@ -144,7 +144,6 @@ void PatternGenerator::GetTreeStatistics( Statistics_t& stats ) const
       hash_length++;
 
       hashnode = hashnode->Next();
-
     } // while hashnode
 
     if( hash_length > stats.MaxHashDepth )
@@ -287,6 +286,9 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
   // Assumes a normalized pattern, for which pat[0] is always zero.
   // Assumes identical bin sizes and positions in each plane.
 
+  // FIXME FIXME: the following can be _very_ sensitive to the floating point
+  // rounding behavior for certain z-values!
+
   assert(fNplanes);
   Double_t xL   = pat[fNplanes-1];
   Double_t xRm1 = xL;               // xR-1
@@ -296,7 +298,7 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
   for( Int_t i = fNplanes-2; i > 0; --i ) {
     // Compare the intersection point with the i-th plane of the left edge 
     // of the band, (xL-x0) * z[i]/zL, to the left edge of the bin, pat[i]-x0. 
-    // If the difference is larger than one bin width (=1), the bin is
+    // If the difference is equal or larger than one bin width (=1), the bin is
     // outside of the allowed band.
     // Multiply with zL (to avoid division) and recall x0 = 0.
     Double_t dL = xL*fZ[i] - pat[i]*zL;
@@ -356,7 +358,7 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
   if( depth >= fNlevels )
     return;
 
-  // If not already done, generate the child patterns of the parent
+  // If not already done, generate the child patterns of this parent
   if( !parent->fChild ) {
     ChildIter it( *parent );
     while( it ) {
@@ -387,9 +389,9 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
   while( ln ) {
     Pattern* node = ln->GetPattern();
     // We only need to go deeper if either this pattern does not have children
-    // yet OR (important!), children were previously generated only from a 
-    // deeper location in the tree and so this pattern's subtree needs to be
-    // extended deeper down now.
+    // yet OR (important!) children were previously generated from a deeper
+    // location in the tree and so this pattern's subtree needs to be extended
+    // deeper down now.
     if( !node->fChild || node->fMinDepth > depth )
       MakeChildNodes( node, depth+1 );
     ln = ln->Next();

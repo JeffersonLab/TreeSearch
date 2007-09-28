@@ -34,7 +34,7 @@ namespace TreeSearch {
     Double_t       fMaxSlope;    // Max allowed slope, normalized units (0-1)
     vector<double> fZ;           // z positions of planes, normalized (0-1)
 
-    vector<Link*>  fHashTable;// Hashtab for indexing patterns during build
+    vector<Link*>  fHashTable;   // Hashtab for indexing patterns during build
 
     void     AddHash( Pattern* pat );
     Pattern* Find( const Pattern& pat );
