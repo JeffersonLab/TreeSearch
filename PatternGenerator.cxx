@@ -5,13 +5,22 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "PatternGenerator.h"
-#include "PatternTree.h"
 #include "TMath.h"
+#include "TString.h"
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#if ROOT_VERSION_CODE < ROOT_VERSION(5,8,0)
+#include <cstdlib>
+#endif
 
 //FIXME: TEST
 #include <ctime>
+//TODO: Print("C") = generate and count patterns
+//TODO: Print("P") = generate and visualize patterns
+//TODO: Interface to PatternTree
+//TODO: Write() tree to binary file
+//TODO: Read() tree from binary file
 
 using namespace std;
 
@@ -23,7 +32,8 @@ namespace TreeSearch {
 inline
 PatternGenerator::ChildIter& PatternGenerator::ChildIter::operator++()
 { 
-  // Iterator over all suitable child patterns of a given parent pattern.
+  // Iterator over all suitable child patterns of a given parent pattern
+  // that occur when the bin resolution is doubled.
   // Child pattern bits are either 2*bit or 2*bit+1 of the parent bits,
   // yielding 2^nbits (=2^nplanes) different combinations.
   // The bits of suitable patterns must monotonically increase.
@@ -31,7 +41,11 @@ PatternGenerator::ChildIter& PatternGenerator::ChildIter::operator++()
   // Note that type() is an important part of the result.
   // type & 1 indicates a pattern shifted by one to the right
   // type & 2 indicates a mirrored pattern 
-  // To recover the pattern, mirror first, then shift left, as approriate.
+  // To recover the actual pattern, mirror first, then shift, as appropriate.
+  // With the self-referential tree structure used here, mirrored patterns
+  // only ever occur as children of the root of the tree. Simultaneously
+  // mirrored and shifted patterns never occur.
+  // Hence, type = 0, 1, and, very rarely, 2.
 
   if( fCount > 0 ) {
     while( fCount-- ) {
@@ -114,11 +128,13 @@ void PatternGenerator::DoTree( EOperation op )
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::GetTreeStatistics( Statistics_t& stats ) const
+void PatternGenerator::CalcStatistics()
 {
-  // Collect statistics on the build tree. Used by Print().
+  // Collect statistics on the build tree. This is best done separately here
+  // because some things (averages, memory requirements) can only be 
+  // calculated once the tree is complete..
 
-  memset( &stats, 0, sizeof(Statistics_t) );
+  memset( &fStats, 0, sizeof(Statistics_t) );
 
   for( vector<Link*>::const_iterator it = fHashTable.begin();
        it != fHashTable.end(); ++it ) {
@@ -127,36 +143,36 @@ void PatternGenerator::GetTreeStatistics( Statistics_t& stats ) const
     UInt_t hash_length = 0;
     while( hashnode ) {
       // Count patterns
-      stats.nPatterns++;
+      fStats.nPatterns++;
       // Count child nodes and length of child list
       Pattern* pat = hashnode->GetPattern();
       assert(pat);
       Link* ln = pat->fChild;
       UInt_t list_length = 0;
       while( ln ) {
-	stats.nLinks++;
+	fStats.nLinks++;
 	list_length++;
 	ln = ln->Next();
       }
-      if( list_length > stats.MaxChildListLength )
-	stats.MaxChildListLength = list_length;
+      if( list_length > fStats.MaxChildListLength )
+	fStats.MaxChildListLength = list_length;
       // Count collision list depth
       hash_length++;
 
       hashnode = hashnode->Next();
     } // while hashnode
 
-    if( hash_length > stats.MaxHashDepth )
-      stats.MaxHashDepth = hash_length;
+    if( hash_length > fStats.MaxHashDepth )
+      fStats.MaxHashDepth = hash_length;
 
   } // hashtable elements
 
-  stats.nBytes = 
-    stats.nPatterns * sizeof(Pattern)
-    + stats.nPatterns * fNplanes * sizeof(UShort_t)
-    + stats.nLinks * sizeof(Link);
-  stats.nHashBytes = fHashTable.size() * sizeof(Link*)
-    + stats.nPatterns * sizeof(Link);
+  fStats.nBytes = 
+    fStats.nPatterns * sizeof(Pattern)
+    + fStats.nPatterns * fNplanes * sizeof(UShort_t)
+    + fStats.nLinks * sizeof(Link);
+  fStats.nHashBytes = fHashTable.size() * sizeof(Link*)
+    + fStats.nPatterns * sizeof(Link);
 }
 
 //_____________________________________________________________________________
@@ -189,19 +205,28 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
   }
   os << endl;
 
-  Statistics_t stats;
-  GetTreeStatistics( stats );
-  os << "patterns = " << stats.nPatterns
-     << ", links = "   << stats.nLinks
-     << ", bytes = " << stats.nBytes
+  os << "patterns = " << fStats.nPatterns
+     << ", links = "   << fStats.nLinks
+     << ", bytes = " << fStats.nBytes
      << endl;
-  os << "maxlinklen = " << stats.MaxChildListLength
-     << ", maxhash = " << stats.MaxHashDepth
-     << ", hashbytes = " << stats.nHashBytes
+  os << "maxlinklen = " << fStats.MaxChildListLength
+     << ", maxhash = " << fStats.MaxHashDepth
+     << ", hashbytes = " << fStats.nHashBytes
      << endl;
+  os << "time = " << fStats.BuildTime << " s" << endl;
  
  //TODO: add more features
 
+}
+
+//_____________________________________________________________________________
+Int_t PatternGenerator::Write( const char* filename )
+{
+  // Write tree to binary file
+
+  //  WalkTree( root, WritePattern(outfile) );
+
+  return 0;
 }
 
 //_____________________________________________________________________________
@@ -225,28 +250,23 @@ void PatternGenerator::AddHash( Pattern* pat )
 }
 
 //_____________________________________________________________________________
-PatternTree* PatternGenerator::Generate( UInt_t maxdepth, Double_t width,
-					 const vector<double>& zpos,
-					 Double_t maxslope )
+PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
 {
   // Generate a new pattern tree for the given parameters. Returns a pointer
   // to the generated tree, or zero if error
 
-  // Clear out previous build, if any
-  DoTree( kDelete );
-
   // Set parameters for the new build.
-  //TODO: normalize zpos and maxslope
-  fNlevels  = maxdepth+1;
-  fZ        = zpos;
+  if( PatternTree::Normalize(parameters) != 0 )
+    return 0;
+
+  fNlevels  = parameters.maxdepth+1;
+  fZ        = parameters.zpos;
   fNplanes  = fZ.size();
-  fMaxSlope = maxslope;
-  // TODO: check for unreasonable input
+  fMaxSlope = parameters.maxslope;
 
 
-  // FIXME: test
-  clock_t start = clock();
-  double cpu_secs;
+  // Benchmark the build
+  clock_t cpu_ticks = clock();
 
   // Start with the trivial all-zero root node at depth 0. 
   Pattern* root = new Pattern( fNplanes );
@@ -255,11 +275,14 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth, Double_t width,
   // Generate the tree recursively
   MakeChildNodes( root, 1 );
   
-  // FIXME: TEST TEST
-  cpu_secs = ((double)(clock()-start))/CLOCKS_PER_SEC;
+  // Calculate tree statistics (number of patterns, links etc.)
+  cpu_ticks = clock() - cpu_ticks;
+  CalcStatistics();
+  fStats.BuildTime = static_cast<Double_t>(cpu_ticks)/CLOCKS_PER_SEC;
 
+  //FIXME: TEST
+  // Print tree statistics
   Print();
-  cout << "time = " << cpu_secs << " s" << endl;
   // Dump the entire database for inspection
   ofstream outfile("nodes.txt");
   if( outfile ) {
@@ -267,7 +290,49 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth, Double_t width,
     outfile.close();
   }
 
-  return 0;
+  // Create a PatternTree object from the build tree
+
+  PatternTree* tree = new PatternTree( parameters,
+				       fStats.nPatterns,
+				       fStats.nLinks );
+  if( tree ) {
+//     Int_t (PatternTree::*CopyPattern)(int) = &PatternTree::AddPattern;
+//     (tree->*CopyPattern)(1);
+    
+//    WalkTree( root, CopyPattern(tree) );
+
+  }
+  return tree;
+}
+
+//_____________________________________________________________________________
+PatternTree* PatternGenerator::Generate( UInt_t maxdepth, 
+					 Double_t detector_width, 
+					 const char* zpos,
+					 Double_t maxslope )
+{
+  // Convenience function for use at the command line and in scripts
+
+  TreeParam_t param;
+  param.maxdepth = maxdepth;
+  param.width    = detector_width;
+  param.maxslope = maxslope;
+  
+  TString zlist( zpos );
+  TString tok;
+  Ssiz_t pos = 0;
+  while( zlist.Tokenize(tok, pos, ",") ) {
+    if( tok.IsNull() )
+      continue;
+#if ROOT_VERSION_CODE < ROOT_VERSION(5,8,0)
+    Double_t val = atof(tok.Data());
+#else
+    Double_t val = tok.Atof();
+#endif
+    param.zpos.push_back( val );
+  }
+
+  return Generate( param );
 }
 
 //_____________________________________________________________________________
@@ -286,8 +351,8 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
   // Assumes a normalized pattern, for which pat[0] is always zero.
   // Assumes identical bin sizes and positions in each plane.
 
-  // FIXME FIXME: the following can be _very_ sensitive to the floating point
-  // rounding behavior for certain z-values!
+  // FIXME FIXME: for certain z-values, the following can be _very_ sensitive 
+  // to the floating point rounding behavior!
 
   assert(fNplanes);
   Double_t xL   = pat[fNplanes-1];
