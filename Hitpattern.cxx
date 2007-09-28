@@ -234,7 +234,7 @@ void Bits::SetBitRange( UInt_t lo, UInt_t hi )
   // Set range of bits from lo to hi to value.
 
   if( hi<lo ) return;
-  SetBitNumber( hi ); // expand array if necessary
+  SetBitNumber( hi ); // expands array if necessary
   if( lo==hi ) return;
   UChar_t mask  = ~((1U<<(lo&7))-1);
   UChar_t mask2 = (1U<<(hi&7))-1;

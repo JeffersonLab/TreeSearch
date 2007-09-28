@@ -26,7 +26,7 @@ namespace TreeSearch {
     void ResetBitRange( UInt_t lo, UInt_t hi );
     void SetBitRange( UInt_t lo, UInt_t hi );
     void FastClear() { memset(fAllBits,0,fNbytes); }
-    ClassDef(Bits,1)  // Bit container with additional methods over TBits
+    ClassDef(Bits,1)  // TBits container with range setting methods
   };
 
   class PatternTree;

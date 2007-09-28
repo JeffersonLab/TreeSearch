@@ -5,7 +5,7 @@
 //                                                                           //
 // TreeSearch::TimeToDistConv                                                //
 //                                                                           //
-// Base class for algorithms for converting drift time into  drift distance  //
+// Base class for algorithms for converting drift time to drift distance     //
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +44,7 @@ namespace TreeSearch {
   //___________________________________________________________________________
   // LinearTTD
   //
-  // Simple linear conversion of drit time (s) and drift distance (m).
+  // Simple linear conversion of drift time (s) and drift distance (m).
   
   class LinearTTD : public TimeToDistConv {
 
