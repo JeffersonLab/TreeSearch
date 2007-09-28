@@ -212,7 +212,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   fIsInit = kFALSE;  // Force check of hitpattern parameters
 
   Double_t angle = kBig;
-  DBRequest request[] = {
+  const DBRequest request[] = {
     { "angle",        &angle,        kDouble, 0, 1 },
     { "maxslope",     &fMaxSlope,    kDouble, 0, 1, -1 },
     { "search_depth", &fDepth,       kUInt,   0, 0, -1 },

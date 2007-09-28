@@ -279,7 +279,7 @@ Int_t WirePlane::DefineVariables( EMode mode )
     { "hit.trkdist", "Track distance (m)",
                                     "fHits.TreeSearch::Hit.GetTrackDist()"},
     { "hit.trkpos",  "Track position (m)",
-                                     "fHits.TreeSearch::Hit.fTrackPos"},
+                                    "fHits.TreeSearch::Hit.fTrackPos"},
 #ifdef TESTCODE
     { "nmiss",       "Decoder misses",     "fNmiss" },
     { "nrej",        "Time cut nopass",    "fNrej" },
@@ -354,7 +354,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   fMinTime = -kBig;
   fMaxTime =  kBig;
 
-  DBRequest request[] = {
+  const DBRequest request[] = {
     { "detmap",        detmap,        kIntV },
     { "nwires",        &fNelem,       kInt },
     { "type",          &plane_type,   kTString, 0, 1 },
