@@ -67,7 +67,7 @@ ifeq ($(ARCH),linux)
 # Linux with gcc (RedHat)
 CXX           = g++
 ifdef DEBUG
-  CXXFLAGS    = -g -O0
+  CXXFLAGS    = -g -O0 
   LDFLAGS     = -g -O0
   DEFINES     =
 else
@@ -79,6 +79,9 @@ DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
 LD            = g++
 SOFLAGS       = -shared
+ifdef COMPAT
+CXXFLAGS     += -mfpmath=387
+endif
 endif
 
 ifeq ($(CXX),)
