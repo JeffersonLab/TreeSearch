@@ -11,6 +11,8 @@
 #include "PatternTree.h"
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <cassert>
 
 using std::vector;
 
@@ -45,6 +47,7 @@ namespace TreeSearch {
 
     vector<Link*>  fHashTable;   // Hashtab for indexing patterns during build
     Statistics_t   fStats;       // Tree statistics
+    //    Int_t          fIndex;   // Current pattern count (for serializing)
 
     enum EOperation { kDelete, kResetRefIndex };
     void     AddHash( Pattern* pat );
@@ -55,30 +58,9 @@ namespace TreeSearch {
     void     MakeChildNodes( Pattern* parent, UInt_t depth );
     bool     TestSlope( const Pattern& pat, UInt_t depth );
 
-    // Utility class for iterating over child patterns
-    class ChildIter {
-    private:
-      const Pattern fParent;  // copy of parent pattern
-      Pattern   fChild;       // current child pattern
-      Int_t     fCount;       // trial iterations left to do
-      Int_t     fType;        // current pattern type (normal/shifted/mirrored)
-    public:
-      ChildIter( const Pattern& parent ) 
-	: fParent(parent), fChild(parent), fType(0) { reset(); }
-      ChildIter&      operator++();
-      const ChildIter operator++(int) { 
-	ChildIter clone(*this);
-	++(*this); 
-	return clone;
-      }
-      Pattern& operator*()            { return fChild; }
-               operator bool()  const { return (fCount >= 0); }
-      Int_t    type()           const { return fType; }
-      void     reset() { 
-	fCount = 1<<fParent.GetNbits();
-	++(*this);
-      }
-    };
+    template<typename Operation>
+    Int_t    WalkTree( Link* link, Operation& op, UInt_t depth = 0,
+		       UInt_t op = 0, UInt_t off = 0 ) const;
 
     ClassDef(PatternGenerator,0)   // Generator for pattern template database
 
