@@ -41,7 +41,7 @@ namespace TreeSearch {
 
     void           AddPlane( WirePlane* wp );
     Int_t          GetType() const { return fType; }
-    UInt_t         GetDepth() const { return fDepth; }
+    UInt_t         GetNlevels()  const { return fNlevels; }
     Double_t       GetMaxSlope() const { return fMaxSlope; }
     Double_t       GetZsize() const;
     Double_t       GetWidth() const { return fWidth; }
@@ -62,7 +62,7 @@ namespace TreeSearch {
   protected:
     Int_t               fType;        // Type of plane (u,v,x,y...)
     vector<WirePlane*>  fPlanes;      // Wire planes of this type
-    UInt_t              fDepth;       // Depth of search tree (bin resolution)
+    UInt_t              fNlevels;     // Number of levels of search tree
     Double_t            fMaxSlope;    // Maximum physical track slope (0=perp)
     Double_t            fWidth;       // Width of tracking region (m)
     Double_t            fSinAngle;    // Sine of wire angle

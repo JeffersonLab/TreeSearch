@@ -19,22 +19,22 @@ ClassImp(TreeSearch::Hitpattern)
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-Hitpattern::Hitpattern( UInt_t depth, UInt_t nplanes, Double_t width )
-  : fDepth(depth), fNplanes(0), fScale(0.0), fOffset(0.5*width), fPattern(NULL)
+Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
+  : fNlevels(nlevels), fNplanes(0), fScale(0), fOffset(0.5*width), fPattern(0)
 {
   // Constructor
 
   static const char* const here = "TreeSearch::Hitpattern";
   
-  if( nplanes == 0 || nplanes > 100 || fDepth == 0 || fDepth > 16 ) {
-    ::Error( here, "Illegal number of planes or depth: %d %d.\n"
-	     "Both > 0, nplanes <= 100, depth <= 16.", nplanes, depth );
+  if( nplanes == 0 || nplanes > 100 || fNlevels == 0 || fNlevels > 16 ) {
+    ::Error( here, "Illegal number of planes or tree levels: %d %d.\n"
+	     "Both > 0, nplanes <= 100, levels <= 16.", nplanes, nlevels );
   } else if( width < 1e-2 ) { // Negative or very small width?
     ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", width );
   } else {
     fNplanes = nplanes;
     fPattern = new Bits*[fNplanes];
-    UInt_t nbins = 1U<<fDepth;
+    UInt_t nbins = 1U<<fNlevels;
     for( UInt_t i=0; i<fNplanes; i++ )
       fPattern[i] = new Bits( nbins );
     fScale = static_cast<Double_t>(nbins>>1) / width;
@@ -43,7 +43,7 @@ Hitpattern::Hitpattern( UInt_t depth, UInt_t nplanes, Double_t width )
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const Hitpattern& orig ) 
-  : fDepth(orig.fDepth), fNplanes(orig.fNplanes),
+  : fNlevels(orig.fNlevels), fNplanes(orig.fNplanes),
     fScale(orig.fScale), fOffset(orig.fOffset), fPattern(NULL)
 {
   // Copy ctor
@@ -61,7 +61,7 @@ Hitpattern& Hitpattern::operator=( const Hitpattern& rhs )
   // Assignment
 
   if( this != &rhs ) {
-    fDepth   = rhs.fDepth;
+    fNlevels = rhs.fNlevels;
     fNplanes = rhs.fNplanes;
     fScale   = rhs.fScale;
     fOffset  = rhs.fOffset;
@@ -97,8 +97,8 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
   Int_t hi = TMath::FloorNint( fScale*end );
   if( hi < 0 ) return;
   Int_t lo = TMath::FloorNint( fScale*start );
-  // At the deepest tree level, there are 2^(fDepth-1) bins.
-  Int_t nbins = 1<<(fDepth-1);
+  // At the deepest tree level, there are 2^(fNlevels-1) bins.
+  Int_t nbins = 1<<(fNlevels-1);
   if( lo >= nbins ) return;
   if( lo < 0 )
     lo = 0;

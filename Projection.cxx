@@ -24,7 +24,7 @@ typedef vector<WirePlane*>::size_type vwsiz_t;
 Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   //, const PatternTree* pt )
-  : THaAnalysisObject( name, name ), fType(type), fDepth(0),
+  : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0),
     fHitpattern(NULL), fPatternTree(NULL), fDetector(parent)
     //    fPatternTree(pt)
@@ -40,7 +40,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 
 //_____________________________________________________________________________
 Projection::Projection( const Projection& orig )
-  : fType(orig.fType), fPlanes(orig.fPlanes), fDepth(orig.fDepth),
+  : fType(orig.fType), fPlanes(orig.fPlanes), fNlevels(orig.fNlevels),
     fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
     fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
     fHitpattern(NULL), fPatternTree(NULL), fDetector(orig.fDetector)
@@ -60,7 +60,7 @@ Projection& Projection::operator=( const Projection& rhs )
 
   if( this != &rhs ) {
     fType     = rhs.fType;
-    fDepth    = rhs.fDepth;
+    fNlevels    = rhs.fNlevels;
     fPlanes   = rhs.fPlanes;
     fMaxSlope = rhs.fMaxSlope;
     fWidth    = rhs.fWidth;
@@ -168,7 +168,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   if( status != kOK )
     return status;
 
-  // TODO: load pattern database for given type, nplanes, depth.
+  // TODO: load pattern database for given type, nplanes, nlevels.
 
   // We cannot initialize the hitpattern here because we don't know fWidth yet
 
@@ -181,7 +181,7 @@ Int_t Projection::InitHitpattern()
   // Initialize the hitpattern if not already done
 
   if( fHitpattern ) {
-    if( fHitpattern->GetDepth() == fDepth &&
+    if( fHitpattern->GetNlevels() == fNlevels &&
 	fHitpattern->GetNplanes() == GetNplanes() &&
 	fHitpattern->GetWidth() == fWidth ) {
       fIsInit = kTRUE;
@@ -191,7 +191,7 @@ Int_t Projection::InitHitpattern()
     delete fHitpattern; fHitpattern = NULL;
   }
 
-  fHitpattern = new Hitpattern( fDepth, GetNplanes(), fWidth );
+  fHitpattern = new Hitpattern( fNlevels, GetNplanes(), fWidth );
   if( !fHitpattern || fHitpattern->IsError() )
     return -1;
     
@@ -215,7 +215,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   const DBRequest request[] = {
     { "angle",        &angle,        kDouble, 0, 1 },
     { "maxslope",     &fMaxSlope,    kDouble, 0, 1, -1 },
-    { "search_depth", &fDepth,       kUInt,   0, 0, -1 },
+    { "search_depth", &fNlevels,     kUInt,   0, 0, -1 },
     { 0 }
   };
 
@@ -224,9 +224,10 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   if( err )
     return kInitError;
 
-  if( fDepth > 16 ) {
-    Error( Here(here), "Illegal search_depth = %u. Must be <= 16. "
-	     "Fix database.", fDepth );
+  ++fNlevels; // The number of levels is maxdepth+1
+  if( fNlevels > 16 ) {
+    Error( Here(here), "Illegal search_depth = %u. Must be < 16. "
+	   "Fix database.", fNlevels );
     return kInitError;
   }
 
@@ -321,9 +322,9 @@ void Projection::Print( Option_t* opt ) const
 
   cout << "Projection:  " 
        << GetName()
-       << " type=" << GetType()
-       << " npl="  << fPlanes.size()
-       << " depth=" << GetDepth()
+       << " type="  << GetType()
+       << " npl="   << fPlanes.size()
+       << " nlev="  << GetNlevels()
        << " zsize=" << GetZsize()
        << " maxsl=" << GetMaxSlope()
        << " width=" << GetWidth()
