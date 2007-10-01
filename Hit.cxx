@@ -55,8 +55,8 @@ namespace TreeSearch {
 HitPairIter::HitPairIter( const TSeqCollection* collA,
 			  const TSeqCollection* collB,
 			  Double_t maxdist ) 
-  : fCollA(collA), fCollB(collB), fIterA(NULL), fIterB(NULL),
-    fSaveIter(NULL), fSaveHit(NULL), fMaxDist(maxdist), fStarted(kFALSE),
+  : fCollA(collA), fCollB(collB), fIterA(0), fIterB(0),
+    fSaveIter(0), fSaveHit(0), fMaxDist(maxdist), fStarted(kFALSE),
     fScanning(kFALSE)
 {
   // Constructor
@@ -74,8 +74,8 @@ HitPairIter::HitPairIter( const TSeqCollection* collA,
 
 //_____________________________________________________________________________
 HitPairIter::HitPairIter( const HitPairIter& rhs )
-  : fCollA(rhs.fCollA), fCollB(rhs.fCollB), fIterA(NULL), fIterB(NULL),
-    fSaveIter(NULL), fSaveHit(rhs.fSaveHit),
+  : fCollA(rhs.fCollA), fCollB(rhs.fCollB), fIterA(0), fIterB(0),
+    fSaveIter(0), fSaveHit(rhs.fSaveHit),
     fMaxDist(fMaxDist), fStarted(rhs.fStarted), fScanning(rhs.fScanning),
     fCurrent(rhs.fCurrent), fNext(rhs.fNext)
 {
@@ -158,8 +158,8 @@ HitPairIter& HitPairIter::Next()
   // hits returned are zero, then there are no more hits in either plane.
 
   if( !fStarted ) {
-    fNext = make_pair( fIterA ? fIterA->Next() : NULL, 
-		       fIterB ? fIterB->Next() : NULL );
+    fNext = make_pair( fIterA ? fIterA->Next() : 0, 
+		       fIterB ? fIterB->Next() : 0 );
     fStarted = kTRUE;
   }
 
@@ -171,11 +171,11 @@ HitPairIter& HitPairIter::Next()
     switch( hitA->Compare(hitB,fMaxDist) ) {
     case -1: // A<B 
       fNext.first  = fIterA->Next();
-      fCurrent.second = NULL;
+      fCurrent.second = 0;
       break;
     case  1: // A>B
       fNext.second = fIterB->Next();
-      fCurrent.first = NULL;
+      fCurrent.first = 0;
       break;
     default: // A==B
       {
@@ -223,7 +223,7 @@ HitPairIter& HitPairIter::Next()
 	    *fSaveIter = *fIterB;
 	    fSaveHit = hitB;
 	  }
-	  // nextB != NULL and hitA == nextB guaranteed here, so the
+	  // nextB != 0 and hitA == nextB guaranteed here, so the
 	  // next iteration will give hitA==hitB again.
 	  fNext.second = nextB;
 	}

@@ -34,7 +34,7 @@ namespace TreeSearch {
 
   public:
     MWDC( const char* name, const char* description = "", 
-	  THaApparatus* app = NULL );
+	  THaApparatus* app = 0 );
     virtual ~MWDC();
 
     virtual void    Clear( Option_t* opt="" );

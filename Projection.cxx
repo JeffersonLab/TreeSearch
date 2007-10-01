@@ -26,7 +26,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
   //, const PatternTree* pt )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0),
-    fHitpattern(NULL), fPatternTree(NULL), fDetector(parent)
+    fHitpattern(0), fPatternTree(0), fDetector(parent)
     //    fPatternTree(pt)
 {
   // Constructor
@@ -43,7 +43,7 @@ Projection::Projection( const Projection& orig )
   : fType(orig.fType), fPlanes(orig.fPlanes), fNlevels(orig.fNlevels),
     fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
     fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
-    fHitpattern(NULL), fPatternTree(NULL), fDetector(orig.fDetector)
+    fHitpattern(0), fPatternTree(0), fDetector(orig.fDetector)
 {
   // Copying
 
@@ -71,11 +71,11 @@ Projection& Projection::operator=( const Projection& rhs )
     if( rhs.fHitpattern )
       fHitpattern = new Hitpattern(*rhs.fHitpattern);
     else
-      fHitpattern = NULL;
+      fHitpattern = 0;
 //     if( rhs.fPatternTree )
 //       fPatternTree = new PatternTree(*rhs.fPatternTree);
 //     else
-    fPatternTree = NULL;
+    fPatternTree = 0;
   }
   return *this;
 }
@@ -153,8 +153,8 @@ Int_t Projection::Decode( const THaEvData& evdata )
 //   fMaxSlope = fWidth = 0.0;
 //   fZmin = kBig;
 //   fZmax = -kBig;
-//   delete fHitpattern; fHitpattern = NULL;
-//   //  delete fPatternTree; fPatternTree = NULL;
+//   delete fHitpattern; fHitpattern = 0;
+//   //  delete fPatternTree; fPatternTree = 0;
 // }
 
 //_____________________________________________________________________________
@@ -188,7 +188,7 @@ Int_t Projection::InitHitpattern()
       return 0;
     }
 
-    delete fHitpattern; fHitpattern = NULL;
+    delete fHitpattern; fHitpattern = 0;
   }
 
   fHitpattern = new Hitpattern( fNlevels, GetNplanes(), fWidth );

@@ -32,8 +32,8 @@ WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(-1),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
-    fPartner(NULL), fProjection(NULL), fMWDC(NULL), fResolution(0.0),
-    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(NULL), fHits(NULL)
+    fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
+    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0), fHits(0)
 #ifdef TESTCODE
   , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
     fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
@@ -99,7 +99,7 @@ void WirePlane::CheckCrosstalk()
   UInt_t cursiz = 1;
   fClsiz = 1;
   Int_t prev_iw = -(1<<16);
-  Hit* prev_hit = NULL;
+  Hit* prev_hit = 0;
   for( Int_t i = 0; i < GetNhits(); ++i ) {
     Hit* hit = (Hit*)fHits->At(i);
     Int_t iw = hit->GetWireNum();
@@ -151,7 +151,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   // NB: certain indices below are guaranteed to be in range by construction
   // in ReadDatabase, so we can avoid unneeded checks.
   bool sorted = true;
-  Hit* prevHit = NULL;
+  Hit* prevHit = 0;
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module * d = fDetMap->GetModule(imod);
     Double_t ref_time =
@@ -215,7 +215,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 		     fResolution,
 		     this,
 		     // TODO: fill MC info here
-		     NULL, 0.0
+		     0, 0.0
 		     );
 	  } else
 	    theHit = new( (*fHits)[nHits++] )
@@ -381,7 +381,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     if( FillDetMap( *detmap, flags, here ) > 0 )
       status = kOK;
   }
-  delete detmap; detmap = NULL;
+  delete detmap; detmap = 0;
 
   // Create time-to-distance converter
   if( status == kOK ) {
@@ -415,7 +415,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     }
   }
 ttderr:
-  delete ttd_param; ttd_param = NULL;
+  delete ttd_param; ttd_param = 0;
   if( status != kOK )
     return status;
 

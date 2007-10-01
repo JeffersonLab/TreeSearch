@@ -44,7 +44,7 @@ Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const Hitpattern& orig ) 
   : fNlevels(orig.fNlevels), fNplanes(orig.fNplanes),
-    fScale(orig.fScale), fOffset(orig.fOffset), fPattern(NULL)
+    fScale(orig.fScale), fOffset(orig.fOffset), fPattern(0)
 {
   // Copy ctor
 
@@ -65,7 +65,7 @@ Hitpattern& Hitpattern::operator=( const Hitpattern& rhs )
     fNplanes = rhs.fNplanes;
     fScale   = rhs.fScale;
     fOffset  = rhs.fOffset;
-    delete fPattern; fPattern = NULL;
+    delete fPattern; fPattern = 0;
     if( fNplanes > 0 ) {
       fPattern = new Bits*[fNplanes];
       for( UInt_t i=fNplanes; i--; )
@@ -142,11 +142,11 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   Double_t maxdist = A->GetMaxSlope() * dz;
   Double_t maxdist2 = 0.5*maxdist;
   bool do_single_hits =
-    ( A->GetDetector()->TestBit(MWDC::kPairsOnly) == kFALSE || B == NULL );
+    ( A->GetDetector()->TestBit(MWDC::kPairsOnly) == kFALSE || B == 0 );
 
   Int_t nhits = 0;
 
-  HitPairIter it( A->GetHits(), B ? B->GetHits() : NULL, maxdist );
+  HitPairIter it( A->GetHits(), B ? B->GetHits() : 0, maxdist );
   while( it ) {
     nhits++;
     const Hit* hitA = static_cast<const Hit*>((*it).first);

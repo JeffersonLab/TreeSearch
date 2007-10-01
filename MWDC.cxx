@@ -87,14 +87,14 @@ public:
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
-  : THaTrackingDetector(name,desc,app), fCrateMap(NULL)
+  : THaTrackingDetector(name,desc,app), fCrateMap(0)
 { 
   // Constructor
 
   fRefMap = new THaDetMap;
 
   // Set up the projection objects (describing wire planes of same type)
-  fProj.resize( kTypeEnd, NULL );
+  fProj.resize( kTypeEnd, 0 );
   // Default plane angles and names. Angles can be overridden via the database
   Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
   const char* p_name[] = { "u", "v", "x" };
@@ -260,7 +260,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	break;
     }
   }
-  delete fCrateMap; fCrateMap = NULL;
+  delete fCrateMap; fCrateMap = 0;
   if( status )
     return fStatus = status;
 
@@ -512,7 +512,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       status = kOK;
     }
   }
-  delete cmap; cmap = NULL;
+  delete cmap; cmap = 0;
   if( status != kOK )
     return status;
 
@@ -627,7 +627,7 @@ inline
 static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot, 
 				 const THashTable* table )
 {
-  if( !table ) return NULL;
+  if( !table ) return 0;
   CSpair m( crate, slot );
   return static_cast<DAQmodule*>( table->FindObject(&m) );
 }

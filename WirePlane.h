@@ -27,7 +27,7 @@ namespace TreeSearch {
 
   public:
     WirePlane( const char* name, const char* description = "", 
-	       THaDetectorBase* parent = NULL );
+	       THaDetectorBase* parent = 0 );
     virtual ~WirePlane();
 
     virtual void    Clear( Option_t* opt="" );

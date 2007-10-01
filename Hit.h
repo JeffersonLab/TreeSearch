@@ -22,7 +22,7 @@ namespace TreeSearch {
   class Hit : public TObject {
 
   public:
-    Hit() : fWirePlane(NULL) {}
+    Hit() : fWirePlane(0) {}
     Hit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
 	 const WirePlane* wp ) :
 #ifdef TESTCODE
@@ -83,7 +83,7 @@ namespace TreeSearch {
   class MCHit : public Hit {
 
   public:
-    MCHit() : fMCTrack(NULL) {}
+    MCHit() : fMCTrack(0) {}
     MCHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
 	   const WirePlane* wp, MCTrack* mctrk, Double_t mcpos )
       : Hit(wnum, pos, tdc, time, res, wp), fMCTrack(mctrk), fMCPos(mcpos) {}
@@ -139,7 +139,7 @@ namespace TreeSearch {
     }
     bool operator!=( const HitPairIter& rhs ) const { return !(*this==rhs); }
     operator bool() const 
-    { return (fCurrent.first != NULL || fCurrent.second != NULL); }
+    { return (fCurrent.first != 0 || fCurrent.second != 0); }
     bool operator!() const { return !((bool)*this); }
 
   private:

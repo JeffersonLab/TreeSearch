@@ -26,7 +26,7 @@ namespace TreeSearch {
   public:
 
     Projection( Int_t type, const char* name, Double_t angle,
-		THaDetectorBase* parent = NULL );
+		THaDetectorBase* parent = 0 );
     Projection( const Projection& orig );
     Projection& operator=( const Projection& rhs );
     virtual ~Projection();
