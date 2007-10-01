@@ -9,11 +9,11 @@
 
 #include "Rtypes.h"
 #include <vector>
-#include <string>
 
 namespace TreeSearch {
 
   class Pattern;
+  class Link;
 
   struct TreeParam_t {
     UInt_t    maxdepth;
@@ -24,12 +24,12 @@ namespace TreeSearch {
 
   class PatternTree {
   public:
-    PatternTree( const TreeParam_t& param );
-    PatternTree( const TreeParam_t& param, UInt_t nPatterns, UInt_t nLinks );
+    PatternTree( const TreeParam_t& param,
+		 UInt_t nPatterns = 0, UInt_t nLinks = 0 );
     virtual ~PatternTree();
  
-    Int_t  AddPattern(int);
-    Int_t  Read( const std::string& filename );
+    Int_t  AddPattern( const Link* patt );
+    Int_t  Read( const char* filename );
 
     const  TreeParam_t& GetParameters() const { return fParameters; }
     const  Pattern*     GetRoot()       const { return fRoot; }
@@ -42,7 +42,6 @@ namespace TreeSearch {
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
