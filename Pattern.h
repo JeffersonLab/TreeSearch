@@ -20,13 +20,20 @@ namespace TreeSearch {
   private:
     Pattern*   fPattern;    // Bit pattern treenode
     Link*      fNext;       // Next list element
-    Int_t      fOp;         // Operation to be applied to pattern
+    UChar_t    fOp;         // Operation to be applied to pattern (bits 0-1)
+                            // and parent pattern (bits 2-3)
   public:
+    UChar_t    fDepth;      // Current depth of tree recursion
+    UShort_t   fOff;        // Offset of parent pattern
     Link( Pattern* pat, Link* next, Int_t op )
-      : fPattern(pat), fNext(next), fOp(op) {}
+      : fPattern(pat), fNext(next), fOp(op), fDepth(0), fOff(0) 
+    { assert( op >= 0 && op < 4 ); }
     Pattern*   GetPattern() const { return fPattern; }
-    Link*      Next() const { return fNext; }
-    Int_t      Type() const { return fOp; }
+    Link*      Next()       const { return fNext; }
+    Int_t      Type()       const { return (fOp & 3); }
+    Int_t      Ptype()      const { return ((fOp>>2) & 3); }
+    void       SetPtype( Int_t op ) 
+    { assert(op>=0&&op<4); fOp = (fOp & 0xf3) | (op<<2); }
   }; // end class Link
 
   class Pattern {
@@ -59,12 +66,6 @@ namespace TreeSearch {
     bool operator!=( const Pattern& rhs ) const { 
       return !(*this == rhs );
     }
-    Link*      GetChild()    const  { return fChild; }
-    UShort_t*  GetBits()            { return fBits; }
-    UInt_t     GetMinDepth() const  { return fMinDepth; }
-    UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
-    UInt_t     GetNbits()    const  { return fNbits; }
-    Int_t      Hash()        const  { return GetWidth(); }
     UShort_t&  operator[](UInt_t i) { 
       assert(i<fNbits);
       return fBits[i];
@@ -73,6 +74,14 @@ namespace TreeSearch {
       assert(i<fNbits);
       return fBits[i];
     }
+    Link*      GetChild()    const  { return fChild; }
+    UShort_t*  GetBits()            { return fBits; }
+    //    UInt_t     GetMinDepth() const  { return fMinDepth; }
+    UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
+    UInt_t     GetNbits()    const  { return fNbits; }
+    Int_t      GetRefIndex() const  { return fRefIndex; }
+    Int_t      Hash()        const  { return GetWidth(); }
+    void       SetRefIndex( Int_t i ) { fRefIndex = i; }
     void       Print( bool print_links = true, std::ostream& os = std::cout,
 		      bool end_line = true ) const;
   }; // end class Pattern
