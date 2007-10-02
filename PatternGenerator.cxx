@@ -245,8 +245,8 @@ Int_t WritePattern::operator() ( const NodeDescriptor& nd )
   Pattern* node = nd.link->GetPattern();
   if( node->GetRefIndex() < 0 ) {
     node->SetRefIndex( fIndex++ );
-    // Header for new pattern: -1
-    os->put(-1);
+    // Header for new pattern: link type | 128 (< 0)
+    os->put( nd.link->Type() | 0x80 );
     if( os->fail() ) return -1;
     // Pattern data. NB: fBits[0] is always 0, so we can skip it
     for( size_t i=1; i<node->GetNbits(); i++ ) {
