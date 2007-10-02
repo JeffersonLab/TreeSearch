@@ -216,23 +216,28 @@ WritePattern::WritePattern( const char* filename, size_t index_size )
   }
   if( (fIdxSiz & (fIdxSiz-1)) != 0 ) {
     ::Error( here, "Invalid index_size. Must be a power of 2" );
+    fIdxSiz = sizeof(Int_t);
   }    
 }
 
 //_____________________________________________________________________________
 template< typename T>
 inline
-void swapped_binary_write( ostream& os, T data, size_t start = 0 )
+void swapped_binary_write( ostream& os, const T& data, size_t n = 1, 
+			   size_t start = 0 )
 {
-  // Write single item "data" to "os" in binary big-endian (MSB) format
-  size_t size = sizeof(data);
-  Byte_t* bytes = reinterpret_cast<Byte_t*>( &data );
+  // Write "n" elements of "data" to "os" in binary big-endian (MSB) format.
+  // "start" indicates an optional _byte_ skip count from the beginning of
+  // the MSB word - designed for scalar data where the MSB bytes are known 
+  // to be zero.
+  size_t size = sizeof(T);
+  const char* bytes = reinterpret_cast<const char*>( &data );
 #ifdef R__BYTESWAP
   size_t k = size-1;
-  for( size_t i=start; i<size; i++ )
+  for( size_t i = start; i < n * size; ++i )
     os.put( bytes[(i&~k)+(k-i&k)] );
 #else
-  os.write( bytes+start, size-start );
+  os.write( bytes+start, n*size-start );
 #endif
 }
 
@@ -249,10 +254,7 @@ Int_t WritePattern::operator() ( const NodeDescriptor& nd )
     os->put( nd.link->Type() | 0x80 );
     if( os->fail() ) return -1;
     // Pattern data. NB: fBits[0] is always 0, so we can skip it
-    for( size_t i=1; i<node->GetNbits(); i++ ) {
-      swapped_binary_write( *os, node->GetBits()[i] );
-      if( os->fail() ) return -1;
-    }
+    swapped_binary_write( *os, node->GetBits()[1], node->GetNbits()-1 );
     UShort_t nchild = 0;
     Link* ln = node->GetChild();
     while( ln ) {
@@ -268,7 +270,7 @@ Int_t WritePattern::operator() ( const NodeDescriptor& nd )
     // Reference pattern header: type (>= 0)
     os->put( nd.link->Type() );
     // Reference index
-    swapped_binary_write( *os, node->GetRefIndex(), sizeof(Int_t)-fIdxSiz );
+    swapped_binary_write( *os, node->GetRefIndex(), 1, sizeof(Int_t)-fIdxSiz );
     if( os->fail() ) return -1;
     // Don't write child nodes
     return 1;
@@ -279,8 +281,7 @@ Int_t WritePattern::operator() ( const NodeDescriptor& nd )
 inline
 Int_t PrintPattern::operator() ( const NodeDescriptor& nd )
 {
-  // Print pattern referenced by link, using the bit offset info from
-  // link->Ptype().
+  // Print actual (shifted & mirrored) pattern described by "nd".
 
   ++fCount;
   if( fDump )
@@ -374,7 +375,7 @@ void PatternGenerator::CalcStatistics()
 {
   // Collect statistics on the build tree. This is best done separately here
   // because some things (averages, memory requirements) can only be 
-  // calculated once the tree is complete..
+  // calculated once the tree is complete.
 
   memset( &fStats, 0, sizeof(Statistics_t) );
 
@@ -436,22 +437,21 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
     return;
   }
 
-  // Print ASCII pictures of ALL the patterns in the tree, where "all" means
-  // all patterns that can be derived from the stored pattens
+  // Print ASCII pictures of ALL actual patterns in the tree
   if( *opt == 'P' ) {
     PrintPattern print(os);
     fTreeWalk( fHashTable[0], print );
     return;
   }
 
-  // Dump n-tuples of all patterns, one per line
+  // Dump n-tuples of all actual patterns, one per line
   if( *opt == 'L' ) {
     PrintPattern print(os,true);
     fTreeWalk( fHashTable[0], print );
     return;
   }
 
-  // Count all patterns that can be derived
+  // Count all actual patterns
   if( *opt == 'C' ) {
     CountPattern count;
     fTreeWalk( fHashTable[0], count );
