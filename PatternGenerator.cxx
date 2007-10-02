@@ -428,18 +428,19 @@ Int_t PatternGenerator::WalkTree( Link* link, Operation& action,
 				  UInt_t depth, UInt_t op, UInt_t off ) const
 {
   // Traverse the tree and call function object "action" for each link. 
+  // The return value from action determines the behavior:
+  //  <0: error, return immediately
+  //   0: process child nodes recursively
+  //  >0: ignore child nodes
 
   if( depth >= fNlevels )
     return 0;
 
+  // Pass the current link opcode, depth, and offset as part of the link.
   link->SetPtype(op);
   link->fDepth = depth;
   link->fOff = off;
   Int_t ret = action(link);
-  // Return values from action: 
-  //  <0: error, return immediately
-  //   0: process child nodes recursively
-  //  >0: ignore child nodes
   if( ret == 0 ) {
     Link* ln = link->GetPattern()->GetChild();
     while( ln ) {
