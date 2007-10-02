@@ -20,20 +20,15 @@ namespace TreeSearch {
   private:
     Pattern*   fPattern;    // Bit pattern treenode
     Link*      fNext;       // Next list element
-    UChar_t    fOp;         // Operation to be applied to pattern (bits 0-1)
-                            // and parent pattern (bits 2-3)
+    Int_t      fOp;         // Operation to be applied to pattern (bits 0-1)
   public:
-    UChar_t    fDepth;      // Current depth of tree recursion
-    UShort_t   fOff;        // Offset of parent pattern
     Link( Pattern* pat, Link* next, Int_t op )
-      : fPattern(pat), fNext(next), fOp(op), fDepth(0), fOff(0) 
-    { assert( op >= 0 && op < 4 ); }
+      : fPattern(pat), fNext(next), fOp(op) { assert( op >= 0 && op < 4 ); }
     Pattern*   GetPattern() const { return fPattern; }
     Link*      Next()       const { return fNext; }
-    Int_t      Type()       const { return (fOp & 3); }
-    Int_t      Ptype()      const { return ((fOp>>2) & 3); }
-    void       SetPtype( Int_t op ) 
-    { assert(op>=0&&op<4); fOp = (fOp & 0xf3) | (op<<2); }
+    Int_t      Type()       const { return fOp; }
+    Bool_t     Mirrored()   const { return ((fOp & 2) != 0); }
+    UInt_t     Shift()      const { return (fOp & 1); }
   }; // end class Link
 
   class Pattern {
