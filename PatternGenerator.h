@@ -9,6 +9,7 @@
 
 #include "Pattern.h"
 #include "PatternTree.h"
+#include "TreeWalk.h"
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -47,7 +48,7 @@ namespace TreeSearch {
 
     vector<Link*>  fHashTable;   // Hashtab for indexing patterns during build
     Statistics_t   fStats;       // Tree statistics
-    //    Int_t          fIndex;   // Current pattern count (for serializing)
+    TreeWalk       fTreeWalk;    // TreeWalk functor
 
     enum EOperation { kDelete, kResetRefIndex };
     void     AddHash( Pattern* pat );
@@ -57,10 +58,6 @@ namespace TreeSearch {
     bool     LineCheck( const Pattern& pat );
     void     MakeChildNodes( Pattern* parent, UInt_t depth );
     bool     TestSlope( const Pattern& pat, UInt_t depth );
-
-    template<typename Operation>
-    Int_t    WalkTree( Link* link, Operation& op, UInt_t depth = 0,
-		       UInt_t op = 0, UInt_t off = 0 ) const;
 
     ClassDef(PatternGenerator,0)   // Generator for pattern template database
 
