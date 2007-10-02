@@ -12,7 +12,7 @@
 
 namespace TreeSearch {
 
-  class Pattern;
+  //  class Pattern;
   class Link;
 
   struct TreeParam_t {
@@ -32,13 +32,13 @@ namespace TreeSearch {
     Int_t  Read( const char* filename );
 
     const  TreeParam_t& GetParameters() const { return fParameters; }
-    const  Pattern*     GetRoot()       const { return fRoot; }
+    const  Link*        GetRoot()       const { return fRoot; }
     static Int_t        Normalize( TreeParam_t& param );
 
   private:
     
     TreeParam_t  fParameters; // Tree parameters (levels, width, depth)
-    Pattern*     fRoot;       // Root node 
+    Link*        fRoot;       // Root node 
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
