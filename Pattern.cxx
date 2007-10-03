@@ -13,10 +13,11 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 Pattern::Pattern( UInt_t size )
-  : fChild(0), fNbits(size), fMinDepth(-1), fRefIndex(-1)
+  : fChild(0), fNbits(size)
 {
   // Constructor. Puts bit array on heap. Minimum size is 1.
 
+  assert( fNbits <= 16 );
   if( fNbits == 0 )
     ++fNbits;
   fBits = new UShort_t[fNbits];
@@ -32,7 +33,7 @@ Pattern::Pattern( UInt_t size )
 
 //_____________________________________________________________________________
 Pattern::Pattern( const Pattern& orig )
-  : fChild(0), fNbits(orig.fNbits), fMinDepth(-1), fRefIndex(-1)
+  : fChild(0), fNbits(orig.fNbits)
 {
   // Copy constructor. Copy has same bits, no children
 
@@ -41,15 +42,13 @@ Pattern::Pattern( const Pattern& orig )
 }
 
 //_____________________________________________________________________________
-Pattern& Pattern::operator=( const Pattern& rhs )
+const Pattern& Pattern::operator=( const Pattern& rhs )
 {
   // Assignment. Copies only this bits, not the pointers to the children.
 
   if( this != &rhs ) {
     fChild = 0;
     fNbits = rhs.fNbits;
-    fMinDepth = -1;
-    fRefIndex = -1;
     delete fBits;
     fBits = new UShort_t[fNbits];
     memcpy( fBits, rhs.fBits, fNbits*sizeof(UShort_t) );
@@ -60,7 +59,7 @@ Pattern& Pattern::operator=( const Pattern& rhs )
 //_____________________________________________________________________________
 Pattern::~Pattern()
 {
-  // Destroys a Pattern. Deletes all child listnodes (but not the treenodes
+  // Destroys a Pattern. Deletes all child links (but not the Patterns
   // they point to)
 
   while( fChild ) {
@@ -79,7 +78,7 @@ void Pattern::Print( bool print_links, ostream& os, bool end_line ) const
   for( UInt_t i=0; i<fNbits; i++ ) {
     os << fBits[i] << " ";
   }
-  os << "=" << fMinDepth;
+  //  os << "=" << fMinDepth;
   if( print_links ) {
     os << ":  ";
     Link* ln = fChild;
