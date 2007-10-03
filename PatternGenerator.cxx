@@ -11,6 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <ctime>
 #if ROOT_VERSION_CODE < ROOT_VERSION(5,8,0)
 #include <cstdlib>   // for atof()
@@ -26,9 +27,9 @@ ClassImp(TreeSearch::PatternGenerator)
 // Private definitions, used internally
 namespace {
 
-  using namespace TreeSearch;
+using namespace TreeSearch;
 
-// Utility class for iterating over child patterns
+// Iterator over child patterns of a given parent patten
 class ChildIter {
 private:
   const Pattern fParent;  // copy of parent pattern
@@ -45,7 +46,7 @@ public:
     return clone;
   }
   Pattern& operator*()            { return fChild; }
-  operator bool()  const { return (fCount >= 0); }
+           operator bool()  const { return (fCount >= 0); }
   Int_t    type()           const { return fType; }
   void     reset() { 
     fCount = 1<<fParent.GetNbits();
@@ -53,21 +54,24 @@ public:
   }
 };
 
-// Function objects for tree traversal operations
+// "Visitor" objects for tree traversal operations. The object's operator()
+// is applied to each tree node. These should be used with the TreeWalk
+// iterator (see TreeWalk.h)
 
 // Copy pattern to PatternTree object
-class CopyPattern {
+class CopyPattern : public NodeVisitor {
 public:
-  CopyPattern( PatternTree* tree ) : fTree(tree), fIndex(0) { assert(fTree); }
+  CopyPattern( PatternTree* tree ) 
+    : fTree(tree) { assert(fTree); }
   Int_t operator() ( const NodeDescriptor& nd );
 
 private:
   PatternTree* fTree;    // Tree object to fill
-  Int_t        fIndex;   // Current pattern count
+  map<Pattern*,Int_t> fMap; // Index map for serializing 
 };
 
 // Write pattern to binary file
-class WritePattern {
+class WritePattern : public NodeVisitor {
 public:
   WritePattern( const char* filename, size_t index_size = sizeof(Int_t) );
   ~WritePattern() { delete os; }
@@ -75,8 +79,8 @@ public:
 
 private:
   ofstream* os;        // Output file stream
-  Int_t     fIndex;    // Current pattern count
-  size_t    fIdxSiz;   // Required size for fIndex (1, 2, or 4)
+  size_t    fIdxSiz;   // Required size for pattern count (1, 2, or 4)
+  map<Pattern*,Int_t> fMap; // Index map for serializing 
 
   // Because of the pointer member, disallow copying and assignment
   WritePattern( const WritePattern& orig );
@@ -84,7 +88,7 @@ private:
 };
 
 // Count unique patterns (including shifts)
-class CountPattern {
+class CountPattern : public NodeVisitor {
 public:
   CountPattern() : fCount(0) {}
   Int_t operator() ( const NodeDescriptor& nd ) { fCount++; return 0; }
@@ -94,8 +98,8 @@ private:
   ULong64_t    fCount;    // Pattern count
 };
 
-// Print (and count) unique patterns to output stream (including shifts)
-class PrintPattern {
+// Pretty print to output stream (and count) all actual patterns
+class PrintPattern : public NodeVisitor {
 public:
   PrintPattern( ostream& ostr = cout, bool dump = false ) 
     : os(ostr), fCount(0), fDump(dump) {}
@@ -176,9 +180,11 @@ inline
 Int_t CopyPattern::operator() ( const NodeDescriptor& nd )
 {
   Pattern* node = nd.link->GetPattern();
-  if( node->GetRefIndex() < 0 ) {
-    node->SetRefIndex( fIndex++ );
-//FIXME: TEST TEST
+  map<Pattern*,Int_t>::iterator idx = fMap.find(node);
+  if( idx == fMap.end() ) {
+    map<Pattern*,Int_t>::size_type n = fMap.size();
+    fMap[node] = n;
+    // FIXME: TEST TEST
     print(-1);
     if( fTree->AddPattern(nd.link) )
       return -1;
@@ -192,14 +198,14 @@ Int_t CopyPattern::operator() ( const NodeDescriptor& nd )
     return 0;
   } else {
     print(nd.link->Type());
-    print(node->GetRefIndex());
+    print(idx->second);
     return 1;
   }
 }
 
 //_____________________________________________________________________________
 WritePattern::WritePattern( const char* filename, size_t index_size )
-  : os(0), fIndex(0), fIdxSiz(index_size)
+  : os(0), fIdxSiz(index_size)
 {
   static const char* here = "PatternGenerator::WritePattern";
 
@@ -228,8 +234,8 @@ void swapped_binary_write( ostream& os, const T& data, size_t n = 1,
 {
   // Write "n" elements of "data" to "os" in binary big-endian (MSB) format.
   // "start" indicates an optional _byte_ skip count from the beginning of
-  // the MSB word - designed for scalar data where the MSB bytes are known 
-  // to be zero.
+  // the big-endian format data - designed to write only the non-trivial
+  // part of scalar data for which the upper bytes are known to be always zero.
   size_t size = sizeof(T);
   const char* bytes = reinterpret_cast<const char*>( &data );
 #ifdef R__BYTESWAP
@@ -245,12 +251,19 @@ void swapped_binary_write( ostream& os, const T& data, size_t n = 1,
 inline
 Int_t WritePattern::operator() ( const NodeDescriptor& nd )
 {
+  // Write the single pattern referenced by "nd" to the binary output stream.
+  // In essence, this implements the serialization method for cyclical graphs
+  // described in
+  // http://www.parashift.com/c++-faq-lite/serialization.html#faq-36.11
+
   if( !os )
     return -1;
   Pattern* node = nd.link->GetPattern();
-  if( node->GetRefIndex() < 0 ) {
-    node->SetRefIndex( fIndex++ );
-    // Header for new pattern: link type | 128 (< 0)
+  map<Pattern*,Int_t>::iterator idx = fMap.find(node);
+  if( idx == fMap.end() ) {
+    map<Pattern*,Int_t>::size_type n = fMap.size();
+    fMap[node] = n;
+    // Header for new pattern: link type + 128 (=128-130)
     os->put( nd.link->Type() | 0x80 );
     if( os->fail() ) return -1;
     // Pattern data. NB: fBits[0] is always 0, so we can skip it
@@ -267,10 +280,10 @@ Int_t WritePattern::operator() ( const NodeDescriptor& nd )
     // Write child nodes
     return 0;
   } else {
-    // Reference pattern header: type (>= 0)
+    // Reference pattern header: the plain link type (=0-2)
     os->put( nd.link->Type() );
     // Reference index
-    swapped_binary_write( *os, node->GetRefIndex(), 1, sizeof(Int_t)-fIdxSiz );
+    swapped_binary_write( *os, idx->second, 1, sizeof(Int_t)-fIdxSiz );
     if( os->fail() ) return -1;
     // Don't write child nodes
     return 1;
@@ -326,6 +339,27 @@ Int_t PrintPattern::operator() ( const NodeDescriptor& nd )
 namespace TreeSearch {
 
 //_____________________________________________________________________________
+// Linked-list node for the hash table of base patterns
+
+class HashNode {
+  friend class PatternGenerator;
+private:
+  Pattern*   fPattern;    // Bit pattern treenode
+  HashNode*  fNext;       // Next linked list element
+  UInt_t     fMinDepth;   // Minimum valid depth for this pattern (<=16)
+
+public:
+  HashNode( Pattern* pat, HashNode* next )
+    : fPattern(pat), fNext(next), fMinDepth(-1) {}
+  Pattern*   GetPattern() const { return fPattern; }
+  HashNode*  Next()       const { return fNext; }
+  
+  void       UsedAtDepth( UInt_t depth ) {
+    if( depth < fMinDepth ) fMinDepth = depth;
+  }
+}; // end class HashNode
+
+//_____________________________________________________________________________
 PatternGenerator::PatternGenerator()
   : fNlevels(0), fNplanes(0), fMaxSlope(0)
 {
@@ -338,36 +372,29 @@ PatternGenerator::~PatternGenerator()
 {
   // Destructor
 
-  DoTree( kDelete );
+  DeleteTree();
 
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::DoTree( EOperation op )
+void PatternGenerator::DeleteTree()
 {
-  // Execute given operation on all unique Pattern nodes of the build tree.
+  // Delete the build tree along with its hash table.
   // Internal utility function.
 
-  for( vector<Link*>::iterator it = fHashTable.begin();
+  for( vector<HashNode*>::iterator it = fHashTable.begin();
        it != fHashTable.end(); ++it ) {
-    Link* hashnode = *it;
+    HashNode* hashnode = *it;
     while( hashnode ) {
-      Link* cur_node = hashnode;
+      HashNode* cur_node = hashnode;
       hashnode = hashnode->Next();
       assert( cur_node->GetPattern() );
-      switch( op ) {
-      case kDelete:
-	delete cur_node->GetPattern();
-	delete cur_node;
-	break;
-      case kResetRefIndex:
-	cur_node->GetPattern()->SetRefIndex(-1);
-	break;
-      }
+      delete cur_node->GetPattern();
+      delete cur_node;
+      break;
     }
   }
-  if( op == kDelete )
-    fHashTable.clear();
+  fHashTable.clear();
 }
 
 //_____________________________________________________________________________
@@ -379,10 +406,10 @@ void PatternGenerator::CalcStatistics()
 
   memset( &fStats, 0, sizeof(Statistics_t) );
 
-  for( vector<Link*>::const_iterator it = fHashTable.begin();
+  for( vector<HashNode*>::const_iterator it = fHashTable.begin();
        it != fHashTable.end(); ++it ) {
     // Each hashnode points to a unique pattern by construction of the table
-    Link* hashnode = *it;
+    HashNode* hashnode = *it;
     UInt_t hash_length = 0;
     while( hashnode ) {
       // Count patterns
@@ -414,7 +441,7 @@ void PatternGenerator::CalcStatistics()
     fStats.nPatterns * sizeof(Pattern)
     + fStats.nPatterns * fNplanes * sizeof(UShort_t)
     + fStats.nLinks * sizeof(Link);
-  fStats.nHashBytes = fHashTable.size() * sizeof(Link*)
+  fStats.nHashBytes = fHashTable.size() * sizeof(HashNode*)
     + fStats.nPatterns * sizeof(Link);
 }
 
@@ -425,9 +452,9 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
 
   // Dump all stored patterns, using Pattern::print()
   if( *opt == 'D' ) {
-    for( vector<Link*>::const_iterator it = fHashTable.begin();
+    for( vector<HashNode*>::const_iterator it = fHashTable.begin();
 	 it != fHashTable.end(); ++it ) {
-      Link* hashnode = *it;
+      HashNode* hashnode = *it;
       while( hashnode ) {
 	Pattern* pat = hashnode->GetPattern();
 	pat->Print( true, os );
@@ -437,24 +464,25 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
     return;
   }
 
+  Link root_link( fHashTable[0]->GetPattern(), 0, 0 );
   // Print ASCII pictures of ALL actual patterns in the tree
   if( *opt == 'P' ) {
     PrintPattern print(os);
-    fTreeWalk( fHashTable[0], print );
+    fTreeWalk( &root_link, print );
     return;
   }
 
   // Dump n-tuples of all actual patterns, one per line
   if( *opt == 'L' ) {
     PrintPattern print(os,true);
-    fTreeWalk( fHashTable[0], print );
+    fTreeWalk( &root_link, print );
     return;
   }
 
   // Count all actual patterns
   if( *opt == 'C' ) {
     CountPattern count;
-    fTreeWalk( fHashTable[0], count );
+    fTreeWalk( &root_link, count );
     os << "Total pattern count = " << count.GetCount() << endl;
     return;
   }
@@ -487,7 +515,6 @@ Int_t PatternGenerator::Write( const char* filename )
 {
   // Write tree to binary file
 
-  DoTree( kResetRefIndex );
   // TODO: write header
 
   size_t index_size = sizeof(Int_t);
@@ -496,11 +523,12 @@ Int_t PatternGenerator::Write( const char* filename )
   else if( fStats.nPatterns < (1U<<16) )
     index_size = 2;
   WritePattern write(filename,index_size);
-  return fTreeWalk( fHashTable[0], write );
+  Link root_link( fHashTable[0]->GetPattern(), 0, 0 );
+  return fTreeWalk( &root_link, write );
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::AddHash( Pattern* pat )
+HashNode* PatternGenerator::AddHash( Pattern* pat )
 {
   // Add given pattern to the hash table
 
@@ -516,7 +544,7 @@ void PatternGenerator::AddHash( Pattern* pat )
     hashsize = fHashTable.size();
   }
   Int_t hash = pat->Hash()%hashsize;
-  fHashTable[hash] = new Link( pat, fHashTable[hash], 0 );
+  return fHashTable[hash] = new HashNode( pat, fHashTable[hash] );
 }
 
 //_____________________________________________________________________________
@@ -525,7 +553,7 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   // Generate a new pattern tree for the given parameters. Returns a pointer
   // to the generated tree, or zero if error
 
-  DoTree( kDelete );
+  DeleteTree();
 
   // Set parameters for the new build.
   if( PatternTree::Normalize(parameters) != 0 )
@@ -543,10 +571,10 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
 
   // Start with the trivial all-zero root node at depth 0. 
   Pattern* root = new Pattern( fNplanes );
-  AddHash( root );
+  HashNode* hroot = AddHash( root );
 
   // Generate the tree recursively
-  MakeChildNodes( root, 1 );
+  MakeChildNodes( hroot, 1 );
   
   // Calculate tree statistics (number of patterns, links etc.)
   cpu_ticks = clock() - cpu_ticks;
@@ -566,7 +594,6 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
 //     Int_t (PatternTree::*CopyPattern)(int) = &PatternTree::AddPattern;
 //     (tree->*CopyPattern)(1);
     
-    DoTree( kResetRefIndex );
     Link root_link(root,0,0);
     CopyPattern copy(tree);
     fTreeWalk( &root_link, copy );
@@ -662,58 +689,62 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
 }
 
 //_____________________________________________________________________________
-Pattern* PatternGenerator::Find( const Pattern& pat )
+HashNode* PatternGenerator::Find( const Pattern& pat )
 {
   // Search for the given pattern in the current database
 
   UInt_t hashsize = fHashTable.size();
   assert(hashsize);
   Int_t hash = pat.Hash()%hashsize;
-  Link* link = fHashTable[hash];
-  while( link ) {
-    Pattern* rhs = link->GetPattern();
+  HashNode* hashNode = fHashTable[hash];
+  while( hashNode ) {
+    Pattern* rhs = hashNode->GetPattern();
     if( pat == *rhs )
-      return rhs;
-    link = link->Next();
+      return hashNode;
+    hashNode = hashNode->Next();
   }
   return 0;
 }
 
 //_____________________________________________________________________________
-void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
+void PatternGenerator::MakeChildNodes( HashNode* pnode, UInt_t depth )
 {
   // Generate child nodes for the given parent pattern
 
   // Requesting child nodes for the parent at this depth implies that the 
   // parent is being used at the level above
   if( depth > 0 )
-    parent->UsedAtDepth( depth-1 );
+    pnode->UsedAtDepth( depth-1 );
 
   // Base case of the recursion: no child nodes beyond fNlevels-1
   if( depth >= fNlevels )
     return;
 
   // If not already done, generate the child patterns of this parent
+  Pattern* parent = pnode->GetPattern();
+  assert(parent);
   if( !parent->fChild ) {
     ChildIter it( *parent );
     while( it ) {
       Pattern& child = *it;
 
       // Pattern already exists?
-      Pattern* node = Find( child );
+      HashNode* node = Find( child );
       if( node ) {
+	Pattern* pat = node->GetPattern();
+	assert(pat);
 	// If the pattern has only been tested at a higher depth, we need to
 	// redo the slope test since the slope is larger now at lower depth
-	if( depth >= node->fMinDepth || TestSlope(*node, depth)) {
+	if( depth >= node->fMinDepth || TestSlope(*pat, depth)) {
 	  // Only add a reference to the existing pattern
-	  parent->AddChild( node, it.type() );
+	  parent->AddChild( pat, it.type() );
 	}
       } else if( TestSlope(child, depth) && LineCheck(child) ) {
 	// If the pattern is new, check it for consistency with maxslope and 
 	// the straight line condition.
-	node = new Pattern( child );
-	AddHash( node );
-	parent->AddChild( node, it.type() );
+	Pattern* pat = new Pattern( child );
+	AddHash( pat );
+	parent->AddChild( pat, it.type() );
       }
       ++it;
     }
@@ -722,12 +753,17 @@ void PatternGenerator::MakeChildNodes( Pattern* parent, UInt_t depth )
   // Recursively generate child nodes down the tree
   Link* ln = parent->GetChild();
   while( ln ) {
-    Pattern* node = ln->GetPattern();
+    Pattern* pat = ln->GetPattern();
+    // This Find() is necessary because we don't want to store the state 
+    // parameter fMinDepth with the pattern itself - if we did so, we'd
+    // get bigger patterns but minimally faster code here
+    HashNode* node = Find( *pat );
+    assert(node);
     // We only need to go deeper if either this pattern does not have children
     // yet OR (important!) children were previously generated from a deeper
     // location in the tree and so this pattern's subtree needs to be extended
     // deeper down now.
-    if( !node->fChild || node->fMinDepth > depth )
+    if( !pat->fChild || node->fMinDepth > depth )
       MakeChildNodes( node, depth+1 );
     ln = ln->Next();
   }

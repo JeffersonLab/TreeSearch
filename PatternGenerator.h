@@ -19,8 +19,10 @@ using std::vector;
 
 namespace TreeSearch {
 
-  class PatternGenerator {
+  class HashNode;
 
+  class PatternGenerator {
+    friend class NodeVisitor;
   public:
     PatternGenerator();
     virtual ~PatternGenerator();
@@ -46,18 +48,17 @@ namespace TreeSearch {
     Double_t       fMaxSlope;    // Max allowed slope, normalized units (0-1)
     vector<double> fZ;           // z positions of planes, normalized (0-1)
 
-    vector<Link*>  fHashTable;   // Hashtab for indexing patterns during build
+    vector<HashNode*> fHashTable;// Hashtab for indexing patterns during build
     Statistics_t   fStats;       // Tree statistics
-    TreeWalk       fTreeWalk;    // TreeWalk functor
+    TreeWalk       fTreeWalk;    // Iterator over the pattern tree
 
-    enum EOperation { kDelete, kResetRefIndex };
-    void     AddHash( Pattern* pat );
-    void     CalcStatistics();
-    void     DoTree( EOperation op );
-    Pattern* Find( const Pattern& pat );
-    bool     LineCheck( const Pattern& pat );
-    void     MakeChildNodes( Pattern* parent, UInt_t depth );
-    bool     TestSlope( const Pattern& pat, UInt_t depth );
+    HashNode* AddHash( Pattern* pat );
+    void      CalcStatistics();
+    void      DeleteTree();
+    HashNode* Find( const Pattern& pat );
+    bool      LineCheck( const Pattern& pat );
+    void      MakeChildNodes( HashNode* parent, UInt_t depth );
+    bool      TestSlope( const Pattern& pat, UInt_t depth );
 
     ClassDef(PatternGenerator,0)   // Generator for pattern template database
 
