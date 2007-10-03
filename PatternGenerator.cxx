@@ -644,47 +644,86 @@ bool PatternGenerator::TestSlope( const Pattern& pat, UInt_t depth )
 bool PatternGenerator::LineCheck( const Pattern& pat )
 {
   // Check if the gievn bit pattern is consistent with a straight line.
-  // The intersection plane positions are given by fZ[].
+  // The intersection plane positions are given by fZ[]. Assumes fZ[0]=0.
+  // The other z values must increase strictly monotonically, fZ{i] > fZ[i-1].
+  // In the parent class, the z-values are normalized so that 
+  // fZ[fNplanes-1] = 1.0, but that is not required.
   // Assumes a normalized pattern, for which pat[0] is always zero.
-  // Assumes identical bin sizes and positions in each plane.
+  // Assumes identical bin sizes and bin boundaries in each plane.
+  // If any of these assumption are relaxed, the algorithm requires additional
+  // tests and might need to save some data in temporary variables.
 
   // FIXME FIXME: for certain z-values, the following can be _very_ sensitive 
   // to the floating point rounding behavior!
 
-  assert(fNplanes);
-  Double_t xL   = pat[fNplanes-1];
-  Double_t xRm1 = xL;               // xR-1
-  Double_t zL   = fZ[fNplanes-1];
-  Double_t zR   = zL;
+  struct Point {
+    Double_t x, z;
+  };
 
-  for( Int_t i = fNplanes-2; i > 0; --i ) {
-    // Compare the intersection point with the i-th plane of the left edge 
-    // of the band, (xL-x0) * z[i]/zL, to the left edge of the bin, pat[i]-x0. 
-    // If the difference is equal or larger than one bin width (=1), the bin is
-    // outside of the allowed band.
-    // Multiply with zL (to avoid division) and recall x0 = 0.
-    Double_t dL = xL*fZ[i] - pat[i]*zL;
-    if( TMath::Abs(dL) >= zL )
-      return false;
-    // Likewise for the right edge
-    Double_t dR = xRm1*fZ[i] - pat[i]*zR;
-    if( TMath::Abs(dR) >= zR )
+  Point SL = { pat[fNplanes-1], fZ[fNplanes-1] };
+  Point SR = { SL.x + 1, SL.z };
+  Double_t xBL = 0.0;
+  Double_t xBR = 1.0;
+  Double_t mL  = SL.x/SL.z;
+  Double_t mR  = mL;
+  
+  for( Int_t j = fNplanes-2; j > 0; --j ) {
+    // xL and xR are the edges of the active bin in the current plane
+    // The bin width is assumed to be unity in all planes
+    Double_t xL = pat[j];
+    Double_t xR = xL+1;
+    // z is the current plane's z coordinate
+    Double_t z  = fZ[j];
+    // jL and jR define the left and right boundary of the allowed x-region
+    // in the current plane
+    Double_t jL = z*mL + xBL;
+    Double_t jR = z*mR + xBR;
+
+    // If the bin is outside of the boundaries, the pattern is not consistent
+    // with a straight line
+    if( xL >= jR || xR <= jL )
       return false;
 
-    if( i > 1 ) {
-      // If dL>0, the right edge of the bin is inside the band,
-      // so set a new right-side limit.
-      if( dL > 0 ) {
-	xRm1 = pat[i];
-	zR   = fZ[i];
+    // Recalculate the right and left boundaries for the next hit, given that
+    // it passes through this bin. 
+    if( xR < jR ) {
+      assert((SL.z-z)>1e-3);
+      mR = (SL.x - xR) / (SL.z - z);
+      Double_t new_xBR = xR - z*mR;
+      assert(new_xBR >= xBL);
+      if( new_xBR < xBR )
+	xBR = new_xBR;
+      else {
+	xBR = xR;
+	assert(z>1e-3);
+	mR = (xR - xBR) / z;
       }
-      // Likewise for the left-side limit
-      if( dR < 0 ) {
-	xL = pat[i];
-	zL = fZ[i];
-      }
+      SR.x = xR;
+      SR.z = z;
     }
+    // By construction (though not totally obvious), we always have 
+    // jR <= jL+1. Also, we are guaranteed xR = xL+1 (with bin width = 1).
+    // Thus, if the above test, xR < jR, is true, we must have xL <= jL,
+    // and the following can always be skipped. Hence the "else" here:
+    // (This is important because the previous block reassigns SR!)
+    else if( xL > jL ) {
+      assert((SR.z-z)>1e-3);
+      mL = (SR.x - xL) / (SR.z - z);
+      Double_t new_xBL = xL - z*mL;
+      assert(new_xBL<=xBR);
+      if( new_xBL > xBL )
+	xBL = new_xBL;
+      else {
+	xBL = xL;
+	assert(z>1e-3);
+	mL = (xL - xBL) / z;
+      }
+      SL.x = xL;
+      SL.z = z;
+    }
+
   } // planes
+
   return true;
 }
 
