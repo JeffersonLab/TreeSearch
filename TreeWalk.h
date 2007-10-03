@@ -5,12 +5,15 @@
 //                                                                           //
 // TreeSearch::TreeWalk                                                      //
 //                                                                           //
-// Generic function object to traverse a PatternTree                         //
+// Generic function object to traverse a PatternTree.                        //
+//                                                                           //
+// This implements an internal iterator pattern [E. Gamma et al.,            //
+// "Design Patterns", Addison-Wesley, 1995] that applies generic operation   //
+// to each tree element.  The operation itself represents a simplified form  //
+// of a visitor pattern [ibid.], where the simplification lies in the fact   //
+// that the tree contains only a single class of nodes instead of many.      //
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
-
-// TODO: ensure at compile time that the function object's operator() 
-// has the correct signature
 
 #include "Pattern.h"
 
@@ -20,7 +23,7 @@ namespace TreeSearch {
   // and mirroring) 
   struct NodeDescriptor {
     Link*    link;     // Linked-list node pointing to a base pattern
-    UShort_t shift;    // Pa
+    UShort_t shift;    // Shift of the base pattern to its actual position
     UChar_t  depth;    // Current recursion depth
     Bool_t   mirrored; // Pattern is mirrored
 
@@ -29,7 +32,7 @@ namespace TreeSearch {
   };    
 
   // "Operation" must be a function object whose operator() takes a
-  // NodeDescriptor or NodeDescriptor& as argument
+  // NodeDescriptor or const NodeDescriptor& as argument
   class TreeWalk {
   private:
     UInt_t   fNlevels;  // Number of levels in tree
@@ -43,6 +46,16 @@ namespace TreeSearch {
 		       UInt_t shift = 0, Bool_t mirrored = false ) const;
 
     ClassDef(TreeWalk, 0)  // Generic traversal function for a PatternTree
+  };
+
+  //___________________________________________________________________________
+  // Base class for "Visitor" classes to the tree nodes. Left empty instead of 
+  // using a pure virtual operator() because the template iterator TreeWalk 
+  // performs better than a non-template version using inheritance from 
+  // NodeVisitor. Inheriting from this base class is still useful for visitors
+  // to gain access to certain classes (like PatternGenerator) as friends.
+  class NodeVisitor {
+    // virtual Int_t operator() ( const NodeDescriptor& nd ) = 0;
   };
 
   //___________________________________________________________________________
@@ -65,8 +78,9 @@ namespace TreeSearch {
       Link* ln = link->GetPattern()->GetChild();
       while( ln ) {
 	// Set up parameters of child pattern based on current position in the
-	// tree. The opcode for the child pattern is the raw opcode xor the
-	// mirror bit of the parent (so that mirrored+mirrored = unmirrored)
+	// tree. The mirroring flag for the child pattern is the pattern's
+	// mirroring flag xor the mirror state of the parent (so that 
+	// mirrored+mirrored = unmirrored)
 	ret = (*this)( ln, action, depth+1, (shift << 1) + ln->Shift(),
 		       mirrored xor ln->Mirrored() );
 	if( ret ) return ret;
