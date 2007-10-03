@@ -652,6 +652,15 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
   // Assumes identical bin sizes and bin boundaries in each plane.
   // If any of these assumption are relaxed, the algorithm requires additional
   // tests and might need to save some data in temporary variables.
+  //
+  // The algorithm works by computing left and right boundary lines within
+  // which a bin must lie. The boundaries are the connections between the
+  // top and bottom reference points, (SL, SR) and (BL, BR), respectively.
+  // Starting from the top plane (fZ[fNplanes-1]), bins in successively lower
+  // planes are tested to lie in the allowed region. If they do, the boundaries
+  // is narrowed if necessary to ensure that subsequent bins are consistent
+  // with all bins above. If the test succeeds in all planes, the pattern is
+  // consistent with a line.
 
   // FIXME FIXME: for certain z-values, the following can be _very_ sensitive 
   // to the floating point rounding behavior!
@@ -662,8 +671,10 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
 
   Point SL = { pat[fNplanes-1], fZ[fNplanes-1] };
   Point SR = { SL.x + 1, SL.z };
+  // Since fZ[0] = 0, we only need the x-coordinate of BL and BR
   Double_t xBL = 0.0;
   Double_t xBR = 1.0;
+  // mL and mR are the current slopes of the left and right boundaries, resp.
   Double_t mL  = SL.x/SL.z;
   Double_t mR  = mL;
   
@@ -672,20 +683,28 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
     // The bin width is assumed to be unity in all planes
     Double_t xL = pat[j];
     Double_t xR = xL+1;
-    // z is the current plane's z coordinate
+    // z is the current plane's z position
     Double_t z  = fZ[j];
     // jL and jR define the left and right boundary of the allowed x-region
-    // in the current plane
+    // at the current plane
     Double_t jL = z*mL + xBL;
     Double_t jR = z*mR + xBR;
 
-    // If the bin is outside of the boundaries, the pattern is not consistent
-    // with a straight line
+    // If the current bin is outside of the boundaries, we're done. 
+    // The test fails.
     if( xL >= jR || xR <= jL )
       return false;
 
+    // If this was the last plane before the bottom, all tests succeeded,
+    // and we are done with the loop.
+    if( j == 1 )
+      break;
+
     // Recalculate the right and left boundaries for the next hit, given that
-    // it passes through this bin. 
+    // it passes through this bin. This is only necessary, of course, if the
+    // present bin "cuts" into the allowed region (either its left or right
+    // edge are between the boundaries).
+    assert( !( xR < jR && xL > jL )); //both edges must never be inside
     if( xR < jR ) {
       assert((SL.z-z)>1e-3);
       mR = (SL.x - xR) / (SL.z - z);
@@ -694,7 +713,6 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
       if( new_xBR < xBR )
 	xBR = new_xBR;
       else {
-	xBR = xR;
 	assert(z>1e-3);
 	mR = (xR - xBR) / z;
       }
@@ -714,14 +732,12 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
       if( new_xBL > xBL )
 	xBL = new_xBL;
       else {
-	xBL = xL;
 	assert(z>1e-3);
 	mL = (xL - xBL) / z;
       }
       SL.x = xL;
       SL.z = z;
     }
-
   } // planes
 
   return true;
