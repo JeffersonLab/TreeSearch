@@ -709,7 +709,6 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
       assert((SL.z-z)>1e-3);
       mR = (SL.x - xR) / (SL.z - z);
       Double_t new_xBR = xR - z*mR;
-      assert(new_xBR >= xBL);
       if( new_xBR < xBR )
 	xBR = new_xBR;
       else {
@@ -728,7 +727,6 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
       assert((SR.z-z)>1e-3);
       mL = (SR.x - xL) / (SR.z - z);
       Double_t new_xBL = xL - z*mL;
-      assert(new_xBL<=xBR);
       if( new_xBL > xBL )
 	xBL = new_xBL;
       else {
