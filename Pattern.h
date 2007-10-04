@@ -67,7 +67,6 @@ namespace TreeSearch {
     UShort_t*  GetBits()            { return fBits; }
     UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
     UInt_t     GetNbits()    const  { return fNbits; }
-    Int_t      Hash()        const  { return GetWidth(); }
     void       Print( bool print_links = true, std::ostream& os = std::cout,
 		      bool end_line = true ) const;
 

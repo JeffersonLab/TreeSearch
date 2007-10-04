@@ -339,27 +339,6 @@ Int_t PrintPattern::operator() ( const NodeDescriptor& nd )
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-// Linked-list node for the hash table of base patterns
-
-class HashNode {
-  friend class PatternGenerator;
-private:
-  Pattern*   fPattern;    // Bit pattern treenode
-  HashNode*  fNext;       // Next linked list element
-  UInt_t     fMinDepth;   // Minimum valid depth for this pattern (<=16)
-
-public:
-  HashNode( Pattern* pat, HashNode* next )
-    : fPattern(pat), fNext(next), fMinDepth(-1) {}
-  Pattern*   GetPattern() const { return fPattern; }
-  HashNode*  Next()       const { return fNext; }
-  
-  void       UsedAtDepth( UInt_t depth ) {
-    if( depth < fMinDepth ) fMinDepth = depth;
-  }
-}; // end class HashNode
-
-//_____________________________________________________________________________
 PatternGenerator::PatternGenerator()
   : fNlevels(0), fNplanes(0), fMaxSlope(0)
 {
@@ -382,17 +361,9 @@ void PatternGenerator::DeleteTree()
   // Delete the build tree along with its hash table.
   // Internal utility function.
 
-  for( vector<HashNode*>::iterator it = fHashTable.begin();
+  for( vector<HashNode>::iterator it = fHashTable.begin();
        it != fHashTable.end(); ++it ) {
-    HashNode* hashnode = *it;
-    while( hashnode ) {
-      HashNode* cur_node = hashnode;
-      hashnode = hashnode->Next();
-      assert( cur_node->GetPattern() );
-      delete cur_node->GetPattern();
-      delete cur_node;
-      break;
-    }
+    delete (*it).GetPattern();
   }
   fHashTable.clear();
 }
@@ -406,17 +377,14 @@ void PatternGenerator::CalcStatistics()
 
   memset( &fStats, 0, sizeof(Statistics_t) );
 
-  for( vector<HashNode*>::const_iterator it = fHashTable.begin();
+  for( vector<HashNode>::const_iterator it = fHashTable.begin();
        it != fHashTable.end(); ++it ) {
     // Each hashnode points to a unique pattern by construction of the table
-    HashNode* hashnode = *it;
-    UInt_t hash_length = 0;
-    while( hashnode ) {
+    Pattern* pat = (*it).GetPattern();
+    if( pat ) {
       // Count patterns
       fStats.nPatterns++;
       // Count child nodes and length of child list
-      Pattern* pat = hashnode->GetPattern();
-      assert(pat);
       Link* ln = pat->fChild;
       UInt_t list_length = 0;
       while( ln ) {
@@ -426,23 +394,14 @@ void PatternGenerator::CalcStatistics()
       }
       if( list_length > fStats.MaxChildListLength )
 	fStats.MaxChildListLength = list_length;
-      // Count collision list depth
-      hash_length++;
-
-      hashnode = hashnode->Next();
-    } // while hashnode
-
-    if( hash_length > fStats.MaxHashDepth )
-      fStats.MaxHashDepth = hash_length;
-
+    } // if pattern
   } // hashtable elements
 
   fStats.nBytes = 
     fStats.nPatterns * sizeof(Pattern)
     + fStats.nPatterns * fNplanes * sizeof(UShort_t)
     + fStats.nLinks * sizeof(Link);
-  fStats.nHashBytes = fHashTable.size() * sizeof(HashNode*)
-    + fStats.nPatterns * sizeof(Link);
+  fStats.nHashBytes = fHashTable.size() * sizeof(HashNode);
 }
 
 //_____________________________________________________________________________
@@ -452,19 +411,16 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
 
   // Dump all stored patterns, using Pattern::print()
   if( *opt == 'D' ) {
-    for( vector<HashNode*>::const_iterator it = fHashTable.begin();
+    for( vector<HashNode>::const_iterator it = fHashTable.begin();
 	 it != fHashTable.end(); ++it ) {
-      HashNode* hashnode = *it;
-      while( hashnode ) {
-	Pattern* pat = hashnode->GetPattern();
+      Pattern* pat = (*it).GetPattern();
+      if( pat )
 	pat->Print( true, os );
-	hashnode = hashnode->Next();
-      }
     }
     return;
   }
 
-  Link root_link( fHashTable[0]->GetPattern(), 0, 0 );
+  Link root_link( fHashTable[0].GetPattern(), 0, 0 );
   // Print ASCII pictures of ALL actual patterns in the tree
   if( *opt == 'P' ) {
     PrintPattern print(os);
@@ -503,11 +459,10 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
      << ", bytes = " << fStats.nBytes
      << endl;
   os << "maxlinklen = " << fStats.MaxChildListLength
-     << ", maxhash = " << fStats.MaxHashDepth
+     << ", hashsize = " << fHashTable.size()
      << ", hashbytes = " << fStats.nHashBytes
      << endl;
   os << "time = " << fStats.BuildTime << " s" << endl;
- 
 }
 
 //_____________________________________________________________________________
@@ -523,28 +478,8 @@ Int_t PatternGenerator::Write( const char* filename )
   else if( fStats.nPatterns < (1U<<16) )
     index_size = 2;
   WritePattern write(filename,index_size);
-  Link root_link( fHashTable[0]->GetPattern(), 0, 0 );
+  Link root_link( fHashTable[0].GetPattern(), 0, 0 );
   return fTreeWalk( &root_link, write );
-}
-
-//_____________________________________________________________________________
-HashNode* PatternGenerator::AddHash( Pattern* pat )
-{
-  // Add given pattern to the hash table
-
-  assert(pat);
-  UInt_t hashsize = fHashTable.size();
-  if( hashsize == 0 ) {
-    // Set the size of the hash table.
-    // 2^(nlevels-1)*2^(nplanes-2) is the upper limit for the number of
-    // patterns, so a size of 2^(nlevels-1) will give 2^(nplanes-2) collisions
-    // per entry (i.e. 2, 4, 8), with which we can live. Anything better would
-    // require a cleverer hash function.
-    fHashTable.resize( 1<<(fNlevels-1), 0 );
-    hashsize = fHashTable.size();
-  }
-  Int_t hash = pat->Hash()%hashsize;
-  return fHashTable[hash] = new HashNode( pat, fHashTable[hash] );
 }
 
 //_____________________________________________________________________________
@@ -630,6 +565,66 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth,
   }
 
   return Generate( param );
+}
+
+//_____________________________________________________________________________
+UInt_t PatternGenerator::Hash( const Pattern& pat ) const
+{
+  // Calculate unique a hash value for the given pattern. The maximum value is
+  // 2^(fNlevels-1 + fNplanes-2) - 1. With the hash computed here, collisions 
+  // never occur for patterns that pass LineCheck(). 
+
+  UInt_t hash = pat[fNplanes-1] * (1U << fNplanes-2);
+  const Double_t x = pat[fNplanes-1];
+  const Double_t z = fZ[fNplanes-1];
+
+  // In each intermediary plane, patterns can have at most two valid bit
+  // positions, yielding a unique signature for each valid pattern
+  // (assuming equal bin width for all planes).
+  for( Int_t i = fNplanes-2; i > 0; --i ) {
+    Double_t d = pat[i]*z - x*fZ[i];
+    if( d > 0 )
+      hash += (1U << (i-1));
+    // The case d==0, where a bin's edge falls _exactly_ on the boundary of
+    // the allowed region is ambiguous and may be affected by floating point
+    // rounding behavior. The test here appears compatible with the 
+    // LineCheck() algorithm on all platforms tested - yet, I am a little 
+    // uneasy about it.
+  }
+  return hash;
+}
+
+//_____________________________________________________________________________
+PatternGenerator::HashNode* PatternGenerator::AddHash( Pattern* pat )
+{
+  // Add given pattern to the hash table
+
+  // This implements a perfect hash table (no collisions), the fastest way to
+  // do the pattern lookup during build. 
+  assert(pat);
+  if( fHashTable.empty() )
+    fHashTable.resize( (1U << (fNlevels-1)) * (1U << (fNplanes-2)) );
+
+  HashNode& h = fHashTable[ Hash(*pat) ];
+  assert(h.fPattern == 0); // Overwriting exisiting entries should never happen
+  h.fPattern = pat;
+
+  return &h;
+}
+
+//_____________________________________________________________________________
+PatternGenerator::HashNode* PatternGenerator::Find( const Pattern& pat )
+{
+  // Search for the given pattern in the current database
+
+  HashNode& h = fHashTable[ Hash(pat) ];
+  if( h.fPattern ) {
+    if( pat == *h.fPattern )
+      return &h;
+    // A hash collision for valid patterns should never happen
+    assert( LineCheck(pat) == false );
+  }
+  return 0;
 }
 
 //_____________________________________________________________________________
@@ -739,24 +734,6 @@ bool PatternGenerator::LineCheck( const Pattern& pat )
   } // planes
 
   return true;
-}
-
-//_____________________________________________________________________________
-HashNode* PatternGenerator::Find( const Pattern& pat )
-{
-  // Search for the given pattern in the current database
-
-  UInt_t hashsize = fHashTable.size();
-  assert(hashsize);
-  Int_t hash = pat.Hash()%hashsize;
-  HashNode* hashNode = fHashTable[hash];
-  while( hashNode ) {
-    Pattern* rhs = hashNode->GetPattern();
-    if( pat == *rhs )
-      return hashNode;
-    hashNode = hashNode->Next();
-  }
-  return 0;
 }
 
 //_____________________________________________________________________________
