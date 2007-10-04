@@ -11,7 +11,8 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version
 export DEBUG = 1
-export TESTCODE = 1
+#export TESTCODE = 1
+export I387MATH = 1
 
 # Architecture to compile for
 ARCH          = linux
@@ -80,8 +81,10 @@ DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
 LD            = g++
 SOFLAGS       = -shared
-ifdef COMPAT
+ifdef I387MATH
 CXXFLAGS     += -mfpmath=387
+else
+CXXFLAGS     += -march=pentium4 -mfpmath=sse
 endif
 endif
 
