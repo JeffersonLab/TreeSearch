@@ -19,8 +19,6 @@ using std::vector;
 
 namespace TreeSearch {
 
-  class HashNode;
-
   class PatternGenerator {
     friend class NodeVisitor;
   public:
@@ -31,16 +29,18 @@ namespace TreeSearch {
     PatternTree* Generate( UInt_t maxdepth, Double_t detector_width, 
 			   const char* zpos, Double_t maxslope );
 
-    void  Print( Option_t* opt="", std::ostream& os = std::cout ) const;
-    Int_t Write( const char* filename );
-
-  private:
-
     struct Statistics_t {
       UInt_t nPatterns, nLinks, nBytes, MaxChildListLength, nHashBytes;
       ULong64_t nAllPatterns;
       Double_t  BuildTime;
     };
+
+    Pattern* GetRoot() const { return fHashTable[0].fPattern; }
+    const Statistics_t& GetStatistics() const { return fStats; }
+    void  Print( Option_t* opt="", std::ostream& os = std::cout ) const;
+    Int_t Write( const char* filename );
+
+  private:
 
     class HashNode {
       friend class PatternGenerator;
@@ -66,12 +66,13 @@ namespace TreeSearch {
 
     HashNode* AddHash( Pattern* pat );
     void      CalcStatistics();
+    void      ClearStatistics();
     void      DeleteTree();
     HashNode* Find( const Pattern& pat );
     UInt_t    Hash( const Pattern& pat ) const;
-    bool      LineCheck( const Pattern& pat );
+    bool      LineCheck( const Pattern& pat ) const;
     void      MakeChildNodes( HashNode* parent, UInt_t depth );
-    bool      TestSlope( const Pattern& pat, UInt_t depth );
+    bool      TestSlope( const Pattern& pat, UInt_t depth ) const;
 
     ClassDef(PatternGenerator,0)   // Generator for pattern template database
 

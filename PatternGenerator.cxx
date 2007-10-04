@@ -185,7 +185,7 @@ Int_t CopyPattern::operator() ( const NodeDescriptor& nd )
     map<Pattern*,Int_t>::size_type n = fMap.size();
     fMap[node] = n;
     // FIXME: TEST TEST
-    print(-1);
+    print(128+nd.link->Type());
     if( fTree->AddPattern(nd.link) )
       return -1;
     Int_t nchild = 0;
@@ -366,6 +366,7 @@ void PatternGenerator::DeleteTree()
     delete (*it).GetPattern();
   }
   fHashTable.clear();
+  ClearStatistics();
 }
 
 //_____________________________________________________________________________
@@ -375,7 +376,7 @@ void PatternGenerator::CalcStatistics()
   // because some things (averages, memory requirements) can only be 
   // calculated once the tree is complete.
 
-  memset( &fStats, 0, sizeof(Statistics_t) );
+  ClearStatistics();
 
   for( vector<HashNode>::const_iterator it = fHashTable.begin();
        it != fHashTable.end(); ++it ) {
@@ -402,6 +403,12 @@ void PatternGenerator::CalcStatistics()
     + fStats.nPatterns * fNplanes * sizeof(UShort_t)
     + fStats.nLinks * sizeof(Link);
   fStats.nHashBytes = fHashTable.size() * sizeof(HashNode);
+}
+
+//_____________________________________________________________________________
+void PatternGenerator::ClearStatistics()
+{
+  memset( &fStats, 0, sizeof(Statistics_t) );
 }
 
 //_____________________________________________________________________________
@@ -628,7 +635,8 @@ PatternGenerator::HashNode* PatternGenerator::Find( const Pattern& pat )
 }
 
 //_____________________________________________________________________________
-bool PatternGenerator::TestSlope( const Pattern& pat, UInt_t depth )
+inline
+bool PatternGenerator::TestSlope( const Pattern& pat, UInt_t depth ) const
 {
   UInt_t width = pat.GetWidth();
   return ( width < 2 ||
@@ -636,7 +644,7 @@ bool PatternGenerator::TestSlope( const Pattern& pat, UInt_t depth )
 }
 
 //_____________________________________________________________________________
-bool PatternGenerator::LineCheck( const Pattern& pat )
+bool PatternGenerator::LineCheck( const Pattern& pat ) const
 {
   // Check if the gievn bit pattern is consistent with a straight line.
   // The intersection plane positions are given by fZ[]. Assumes fZ[0]=0.
