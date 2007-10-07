@@ -224,12 +224,12 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   if( err )
     return kInitError;
 
-  ++fNlevels; // The number of levels is maxdepth+1
-  if( fNlevels > 16 ) {
+  if( fNlevels >= 16 ) {
     Error( Here(here), "Illegal search_depth = %u. Must be < 16. "
 	   "Fix database.", fNlevels );
     return kInitError;
   }
+  ++fNlevels; // The number of levels is maxdepth+1
 
   // If angle read, set it, otherwise keep default from call to constructor
   if( angle < kBig )
