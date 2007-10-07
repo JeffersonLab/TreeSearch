@@ -23,12 +23,14 @@ namespace TreeSearch {
   // and mirroring) 
   struct NodeDescriptor {
     Link*    link;     // Linked-list node pointing to a base pattern
+    Pattern* parent;   // Parent node
     UShort_t shift;    // Shift of the base pattern to its actual position
     UChar_t  depth;    // Current recursion depth
     Bool_t   mirrored; // Pattern is mirrored
 
-    NodeDescriptor( Link* ln, UShort_t shft, Bool_t mir, UChar_t dep )
-      : link(ln), shift(shft), depth(dep), mirrored(mir) {}
+    NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
+		    UChar_t dep )
+      : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir) {}
   };    
 
   // "Operation" must be a function object whose operator() takes a
@@ -42,27 +44,24 @@ namespace TreeSearch {
     void SetNlevels( UInt_t n ) { fNlevels = n; }
     
     template<typename Operation>
-    Int_t operator() ( Link* link, Operation& op, UInt_t depth = 0,
-		       UInt_t shift = 0, Bool_t mirrored = false ) const;
-
+    Int_t operator() ( Link* link, Operation& op, Pattern* parent = 0,
+		       UInt_t depth = 0, UInt_t shift = 0,
+		       Bool_t mirrored = false ) const;
     ClassDef(TreeWalk, 0)  // Generic traversal function for a PatternTree
   };
 
   //___________________________________________________________________________
-  // Base class for "Visitor" classes to the tree nodes. Left empty instead of 
-  // using a pure virtual operator() because the template iterator TreeWalk 
-  // performs better than a non-template version using inheritance from 
-  // NodeVisitor. Inheriting from this base class is still useful for visitors
-  // to gain access to certain classes (like PatternGenerator) as friends.
-  class NodeVisitor {
-    // virtual Int_t operator() ( const NodeDescriptor& nd ) = 0;
-  };
+  // Base class for "Visitor" classes to the tree nodes.
+//   class NodeVisitor {
+//     virtual Int_t operator() ( const NodeDescriptor& nd ) = 0;
+//   };
 
   //___________________________________________________________________________
   template<typename Operation>
   inline
-  Int_t TreeWalk::operator()( Link* link, Operation& action, UInt_t depth,
-			      UInt_t shift, Bool_t mirrored ) const
+  Int_t TreeWalk::operator()( Link* link, Operation& action, Pattern* parent,
+			      UInt_t depth, UInt_t shift, 
+			      Bool_t mirrored ) const
   {
     // Traverse the tree and call function object "action" for each link. 
     // The return value from action determines the behavior:
@@ -73,15 +72,16 @@ namespace TreeSearch {
     if( depth >= fNlevels )
       return 0;
 
-    Int_t ret = action( NodeDescriptor(link, shift, mirrored, depth) );
+    Int_t ret = action( NodeDescriptor(link, parent, shift, mirrored, depth) );
     if( ret == 0 ) {
-      Link* ln = link->GetPattern()->GetChild();
+      Pattern* pat = link->GetPattern();
+      Link* ln = pat->GetChild();
       while( ln ) {
 	// Set up parameters of child pattern based on current position in the
 	// tree. The mirroring flag for the child pattern is the pattern's
 	// mirroring flag xor the mirror state of the parent (so that 
 	// mirrored+mirrored = unmirrored)
-	ret = (*this)( ln, action, depth+1, (shift << 1) + ln->Shift(),
+	ret = (*this)( ln, action, pat, depth+1, (shift << 1) + ln->Shift(),
 		       mirrored xor ln->Mirrored() );
 	if( ret ) return ret;
 	// Continue along the linked list of child nodes
