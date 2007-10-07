@@ -11,6 +11,7 @@
 #include "TreeWalk.h"
 #include <vector>
 #include <map>
+#include <iostream>
 #include <cassert>
 
 using std::vector;
@@ -34,19 +35,21 @@ namespace TreeSearch {
 		 UInt_t nPatterns = 0, UInt_t nLinks = 0 );
     virtual ~PatternTree();
  
+    void   Print( Option_t* opt="", std::ostream& os = std::cout );
     Int_t  Read( const char* filename );
+    Int_t  Write( const char* filename );
 
-    Bool_t              IsOK()          const { return fParamOK; }
-    const  TreeParam_t& GetParameters() const { return fParameters; }
-    const  Link*        GetRoot()       const 
-    { return fLinks.empty() ? 0 : &fLinks.front(); }
+    Bool_t IsOK()       const { return fParamOK; }
+    UInt_t GetNlevels() const { return fParameters.zpos.size(); }
+    const TreeParam_t& GetParameters() const { return fParameters; }
+    Link*  GetRoot() { return fLinks.empty() ? 0 : &fLinks.front(); }
 
     // Function object for copying an arbitrary tree into the PatternTree
     // array structure. Used with TreeWalk interator.
     class CopyPattern {
     public:
       CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
-      Int_t operator() ( const NodeDescriptor& nd );
+      TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
     private:
       PatternTree* fTree;    // Tree object to fill
       std::map<Pattern*,Int_t> fMap;   // Index map for serializing 

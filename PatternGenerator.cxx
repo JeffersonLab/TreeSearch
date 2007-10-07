@@ -5,21 +5,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "PatternGenerator.h"
-//#include "TreeFile.h"
+#include "NodeVisitor.h"
 #include "TMath.h"
 #include "TString.h"
 #include "TError.h"
 #include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <map>
+#include <stdexcept>
 #include <ctime>
 #if ROOT_VERSION_CODE < ROOT_VERSION(5,8,0)
 #include <cstdlib>   // for atof()
 #endif
-
-//TODO: Interface to PatternTree
-//TODO: Read() tree from binary file
 
 using namespace std;
 
@@ -54,53 +49,6 @@ public:
     ++(*this);
   }
 };
-
-// "Visitor" objects for tree traversal operations. The object's operator()
-// is applied to each tree node. These should be used with the TreeWalk
-// iterator (see TreeWalk.h)
-
-// Write pattern to binary file
-class WritePattern {
-public:
-  WritePattern( const char* filename, size_t index_size = sizeof(Int_t) );
-  ~WritePattern() { delete os; }
-  Int_t operator() ( const NodeDescriptor& nd );
-
-private:
-  ofstream* os;        // Output file stream
-  size_t    fIdxSiz;   // Required size for pattern count (1, 2, or 4)
-  map<Pattern*,Int_t> fMap; // Index map for serializing 
-
-  // Because of the pointer member, disallow copying and assignment
-  WritePattern( const WritePattern& orig );
-  WritePattern& operator=( const WritePattern& rhs );
-};
-
-// Count unique patterns (including shifts)
-class CountPattern {
-public:
-  CountPattern() : fCount(0) {}
-  Int_t operator() ( const NodeDescriptor& nd ) { fCount++; return 0; }
-  ULong64_t GetCount() const { return fCount; }
-
-private:
-  ULong64_t    fCount;    // Pattern count
-};
-
-// Pretty print to output stream (and count) all actual patterns
-class PrintPattern {
-public:
-  PrintPattern( ostream& ostr = cout, bool dump = false ) 
-    : os(ostr), fCount(0), fDump(dump) {}
-  Int_t operator() ( const NodeDescriptor& nd );
-  ULong64_t GetCount() const { return fCount; }
-
-private:
-  ostream&     os;        // Destinaton stream
-  ULong64_t    fCount;    // Pattern count
-  Bool_t       fDump;     // Dump mode (one line per pattern)
-};
-
 
 //_____________________________________________________________________________
 inline
@@ -155,130 +103,6 @@ ChildIter& ChildIter::operator++()
   } else
     fCount = -1;
   return *this;
-}
-
-//_____________________________________________________________________________
-WritePattern::WritePattern( const char* filename, size_t index_size )
-  : os(0), fIdxSiz(index_size)
-{
-  static const char* here = "PatternGenerator::WritePattern";
-
-  if( filename && *filename ) {
-    os = new ofstream(filename, ios::out|ios::binary|ios::trunc);
-    if( !os || !(*os) ) {
-      ::Error( here, "Error opening treefile %s", filename );
-      if( os )
-	delete os;
-      os = 0;
-    }
-  } else {
-    ::Error( here, "Invalid file name" );
-  }
-  if( (fIdxSiz & (fIdxSiz-1)) != 0 ) {
-    ::Warning( here, "Invalid index_size = %d. Must be a power of 2", fIdxSiz);
-    fIdxSiz = sizeof(Int_t);
-  }    
-}
-
-//_____________________________________________________________________________
-template< typename T>
-inline
-void swapped_binary_write( ostream& os, const T& data, size_t n = 1, 
-			   size_t start = 0 )
-{
-  // Write "n" elements of "data" to "os" in binary big-endian (MSB) format.
-  // "start" indicates an optional _byte_ skip count from the beginning of
-  // the big-endian format data - designed to write only the non-trivial
-  // part of scalar data for which the upper bytes are known to be always zero.
-  size_t size = sizeof(T);
-  const char* bytes = reinterpret_cast<const char*>( &data );
-#ifdef R__BYTESWAP
-  size_t k = size-1;
-  for( size_t i = start; i < n * size; ++i )
-    os.put( bytes[(i&~k)+(k-i&k)] );
-#else
-  os.write( bytes+start, n*size-start );
-#endif
-}
-
-//_____________________________________________________________________________
-inline
-Int_t WritePattern::operator() ( const NodeDescriptor& nd )
-{
-  // Write the single pattern referenced by "nd" to the binary output stream.
-  // In essence, this implements the serialization method for cyclical graphs
-  // described in
-  // http://www.parashift.com/c++-faq-lite/serialization.html#faq-36.11
-
-  if( !os )
-    return -1;
-  Pattern* node = nd.link->GetPattern();
-  map<Pattern*,Int_t>::iterator idx = fMap.find(node);
-  if( idx == fMap.end() ) {
-    map<Pattern*,Int_t>::size_type n = fMap.size();
-    fMap[node] = n;
-    // Header for new pattern: link type + 128 (=128-130)
-    os->put( nd.link->Type() | 0x80 );
-    if( os->fail() ) return -1;
-    // Pattern data. NB: fBits[0] is always 0, so we can skip it
-    swapped_binary_write( *os, node->GetBits()[1], node->GetNbits()-1 );
-    // Child node count
-    UShort_t nchild = node->GetNchildren();
-    swapped_binary_write( *os, nchild );
-    if( os->fail() ) return -1;
-    // Write child nodes
-    return 0;
-  } else {
-    // Reference pattern header: the plain link type (=0-2)
-    os->put( nd.link->Type() );
-    // Reference index
-    swapped_binary_write( *os, idx->second, 1, sizeof(Int_t)-fIdxSiz );
-    if( os->fail() ) return -1;
-    // Don't write child nodes
-    return 1;
-  }
-}
-
-//_____________________________________________________________________________
-inline
-Int_t PrintPattern::operator() ( const NodeDescriptor& nd )
-{
-  // Print actual (shifted & mirrored) pattern described by "nd".
-
-  ++fCount;
-  if( fDump )
-    os << setw(2) << nd.depth;
-
-  Pattern* node = nd.link->GetPattern();
-  for( UInt_t i = 0; i < node->GetNbits(); i++ ) {
-    UInt_t v = node->GetBits()[i];
-    if( nd.mirrored )  // Mirrored pattern
-      v = node->GetWidth() - v;
-    v += nd.shift;
-
-    // In dump mode, write out one pattern n-tuple per line
-    if( fDump )
-      os << " " << setw(5) << v;
-
-    // Otherwise draw a pretty ASCII picture of the pattern
-    else {
-      UInt_t op = (nd.mirrored ? 2 : 0) + nd.link->Shift();
-      os << static_cast<UInt_t>(nd.depth) << "-" << op;
-      for( UInt_t k = 0; k < nd.depth; ++k )
-	os << " ";
-      os << " |";
-      for( UInt_t k = 0; k < v; ++k )
-	os << ".";
-      os << "O";
-      for( UInt_t k = (1<<nd.depth)-1; k > v; --k )
-	os << ".";
-      os << "|" << endl;
-    }
-  }
-  os << endl;
-
-  // Process child nodes
-  return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -379,29 +203,6 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
     return;
   }
 
-  Link root_link( fHashTable[0].GetPattern(), 0, 0 );
-  // Print ASCII pictures of ALL actual patterns in the tree
-  if( *opt == 'P' ) {
-    PrintPattern print(os);
-    fTreeWalk( &root_link, print );
-    return;
-  }
-
-  // Dump n-tuples of all actual patterns, one per line
-  if( *opt == 'L' ) {
-    PrintPattern print(os,true);
-    fTreeWalk( &root_link, print );
-    return;
-  }
-
-  // Count all actual patterns
-  if( *opt == 'C' ) {
-    CountPattern count;
-    fTreeWalk( &root_link, count );
-    os << "Total pattern count = " << count.GetCount() << endl;
-    return;
-  }
-
   // Basic info
   os << "tree: nlevels = " << fNlevels
      << ", nplanes = " << fNplanes
@@ -425,27 +226,12 @@ void PatternGenerator::Print( Option_t* opt, ostream& os ) const
 }
 
 //_____________________________________________________________________________
-Int_t PatternGenerator::Write( const char* filename )
-{
-  // Write tree to binary file
-
-  // TODO: write header
-
-  size_t index_size = sizeof(Int_t);
-  if( fStats.nPatterns < (1U<<8) )
-    index_size = 1;
-  else if( fStats.nPatterns < (1U<<16) )
-    index_size = 2;
-  WritePattern write(filename,index_size);
-  Link root_link( fHashTable[0].GetPattern(), 0, 0 );
-  return fTreeWalk( &root_link, write );
-}
-
-//_____________________________________________________________________________
 PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
 {
   // Generate a new pattern tree for the given parameters. Returns a pointer
   // to the generated tree, or zero if error
+
+  static const char* const here = "PatternGenerator::Generate";
 
   // Set parameters for the new build.
   if( parameters.Normalize() != 0 )
@@ -457,8 +243,6 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   fZ        = parameters.zpos;
   fNplanes  = fZ.size();
   fMaxSlope = parameters.maxslope;
-
-  fTreeWalk.SetNlevels( fNlevels );
 
   // Benchmark the build
   clock_t cpu_ticks = clock();
@@ -480,14 +264,33 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   Print();
 
   // Create a PatternTree object from the build tree
-  PatternTree* tree = new PatternTree( parameters,
-				       fStats.nPatterns,
-				       fStats.nLinks );
+  PatternTree* tree = 0;
+  try {
+    tree = new PatternTree( parameters, fStats.nPatterns, fStats.nLinks );
+  }
+  catch( bad_alloc ) {
+    delete tree;
+    tree = 0;
+  }
   if( tree ) {
     // Copy all base patterns of the build tree to the PatternTree
     Link root_link(root,0,0);
+    TreeWalk walk(fNlevels);
     PatternTree::CopyPattern copy(tree);
-    fTreeWalk( &root_link, copy );
+    cout << "Filling tree..." << flush;
+    TreeWalk::ETreeOp ret = walk( &root_link, copy );
+    cout << "done" << endl;
+    if( ret == kError ) {
+      ::Error( here, "Unable to create PatternTree structure" );
+      delete tree;
+      return 0;
+    }
+    //FIXME: TEST
+    // print the copied tree to test file
+//     ofstream outf( "pt.txt", ios::out|ios::trunc );
+//     PrintPattern print(outf);
+//     fTreeWalk( tree->GetRoot(), print );
+//     cout << "Pattern count = " << print.GetCount() << endl;
   }
 
   return tree;

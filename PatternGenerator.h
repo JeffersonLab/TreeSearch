@@ -9,10 +9,7 @@
 
 #include "Pattern.h"
 #include "PatternTree.h"
-#include "TreeWalk.h"
 #include <vector>
-#include <iostream>
-#include <fstream>
 #include <cassert>
 
 using std::vector;
@@ -38,8 +35,8 @@ namespace TreeSearch {
 
     Pattern* GetRoot() const { return fHashTable[0].fPattern; }
     const Statistics_t& GetStatistics() const { return fStats; }
+
     void  Print( Option_t* opt="", std::ostream& os = std::cout ) const;
-    Int_t Write( const char* filename );
 
   private:
 
@@ -63,7 +60,6 @@ namespace TreeSearch {
 
     vector<HashNode> fHashTable; // Hashtab for indexing patterns during build
     Statistics_t   fStats;       // Tree statistics
-    TreeWalk       fTreeWalk;    // Iterator over the pattern tree
 
     HashNode* AddHash( Pattern* pat );
     void      CalcStatistics();

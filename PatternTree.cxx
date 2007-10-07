@@ -6,6 +6,8 @@
 
 #include "PatternTree.h"
 #include "Pattern.h"
+#include "NodeVisitor.h"
+//#include "TreeFile.h"
 #include "TError.h"
 #include <iostream>
 #include <stdexcept>
@@ -36,7 +38,8 @@ try
 }
 catch ( bad_alloc ) {
   ::Error( "PatternTree::PatternTree", "Out of memory trying to create "
-	   "%u patterns, %u links", nPatterns, nLinks );
+	   "%u patterns, %u links. Tree not created.", nPatterns, nLinks );
+  throw;
 }
 
 //_____________________________________________________________________________
@@ -118,6 +121,71 @@ Int_t TreeParam_t::Normalize()
 }
 
 //_____________________________________________________________________________
+void PatternTree::Print( Option_t* opt, ostream& os )
+{
+  // Print information about the tree, depending on option
+
+  TreeWalk walk( GetNlevels() );
+  // Print ASCII pictures of ALL actual patterns in the tree ("P") or
+  // dump n-tuples of all actual patterns, one per line ("L")
+  if( *opt == 'P' or *opt == 'L' ) {
+    PrintPattern print(os, (*opt == 'L'));
+    walk( GetRoot(), print );
+    return;
+  }
+
+  // Count all actual patterns
+  if( *opt == 'C' ) {
+    CountPattern count;
+    walk( GetRoot(), count );
+    os << "Total pattern count = " << count.GetCount() << endl;
+    return;
+  }
+
+  // Basic info
+//   os << "tree: nlevels = " << fNlevels
+//      << ", nplanes = " << fNplanes
+//      << ", zpos = ";
+//   for( UInt_t i=0; i<fZ.size(); i++ ) {
+//     os << fZ[i];
+//     if( i+1 != fZ.size() )
+//       os << ",";
+//   }
+//   os << endl;
+
+//   os << "patterns = " << fStats.nPatterns
+//      << ", links = "   << fStats.nLinks
+//      << ", bytes = " << fStats.nBytes
+//      << endl;
+//   os << "maxlinklen = " << fStats.MaxChildListLength
+//      << ", hashsize = " << fHashTable.size()
+//      << ", hashbytes = " << fStats.nHashBytes
+//      << endl;
+//   os << "time = " << fStats.BuildTime << " s" << endl;
+}
+
+//_____________________________________________________________________________
+Int_t PatternTree::Write( const char* filename )
+{
+  // Write tree to binary file
+
+  // TODO: write header
+
+  size_t index_size = sizeof(Int_t);
+  vpsz_t npatt = fPatterns.size();
+  if( npatt < (1U<<8) )
+    index_size = 1;
+  else if( npatt < (1U<<16) )
+    index_size = 2;
+  WritePattern write(filename,index_size);
+  TreeWalk walk( GetNlevels() );
+  Int_t ret = walk( GetRoot(), write );
+  if( ret != TreeWalk::kError )
+    ret = 0;
+  return ret;
+}
+
+//_____________________________________________________________________________
 void PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child, 
 					 Int_t type )
 {
@@ -137,18 +205,20 @@ void PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child,
 }
 
 //_____________________________________________________________________________
-Int_t PatternTree::CopyPattern::operator() ( const NodeDescriptor& nd )
+TreeWalk::ETreeOp
+PatternTree::CopyPattern::operator() ( const NodeDescriptor& nd )
 try {
   // Add pattern to the PatternTree fTree
 
+  map<Pattern*,Int_t>::iterator idx;
   Pattern* copied_parent = 0;
   if( nd.parent ) {
-    map<Pattern*,Int_t>::iterator ip = fMap.find(nd.parent);
-    assert( ip != fMap.end() );
-    copied_parent = &(fTree->fPatterns.at( ip->second ));
+    idx = fMap.find(nd.parent);
+    assert( idx != fMap.end() );
+    copied_parent = &(fTree->fPatterns.at( idx->second ));
   }
   Pattern* node = nd.link->GetPattern();
-  map<Pattern*,Int_t>::iterator idx = fMap.find(node);
+  idx = fMap.find(node);
   if( idx == fMap.end() ) {
     // New pattern: add pattern to pattern and bits arrays, and add its 
     // child links to links array
@@ -163,7 +233,7 @@ try {
     // elements in contiguous memory, so this is safe:
     UShort_t* bitloc = &(fTree->fBits.at(fTree->fNbit));
     // Tell the pattern to store its bits at address bitloc. This copies the
-    // bits into the fBits vector.
+    // bits into the fTree->fBits vector.
     cur_pat->SetBitloc( bitloc );
     // Link this pattern to its parent
     if( copied_parent ) {
@@ -175,9 +245,9 @@ try {
     }
     // Create the child node links, but with empty pattern pointers
     Int_t nchild = node->GetNchildren();
-    PatternTree::vlsz_t lpos = fTree->fNlnk;
     // Set the child pointer of the copied pattern to the first child node
     if( nchild > 0 ) {
+      PatternTree::vlsz_t lpos = fTree->fNlnk;
       cur_pat->fChild = &(fTree->fLinks.at(lpos));
       cur_pat->fDelChld = false;
       // Link the child node list (not really needed, but we don't want the
@@ -190,7 +260,7 @@ try {
     fTree->fNlnk += nchild;
     fTree->fNbit += cur_pat->GetNbits();
     // Proceed with this pattern's child nodes
-    return 0;
+    return TreeWalk::kRecurseUncond;
   } 
   else {
     // Existing pattern: add link to the parent pattern's child node list,
@@ -198,14 +268,14 @@ try {
     Pattern* ref_node = &(fTree->fPatterns.at( idx->second ));
     AddChild( copied_parent, ref_node, nd.link->Type() );
     // Skip this pattern's child nodes since they are already in the tree
-    return 1;
+    return TreeWalk::kSkipChildNodes;
   }
 }
 catch ( out_of_range ) {
   ::Error( "TreeSearch::CopyPattern", "Array index out of range at %u %u %u "
 	   "(internal logic error). Tree not copied. Call expert.",
 	   fTree->fNpat, fTree->fNlnk, fTree->fNbit );
-  return -1;
+  return TreeWalk::kError;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

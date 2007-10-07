@@ -2,7 +2,7 @@
 
 SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx Hitpattern.cxx \
 	Projection.cxx Pattern.cxx PatternTree.cxx PatternGenerator.cxx \
-	TreeWalk.cxx
+	TreeWalk.cxx NodeVisitor.cxx
 
 PACKAGE = TreeSearch
 

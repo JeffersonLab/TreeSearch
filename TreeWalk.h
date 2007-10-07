@@ -43,37 +43,32 @@ namespace TreeSearch {
     virtual ~TreeWalk() {}
     void SetNlevels( UInt_t n ) { fNlevels = n; }
     
+    // Supported return codes from Operation function object
+    enum ETreeOp { kError, kRecurse, kRecurseUncond, kSkipChildNodes };
+
     template<typename Operation>
-    Int_t operator() ( Link* link, Operation& op, Pattern* parent = 0,
-		       UInt_t depth = 0, UInt_t shift = 0,
-		       Bool_t mirrored = false ) const;
+    ETreeOp operator() ( Link* link, Operation& op, Pattern* parent = 0,
+			 UInt_t depth = 0, UInt_t shift = 0,
+			 Bool_t mirrored = false ) const;
     ClassDef(TreeWalk, 0)  // Generic traversal function for a PatternTree
   };
 
   //___________________________________________________________________________
-  // Base class for "Visitor" classes to the tree nodes.
-//   class NodeVisitor {
-//     virtual Int_t operator() ( const NodeDescriptor& nd ) = 0;
-//   };
-
-  //___________________________________________________________________________
   template<typename Operation>
-  inline
-  Int_t TreeWalk::operator()( Link* link, Operation& action, Pattern* parent,
-			      UInt_t depth, UInt_t shift, 
-			      Bool_t mirrored ) const
+  inline TreeWalk::ETreeOp
+  TreeWalk::operator()( Link* link, Operation& action, Pattern* parent, 
+			UInt_t depth, UInt_t shift, Bool_t mirrored ) const
   {
     // Traverse the tree and call function object "action" for each link. 
     // The return value from action determines the behavior:
-    //  <0: error, return immediately
-    //   0: process child nodes recursively
-    //  >0: ignore child nodes
+    //  kError: error, return immediately
+    //  kRecurseToMaxdepth: process child nodes until reaching maxdepth
+    //  kRecurse: process child nodes (regardless of depth)
+    //  fSkipChildNodes: ignore child nodes
 
-    if( depth >= fNlevels )
-      return 0;
-
-    Int_t ret = action( NodeDescriptor(link, parent, shift, mirrored, depth) );
-    if( ret == 0 ) {
+    ETreeOp ret = action(NodeDescriptor(link, parent, shift, mirrored, depth));
+    if( ret == TreeWalk::kRecurseUncond or
+	( ret == TreeWalk::kRecurse and depth+1 < fNlevels ) ) {
       Pattern* pat = link->GetPattern();
       Link* ln = pat->GetChild();
       while( ln ) {
@@ -83,12 +78,11 @@ namespace TreeSearch {
 	// mirrored+mirrored = unmirrored)
 	ret = (*this)( ln, action, pat, depth+1, (shift << 1) + ln->Shift(),
 		       mirrored xor ln->Mirrored() );
-	if( ret ) return ret;
+	if( ret == TreeWalk::kError ) return ret;
 	// Continue along the linked list of child nodes
 	ln = ln->Next();
       }
-    } else if( ret > 0 )
-      ret = 0;
+    }
     return ret;
   }
 
