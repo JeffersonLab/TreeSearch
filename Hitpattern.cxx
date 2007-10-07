@@ -26,9 +26,9 @@ Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
 
   static const char* const here = "TreeSearch::Hitpattern";
   
-  if( nplanes == 0 || nplanes > 100 || fNlevels == 0 || fNlevels > 16 ) {
+  if( nplanes == 0 || nplanes > 16 || fNlevels == 0 || fNlevels > 16 ) {
     ::Error( here, "Illegal number of planes or tree levels: %d %d.\n"
-	     "Both > 0, nplanes <= 100, levels <= 16.", nplanes, nlevels );
+	     "Both must be <= 16.", nplanes, nlevels );
   } else if( width < 1e-2 ) { // Negative or very small width?
     ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", width );
   } else {
