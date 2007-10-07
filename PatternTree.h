@@ -7,19 +7,25 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "Rtypes.h"
+#include "Pattern.h"
+#include "TreeWalk.h"
 #include <vector>
+#include <map>
+#include <cassert>
+
+using std::vector;
 
 namespace TreeSearch {
 
-  //  class Pattern;
-  class Link;
+  class CopyPattern;
 
   struct TreeParam_t {
     UInt_t    maxdepth;
     Double_t  width;
     Double_t  maxslope;
-    std::vector<Double_t > zpos;
+    vector<Double_t > zpos;
+
+    Int_t Normalize();
   };
 
   class PatternTree {
@@ -28,17 +34,45 @@ namespace TreeSearch {
 		 UInt_t nPatterns = 0, UInt_t nLinks = 0 );
     virtual ~PatternTree();
  
-    Int_t  AddPattern( const Link* patt );
     Int_t  Read( const char* filename );
 
+    Bool_t              IsOK()          const { return fParamOK; }
     const  TreeParam_t& GetParameters() const { return fParameters; }
-    const  Link*        GetRoot()       const { return fRoot; }
-    static Int_t        Normalize( TreeParam_t& param );
+    const  Link*        GetRoot()       const 
+    { return fLinks.empty() ? 0 : &fLinks.front(); }
+
+    // Function object for copying an arbitrary tree into the PatternTree
+    // array structure. Used with TreeWalk interator.
+    class CopyPattern {
+    public:
+      CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
+      Int_t operator() ( const NodeDescriptor& nd );
+    private:
+      PatternTree* fTree;    // Tree object to fill
+      std::map<Pattern*,Int_t> fMap;   // Index map for serializing 
+      void AddChild( Pattern* parent, Pattern* child, Int_t type );
+    };
+    friend class CopyPattern;
 
   private:
     
-    TreeParam_t  fParameters; // Tree parameters (levels, width, depth)
-    Link*        fRoot;       // Root node 
+    typedef vector<Pattern>::size_type vpsz_t;
+    typedef vector<Link>::size_type vlsz_t;
+    typedef vector<UShort_t>::size_type vsiz_t;
+
+    TreeParam_t      fParameters; // Tree parameters (levels, width, depth)
+    Bool_t           fParamOK;    // Flag: Parameters are tested valid
+
+    vector<Pattern>  fPatterns;   // Array of all patterns
+    vector<Link>     fLinks;      // Array of all links
+    vector<UShort_t> fBits;       // Array of all pattern bits
+ 
+    // Definitions for unserializing the tree
+
+    vpsz_t           fNpat;       // Current pattern count 
+    vlsz_t           fNlnk;       // Current link count
+    vsiz_t           fNbit;       // Current bit count
+    Int_t            fID;         // Pattern ID
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
