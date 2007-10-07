@@ -21,6 +21,7 @@ namespace TreeSearch {
 
   class PatternGenerator {
     friend class NodeVisitor;
+    friend class Test_PatternGenerator;
   public:
     PatternGenerator();
     virtual ~PatternGenerator();
@@ -70,9 +71,9 @@ namespace TreeSearch {
     void      DeleteTree();
     HashNode* Find( const Pattern& pat );
     UInt_t    Hash( const Pattern& pat ) const;
-    bool      LineCheck( const Pattern& pat ) const;
+    bool      LineTest( const Pattern& pat ) const;
     void      MakeChildNodes( HashNode* parent, UInt_t depth );
-    bool      TestSlope( const Pattern& pat, UInt_t depth ) const;
+    bool      SlopeTest( const Pattern& pat, UInt_t depth ) const;
 
     ClassDef(PatternGenerator,0)   // Generator for pattern template database
 

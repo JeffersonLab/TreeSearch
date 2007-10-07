@@ -5,6 +5,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "PatternGenerator.h"
+//#include "TreeFile.h"
 #include "TMath.h"
 #include "TString.h"
 #include "TError.h"
@@ -58,20 +59,8 @@ public:
 // is applied to each tree node. These should be used with the TreeWalk
 // iterator (see TreeWalk.h)
 
-// Copy pattern to PatternTree object
-class CopyPattern : public NodeVisitor {
-public:
-  CopyPattern( PatternTree* tree ) 
-    : fTree(tree) { assert(fTree); }
-  Int_t operator() ( const NodeDescriptor& nd );
-
-private:
-  PatternTree* fTree;    // Tree object to fill
-  map<Pattern*,Int_t> fMap; // Index map for serializing 
-};
-
 // Write pattern to binary file
-class WritePattern : public NodeVisitor {
+class WritePattern {
 public:
   WritePattern( const char* filename, size_t index_size = sizeof(Int_t) );
   ~WritePattern() { delete os; }
@@ -88,7 +77,7 @@ private:
 };
 
 // Count unique patterns (including shifts)
-class CountPattern : public NodeVisitor {
+class CountPattern {
 public:
   CountPattern() : fCount(0) {}
   Int_t operator() ( const NodeDescriptor& nd ) { fCount++; return 0; }
@@ -99,7 +88,7 @@ private:
 };
 
 // Pretty print to output stream (and count) all actual patterns
-class PrintPattern : public NodeVisitor {
+class PrintPattern {
 public:
   PrintPattern( ostream& ostr = cout, bool dump = false ) 
     : os(ostr), fCount(0), fDump(dump) {}
@@ -169,41 +158,6 @@ ChildIter& ChildIter::operator++()
 }
 
 //_____________________________________________________________________________
-//FIXME: TEST TEST
-void print( int i )
-{
-  cout << "val = " << i << endl;
-}
-
-//_____________________________________________________________________________
-inline
-Int_t CopyPattern::operator() ( const NodeDescriptor& nd )
-{
-  Pattern* node = nd.link->GetPattern();
-  map<Pattern*,Int_t>::iterator idx = fMap.find(node);
-  if( idx == fMap.end() ) {
-    map<Pattern*,Int_t>::size_type n = fMap.size();
-    fMap[node] = n;
-    // FIXME: TEST TEST
-    print(128+nd.link->Type());
-    if( fTree->AddPattern(nd.link) )
-      return -1;
-    Int_t nchild = 0;
-    Link* ln = node->GetChild();
-    while( ln ) {
-      nchild++;
-      ln = ln->Next();
-    }
-    print(nchild);
-    return 0;
-  } else {
-    print(nd.link->Type());
-    print(idx->second);
-    return 1;
-  }
-}
-
-//_____________________________________________________________________________
 WritePattern::WritePattern( const char* filename, size_t index_size )
   : os(0), fIdxSiz(index_size)
 {
@@ -221,7 +175,7 @@ WritePattern::WritePattern( const char* filename, size_t index_size )
     ::Error( here, "Invalid file name" );
   }
   if( (fIdxSiz & (fIdxSiz-1)) != 0 ) {
-    ::Error( here, "Invalid index_size. Must be a power of 2" );
+    ::Warning( here, "Invalid index_size = %d. Must be a power of 2", fIdxSiz);
     fIdxSiz = sizeof(Int_t);
   }    
 }
@@ -268,13 +222,8 @@ Int_t WritePattern::operator() ( const NodeDescriptor& nd )
     if( os->fail() ) return -1;
     // Pattern data. NB: fBits[0] is always 0, so we can skip it
     swapped_binary_write( *os, node->GetBits()[1], node->GetNbits()-1 );
-    UShort_t nchild = 0;
-    Link* ln = node->GetChild();
-    while( ln ) {
-      nchild++;
-      ln = ln->Next();
-    }
     // Child node count
+    UShort_t nchild = node->GetNchildren();
     swapped_binary_write( *os, nchild );
     if( os->fail() ) return -1;
     // Write child nodes
@@ -398,6 +347,9 @@ void PatternGenerator::CalcStatistics()
     } // if pattern
   } // hashtable elements
 
+  // Count the root node's link, too
+  fStats.nLinks++;
+
   fStats.nBytes = 
     fStats.nPatterns * sizeof(Pattern)
     + fStats.nPatterns * fNplanes * sizeof(UShort_t)
@@ -495,11 +447,11 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   // Generate a new pattern tree for the given parameters. Returns a pointer
   // to the generated tree, or zero if error
 
-  DeleteTree();
-
   // Set parameters for the new build.
-  if( PatternTree::Normalize(parameters) != 0 )
+  if( parameters.Normalize() != 0 )
     return 0;
+
+  DeleteTree();
 
   fNlevels  = parameters.maxdepth+1;
   fZ        = parameters.zpos;
@@ -528,16 +480,13 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   Print();
 
   // Create a PatternTree object from the build tree
-  PatternTree* tree = 0;
-//   PatternTree* tree = new PatternTree( parameters,
-// 				       fStats.nPatterns,
-// 				       fStats.nLinks );
+  PatternTree* tree = new PatternTree( parameters,
+				       fStats.nPatterns,
+				       fStats.nLinks );
   if( tree ) {
-//     Int_t (PatternTree::*CopyPattern)(int) = &PatternTree::AddPattern;
-//     (tree->*CopyPattern)(1);
-    
+    // Copy all base patterns of the build tree to the PatternTree
     Link root_link(root,0,0);
-    CopyPattern copy(tree);
+    PatternTree::CopyPattern copy(tree);
     fTreeWalk( &root_link, copy );
   }
 
@@ -579,7 +528,7 @@ UInt_t PatternGenerator::Hash( const Pattern& pat ) const
 {
   // Calculate unique a hash value for the given pattern. The maximum value is
   // 2^(fNlevels-1 + fNplanes-2) - 1. With the hash computed here, collisions 
-  // never occur for patterns that pass LineCheck(). 
+  // never occur for patterns that pass LineTest(). 
 
   UInt_t hash = pat[fNplanes-1] * (1U << fNplanes-2);
   const Double_t x = pat[fNplanes-1];
@@ -593,10 +542,9 @@ UInt_t PatternGenerator::Hash( const Pattern& pat ) const
     if( d > 0 )
       hash += (1U << (i-1));
     // The case d==0, where a bin's edge falls _exactly_ on the boundary of
-    // the allowed region is ambiguous and may be affected by floating point
-    // rounding behavior. The test here appears compatible with the 
-    // LineCheck() algorithm on all platforms tested - yet, I am a little 
-    // uneasy about it.
+    // the allowed region, is ambiguous and may be affected by floating point
+    // rounding behavior. The test here relies on LineTest() to reject at least
+    // patterns with an active bin to the left of a d==0 bin.
   }
   return hash;
 }
@@ -629,22 +577,22 @@ PatternGenerator::HashNode* PatternGenerator::Find( const Pattern& pat )
     if( pat == *h.fPattern )
       return &h;
     // A hash collision for valid patterns should never happen
-    assert( LineCheck(pat) == false );
+    assert( LineTest(pat) == false );
   }
   return 0;
 }
 
 //_____________________________________________________________________________
 inline
-bool PatternGenerator::TestSlope( const Pattern& pat, UInt_t depth ) const
+bool PatternGenerator::SlopeTest( const Pattern& pat, UInt_t depth ) const
 {
   UInt_t width = pat.GetWidth();
-  return ( width < 2 ||
+  return ( width < 2 or
 	   TMath::Abs((double)(width-1) / (double)(1<<depth)) <= fMaxSlope );
 }
 
 //_____________________________________________________________________________
-bool PatternGenerator::LineCheck( const Pattern& pat ) const
+bool PatternGenerator::LineTest( const Pattern& pat ) const
 {
   // Check if the gievn bit pattern is consistent with a straight line.
   // The intersection plane positions are given by fZ[]. Assumes fZ[0]=0.
@@ -659,14 +607,17 @@ bool PatternGenerator::LineCheck( const Pattern& pat ) const
   // The algorithm works by computing left and right boundary lines within
   // which a bin must lie. The boundaries are the connections between the
   // top and bottom reference points, (SL, SR) and (BL, BR), respectively.
-  // Starting from the top plane (fZ[fNplanes-1]), bins in successively lower
-  // planes are tested to lie in the allowed region. If they do, the boundaries
-  // is narrowed if necessary to ensure that subsequent bins are consistent
-  // with all bins above. If the test succeeds in all planes, the pattern is
-  // consistent with a line.
+  // Starting from the plane one below the top (fZ[fNplanes-2]), bins in
+  // successively lower planes are tested to lie in the allowed region. If they
+  // do, the boundaries are narrowed if necessary to ensure that subsequent
+  // bins are consistent with all bins above. If the test succeeds in all
+  // planes, the pattern is consistent with a line.
+  //
+  // Algorithm originally developed by Brandon Belew, SULI summer intern,
+  // Jefferson Lab, 2007.
 
-  // FIXME FIXME: for certain z-values, the following can be _very_ sensitive 
-  // to the floating point rounding behavior!
+  // FIXME: for certain z-values, the following can be _very_ sensitive 
+  // to the floating point rounding behavior! (Can this be fixed?)
 
   struct Point {
     Double_t x, z;
@@ -695,7 +646,7 @@ bool PatternGenerator::LineCheck( const Pattern& pat ) const
 
     // If the current bin is outside of the boundaries, we're done. 
     // The test fails.
-    if( xL >= jR || xR <= jL )
+    if( xL >= jR or xR <= jL )
       return false;
 
     // If this was the last plane before the bottom, all tests succeeded,
@@ -707,7 +658,7 @@ bool PatternGenerator::LineCheck( const Pattern& pat ) const
     // it passes through this bin. This is only necessary, of course, if the
     // present bin "cuts" into the allowed region (either its left or right
     // edge are between the boundaries).
-    assert( !( xR < jR && xL > jL )); //both edges must never be inside
+    assert( not( xR < jR and xL > jL )); //both edges must never be inside
     if( xR < jR ) {
       assert((SL.z-z)>1e-3);
       mR = (SL.x - xR) / (SL.z - z);
@@ -723,7 +674,7 @@ bool PatternGenerator::LineCheck( const Pattern& pat ) const
     }
     // By construction (though not totally obvious), we always have 
     // jR <= jL+1. Also, we are guaranteed xR = xL+1 (with bin width = 1).
-    // Thus, if the above test, xR < jR, is true, we must have xL <= jL,
+    // Thus, if the above test, xR < jR, is true, then also xL < jL,
     // and the following can always be skipped. Hence the "else" here:
     // (This is important because the previous block reassigns SR!)
     else if( xL > jL ) {
@@ -773,11 +724,11 @@ void PatternGenerator::MakeChildNodes( HashNode* pnode, UInt_t depth )
 	assert(pat);
 	// If the pattern has only been tested at a higher depth, we need to
 	// redo the slope test since the slope is larger now at lower depth
-	if( depth >= node->fMinDepth || TestSlope(*pat, depth)) {
+	if( depth >= node->fMinDepth or SlopeTest(*pat, depth)) {
 	  // Only add a reference to the existing pattern
 	  parent->AddChild( pat, it.type() );
 	}
-      } else if( TestSlope(child, depth) && LineCheck(child) ) {
+      } else if( SlopeTest(child, depth) and LineTest(child) ) {
 	// If the pattern is new, check it for consistency with maxslope and 
 	// the straight line condition.
 	Pattern* pat = new Pattern( child );
@@ -801,7 +752,7 @@ void PatternGenerator::MakeChildNodes( HashNode* pnode, UInt_t depth )
     // yet OR (important!) children were previously generated from a deeper
     // location in the tree and so this pattern's subtree needs to be extended
     // deeper down now.
-    if( !pat->fChild || node->fMinDepth > depth )
+    if( !pat->fChild or node->fMinDepth > depth )
       MakeChildNodes( node, depth+1 );
     ln = ln->Next();
   }
