@@ -25,15 +25,7 @@
 using namespace std;
 typedef string::size_type ssiz_t;
 
-namespace TreeSearch {
-
-typedef vector<WirePlane*>::size_type vwsiz_t;
-typedef vector<Projection*>::size_type vpsiz_t;
-typedef vector<WirePlane*>::iterator vwiter_t;
-typedef vector<vector<Int_t> >::iterator vviter_t;
-
-// Global constant indicating invalid/uninitialized data
-const Double_t kBig = 1e38;
+namespace {
 
 // Helper classes for describing a DAQ hardware module and using it with a
 // THashTable. CSpair can be used to find elements in the THashTable w/o
@@ -84,6 +76,20 @@ public:
   Double_t  fResolution;
   UInt_t    fNchan;
 };
+
+///////////////////////////////////////////////////////////////////////////////
+
+} // end namespace
+
+namespace TreeSearch {
+
+typedef vector<WirePlane*>::size_type vwsiz_t;
+typedef vector<Projection*>::size_type vpsiz_t;
+typedef vector<WirePlane*>::iterator vwiter_t;
+typedef vector<vector<Int_t> >::iterator vviter_t;
+
+// Global constant indicating invalid/uninitialized data
+const Double_t kBig = 1e38;
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
@@ -695,7 +701,7 @@ UInt_t MWDC::GetDAQnchan( THaDetMap::Module* mod ) const
 #endif	  
 
 
-}  
+} // end namespace TreeSearch
 
 ClassImp(TreeSearch::MWDC)
 
