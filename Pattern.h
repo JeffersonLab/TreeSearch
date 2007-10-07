@@ -17,12 +17,13 @@ namespace TreeSearch {
   class Pattern;
 
   class Link {
+    friend class PatternTree;
   private:
     Pattern*   fPattern;    // Bit pattern treenode
     Link*      fNext;       // Next list element
     Int_t      fOp;         // Operation to be applied to pattern (bits 0-1)
   public:
-    Link( Pattern* pat, Link* next, Int_t op )
+    Link( Pattern* pat = 0, Link* next = 0, Int_t op = 0 )
       : fPattern(pat), fNext(next), fOp(op) { assert( op >= 0 && op < 4 ); }
     Pattern*   GetPattern() const { return fPattern; }
     Link*      Next()       const { return fNext; }
@@ -33,17 +34,21 @@ namespace TreeSearch {
 
   class Pattern {
     friend class PatternGenerator;
+    friend class PatternTree;
   private:
     UShort_t*  fBits;        // [fNbits] Bit pattern array
     Link*      fChild;       // Linked list of child patterns
-    UInt_t     fNbits;       // Bit count (size of fBits array, <=16)
+    UShort_t   fNbits;       // Bit count (size of fBits array, <=16)
+    Bool_t     fDelBits;     // If true, delete fBits in d'tor
+    Bool_t     fDelChld;     // If true, delete fChild list in d'tor
 
     Link*      AddChild( Pattern* child, Int_t type ) {
       assert(child);
+      fDelChld = true;
       return (fChild = new Link( child, fChild, type ));
     }
   public:
-    explicit Pattern( UInt_t size );
+    explicit Pattern( UInt_t size = 0 );
     Pattern( const Pattern& orig );
     const Pattern& operator=( const Pattern& rhs );
     ~Pattern();
@@ -63,12 +68,14 @@ namespace TreeSearch {
       return fBits[i];
     }
 
-    Link*      GetChild()    const  { return fChild; }
+    Link*      GetChild()     const { return fChild; }
     UShort_t*  GetBits()            { return fBits; }
-    UInt_t     GetWidth()    const  { return fBits[fNbits-1]-fBits[0]; }
-    UInt_t     GetNbits()    const  { return fNbits; }
+    UInt_t     GetWidth()     const { return fBits[fNbits-1]-fBits[0]; }
+    UInt_t     GetNbits()     const { return fNbits; }
+    Int_t      GetNchildren() const;
     void       Print( bool print_links = true, std::ostream& os = std::cout,
 		      bool end_line = true ) const;
+    void       SetBitloc( UShort_t* bitloc );
 
   }; // end class Pattern
 
