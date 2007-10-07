@@ -66,6 +66,7 @@ namespace TreeSearch {
     //  kRecurse: process child nodes (regardless of depth)
     //  fSkipChildNodes: ignore child nodes
 
+    if( !link ) return TreeWalk::kError;
     ETreeOp ret = action(NodeDescriptor(link, parent, shift, mirrored, depth));
     if( ret == TreeWalk::kRecurseUncond or
 	( ret == TreeWalk::kRecurse and depth+1 < fNlevels ) ) {
