@@ -50,7 +50,7 @@ PatternTree::~PatternTree()
 }
 
 //_____________________________________________________________________________
-Int_t PatternTree::Read( const char* filename )
+PatternTree* PatternTree::Read( const char* filename, const TreeParam_t& tp )
 {
   // Read tree from file
 

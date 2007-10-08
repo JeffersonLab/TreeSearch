@@ -34,9 +34,11 @@ namespace TreeSearch {
     PatternTree( const TreeParam_t& param,
 		 UInt_t nPatterns = 0, UInt_t nLinks = 0 );
     virtual ~PatternTree();
+    // TODO: copy c'tor, assignment
  
+    static PatternTree* Read( const char* filename, const TreeParam_t& param );
+
     void   Print( Option_t* opt="", std::ostream& os = std::cout );
-    Int_t  Read( const char* filename );
     Int_t  Write( const char* filename );
 
     Bool_t IsOK()       const { return fParamOK; }
@@ -70,12 +72,17 @@ namespace TreeSearch {
     vector<Link>     fLinks;      // Array of all links
     vector<UShort_t> fBits;       // Array of all pattern bits
  
-    // Definitions for unserializing the tree
+    // Variables for unserializing the tree
 
     vpsz_t           fNpat;       // Current pattern count 
     vlsz_t           fNlnk;       // Current link count
     vsiz_t           fNbit;       // Current bit count
     Int_t            fID;         // Pattern ID
+
+    // Disallow copying ans assignment for now. The vectors can NOT be copied 
+    // directly since they contain pointers to the other vectors' elements!
+    PatternTree( const PatternTree& orig );
+    const PatternTree& operator=( const PatternTree& rhs );
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
