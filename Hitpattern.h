@@ -9,6 +9,8 @@
 
 #include "TBits.h"
 #include "TMath.h"
+#include "TreeWalk.h"
+#include "Pattern.h"
 #include <cstring>
 #include <cassert>
 
@@ -56,8 +58,7 @@ namespace TreeSearch {
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
     Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
     Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
-    Int_t    ContainsPattern( UShort_t bins[], UInt_t shift, Bool_t mirrored, 
-			      UInt_t depth ) const;
+    Int_t    ContainsPattern( const NodeDescriptor& nd ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
@@ -119,23 +120,30 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Int_t Hitpattern::ContainsPattern( UShort_t bins[], UInt_t shift,
-				     Bool_t mirrored, UInt_t depth ) const
+  Int_t Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
   {
-    // Check if the hitpattern contains the pattern described by the 'bins' 
-    // array at the given depth. 'shift' is a common offset to be added to 
-    // all numbers in bins[]. 'mirrored' indicates a mirrored pattern.
+    // Check if the hitpattern contains the pattern specified by the
+    // NodeDescriptor
     // Returns the count of planes where the corresponding bin in bins[]
     // was found set.
     // Used to compare with the patterns stored in the PatternTree class.
-  
-    assert( bins && depth < fNlevels );
-    UInt_t nbins = 1U<<depth; // Start position of pattern at this depth
-    assert( shift < nbins );
+      
+    assert( nd.depth < fNlevels );
+    // The offset of the hitpattern bits at this depth
+    UInt_t offs = 1U<<nd.depth;
+    // The shift cannot exceed the number of bins at this depth (=offs)
+    assert( nd.shift < offs );
     Int_t n_found = 0;
-    Int_t startpos = nbins + shift;
-    UShort_t* theBin = bins+fNplanes;
-    if( mirrored ) {
+    // The start bit number of the tree pattern we are comparing to
+    Int_t startpos = offs + nd.shift;
+    Pattern* pat = nd.link->GetPattern();
+    assert(pat);
+    // Pointer to the last element of the pattern's bit array + 1
+    UShort_t* theBin = pat->GetBits() + fNplanes;
+    // Check if the pattern's bits are set in the hitpattern, plane by plane
+    if( nd.mirrored ) {
+      // For a mirrored pattern, startpos is the left edge of the pattern!
+      startpos += pat->GetWidth();
       for( UInt_t i=fNplanes; i; ) {
 	if( fPattern[--i]->TestBitNumber(startpos - *--theBin) )
 	  ++n_found;
