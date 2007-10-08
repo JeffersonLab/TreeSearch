@@ -12,6 +12,7 @@
 #include "THaDetectorBase.h"
 #include "TString.h"
 #include "PatternTree.h"
+#include "PatternGenerator.h"
 #include <iostream>
 
 using namespace std;
@@ -19,15 +20,14 @@ using namespace std;
 namespace TreeSearch {
 
 typedef vector<WirePlane*>::size_type vwsiz_t;
+typedef vector<WirePlane*>::iterator  vwiter_t;
 
 //_____________________________________________________________________________
 Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
-  //, const PatternTree* pt )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0),
     fHitpattern(0), fPatternTree(0), fDetector(parent)
-    //    fPatternTree(pt)
 {
   // Constructor
 
@@ -50,11 +50,11 @@ Projection::Projection( const Projection& orig )
   if( orig.fHitpattern )
     fHitpattern = new Hitpattern(*orig.fHitpattern);
 //   if( orig.fPatternTree )
-//     fHitpattern = new PatternTree(*orig.fPatternTree);
+//     fPatternTree = new PatternTree(*orig.fPatternTree);
 }
 
 //_____________________________________________________________________________
-Projection& Projection::operator=( const Projection& rhs )
+const Projection& Projection::operator=( const Projection& rhs )
 {
   // Assignment
 
@@ -85,8 +85,8 @@ Projection::~Projection()
 {
   // Destructor
 
-  //  delete fPatternTree;
-  delete fHitpattern;
+  delete fPatternTree; fPatternTree = 0;
+  delete fHitpattern; fHitpattern = 0;
 }
 
 //_____________________________________________________________________________
@@ -145,58 +145,59 @@ Int_t Projection::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
-// void Projection::Reset()
-// {
-//   // Reset parameters, clear list of planes, delete Hitpattern
-  
-//   fPlanes.clear();
-//   fMaxSlope = fWidth = 0.0;
-//   fZmin = kBig;
-//   fZmax = -kBig;
-//   delete fHitpattern; fHitpattern = 0;
-//   //  delete fPatternTree; fPatternTree = 0;
-// }
-
-//_____________________________________________________________________________
-THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
+void Projection::Reset()
 {
-  // Initialize plane type parameters. Reads database.
-
+  // Reset parameters, clear list of planes, delete Hitpattern
+  
+  fIsInit = kFALSE;
   fPlanes.clear();
-
-  EStatus status = THaAnalysisObject::Init(date);
-  if( status != kOK )
-    return status;
-
-  // TODO: load pattern database for given type, nplanes, nlevels.
-
-  // We cannot initialize the hitpattern here because we don't know fWidth yet
-
-  return fStatus = kOK;
+  fMaxSlope = fWidth = 0.0;
+  delete fHitpattern; fHitpattern = 0;
+  delete fPatternTree; fPatternTree = 0;
 }
 
 //_____________________________________________________________________________
-Int_t Projection::InitHitpattern()
+THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 {
-  // Initialize the hitpattern if not already done
+  // Level-2 initialization - load pattern database and initialize hitpattern
 
-  if( fHitpattern ) {
-    if( fHitpattern->GetNlevels() == fNlevels &&
-	fHitpattern->GetNplanes() == GetNplanes() &&
-	fHitpattern->GetWidth() == fWidth ) {
-      fIsInit = kTRUE;
-      return 0;
-    }
+  //FIXME: untested
+  TreeParam_t tp;
+  tp.maxdepth = fNlevels-1;
+  tp.width = fWidth;
+  tp.maxslope = fMaxSlope;
+  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it )
+    tp.zpos.push_back( (*it)->GetZ() );
 
-    delete fHitpattern; fHitpattern = 0;
-  }
+  if( !tp.Normalize() )
+    return fStatus = kInitError;
 
+  // Attempt to read the pattern database from file
+  delete fPatternTree;
+  //TODO: Make the file name
+  const char* filename = "test.tree";
+  fPatternTree = PatternTree::Read( filename, tp );
+  
+  // If the tree cannot not be read (or the parameters mismatch), then
+  // create it from scratch (takes a few seconds)
+  if( !fPatternTree ) {
+    PatternGenerator pg;
+    fPatternTree = pg.Generate( tp );
+    if( fPatternTree ) {
+      // Write the freshly-generated tree to file
+      // FIXME: hmmm... we don't necesarily have write permission to DB_DIR
+      fPatternTree->Write( filename );
+    } else 
+      return fStatus = kInitError;
+  } 
+
+  // Set up a hitpattern object with the parameters of this projection
+  delete fHitpattern;
   fHitpattern = new Hitpattern( fNlevels, GetNplanes(), fWidth );
   if( !fHitpattern || fHitpattern->IsError() )
-    return -1;
-    
-  fIsInit = kTRUE;
-  return 0;
+    return fStatus = kInitError;
+
+  return fStatus = kOK;
 }
 
 //_____________________________________________________________________________
@@ -209,7 +210,8 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  fIsInit = kFALSE;  // Force check of hitpattern parameters
+  //FIXME: move elsewhere?
+  Reset();
 
   Double_t angle = kBig;
   const DBRequest request[] = {
@@ -241,6 +243,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     fMaxSlope = -fMaxSlope;
   }
 
+  fIsInit = kTRUE;
   return kOK;
 }
 
@@ -249,15 +252,10 @@ Int_t Projection::FillHitpattern()
 {
   // Fill this projection's hitpattern with hits from the wire planes.
   // Returns the total number of hits processed (where hit pairs on plane
-  // and partner plane count as one). Returns < 0 if error.
-
-  // (Re)create hitpattern if necessary
-  if( !fIsInit && InitHitpattern() != 0 )
-    return 0;
+  // and partner plane count as one).
 
   Int_t ntot = 0;
-  vector<WirePlane*>::iterator it;
-  for( it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
+  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
     ntot += fHitpattern->ScanHits( *it, (*it)->GetPartner() );
   }
   return ntot;
@@ -296,7 +294,7 @@ Double_t Projection::GetZsize() const
   if( fPlanes.empty() )
     return 0.0;
 
-  return fPlanes[fPlanes.size()-1]->GetZ() - fPlanes[0]->GetZ();
+  return fPlanes.back()->GetZ() - fPlanes.front()->GetZ();
 }
 
 //_____________________________________________________________________________

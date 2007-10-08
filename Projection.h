@@ -28,14 +28,14 @@ namespace TreeSearch {
     Projection( Int_t type, const char* name, Double_t angle,
 		THaDetectorBase* parent = 0 );
     Projection( const Projection& orig );
-    Projection& operator=( const Projection& rhs );
+    const Projection& operator=( const Projection& rhs );
     virtual ~Projection();
 
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
-    virtual EStatus Init( const TDatime& date );
+    EStatus         InitLevel2( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
-    //    void            Reset();
+    void            Reset();
 
     Int_t          FillHitpattern();
 
@@ -73,7 +73,6 @@ namespace TreeSearch {
 
     THaDetectorBase*    fDetector;    //! Parent detector
 
-    Int_t InitHitpattern();
     void  SetAngle( Double_t a );
 
     // Podd interface
