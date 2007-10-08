@@ -58,7 +58,7 @@ namespace TreeSearch {
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
     Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
     Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
-    Int_t    ContainsPattern( const NodeDescriptor& nd ) const;
+    UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
@@ -120,7 +120,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Int_t Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
+  UInt_t Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
   {
     // Check if the hitpattern contains the pattern specified by the
     // NodeDescriptor. Returns the count of planes where the pattern's bit
@@ -130,24 +130,22 @@ namespace TreeSearch {
     assert( nd.depth < fNlevels );
     // The offset of the hitpattern bits at this depth
     UInt_t offs = 1U<<nd.depth;
-    // The shift cannot exceed the number of bins at this depth (=offs)
-    assert( nd.shift < offs );
-    Int_t n_found = 0;
+    UInt_t n_found = 0;
     // The start bit number of the tree pattern we are comparing to
-    Int_t startpos = offs + nd.shift;
+    UInt_t startpos = offs + nd.shift;
     Pattern* pat = nd.link->GetPattern();
     assert(pat);
     // Pointer to the last element of the pattern's bit array + 1
     UShort_t* theBin = pat->GetBits() + fNplanes;
     // Check if the pattern's bits are set in the hitpattern, plane by plane
     if( nd.mirrored ) {
-      // For a mirrored pattern, startpos is the left edge of the pattern!
-      startpos += pat->GetWidth();
+      assert( startpos < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
 	if( fPattern[--i]->TestBitNumber(startpos - *--theBin) )
 	  ++n_found;
       }
     } else {
+      assert( startpos + pat->GetWidth() < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
 	if( fPattern[--i]->TestBitNumber(startpos + *--theBin) )
 	  ++n_found;

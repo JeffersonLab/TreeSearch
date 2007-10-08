@@ -104,10 +104,11 @@ TreeWalk::ETreeOp PrintPattern::operator() ( const NodeDescriptor& nd )
 
   Pattern* node = nd.link->GetPattern();
   for( UInt_t i = 0; i < node->GetNbits(); i++ ) {
-    UInt_t v = node->GetBits()[i];
-    if( nd.mirrored )  // Mirrored pattern
-      v = node->GetWidth() - v;
-    v += nd.shift;
+    UInt_t v = nd.shift;
+    if( nd.mirrored )
+      v -= node->GetBits()[i];
+    else
+      v += node->GetBits()[i];
 
     // In dump mode, write out one pattern n-tuple per line
     if( fDump )
