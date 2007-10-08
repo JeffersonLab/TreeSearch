@@ -136,18 +136,18 @@ namespace TreeSearch {
     Pattern* pat = nd.link->GetPattern();
     assert(pat);
     // Pointer to the last element of the pattern's bit array + 1
-    UShort_t* theBin = pat->GetBits() + fNplanes;
+    UShort_t* bitnum = pat->GetBits() + fNplanes;
     // Check if the pattern's bits are set in the hitpattern, plane by plane
     if( nd.mirrored ) {
       assert( startpos < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
-	if( fPattern[--i]->TestBitNumber(startpos - *--theBin) )
+	if( fPattern[--i]->TestBitNumber(startpos - *--bitnum) )
 	  ++n_found;
       }
     } else {
       assert( startpos + pat->GetWidth() < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
-	if( fPattern[--i]->TestBitNumber(startpos + *--theBin) )
+	if( fPattern[--i]->TestBitNumber(startpos + *--bitnum) )
 	  ++n_found;
       }
     }
