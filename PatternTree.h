@@ -42,7 +42,8 @@ namespace TreeSearch {
     Int_t  Write( const char* filename );
 
     Bool_t IsOK()       const { return fParamOK; }
-    UInt_t GetNlevels() const { return fParameters.zpos.size(); }
+    UInt_t GetNlevels() const { return fParameters.maxdepth+1; }
+    UInt_t GetNplanes() const { return fParameters.zpos.size(); }
     const TreeParam_t& GetParameters() const { return fParameters; }
     Link*  GetRoot() { return fLinks.empty() ? 0 : &fLinks.front(); }
 
