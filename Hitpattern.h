@@ -123,9 +123,8 @@ namespace TreeSearch {
   Int_t Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
   {
     // Check if the hitpattern contains the pattern specified by the
-    // NodeDescriptor
-    // Returns the count of planes where the corresponding bin in bins[]
-    // was found set.
+    // NodeDescriptor. Returns the count of planes where the pattern's bit
+    // was found set in the hitpattern.
     // Used to compare with the patterns stored in the PatternTree class.
       
     assert( nd.depth < fNlevels );
