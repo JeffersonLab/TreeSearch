@@ -62,8 +62,8 @@ namespace TreeSearch {
     // Traverse the tree and call function object "action" for each link. 
     // The return value from action determines the behavior:
     //  kError: error, return immediately
-    //  kRecurseToMaxdepth: process child nodes until reaching maxdepth
-    //  kRecurse: process child nodes (regardless of depth)
+    //  kRecurse: process child nodes until reaching maxdepth
+    //  kRecurseUncond: process child nodes (regardless of depth)
     //  fSkipChildNodes: ignore child nodes
 
     if( !link ) return TreeWalk::kError;
