@@ -258,8 +258,9 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 
   // Initialize ourselves. This calls our ReadDatabase() and DefineVariables()
   EStatus status = THaTrackingDetector::Init(date);
+
+  // Initialize the wire planes
   if( !status ) {
-    // Initialize the wire planes
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
       status = fPlanes[iplane]->Init(date);
       if( status )
@@ -348,14 +349,15 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     }
   }
 
-  // Initialize the projections
+  // Initialize the projections. This will read the database and set
+  // the projections' angle and maxslope, which we need in the following
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     status = fProj[type]->Init(date);
     if( status )
       return fStatus = status;
   }
 
-  // Sanity checks of U and V angles which the projections read via Init
+  // Sanity checks of U and V angles which the projections just read via Init
   Double_t u_angle = fProj[kUPlane]->GetAngle()*TMath::RadToDeg();
   Double_t v_angle = fProj[kVPlane]->GetAngle()*TMath::RadToDeg();
   Int_t qu = TMath::FloorNint( u_angle/90.0 );
@@ -375,7 +377,8 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
     return fStatus = kInitError;
   }
 
-  // Determine per-projection plane parameters
+  // Determine the width of and add the wire planes to the projections
+  // TODO: this can be multithreaded, too - I think
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* theProj = fProj[type];
     UInt_t n = 0;
@@ -391,8 +394,8 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	  thePlane->SetPlaneNum(n);
 	  // Save pointer to the projection object with each plane and partner
 	  thePlane->SetProjection(theProj);
-	  if( thePlane->GetPartner() ) {
-	    WirePlane* partner = thePlane->GetPartner();
+	  WirePlane* partner = thePlane->GetPartner();
+	  if( partner ) {
 	    partner->SetProjection(theProj);
 	    partner->SetPlaneNum(n);
 	  }
@@ -433,7 +436,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
       theProj->SetWidth( width );
     else {
       Error( Here(here), "Error calculating width of projection plane \"%s\". "
-	     "Wire spacing too small. Fix database.", theProj->GetName() );
+	     "Wire spacing too small? Fix database.", theProj->GetName() );
       return fStatus = kInitError;
     }
     // maxslope is the maximum expected track slope in the projection.
@@ -445,9 +448,9 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
       if( theProj->GetMaxSlope() < 0.01 ) {  // Consider unset
 	theProj->SetMaxSlope( maxslope );
       } else if( theProj->GetMaxSlope() > maxslope ) {
-	Warning( Here(here), "For plane type \"%s\", maxslope from database = "
-		 "%lf exceeds geometric maximum = %lf. Using smaller value.",
-		 theProj->GetName(), theProj->GetMaxSlope(), maxslope );
+// 	Warning( Here(here), "For plane type \"%s\", maxslope from database = "
+// 		 "%lf exceeds geometric maximum = %lf. Using smaller value.",
+// 		 theProj->GetName(), theProj->GetMaxSlope(), maxslope );
 	theProj->SetMaxSlope( maxslope );
       }
     } else {
@@ -456,6 +459,14 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	     theProj->GetName() );
 	return fStatus = kInitError;
     }
+
+    // Now that the projection's list of planes, width, and maxslope is know,
+    // do the level-2 initialization of the projections - load the pattern
+    // database and initialize the hitpattern
+    status = fProj[type]->InitLevel2(date);
+    if( status )
+      return fStatus = status;
+
   }
 
   return fStatus = kOK;
