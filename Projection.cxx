@@ -14,7 +14,7 @@
 #include "PatternTree.h"
 #include "PatternGenerator.h"
 #include <iostream>
-
+#include <sys/time.h>  // for timing
 using namespace std;
 
 namespace TreeSearch {
@@ -120,6 +120,10 @@ void Projection::Clear( Option_t* opt )
 
   if( fHitpattern )
     fHitpattern->Clear();
+
+  //FIXME: TEST
+  n_found = n_test = 0;
+  search_time = 0.0;
 }
 
 //_____________________________________________________________________________
@@ -161,7 +165,6 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 {
   // Level-2 initialization - load pattern database and initialize hitpattern
 
-  //FIXME: untested
   TreeParam_t tp;
   tp.maxdepth = fNlevels-1;
   tp.width = fWidth;
@@ -169,7 +172,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it )
     tp.zpos.push_back( (*it)->GetZ() );
 
-  if( !tp.Normalize() )
+  if( tp.Normalize() != 0 )
     return fStatus = kInitError;
 
   // Attempt to read the pattern database from file
@@ -186,7 +189,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
     if( fPatternTree ) {
       // Write the freshly-generated tree to file
       // FIXME: hmmm... we don't necesarily have write permission to DB_DIR
-      fPatternTree->Write( filename );
+//       fPatternTree->Write( filename );
     } else 
       return fStatus = kInitError;
   } 
@@ -248,6 +251,27 @@ Int_t Projection::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
+Int_t Projection::DefineVariables( EMode mode )
+{
+  // Initialize global variables and lookup table for decoder
+
+
+  if( mode == kDefine && fIsSetup ) return kOK;
+  fIsSetup = ( mode == kDefine );
+
+  // Register variables in global list
+  
+  RVarDef vars[] = {
+    { "n_test",   "Number of pattern comparisons per event", "n_test"     },
+    { "n_found",  "Number of patterns found per event",      "n_found"    },
+    { "t_search", "Search time per event (us)", "search_time"     },
+    { 0 }
+  };
+  DefineVarsFromList( vars, mode );
+  return 0;
+}
+
+//_____________________________________________________________________________
 Int_t Projection::FillHitpattern()
 {
   // Fill this projection's hitpattern with hits from the wire planes.
@@ -259,6 +283,24 @@ Int_t Projection::FillHitpattern()
     ntot += fHitpattern->ScanHits( *it, (*it)->GetPartner() );
   }
   return ntot;
+}
+
+//_____________________________________________________________________________
+Int_t Projection::TreeSearch()
+{
+  
+  struct timeval start, stop, diff;
+  gettimeofday( &start, 0 );
+
+  ComparePattern compare( this );
+  TreeWalk walk( fNlevels );
+  walk( fPatternTree->GetRoot(), compare );
+
+  gettimeofday(&stop, 0 );
+  timersub( &stop, &start, &diff );
+  search_time = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+
+  return 0;
 }
 
 //_____________________________________________________________________________
@@ -338,6 +380,26 @@ void Projection::Print( Option_t* opt ) const
 	wp->Print(opt);
     }
   }
+}
+
+//_____________________________________________________________________________
+TreeWalk::ETreeOp
+Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
+{
+  // Test if the pattern from the database that is given by NodeDescriptor
+  // is present in the current event's hitpattern
+
+  // Match?
+  fProj->n_test++;
+  if( fHitpattern->ContainsPattern(nd) == fHitpattern->GetNplanes() ) {
+    if( nd.depth < fHitpattern->GetNlevels()-1 )
+      return TreeWalk::kRecurse;
+
+    // Found a match at the maximum resolution: add it to the list of roads
+    //TODO...
+    fProj->n_found++;
+  }
+  return TreeWalk::kSkipChildNodes;
 }
 
 //_____________________________________________________________________________
