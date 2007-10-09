@@ -198,6 +198,9 @@ Int_t MWDC::Decode( const THaEvData& evdata )
   // (via "max occupancy" parameter or similar)
 
     fProj[type]->FillHitpattern();
+
+    //TODO: preliminary
+    fProj[type]->TreeSearch();
   }
 
   return 0;
