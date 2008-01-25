@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaAnalysisObject.h"
-#include "TreeWalk.h"
+#include "NodeVisitor.h"
 #include "TMath.h"
 #include <vector>
 #include <cassert>
@@ -90,7 +90,8 @@ namespace TreeSearch {
     // NodeVisitor class for comparing patterns in the tree with the
     // hitpattern. Matches represent candidates for track roads and are
     // added to the list of roads for further analysis
-    class ComparePattern {
+    //FIXME: this should be a member of Hitpattern
+    class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( Projection* proj ) 
 	: fProj(proj) { assert(fProj); fHitpattern = fProj->GetHitpattern(); }

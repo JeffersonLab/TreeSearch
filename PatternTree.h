@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Pattern.h"
-#include "TreeWalk.h"
+#include "NodeVisitor.h"
 #include <vector>
 #include <map>
 #include <iostream>
@@ -34,7 +34,7 @@ namespace TreeSearch {
     PatternTree( const TreeParam_t& param,
 		 UInt_t nPatterns = 0, UInt_t nLinks = 0 );
     virtual ~PatternTree();
-    // TODO: copy c'tor, assignment
+    // TODO: copy c'tor, assignment (see below)
  
     static PatternTree* Read( const char* filename, const TreeParam_t& param );
 
@@ -47,17 +47,6 @@ namespace TreeSearch {
     const TreeParam_t& GetParameters() const { return fParameters; }
     Link*  GetRoot() { return fLinks.empty() ? 0 : &fLinks.front(); }
 
-    // Function object for copying an arbitrary tree into the PatternTree
-    // array structure. Used with TreeWalk interator.
-    class CopyPattern {
-    public:
-      CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
-      TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
-    private:
-      PatternTree* fTree;    // Tree object to fill
-      std::map<Pattern*,Int_t> fMap;   // Index map for serializing 
-      void AddChild( Pattern* parent, Pattern* child, Int_t type );
-    };
     friend class CopyPattern;
 
   private:
@@ -80,13 +69,27 @@ namespace TreeSearch {
     vsiz_t           fNbit;       // Current bit count
     Int_t            fID;         // Pattern ID
 
-    // Disallow copying ans assignment for now. The vectors can NOT be copied 
+    // Disallow copying and assignment for now. The vectors can NOT be copied 
     // directly since they contain pointers to the other vectors' elements!
     PatternTree( const PatternTree& orig );
     const PatternTree& operator=( const PatternTree& rhs );
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
+
+  //___________________________________________________________________________
+  // Copy an arbitrary tree into the PatternTree array structure
+  class CopyPattern : public NodeVisitor {
+  public:
+    CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
+    virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
+
+  private:
+    PatternTree* fTree;    // Tree object to fill
+    std::map<Pattern*,Int_t> fMap;   // Index map for serializing 
+    void AddChild( Pattern* parent, Pattern* child, Int_t type );
+  };
+
 
 ///////////////////////////////////////////////////////////////////////////////
 

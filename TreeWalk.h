@@ -33,8 +33,9 @@ namespace TreeSearch {
       : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir) {}
   };    
 
-  // "Operation" must be a function object whose operator() takes a
-  // NodeDescriptor or const NodeDescriptor& as argument
+  //___________________________________________________________________________
+  class NodeVisitor;
+
   class TreeWalk {
   private:
     UInt_t   fNlevels;  // Number of levels in tree
@@ -43,52 +44,14 @@ namespace TreeSearch {
     virtual ~TreeWalk() {}
     void SetNlevels( UInt_t n ) { fNlevels = n; }
     
-    // Supported return codes from Operation function object
+    // Supported return codes from "op" function object
     enum ETreeOp { kRecurse, kRecurseUncond, kSkipChildNodes, kError };
 
-    template<typename Operation>
-    ETreeOp operator() ( Link* link, Operation& op, Pattern* parent = 0,
+    ETreeOp operator() ( Link* link, NodeVisitor& op, Pattern* parent = 0,
 			 UInt_t depth = 0, UInt_t shift = 0,
 			 Bool_t mirrored = false ) const;
     ClassDef(TreeWalk, 0)  // Generic traversal function for a PatternTree
   };
-
-  //___________________________________________________________________________
-  template<typename Operation>
-  inline TreeWalk::ETreeOp
-  TreeWalk::operator()( Link* link, Operation& action, Pattern* parent, 
-			UInt_t depth, UInt_t shift, Bool_t mirrored ) const
-  {
-    // Traverse the tree and call function object "action" for each link. 
-    // The return value from action determines the behavior:
-    //  kRecurse: process child nodes until reaching maxdepth
-    //  kRecurseUncond: process child nodes (regardless of depth)
-    //  fSkipChildNodes: ignore child nodes
-    //  kError: error, return immediately
-
-    if( !link ) return TreeWalk::kError;
-    ETreeOp ret = action(NodeDescriptor(link, parent, shift, mirrored, depth));
-    if( ret == TreeWalk::kRecurseUncond or
-	( ret == TreeWalk::kRecurse and depth+1 < fNlevels ) ) {
-      Pattern* pat = link->GetPattern();
-      Link* ln = pat->GetChild();
-      while( ln ) {
-	// Set up parameters of child pattern based on current position in the
-	// tree. The mirroring flag for the child pattern is the pattern's
-	// mirroring flag xor the mirror state of the parent (so that 
-	// mirrored+mirrored = unmirrored). The shift corresponds either
-	// to the pattern's left or right edge for unmirrored or mirrored
-	// patterns, respectively.
-	Bool_t new_mir = mirrored xor ln->Mirrored();
-	ret = (*this)( ln, action, pat, depth+1, 
-		       (shift << 1) + (new_mir xor ln->Shift()), new_mir );
-	if( ret == TreeWalk::kError ) return ret;
-	// Continue along the linked list of child nodes
-	ln = ln->Next();
-      }
-    }
-    return ret;
-  }
 
   /////////////////////////////////////////////////////////////////////////////
 

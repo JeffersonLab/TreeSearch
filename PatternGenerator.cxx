@@ -5,6 +5,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "PatternGenerator.h"
+#include "PatternTree.h"
 #include "NodeVisitor.h"
 #include "TMath.h"
 #include "TString.h"
@@ -276,7 +277,7 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
     // Copy all base patterns of the build tree to the PatternTree
     Link root_link(root,0,0);
     TreeWalk walk(fNlevels);
-    PatternTree::CopyPattern copy(tree);
+    CopyPattern copy(tree);
     cout << "Filling tree..." << flush;
     TreeWalk::ETreeOp ret = walk( &root_link, copy );
     cout << "done" << endl;

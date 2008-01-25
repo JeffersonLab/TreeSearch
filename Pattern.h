@@ -17,7 +17,7 @@ namespace TreeSearch {
   class Pattern;
 
   class Link {
-    friend class PatternTree;
+    friend class NodeVisitor;
   private:
     Pattern*   fPattern;    // Bit pattern treenode
     Link*      fNext;       // Next list element
@@ -34,7 +34,7 @@ namespace TreeSearch {
 
   class Pattern {
     friend class PatternGenerator;
-    friend class PatternTree;
+    friend class NodeVisitor;
   private:
     UShort_t*  fBits;        // [fNbits] Bit pattern array
     Link*      fChild;       // Linked list of child patterns

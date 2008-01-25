@@ -186,16 +186,15 @@ Int_t PatternTree::Write( const char* filename )
 }
 
 //_____________________________________________________________________________
-void PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child, 
-					 Int_t type )
+void CopyPattern::AddChild( Pattern* node, Pattern* child, Int_t type )
 {
   // Add child to node's child pattern list
 
   Link* ln = node->GetChild();
   while( ln ) {
-    if( !ln->fPattern ) {
-      ln->fPattern = child;
-      ln->fOp = type;
+    if( !ln->GetPattern() ) {
+      SetLinkPattern( ln, child );
+      SetLinkType( ln, type );
       break;
     }
     assert( ln->GetPattern() != child or ln->Type() != type );
@@ -205,8 +204,7 @@ void PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child,
 }
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp
-PatternTree::CopyPattern::operator() ( const NodeDescriptor& nd )
+TreeWalk::ETreeOp CopyPattern::operator() ( const NodeDescriptor& nd )
 try {
   // Add pattern to the PatternTree fTree
 
@@ -248,12 +246,12 @@ try {
     // Set the child pointer of the copied pattern to the first child node
     if( nchild > 0 ) {
       PatternTree::vlsz_t lpos = fTree->fNlnk;
-      cur_pat->fChild = &(fTree->fLinks.at(lpos));
-      cur_pat->fDelChld = false;
+      SetPatternChild( cur_pat, &(fTree->fLinks.at(lpos)) );
       // Link the child node list (not really needed, but we don't want the
       // fNext pointers to dangle)
       for( Int_t i = nchild-2; i >= 0; --i )
-	fTree->fLinks.at(lpos+i).fNext = &(fTree->fLinks.at(lpos+i+1));
+	SetLinkNext( &(fTree->fLinks.at(lpos+i)), 
+		     &(fTree->fLinks.at(lpos+i+1)) );
     }
     // Update cursors
     fTree->fNpat++;
