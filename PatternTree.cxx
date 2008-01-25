@@ -6,7 +6,7 @@
 
 #include "PatternTree.h"
 #include "Pattern.h"
-#include "NodeVisitor.h"
+#include "StdVisitors.h"
 //#include "TreeFile.h"
 #include "TError.h"
 #include <iostream>
@@ -56,6 +56,7 @@ PatternTree* PatternTree::Read( const char* filename, const TreeParam_t& tp )
 
   try {
 
+    // TODO: implement
   }
   catch ( bad_alloc ) {
     ::Error( "PatternTree::Read", "Out of memory trying to read "
@@ -186,7 +187,8 @@ Int_t PatternTree::Write( const char* filename )
 }
 
 //_____________________________________________________________________________
-void CopyPattern::AddChild( Pattern* node, Pattern* child, Int_t type )
+void 
+PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child, Int_t type )
 {
   // Add child to node's child pattern list
 
@@ -204,7 +206,8 @@ void CopyPattern::AddChild( Pattern* node, Pattern* child, Int_t type )
 }
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp CopyPattern::operator() ( const NodeDescriptor& nd )
+TreeWalk::ETreeOp 
+PatternTree::CopyPattern::operator() ( const NodeDescriptor& nd )
 try {
   // Add pattern to the PatternTree fTree
 

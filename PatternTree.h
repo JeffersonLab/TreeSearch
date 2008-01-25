@@ -18,8 +18,6 @@ using std::vector;
 
 namespace TreeSearch {
 
-  class CopyPattern;
-
   struct TreeParam_t {
     UInt_t    maxdepth;
     Double_t  width;
@@ -47,6 +45,17 @@ namespace TreeSearch {
     const TreeParam_t& GetParameters() const { return fParameters; }
     Link*  GetRoot() { return fLinks.empty() ? 0 : &fLinks.front(); }
 
+    // Copy an arbitrary tree into the PatternTree array structures
+    class CopyPattern : public NodeVisitor {
+    public:
+      CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
+      virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
+
+    private:
+      PatternTree* fTree;    // Tree object to fill
+      std::map<Pattern*,Int_t> fMap;   // Index map for serializing 
+      void AddChild( Pattern* parent, Pattern* child, Int_t type );
+    };
     friend class CopyPattern;
 
   private:
@@ -76,20 +85,6 @@ namespace TreeSearch {
 
     ClassDef(PatternTree,0)   // Precomputed template database
   };
-
-  //___________________________________________________________________________
-  // Copy an arbitrary tree into the PatternTree array structure
-  class CopyPattern : public NodeVisitor {
-  public:
-    CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
-    virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
-
-  private:
-    PatternTree* fTree;    // Tree object to fill
-    std::map<Pattern*,Int_t> fMap;   // Index map for serializing 
-    void AddChild( Pattern* parent, Pattern* child, Int_t type );
-  };
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
