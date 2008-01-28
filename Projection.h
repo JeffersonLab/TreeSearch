@@ -11,10 +11,8 @@
 #include "TreeWalk.h"
 #include "TMath.h"
 #include <vector>
+#include <set>
 #include <cassert>
-
-using std::vector;
-using std::string;
 
 class THaDetectorBase;
 
@@ -40,7 +38,7 @@ namespace TreeSearch {
     void            Reset();
 
     Int_t           FillHitpattern();
-    Int_t           TreeSearch();
+    Int_t           Track();
 
     void            AddPlane( WirePlane* wp );
     Int_t           GetType() const { return fType; }
@@ -58,26 +56,28 @@ namespace TreeSearch {
     void            SetMaxSlope( Double_t m ) { fMaxSlope = m; }
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
     void            SetWidth( Double_t width ) { fWidth = width; }
-
+    
     //FIXME: for testing
-    vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
+    std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
 
   protected:
-    Int_t               fType;        // Type of plane (u,v,x,y...)
-    vector<WirePlane*>  fPlanes;      // Wire planes of this type
-    UInt_t              fNlevels;     // Number of levels of search tree
-    Double_t            fMaxSlope;    // Maximum physical track slope (0=perp)
-    Double_t            fWidth;       // Width of tracking region (m)
-    Double_t            fSinAngle;    // Sine of wire angle
-    Double_t            fCosAngle;    // Cosine of wire angle
+    Int_t           fType;        // Type of plane (u,v,x,y...)
+    std::vector<WirePlane*> fPlanes;  // Wire planes of this type
+    UInt_t          fNlevels;     // Number of levels of search tree
+    Double_t        fMaxSlope;    // Maximum physical track slope (0=perp)
+    Double_t        fWidth;       // Width of tracking region (m)
+    Double_t        fSinAngle;    // Sine of wire angle
+    Double_t        fCosAngle;    // Cosine of wire angle
 
-    Hitpattern*         fHitpattern;  // Hitpattern of current event
-    PatternTree*        fPatternTree; // Precomputed template database
+    Hitpattern*     fHitpattern;  // Hitpattern of current event
+    PatternTree*    fPatternTree; // Precomputed template database
 
-    THaDetectorBase*    fDetector;    //! Parent detector
+    THaDetectorBase* fDetector;    //! Parent detector
+
+    std::
+    multiset<NodeDescriptor> fPatternsFound; // Patterns found by TreeSearch
 
     //FIXME: TEST
-    UInt_t  n_test, n_found;
     Double_t search_time;
     void  SetAngle( Double_t a );
 
@@ -92,15 +92,14 @@ namespace TreeSearch {
     // added to the list of roads for further analysis
     class ComparePattern : public NodeVisitor {
     public:
-      ComparePattern( Projection* proj ) 
-	: fProj(proj) { assert(fProj); fHitpattern = fProj->GetHitpattern(); }
+      ComparePattern( const Hitpattern* hitpat,
+		      std::multiset<NodeDescriptor>* matches )
+	: fHitpattern(hitpat), fMatches(matches) { assert(hitpat && matches); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
     private:
       const Hitpattern* fHitpattern;    // Hitpattern to compare to
-      Projection* fProj;                // Projection we belong to
-//       std::list<Road>&  fRoads;         // List of results
+      std::multiset<NodeDescriptor>* fMatches; // Set of matching patterns
     };
-    friend class ComparePattern;
 
     ClassDef(Projection,0)  // A track projection plane
   };

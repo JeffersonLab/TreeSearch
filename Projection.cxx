@@ -16,6 +16,7 @@
 #include "TreeWalk.h"
 #include <iostream>
 #include <sys/time.h>  // for timing
+
 using namespace std;
 
 namespace TreeSearch {
@@ -122,8 +123,9 @@ void Projection::Clear( Option_t* opt )
   if( fHitpattern )
     fHitpattern->Clear();
 
+  fPatternsFound.clear();
+
   //FIXME: TEST
-  n_found = n_test = 0;
   search_time = 0.0;
 }
 
@@ -263,8 +265,8 @@ Int_t Projection::DefineVariables( EMode mode )
   // Register variables in global list
   
   RVarDef vars[] = {
-    { "n_test",   "Number of pattern comparisons per event", "n_test"     },
-    { "n_found",  "Number of patterns found per event",      "n_found"    },
+    //{ "n_test",   "Number of pattern comparisons per event", "n_test"     },
+    //{ "n_found",  "Number of patterns found per event",      "n_found"    },
     { "t_search", "Search time per event (us)", "search_time"     },
     { 0 }
   };
@@ -287,22 +289,59 @@ Int_t Projection::FillHitpattern()
 }
 
 //_____________________________________________________________________________
-Int_t Projection::TreeSearch()
+Int_t Projection::Track()
 {
-  
+  // Perform tracking in this projection:
+  //
+  // - match hits to straight-line patterns
+  // - combine patterns referring to common sets of hits into one ("Roads")
+  // - fit hits in each road
+  // - filter roads according to chi^2 and similarity
+  //
+  // Results in fRoads
+
+
+  // TreeSearch:
+  // Match the hitpattern of the current event against the pattern template
+  // database. Results in fPatternsFound.
+
+  //FIXME: test
   struct timeval start, stop, diff;
   gettimeofday( &start, 0 );
 
-  ComparePattern compare( this );
+  fPatternsFound.clear();
+
+  ComparePattern compare( fHitpattern, &fPatternsFound );
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
+  //FIXME: test
   gettimeofday(&stop, 0 );
   timersub( &stop, &start, &diff );
   search_time = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
+  cout << fPatternsFound.size() << endl;
+
+  // TreeCombine:
+  // Combine patterns with common sets of hits into Roads
+
+  //TODO...
+
+  // RoadFit:
+  // Fit hits within each road. Store fit parameters with Road. 
+  // Store list of best-fit hits with Road
+
+  //TODO: put in separate routine since the fit will need to be repeated
+
+  // FilterGhosts:
+  // Eliminate roads with high chi^2 and roads that appear to be essentially
+  // identical to others
+
+  //TODO...
+
   return 0;
 }
+
 
 //_____________________________________________________________________________
 void Projection::MakePrefix()
@@ -334,8 +373,7 @@ Double_t Projection::GetZsize() const
 {
   // Get z_max - z_min of the planes.
   
-  if( fPlanes.empty() )
-    return 0.0;
+  assert( !fPlanes.empty() );
 
   return fPlanes.back()->GetZ() - fPlanes.front()->GetZ();
 }
@@ -391,15 +429,14 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
   // is present in the current event's hitpattern
 
   // Match?
-  fProj->n_test++;  //FIXME: test
+  //  fProj->n_test++;  //FIXME: test
   if( fHitpattern->ContainsPattern(nd) == fHitpattern->GetNplanes() ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 
-    // Found a match at the maximum resolution: add it to the list of roads
-    fProj->n_found++;     //FIXME: test
-
-
+    // Found a match at the bottom of the tree. Add this match to the list
+    // of results, ordered by the start bin # (NodeDescriptor::operator<())
+    fMatches->insert( nd );
   }
   return kSkipChildNodes;
 }
