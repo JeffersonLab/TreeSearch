@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaAnalysisObject.h"
-#include "NodeVisitor.h"
+#include "TreeWalk.h"
 #include "TMath.h"
 #include <vector>
 #include <cassert>

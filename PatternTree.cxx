@@ -6,8 +6,6 @@
 
 #include "PatternTree.h"
 #include "Pattern.h"
-#include "TreeWalk.h"
-#include "StdVisitors.h"
 //#include "TreeFile.h"
 #include "TError.h"
 #include <iostream>

@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Pattern.h"
-#include "NodeVisitor.h"
+#include "TreeWalk.h"
 #include <vector>
 #include <map>
 #include <iostream>

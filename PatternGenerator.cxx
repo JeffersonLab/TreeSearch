@@ -6,7 +6,6 @@
 
 #include "PatternGenerator.h"
 #include "PatternTree.h"
-#include "TreeWalk.h"
 #include "TMath.h"
 #include "TString.h"
 #include "TError.h"
