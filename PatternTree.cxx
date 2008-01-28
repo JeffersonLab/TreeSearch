@@ -6,6 +6,7 @@
 
 #include "PatternTree.h"
 #include "Pattern.h"
+#include "TreeWalk.h"
 #include "StdVisitors.h"
 //#include "TreeFile.h"
 #include "TError.h"
@@ -181,7 +182,7 @@ Int_t PatternTree::Write( const char* filename )
   WritePattern write(filename,index_size);
   TreeWalk walk( GetNlevels() );
   Int_t ret = walk( GetRoot(), write );
-  if( ret != TreeWalk::kError )
+  if( ret != kError )
     ret = 0;
   return ret;
 }
@@ -206,7 +207,7 @@ PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child, Int_t type )
 }
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp 
+NodeVisitor::ETreeOp
 PatternTree::CopyPattern::operator() ( const NodeDescriptor& nd )
 try {
   // Add pattern to the PatternTree fTree
@@ -261,7 +262,7 @@ try {
     fTree->fNlnk += nchild;
     fTree->fNbit += cur_pat->GetNbits();
     // Proceed with this pattern's child nodes
-    return TreeWalk::kRecurseUncond;
+    return kRecurseUncond;
   } 
   else {
     // Existing pattern: add link to the parent pattern's child node list,
@@ -269,14 +270,14 @@ try {
     Pattern* ref_node = &(fTree->fPatterns.at( idx->second ));
     AddChild( copied_parent, ref_node, nd.link->Type() );
     // Skip this pattern's child nodes since they are already in the tree
-    return TreeWalk::kSkipChildNodes;
+    return kSkipChildNodes;
   }
 }
 catch ( out_of_range ) {
   ::Error( "TreeSearch::CopyPattern", "Array index out of range at %u %u %u "
 	   "(internal logic error). Tree not copied. Call expert.",
 	   fTree->fNpat, fTree->fNlnk, fTree->fNbit );
-  return TreeWalk::kError;
+  return kError;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

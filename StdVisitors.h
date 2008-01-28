@@ -15,6 +15,7 @@
 
 #include "NodeVisitor.h"
 #include <fstream>
+#include <iostream>
 #include <iomanip>
 #include <map>
 
@@ -26,7 +27,7 @@ class WritePattern : public NodeVisitor {
 public:
   WritePattern( const char* filename, size_t index_size = sizeof(Int_t) );
   virtual ~WritePattern() { delete os; }
-  virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
+  virtual ETreeOp operator() ( const NodeDescriptor& nd );
 
 private:
   std::ofstream* os;        // Output file stream
@@ -43,8 +44,8 @@ private:
 class CountPattern : public NodeVisitor {
 public:
   CountPattern() : fCount(0) {}
-  virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd )
-  { fCount++; return TreeWalk::kRecurse; }
+  virtual ETreeOp operator() ( const NodeDescriptor& nd )
+  { fCount++; return kRecurse; }
   ULong64_t GetCount() const { return fCount; }
 
 private:
@@ -57,7 +58,7 @@ class PrintPattern : public NodeVisitor {
 public:
   PrintPattern( std::ostream& ostr = std::cout, bool dump = false ) 
     : os(ostr), fCount(0), fDump(dump) {}
-  virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
+  virtual ETreeOp operator() ( const NodeDescriptor& nd );
   ULong64_t GetCount() const { return fCount; }
 
 private:

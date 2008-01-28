@@ -6,6 +6,7 @@
 
 #include "PatternGenerator.h"
 #include "PatternTree.h"
+#include "TreeWalk.h"
 #include "TMath.h"
 #include "TString.h"
 #include "TError.h"
@@ -278,7 +279,7 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
     TreeWalk walk(fNlevels);
     PatternTree::CopyPattern copy(tree);
     cout << "Filling tree..." << flush;
-    TreeWalk::ETreeOp ret = walk( &root_link, copy );
+    NodeVisitor::ETreeOp ret = walk( &root_link, copy );
     cout << "done" << endl;
     if( ret == kError ) {
       ::Error( here, "Unable to create PatternTree structure" );

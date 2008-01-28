@@ -5,14 +5,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "TreeWalk.h"
-#include "NodeVisitor.h"
 
 ClassImp(TreeSearch::TreeWalk)
 
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp
+NodeVisitor::ETreeOp
 TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent, 
 		      UInt_t depth, UInt_t shift, Bool_t mirrored ) const
 {
@@ -23,10 +22,11 @@ TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent,
   //  fSkipChildNodes: ignore child nodes
   //  kError: error, return immediately
 
-  if( !link ) return TreeWalk::kError;
-  ETreeOp ret = action(NodeDescriptor(link, parent, shift, mirrored, depth));
-  if( ret == TreeWalk::kRecurseUncond or
-      ( ret == TreeWalk::kRecurse and depth+1 < fNlevels ) ) {
+  if( !link ) return NodeVisitor::kError;
+  NodeVisitor::ETreeOp ret = 
+    action(NodeDescriptor(link, parent, shift, mirrored, depth));
+  if( ret == NodeVisitor::kRecurseUncond or 
+      ( ret == NodeVisitor::kRecurse and depth+1 < fNlevels ) ) {
     Pattern* pat = link->GetPattern();
     Link* ln = pat->GetChild();
     while( ln ) {
@@ -39,7 +39,7 @@ TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent,
       Bool_t new_mir = mirrored xor ln->Mirrored();
       ret = (*this)( ln, action, pat, depth+1, 
 		     (shift << 1) + (new_mir xor ln->Shift()), new_mir );
-      if( ret == TreeWalk::kError ) return ret;
+      if( ret == NodeVisitor::kError ) return ret;
       // Continue along the linked list of child nodes
       ln = ln->Next();
     }

@@ -90,12 +90,11 @@ namespace TreeSearch {
     // NodeVisitor class for comparing patterns in the tree with the
     // hitpattern. Matches represent candidates for track roads and are
     // added to the list of roads for further analysis
-    //FIXME: this should be a member of Hitpattern
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( Projection* proj ) 
 	: fProj(proj) { assert(fProj); fHitpattern = fProj->GetHitpattern(); }
-      TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
+      virtual ETreeOp operator() ( const NodeDescriptor& nd );
     private:
       const Hitpattern* fHitpattern;    // Hitpattern to compare to
       Projection* fProj;                // Projection we belong to

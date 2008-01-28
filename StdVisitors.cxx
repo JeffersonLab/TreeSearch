@@ -5,8 +5,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "StdVisitors.h"
+#include "Pattern.h"
 #include "TError.h"
-#include <iostream>
 
 using namespace std;
 
@@ -57,7 +57,7 @@ void swapped_binary_write( ostream& os, const T& data, size_t n = 1,
 }
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
+NodeVisitor::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
 {
   // Write the single pattern referenced by "nd" to the binary output stream.
   // In essence, this implements the serialization method for cyclical graphs
@@ -65,7 +65,7 @@ TreeWalk::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
   // http://www.parashift.com/c++-faq-lite/serialization.html#faq-36.11
 
   if( !os )
-    return TreeWalk::kError;
+    return kError;
   Pattern* node = nd.link->GetPattern();
   map<Pattern*,Int_t>::iterator idx = fMap.find(node);
   if( idx == fMap.end() ) {
@@ -73,28 +73,28 @@ TreeWalk::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
     fMap[node] = n;
     // Header for new pattern: link type + 128 (=128-130)
     os->put( nd.link->Type() | 0x80 );
-    if( os->fail() ) return TreeWalk::kError;
+    if( os->fail() ) return kError;
     // Pattern data. NB: fBits[0] is always 0, so we can skip it
     swapped_binary_write( *os, node->GetBits()[1], node->GetNbits()-1 );
     // Child node count
     UShort_t nchild = node->GetNchildren();
     swapped_binary_write( *os, nchild );
-    if( os->fail() ) return TreeWalk::kError;
+    if( os->fail() ) return kError;
     // Write child nodes regardless of depth
-    return TreeWalk::kRecurseUncond;
+    return kRecurseUncond;
   } else {
     // Reference pattern header: the plain link type (=0-2)
     os->put( nd.link->Type() );
     // Reference index
     swapped_binary_write( *os, idx->second, 1, sizeof(Int_t)-fIdxSiz );
-    if( os->fail() ) return TreeWalk::kError;
+    if( os->fail() ) return kError;
     // Don't write child nodes
-    return TreeWalk::kSkipChildNodes;
+    return kSkipChildNodes;
   }
 }
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp PrintPattern::operator() ( const NodeDescriptor& nd )
+NodeVisitor::ETreeOp PrintPattern::operator() ( const NodeDescriptor& nd )
 {
   // Print actual (shifted & mirrored) pattern described by "nd".
 
@@ -132,7 +132,7 @@ TreeWalk::ETreeOp PrintPattern::operator() ( const NodeDescriptor& nd )
   os << endl;
 
   // Process child nodes through maxdepth
-  return TreeWalk::kRecurse;
+  return kRecurse;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

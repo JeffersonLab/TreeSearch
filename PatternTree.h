@@ -33,7 +33,8 @@ namespace TreeSearch {
 		 UInt_t nPatterns = 0, UInt_t nLinks = 0 );
     virtual ~PatternTree();
     // TODO: copy c'tor, assignment (see below)
- 
+    // TODO: implement Read()
+
     static PatternTree* Read( const char* filename, const TreeParam_t& param );
 
     void   Print( Option_t* opt="", std::ostream& os = std::cout );
@@ -49,7 +50,7 @@ namespace TreeSearch {
     class CopyPattern : public NodeVisitor {
     public:
       CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
-      virtual TreeWalk::ETreeOp operator() ( const NodeDescriptor& nd );
+      virtual ETreeOp operator() ( const NodeDescriptor& nd );
 
     private:
       PatternTree* fTree;    // Tree object to fill

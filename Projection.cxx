@@ -13,6 +13,7 @@
 #include "TString.h"
 #include "PatternTree.h"
 #include "PatternGenerator.h"
+#include "TreeWalk.h"
 #include <iostream>
 #include <sys/time.h>  // for timing
 using namespace std;
@@ -383,23 +384,24 @@ void Projection::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
-TreeWalk::ETreeOp
+NodeVisitor::ETreeOp 
 Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
 {
   // Test if the pattern from the database that is given by NodeDescriptor
   // is present in the current event's hitpattern
 
   // Match?
-  fProj->n_test++;
+  fProj->n_test++;  //FIXME: test
   if( fHitpattern->ContainsPattern(nd) == fHitpattern->GetNplanes() ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
-      return TreeWalk::kRecurse;
+      return kRecurse;
 
     // Found a match at the maximum resolution: add it to the list of roads
-    //TODO...
-    fProj->n_found++;
+    fProj->n_found++;     //FIXME: test
+
+
   }
-  return TreeWalk::kSkipChildNodes;
+  return kSkipChildNodes;
 }
 
 //_____________________________________________________________________________
