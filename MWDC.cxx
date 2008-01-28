@@ -199,8 +199,6 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 
     fProj[type]->FillHitpattern();
 
-    //TODO: preliminary
-    fProj[type]->TreeSearch();
   }
 
   return 0;
@@ -209,12 +207,16 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 //_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
-  return 0;//fNtracks;
+  return 0;
 }
 
 //_____________________________________________________________________________
 Int_t MWDC::FineTrack( TClonesArray& tracks )
 {
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    
+    fProj[type]->Track();
+  }
   return 0;//fNtracks;
 }
 
