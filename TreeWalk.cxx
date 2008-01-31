@@ -10,6 +10,7 @@
 using namespace std;
 
 ClassImp(TreeSearch::TreeWalk)
+ClassImp(TreeSearch::NodeDescriptor)
 
 namespace TreeSearch {
 

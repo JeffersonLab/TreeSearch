@@ -22,6 +22,7 @@
 #pragma link C++ class TreeSearch::PatternGenerator+;
 #pragma link C++ class TreeSearch::PatternGenerator::Statistics_t+;
 #pragma link C++ class TreeSearch::TreeWalk+;
+#pragma link C++ class TreeSearch::NodeDescriptor+;
 #pragma link C++ class TreeSearch::TreeParam_t+;
 
 #pragma link C++ class std::pair<TObject*,TObject*>;

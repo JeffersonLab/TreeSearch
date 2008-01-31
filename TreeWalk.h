@@ -36,6 +36,7 @@ namespace TreeSearch {
     NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
 		    UChar_t dep )
       : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir) {}
+    virtual ~NodeDescriptor() {}
 
     // Comparison operators for inserting into ordered STL containers.
     // Order nodes by ascending start bin.
@@ -46,6 +47,7 @@ namespace TreeSearch {
     bool operator==( const NodeDescriptor& rhs ) const {
       return ( shift == rhs.shift );
     }
+    ClassDef(NodeDescriptor, 0)  // Full description of a pattern
   };    
 
   //___________________________________________________________________________
