@@ -17,8 +17,7 @@ using std::vector;
 namespace TreeSearch {
 
   class PatternGenerator {
-    friend class NodeVisitor;
-    friend class Test_PatternGenerator;
+    //    friend class Test_PatternGenerator;
   public:
     PatternGenerator();
     virtual ~PatternGenerator();
