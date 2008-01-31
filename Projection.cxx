@@ -218,7 +218,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 
   // Set up a hitpattern object with the parameters of this projection
   delete fHitpattern;
-  fHitpattern = new Hitpattern( fNlevels, GetNlayers(), fWidth );
+  fHitpattern = new Hitpattern( *fPatternTree );
   if( !fHitpattern || fHitpattern->IsError() )
     return fStatus = kInitError;
 
