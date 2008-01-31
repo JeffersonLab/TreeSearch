@@ -18,11 +18,10 @@ ClassImp(TreeSearch::PatternTree)
 namespace TreeSearch {
 
 //_____________________________________________________________________________
-PatternTree::PatternTree( const TreeParam_t& parameters, UInt_t nPatterns,
+PatternTree::PatternTree( const TreeParam_t& param, UInt_t nPatterns,
 			  UInt_t nLinks )
 try
-  : fParameters(parameters), fParamOK(false), fNpat(0), fNlnk(0), fNbit(0), 
-    fID(0)
+  : fParameters(param), fParamOK(false), fNpat(0), fNlnk(0), fNbit(0)
 {
   // Constructor. 
 
@@ -72,8 +71,9 @@ Int_t TreeParam_t::Normalize()
 {
   // Test, then normalize parameter values to width = 1 and z_max = 1.
   // Returns 0 on success, != 0 on error. On success only, the input data
-  // are irreversibly modified. zpos.front(), zpos.back(), and width will 
-  // have trivial values (0, 1, 1, respectively) that algorithms can rely on.
+  // are irreversibly modified: zpos.front() and zpos.back() will be 0 and 1,
+  // respectively, and maxslope is scaled to the normalized aspect ratio.
+  // width is not changed
 
   static const char* const here = "TreeParam_t::Normalize";
 
@@ -114,8 +114,6 @@ Int_t TreeParam_t::Normalize()
 
   // Scale maxslope to the new aspect ratio
   maxslope *= zsize / width;
-
-  width = 1.0;
 
   return 0;
 }

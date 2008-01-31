@@ -45,6 +45,7 @@ namespace TreeSearch {
     UInt_t GetNplanes() const { return fParameters.zpos.size(); }
     const TreeParam_t& GetParameters() const { return fParameters; }
     Link*  GetRoot() { return fLinks.empty() ? 0 : &fLinks.front(); }
+    Double_t GetWidth() const { return fParameters.width; }
 
     // Copy an arbitrary tree into the PatternTree array structures
     class CopyPattern : public NodeVisitor {
@@ -77,7 +78,6 @@ namespace TreeSearch {
     vpsz_t           fNpat;       // Current pattern count 
     vlsz_t           fNlnk;       // Current link count
     vsiz_t           fNbit;       // Current bit count
-    Int_t            fID;         // Pattern ID
 
     // Disallow copying and assignment for now. The vectors can NOT be copied 
     // directly since they contain pointers to the other vectors' elements!
