@@ -13,6 +13,7 @@
 #include "Pattern.h"
 #include <cstring>
 #include <cassert>
+#include <vector>
 
 namespace TreeSearch {
 
@@ -33,6 +34,7 @@ namespace TreeSearch {
 
   class PatternTree;
   class WirePlane;
+  class Hit;
 
   class Hitpattern {
 
@@ -43,27 +45,43 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    Bits*    GetRow( UInt_t i ) const { return i<fNplanes ? fPattern[i] : 0; }
-
-    Double_t GetWidth()   const { return (1U<<(fNlevels-1))/fScale; }
+    std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, UInt_t bin ) {
+      // Get array of hits that set the given bin in the given plane
+      return fHits[ MakeIdx(plane,bin) ];
+    }
+      
+    UInt_t   GetNbins()   const { return 1U<<(fNlevels-1); }
+    UInt_t   GetNhits()   const { return (UInt_t)fHitList.size(); }
     UInt_t   GetNlevels() const { return fNlevels; }
     UInt_t   GetNplanes() const { return fNplanes; }
     Double_t GetOffset()  const { return fOffset; }
-
+    Double_t GetWidth()   const { return GetNbins()/fScale; }
+    
     Bool_t   IsError()    const { return (fNplanes == 0); }
 
-    void     SetPositionRange( Double_t start, Double_t end, UInt_t plane );
-    void     SetPosition( Double_t pos, Double_t res, UInt_t plane )
-    { SetPositionRange( pos-res, pos+res, plane ); }
+    void     SetPositionRange( Double_t start, Double_t end, UInt_t plane,
+			       Hit* hitA, Hit* hitB = 0 );
+    void     SetPosition( Double_t pos, Double_t res, UInt_t plane,
+			  Hit* hitA, Hit* hitB = 0 )
+    { SetPositionRange( pos-res, pos+res, plane, hitA, hitB ); }
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
     Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
-    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
+//     Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
     UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
 
     void     SetOffset( Double_t off ) { fOffset = off; }
+
+#ifdef TESTCODE
+    // Total number of bins set at the highest resolution
+    UInt_t   GetBinsSet() const;
+    // Number of references from bins to hits
+    UInt_t   GetHitListSize() const { return (UInt_t)fHitList.size(); }
+    // Maximum number of hits recorded per bin
+    UInt_t   GetMaxhitBin() const { return fMaxhitBin; }
+#endif
 
 //FIXME: add Draw() (=event display)
 
@@ -75,32 +93,45 @@ namespace TreeSearch {
     Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
     Bits**   fPattern;  // [fNplanes] pattern at all fNlevels resolutions
 
+    // For each plane and each bin at max level, provide an array
+    // of pointers to the hits that set this bin. This must be an array,
+    // not a tree or list, for lookup efficiency during track processing.
+    // Since each plane has the same number of levels, we can simplify
+    // this to a 2D array, which performs better than a 3D array would.
+    // [fNplanes<<(fNlevels-1)][number of hits in bin]
+    std::vector<std::vector<Hit*> > fHits;
+    // Linear list of plane/bin number index of all hits
+    std::vector<UInt_t> fHitList;
+    
+    UInt_t MakeIdx( UInt_t plane, UInt_t bin ) const {
+      // Return index into fHits corresponding to the given plane and bin
+      assert( plane<fNplanes && bin<GetNbins() );
+      UInt_t idx = plane*GetNbins() + bin;
+      assert( idx < fHits.size());
+      return idx;
+    }
+
+    void AddHit( UInt_t plane, UInt_t bin, Hit* hit );
+
+#ifdef TESTCODE
+    UInt_t  fMaxhitBin;  // Maximum depth of hit array per bin
+#endif
 
     ClassDef(Hitpattern,0)  // Wire chamber hitpattern at multiple resolutions
   };
 
   //___________________________________________________________________________
-  inline
-  void Hitpattern::Clear( Option_t* opt )
-  {
-    // Clear the hitpattern
+//   inline
+//   Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane, 
+// 					  UInt_t depth ) const
+//   {
+//     // Test if point is set at the given depth and plane.
 
-    for( UInt_t i=fNplanes; i; )
-      fPattern[--i]->FastClear();
-  }
-
-  //___________________________________________________________________________
-  inline
-  Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane, 
-					  UInt_t depth ) const
-  {
-    // Test if point is set at the given depth and plane.
-
-    assert( depth < fNlevels && plane < fNplanes );
-    UInt_t offset = 1U<<depth;
-    assert( bin < offset );
-    return fPattern[plane]->TestBitNumber( bin + offset );
-  }
+//     assert( depth < fNlevels && plane < fNplanes );
+//     UInt_t offset = 1U<<depth;
+//     assert( bin < offset );
+//     return fPattern[plane]->TestBitNumber( bin + offset );
+//   }
 
   //___________________________________________________________________________
   inline
@@ -111,8 +142,8 @@ namespace TreeSearch {
     // The pattern will be tested at the given depth.
 
     assert( depth < fNlevels && plane < fNplanes );
-    Int_t bin = TMath::FloorNint( fScale*pos );
-    if( bin < 0 || bin >= 1<<(fNlevels-1) )
+    UInt_t bin = TMath::FloorNint( fScale*pos );
+    if( bin < 0 || bin >= GetNbins() )
       return kFALSE;
     return 
       fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
