@@ -125,8 +125,9 @@ void Projection::Clear( Option_t* opt )
 
   fPatternsFound.clear();
 
-  //FIXME: TEST
-  search_time = 0.0;
+#ifdef TESTCODE
+  t_treesearch = 0.0;
+#endif
 }
 
 //_____________________________________________________________________________
@@ -172,8 +173,14 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   tp.maxdepth = fNlevels-1;
   tp.width = fWidth;
   tp.maxslope = fMaxSlope;
-  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it )
+  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
+    Double_t zpos = (*it)->GetZ();
+    // The reference plane for a partnered plane pair is halfway between
+    if( (*it)->GetPartner() ) {
+      zpos = 0.5*( zpos + (*it)->GetPartner()->GetZ() );
+    }
     tp.zpos.push_back( (*it)->GetZ() );
+  }
 
   if( tp.Normalize() != 0 )
     return fStatus = kInitError;
@@ -258,16 +265,21 @@ Int_t Projection::DefineVariables( EMode mode )
 {
   // Initialize global variables and lookup table for decoder
 
-
   if( mode == kDefine && fIsSetup ) return kOK;
   fIsSetup = ( mode == kDefine );
 
-  // Register variables in global list
-  
+  // Global variables
   RVarDef vars[] = {
-    //{ "n_test",   "Number of pattern comparisons per event", "n_test"     },
-    //{ "n_found",  "Number of patterns found per event",      "n_found"    },
-    { "t_search", "Search time per event (us)", "search_time"     },
+#ifdef TESTCODE
+    { "n_hits", "Number of hits used for filling hitpattern", "n_hits" },
+    { "n_bins", "Number of bins set in hitpattern", "n_bins" },
+    { "n_binhits", "Number of references from bins to hits","n_binhits" },
+    { "maxhits_per_bin", "Max number of hits per bin", "maxhits_bin" },
+    { "n_test", "Number of pattern comparisons", "n_test"  },
+    { "n_pat", "Number of patterns found",   "n_pat"    },
+    { "t_treesearch", "Time in TreeSearch (us)", "t_treesearch" },
+    //    { "", "", "" },
+#endif
     { 0 }
   };
   DefineVarsFromList( vars, mode );
@@ -285,6 +297,12 @@ Int_t Projection::FillHitpattern()
   for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
     ntot += fHitpattern->ScanHits( *it, (*it)->GetPartner() );
   }
+#ifdef TESTCODE
+  n_hits = ntot;
+  n_bins = fHitpattern->GetBinsSet();
+  n_binhits = fHitpattern->GetHitListSize();
+  maxhits_bin = fHitpattern->GetMaxhitBin();
+#endif
   return ntot;
 }
 
@@ -305,22 +323,26 @@ Int_t Projection::Track()
   // Match the hitpattern of the current event against the pattern template
   // database. Results in fPatternsFound.
 
-  //FIXME: test
+  fPatternsFound.clear();
+
+#ifdef TESTCODE
   struct timeval start, stop, diff;
   gettimeofday( &start, 0 );
-
-  fPatternsFound.clear();
+#endif
 
   ComparePattern compare( fHitpattern, &fPatternsFound );
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
-  //FIXME: test
+#ifdef TESTCODE
+  //FIXME: use high-res CPU time timer instead
   gettimeofday(&stop, 0 );
   timersub( &stop, &start, &diff );
-  search_time = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+  t_treesearch = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
-  cout << fPatternsFound.size() << endl;
+  n_test = compare.GetNtest();
+  n_pat  = fPatternsFound.size();
+#endif
 
   // TreeCombine:
   // Combine patterns with common sets of hits into Roads
@@ -428,14 +450,16 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
   // Test if the pattern from the database that is given by NodeDescriptor
   // is present in the current event's hitpattern
 
+#ifdef TESTCODE
+  ++fNtest;
+#endif
   // Match?
-  //  fProj->n_test++;  //FIXME: test
   if( fHitpattern->ContainsPattern(nd) == fHitpattern->GetNplanes() ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 
-    // Found a match at the bottom of the tree. Add this match to the list
-    // of results, ordered by the start bin # (NodeDescriptor::operator<())
+    // Found a match at the bottom of the tree. Add it to the list of results,
+    // ordered by the start bin # (NodeDescriptor::operator<())
     fMatches->insert( nd );
   }
   return kSkipChildNodes;

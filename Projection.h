@@ -62,7 +62,7 @@ namespace TreeSearch {
 
   protected:
     Int_t           fType;        // Type of plane (u,v,x,y...)
-    std::vector<WirePlane*> fPlanes;  // Wire planes of this type
+    std::vector<WirePlane*> fPlanes; // Primary wire planes of this proj type
     UInt_t          fNlevels;     // Number of levels of search tree
     Double_t        fMaxSlope;    // Maximum physical track slope (0=perp)
     Double_t        fWidth;       // Width of tracking region (m)
@@ -77,8 +77,12 @@ namespace TreeSearch {
     std::
     multiset<NodeDescriptor> fPatternsFound; // Patterns found by TreeSearch
 
-    //FIXME: TEST
-    Double_t search_time;
+#ifdef TESTCODE
+    UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
+    UInt_t n_test, n_pat;
+    Double_t t_treesearch;
+#endif
+
     void  SetAngle( Double_t a );
 
     // Podd interface
@@ -94,11 +98,21 @@ namespace TreeSearch {
     public:
       ComparePattern( const Hitpattern* hitpat,
 		      std::multiset<NodeDescriptor>* matches )
-	: fHitpattern(hitpat), fMatches(matches) { assert(hitpat && matches); }
+	: fHitpattern(hitpat), fMatches(matches)
+#ifdef TESTCODE
+	, fNtest(0)
+#endif
+      { assert(hitpat && matches); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
+#ifdef TESTCODE
+      UInt_t GetNtest() const { return fNtest; }
+#endif
     private:
       const Hitpattern* fHitpattern;    // Hitpattern to compare to
       std::multiset<NodeDescriptor>* fMatches; // Set of matching patterns
+#ifdef TESTCODE
+      UInt_t fNtest;  // Number of pattern comparisons
+#endif
     };
 
     ClassDef(Projection,0)  // A track projection plane
