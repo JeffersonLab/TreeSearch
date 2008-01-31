@@ -7,6 +7,7 @@
 #include "Hitpattern.h"
 #include "Hit.h"
 #include "WirePlane.h"
+#include "PatternTree.h"
 #include "TError.h"
 
 #include <iostream>
@@ -20,8 +21,20 @@ ClassImp(TreeSearch::Hitpattern)
 namespace TreeSearch {
 
 //_____________________________________________________________________________
+Hitpattern::Hitpattern( const PatternTree& pt )
+  : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0), 
+    fOffset(0.5*pt.GetWidth()), fPattern(0)
+#ifdef TESTCODE
+  , fMaxhitBin(0)
+#endif
+{
+  // Construct Hitpattern using paramaters of pattern tree
+
+  Init( pt.GetWidth() );
+}
+
+//_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
-try
   : fNlevels(nlevels), fNplanes(0), fScale(0), fOffset(0.5*width), fPattern(0)
 #ifdef TESTCODE
   , fMaxhitBin(0)
@@ -38,18 +51,31 @@ try
     ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", width );
   } else {
     fNplanes = nplanes;
+    Init( width );
+  }
+}
+
+//_____________________________________________________________________________
+void Hitpattern::Init( Double_t width )
+{
+  // Allocate memory for new Hitpattern object.
+  // Internal utility function called by constructors.
+
+  assert( width >= 1e-2 );
+  fScale = GetNbins() / width;
+
+  try {
     fPattern = new Bits*[fNplanes];
     UInt_t nbins2 = 2*GetNbins();  // 2*number of bins at deepest level
     for( UInt_t i=0; i<fNplanes; i++ )
       fPattern[i] = new Bits( nbins2 );
-    fScale = GetNbins() / width;
     fHits.resize( fNplanes*GetNbins() );
   }
-}
-catch ( std::bad_alloc ) {
-  ::Error( "Hitpattern::Hitpattern", "Out of memory trying to construct "
-	   "new Hitpattern object. Call expert." );
-  throw;
+  catch ( std::bad_alloc ) {
+    ::Error( "Hitpattern::Hitpattern", "Out of memory trying to construct "
+	     "new Hitpattern object. Call expert." );
+    throw;
+  }
 }
 
 //_____________________________________________________________________________

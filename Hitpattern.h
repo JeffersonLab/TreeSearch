@@ -39,7 +39,7 @@ namespace TreeSearch {
   class Hitpattern {
 
   public:
-    //    Hitpattern( const PatternTree& pt );
+    explicit Hitpattern( const PatternTree& pt );  // preferred constructor
     Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width );
     Hitpattern( const Hitpattern& orig );
     Hitpattern& operator=( const Hitpattern& rhs );
@@ -116,6 +116,9 @@ namespace TreeSearch {
 #ifdef TESTCODE
     UInt_t  fMaxhitBin;  // Maximum depth of hit array per bin
 #endif
+
+  private:
+    void Init( Double_t width );
 
     ClassDef(Hitpattern,0)  // Wire chamber hitpattern at multiple resolutions
   };
