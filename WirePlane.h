@@ -55,8 +55,10 @@ namespace TreeSearch {
     TSeqCollection* GetHits() const { return fHits; }
     Int_t           GetNhits() const { return fHits->GetLast()+1; }
     UInt_t          GetPlaneNum() const { return fPlaneNum; }
+    UInt_t          GetLayerNum() const { return fLayerNum; }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
+    void            SetLayerNum( UInt_t n ) { fLayerNum = n; }
     void            SetProjection( Projection* p ) { fProjection = p; }
 
     // Helper functors for STL algorithms...
@@ -81,6 +83,7 @@ namespace TreeSearch {
     // Geometry, configuration
 
     UInt_t      fPlaneNum;     // Ordinal of this plane within its projection
+    UInt_t      fLayerNum;     // Layer number of this plane within its proj
     EProjType   fType;         // Plane type (x,y,u,v)
     Double_t    fWireStart;    // Position of 1st wire (along wire coord) (m)
     Double_t    fWireSpacing;  // Wire spacing (assumed constant) (m)
