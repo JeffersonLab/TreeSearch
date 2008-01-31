@@ -42,8 +42,8 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 
 //_____________________________________________________________________________
 Projection::Projection( const Projection& orig )
-  : fType(orig.fType), fPlanes(orig.fPlanes), fNlevels(orig.fNlevels),
-    fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
+  : fType(orig.fType), fPlanes(orig.fPlanes), fLayers(orig.fLayers),
+    fNlevels(orig.fNlevels), fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
     fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
     fHitpattern(0), fPatternTree(0), fDetector(orig.fDetector)
 {
@@ -64,6 +64,7 @@ const Projection& Projection::operator=( const Projection& rhs )
     fType     = rhs.fType;
     fNlevels    = rhs.fNlevels;
     fPlanes   = rhs.fPlanes;
+    fLayers   = rhs.fLayers;
     fMaxSlope = rhs.fMaxSlope;
     fWidth    = rhs.fWidth;
     fSinAngle = rhs.fSinAngle;
@@ -92,27 +93,27 @@ Projection::~Projection()
 }
 
 //_____________________________________________________________________________
-void Projection::AddPlane( WirePlane* wp )
+void Projection::AddPlane( WirePlane* wp, WirePlane* partner )
 {
-  // Add wire plane to this projection
+  // Add wire plane wp (and optional partner plane) to this projection. 
+  // Sets plane and layer numbers.
 
-  if( !wp )
-    return;
+  assert(wp);
 
-//   const WirePlane* planes[] = { wp, wp->GetPartner(), 0 };
-//   const WirePlane** p = planes;
-//   while( *p ) {
-//     Double_t z = (*p)->GetZ();
-//     if( z < fZmin )
-//       fZmin = z;
-//     if( z > fZmax )
-//       fZmax = z;
-//     ++p;
-//   }
-  
-  // Only add the primary plane; partner planes are linked within the
-  // plane objects
+  wp->SetPlaneNum( fPlanes.size() );
   fPlanes.push_back( wp );
+  if( partner ) {
+    assert( partner->GetZ() > wp->GetZ() ); // Planes must be ordered
+    partner->SetPlaneNum( fPlanes.size() );
+    fPlanes.push_back( partner );
+  }
+
+  // Only add the primary plane to the vector of layers; partner planes are
+  // linked within the plane objects (get via wp->GetPartner())
+  wp->SetLayerNum( fLayers.size() );
+  fLayers.push_back( wp );
+  if( partner )
+    partner->SetLayerNum( wp->GetLayerNum() );
 }
 
 //_____________________________________________________________________________
@@ -136,8 +137,8 @@ Int_t Projection::Decode( const THaEvData& evdata )
   // Decode all planes belonging to this projection
 
   Int_t sum = 0;
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    WirePlane* wp = fPlanes[iplane];
+  for( vwsiz_t i = 0; i < fLayers.size(); ++i ) {
+    WirePlane* wp = fLayers[i];
     Int_t nhits = wp->Decode( evdata );
     sum += nhits;
     if( (wp = wp->GetPartner()) ) {
@@ -159,9 +160,26 @@ void Projection::Reset()
   
   fIsInit = kFALSE;
   fPlanes.clear();
+  fLayers.clear();
   fMaxSlope = fWidth = 0.0;
   delete fHitpattern; fHitpattern = 0;
   delete fPatternTree; fPatternTree = 0;
+}
+
+//_____________________________________________________________________________
+Double_t Projection::GetLayerZ( UInt_t i ) const
+{
+  // Return the effective z-position of the i-th wire plane layer.  In case
+  // of a partnered plane pair, the effective z is halfway between the two
+  // planes
+
+  assert( i<fLayers.size() );
+  WirePlane* wp = fLayers[i];
+  Double_t zpos = wp->GetZ();
+  if( wp->GetPartner() )
+    zpos = 0.5*( zpos + wp->GetPartner()->GetZ() );
+
+  return zpos;
 }
 
 //_____________________________________________________________________________
@@ -173,14 +191,8 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   tp.maxdepth = fNlevels-1;
   tp.width = fWidth;
   tp.maxslope = fMaxSlope;
-  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
-    Double_t zpos = (*it)->GetZ();
-    // The reference plane for a partnered plane pair is halfway between
-    if( (*it)->GetPartner() ) {
-      zpos = 0.5*( zpos + (*it)->GetPartner()->GetZ() );
-    }
-    tp.zpos.push_back( (*it)->GetZ() );
-  }
+  for( vwsiz_t i = 0; i < fLayers.size(); ++i )
+    tp.zpos.push_back( GetLayerZ(i) );
 
   if( tp.Normalize() != 0 )
     return fStatus = kInitError;
@@ -206,7 +218,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 
   // Set up a hitpattern object with the parameters of this projection
   delete fHitpattern;
-  fHitpattern = new Hitpattern( fNlevels, GetNplanes(), fWidth );
+  fHitpattern = new Hitpattern( fNlevels, GetNlayers(), fWidth );
   if( !fHitpattern || fHitpattern->IsError() )
     return fStatus = kInitError;
 
@@ -294,7 +306,7 @@ Int_t Projection::FillHitpattern()
   // and partner plane count as one).
 
   Int_t ntot = 0;
-  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
+  for( vwiter_t it = fLayers.begin(); it != fLayers.end(); ++it ) {
     ntot += fHitpattern->ScanHits( *it, (*it)->GetPartner() );
   }
 #ifdef TESTCODE
@@ -425,6 +437,7 @@ void Projection::Print( Option_t* opt ) const
        << GetName()
        << " type="  << GetType()
        << " npl="   << fPlanes.size()
+       << " nlay="  << fLayers.size()
        << " nlev="  << GetNlevels()
        << " zsize=" << GetZsize()
        << " maxsl=" << GetMaxSlope()
@@ -436,9 +449,6 @@ void Projection::Print( Option_t* opt ) const
     for( vwsiz_t i = 0; i < fPlanes.size(); ++i ) {
       WirePlane* wp = fPlanes[i];
       wp->Print(opt);
-      wp = wp->GetPartner();
-      if( wp )
-	wp->Print(opt);
     }
   }
 }

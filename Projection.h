@@ -31,6 +31,7 @@ namespace TreeSearch {
     const Projection& operator=( const Projection& rhs );
     virtual ~Projection();
 
+    void            AddPlane( WirePlane* wp, WirePlane* partner = 0 );
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
     EStatus         InitLevel2( const TDatime& date );
@@ -40,18 +41,19 @@ namespace TreeSearch {
     Int_t           FillHitpattern();
     Int_t           Track();
 
-    void            AddPlane( WirePlane* wp );
-    Int_t           GetType() const { return fType; }
-    UInt_t          GetNlevels()  const { return fNlevels; }
-    Double_t        GetMaxSlope() const { return fMaxSlope; }
-    Double_t        GetZsize() const;
-    Double_t        GetWidth() const { return fWidth; }
+
     Double_t        GetAngle() const;
-    Double_t        GetSinAngle() const { return fSinAngle; }
     Double_t        GetCosAngle() const { return fCosAngle; }
     Hitpattern*     GetHitpattern() const { return fHitpattern; }
-    UInt_t          GetNplanes() const
-    { return static_cast<UInt_t>( fPlanes.size() ); }
+    Double_t        GetLayerZ( UInt_t layer ) const;
+    Double_t        GetMaxSlope() const { return fMaxSlope; }
+    UInt_t          GetNlevels()  const { return fNlevels; }
+    UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
+    UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
+    Double_t        GetSinAngle() const { return fSinAngle; }
+    Int_t           GetType()  const { return fType; }
+    Double_t        GetWidth() const { return fWidth; }
+    Double_t        GetZsize() const;
 
     void            SetMaxSlope( Double_t m ) { fMaxSlope = m; }
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
@@ -59,10 +61,12 @@ namespace TreeSearch {
     
     //FIXME: for testing
     std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
+    std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
 
   protected:
     Int_t           fType;        // Type of plane (u,v,x,y...)
-    std::vector<WirePlane*> fPlanes; // Primary wire planes of this proj type
+    std::vector<WirePlane*> fPlanes; // Wire planes in this projection
+    std::vector<WirePlane*> fLayers; // Effective detector planes (wp pairs)
     UInt_t          fNlevels;     // Number of levels of search tree
     Double_t        fMaxSlope;    // Maximum physical track slope (0=perp)
     Double_t        fWidth;       // Width of tracking region (m)

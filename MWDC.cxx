@@ -386,25 +386,22 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   // TODO: this can be multithreaded, too - I think
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* theProj = fProj[type];
-    UInt_t n = 0;
     Double_t width = 0.0;
     // Associate planes with plane types
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
       WirePlane* thePlane = fPlanes[iplane];
       if( thePlane->GetType() == type ) {
-	// Add only primary planes (i.e. the first one of a partnered pair)
-	// to the list and count them
+	// Add planes not yet used to the corresponding projection
 	if( !thePlane->GetProjection() ) {
-	  theProj->AddPlane( thePlane );
-	  thePlane->SetPlaneNum(n);
+	  WirePlane* partner = thePlane->GetPartner();
+	  assert( !partner || partner->GetProjection() == 0 );
+	  // AddPlane() takes care of setting the plane and layer numbers in
+	  // the WirePlane objects
+	  theProj->AddPlane( thePlane, partner );
 	  // Save pointer to the projection object with each plane and partner
 	  thePlane->SetProjection(theProj);
-	  WirePlane* partner = thePlane->GetPartner();
-	  if( partner ) {
+	  if( partner ) 
 	    partner->SetProjection(theProj);
-	    partner->SetPlaneNum(n);
-	  }
-	  ++n;
 	}
 	// Determine the "width" of this projection plane (=width along the
 	// projection coordinate).
@@ -429,7 +426,8 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	  width = w;
       }
     }
-    // Require at least 3 planes per projection
+    UInt_t n = theProj->GetNlayers();
+    // Require at least 3 layers per projection
     if( n < 3 ) {
       Error( Here(here), "Too few planes of type \"%s\" defined. "
 	     "Need >= 3, have %u. Fix database.", theProj->GetName(), n );
