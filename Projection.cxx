@@ -10,10 +10,13 @@
 #include "Hitpattern.h"
 #include "WirePlane.h"
 #include "THaDetectorBase.h"
-#include "TString.h"
 #include "PatternTree.h"
 #include "PatternGenerator.h"
 #include "TreeWalk.h"
+
+#include "TMath.h"
+#include "TString.h"
+
 #include <iostream>
 #include <sys/time.h>  // for timing
 
@@ -127,7 +130,7 @@ void Projection::Clear( Option_t* opt )
   fPatternsFound.clear();
 
 #ifdef TESTCODE
-  t_treesearch = 0.0;
+  t_treesearch = t_treecombine = t_track = 0.0;
 #endif
 }
 
@@ -290,6 +293,8 @@ Int_t Projection::DefineVariables( EMode mode )
     { "n_test", "Number of pattern comparisons", "n_test"  },
     { "n_pat", "Number of patterns found",   "n_pat"    },
     { "t_treesearch", "Time in TreeSearch (us)", "t_treesearch" },
+    { "t_treecombine", "Time in TreeCombine (us)", "t_treecombine" },
+    { "t_track", "Time in Track (us)", "t_track" },
     //    { "", "", "" },
 #endif
     { 0 }
@@ -338,8 +343,9 @@ Int_t Projection::Track()
   fPatternsFound.clear();
 
 #ifdef TESTCODE
-  struct timeval start, stop, diff;
+  struct timeval start, start2, stop, diff;
   gettimeofday( &start, 0 );
+  gettimeofday( &start2, 0 );
 #endif
 
   ComparePattern compare( fHitpattern, &fPatternsFound );
@@ -349,17 +355,27 @@ Int_t Projection::Track()
 #ifdef TESTCODE
   //FIXME: use high-res CPU time timer instead
   gettimeofday(&stop, 0 );
-  timersub( &stop, &start, &diff );
+  timersub( &stop, &start2, &diff );
   t_treesearch = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
   n_test = compare.GetNtest();
   n_pat  = fPatternsFound.size();
+
+  gettimeofday( &start2, 0 );
 #endif
 
-  // TreeCombine:
   // Combine patterns with common sets of hits into Roads
+  TreeCombine();
 
-  //TODO...
+#ifdef TESTCODE
+  gettimeofday(&stop, 0 );
+  timersub( &stop, &start2, &diff );
+  t_treecombine = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+
+  //  n_roads = fRoads.size();
+
+  gettimeofday( &start2, 0 );
+#endif
 
   // RoadFit:
   // Fit hits within each road. Store fit parameters with Road. 
@@ -373,9 +389,39 @@ Int_t Projection::Track()
 
   //TODO...
 
+#ifdef TESTCODE
+  gettimeofday(&stop, 0 );
+  timersub( &stop, &start, &diff );
+  t_track = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+#endif
+
   return 0;
 }
 
+
+//_____________________________________________________________________________
+Int_t Projection::TreeCombine()
+{
+  // Combine patterns with common sets of hits into Roads
+
+  Int_t maxdist = 2;  // Search range. TODO: calculate
+
+  multiset<NodeDescriptor>::iterator it1, it2;
+  for( it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); ++it1 ) {
+    it2 = it1;
+    while( ++it2 != fPatternsFound.end() && 
+	   TMath::Abs((*it2)-(*it1)) <= maxdist ) {
+
+      UInt_t n = fHitpattern->CommonPlanes( *it1, *it2, maxdist );
+      cout << n << endl;
+      
+    }
+
+
+
+  }
+  return 0;
+}
 
 //_____________________________________________________________________________
 void Projection::MakePrefix()

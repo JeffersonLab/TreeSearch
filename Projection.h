@@ -40,6 +40,7 @@ namespace TreeSearch {
 
     Int_t           FillHitpattern();
     Int_t           Track();
+    Int_t           TreeCombine();
 
 
     Double_t        GetAngle() const;
@@ -83,8 +84,8 @@ namespace TreeSearch {
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
-    UInt_t n_test, n_pat;
-    Double_t t_treesearch;
+    UInt_t n_test, n_pat, n_roads;
+    Double_t t_treesearch, t_treecombine, t_track;
 #endif
 
     void  SetAngle( Double_t a );
