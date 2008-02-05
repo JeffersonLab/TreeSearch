@@ -43,9 +43,9 @@ namespace TreeSearch {
     // operator[] returns actual bit value in the i-th plane
     UInt_t  operator[](UInt_t i) const {
       //    UInt_t   GetBit( UInt_t i ) const {
-      Pattern* pat = link->GetPattern();
-      if( mirrored ) return shift - (*pat)[i];
-      else           return shift + (*pat)[i];
+      Pattern& pat = *(link->GetPattern());
+      if( mirrored ) return shift - pat[i];
+      else           return shift + pat[i];
     }
     // Comparison operators for inserting into ordered STL containers.
     // Order nodes by ascending start bin.
@@ -63,6 +63,7 @@ namespace TreeSearch {
     Int_t operator-( const NodeDescriptor& rhs ) const {
       return ( shift-rhs.shift );
     }
+    void Print() const;
     ClassDef(NodeDescriptor, 0)  // Full description of a pattern
   };    
 

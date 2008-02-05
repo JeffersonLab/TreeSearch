@@ -53,6 +53,18 @@ TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent,
 
 
 //_____________________________________________________________________________
+void NodeDescriptor::Print() const
+{
+  // Print bit contents of the pattern of this NodeDescriptor
+
+  cout << "(" << (UInt_t)depth << "/" << (mirrored ? "-" : "+") << ") ";
+  for( UInt_t i=0; i<link->GetPattern()->GetNbits(); i++ ) {
+    cout << (*this)[i] << " ";
+  }
+  cout << endl;
+}
+
+//_____________________________________________________________________________
 void NodeVisitor::SetLinkPattern( Link* link, Pattern* pattern ) {
   link->fPattern = pattern;
 }
