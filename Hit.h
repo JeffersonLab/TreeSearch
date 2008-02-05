@@ -53,6 +53,8 @@ namespace TreeSearch {
     Double_t GetTrackDist()  const { return fTrackPos-fPos; }
     Double_t GetResolution() const { return fResolution; }
 
+    const WirePlane* GetWirePlane() const { return fWirePlane; }
+
 #ifdef TESTCODE
     Int_t    fCl;          // Neighboring wire also fired
     Int_t    fMulti;       // Additional hits present on same wire
