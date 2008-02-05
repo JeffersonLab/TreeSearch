@@ -45,11 +45,16 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, UInt_t bin ) {
+    UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
+    UInt_t   CommonPlanes( const NodeDescriptor& nd1,
+			   const NodeDescriptor& nd2,
+			   UInt_t maxdist ) const;
+
+    const std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, 
+						   UInt_t bin ) const {
       // Get array of hits that set the given bin in the given plane
       return fHits[ MakeIdx(plane,bin) ];
     }
-      
     UInt_t   GetNbins()   const { return 1U<<(fNlevels-1); }
     UInt_t   GetNhits()   const { return (UInt_t)fHitList.size(); }
     UInt_t   GetNlevels() const { return fNlevels; }
@@ -65,9 +70,8 @@ namespace TreeSearch {
 			  Hit* hitA, Hit* hitB = 0 )
     { SetPositionRange( pos-res, pos+res, plane, hitA, hitB ); }
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
-    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
-//     Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
-    UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
+    //    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
+    //    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
@@ -137,20 +141,20 @@ namespace TreeSearch {
 //   }
 
   //___________________________________________________________________________
-  inline
-  Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane, 
-				   UInt_t depth ) const
-  {
-    // Test if position 'pos' (in m) is marked in the hit pattern.
-    // The pattern will be tested at the given depth.
+//   inline
+//   Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane, 
+// 				   UInt_t depth ) const
+//   {
+//     // Test if position 'pos' (in m) is marked in the hit pattern.
+//     // The pattern will be tested at the given depth.
 
-    assert( depth < fNlevels && plane < fNplanes );
-    UInt_t bin = TMath::FloorNint( fScale*pos );
-    if( bin < 0 || bin >= GetNbins() )
-      return kFALSE;
-    return 
-      fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
-  }
+//     assert( depth < fNlevels && plane < fNplanes );
+//     UInt_t bin = TMath::FloorNint( fScale*pos );
+//     if( bin < 0 || bin >= GetNbins() )
+//       return kFALSE;
+//     return 
+//       fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
+//   }
 
   //___________________________________________________________________________
   inline

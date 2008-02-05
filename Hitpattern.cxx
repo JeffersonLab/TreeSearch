@@ -9,12 +9,16 @@
 #include "WirePlane.h"
 #include "PatternTree.h"
 #include "TError.h"
+#include "TMath.h"
 
 #include <iostream>
 #include <stdexcept>
+#include <algorithm>
+#include <set>
 
-using std::cout;
-using std::endl;
+using namespace std;
+
+typedef std::vector<TreeSearch::Hit*>::size_type vsiz_t;
 
 ClassImp(TreeSearch::Hitpattern)
 
@@ -162,7 +166,7 @@ void Hitpattern::Clear( Option_t* opt )
     fPattern[--i]->FastClear();
 
   // For speed, clear only arrays that are actually filled
-  for( std::vector<UInt_t>::size_type i = fHitList.size(); i; ) {
+  for( vector<UInt_t>::size_type i = fHitList.size(); i; ) {
     UInt_t idx = fHitList[--i];
     assert( idx < fHits.size());
     fHits[idx].clear();
@@ -173,6 +177,107 @@ void Hitpattern::Clear( Option_t* opt )
   fMaxhitBin = 0;
 #endif
 }
+
+//_____________________________________________________________________________
+static void PrintHits( const vector<Hit*> hits )
+{
+  cout << hits.size() << " hits" << endl;
+
+  for( vector<Hit*>::size_type i=0; i<hits.size(); ++i ) {
+    cout << " ";
+    hits[i]->Print();
+  }
+  
+}
+
+//_____________________________________________________________________________
+UInt_t Hitpattern::CommonPlanes( const NodeDescriptor& nd1,
+				 const NodeDescriptor& nd2,
+				 UInt_t maxdist ) const
+{
+  // Return the number of physical wire planes (not layers) in which the
+  // two patterns nd1 and nd2 share at least one hit
+
+  nd1.link->GetPattern()->Print(false,std::cout,true);
+  nd2.link->GetPattern()->Print(false,std::cout,true);
+
+  UInt_t matches = 0;
+  bool top = true;
+  for( UInt_t i=fNplanes; i; ) {
+    --i;
+    UInt_t bin1 = nd1[i];
+    UInt_t bin2 = nd2[i];
+
+    // Quit if top bins too far apart
+    if( top ) {
+      if( (bin1 > bin2 && bin1-bin2 > maxdist) ||
+	  (bin1 < bin2 && bin2-bin1 > maxdist) )
+	break;
+      top = false;
+    }
+
+    const vector<Hit*>& hits1 = GetHits(i,bin1);
+    const vector<Hit*>& hits2 = GetHits(i,bin2);
+
+    PrintHits( hits1 );
+    PrintHits( hits2 );
+    if( hits1.empty() or hits2.empty() )
+      continue;
+
+    vector<Hit*>::const_iterator it = hits2.begin();
+    const WirePlane* wp = (*it)->GetWirePlane();
+    assert(wp);
+    bool do_pairs = (wp->GetPartner() != 0);
+
+    // Naturally, same bins always match
+    if( bin1 == bin2 ) {
+      ++matches;
+      if( do_pairs )
+	++matches;
+      continue;
+    }
+    
+    // Fast search for identical elements in the two arrays.
+    // This runs in N*log(N) time, like sorting all the hits would.
+    // N = hits1.size() + hits2.size() is small anyway.
+
+    // Put hits from the first bin into a sorted container, allowing only
+    // unique elements
+    set<Hit*> sorted_hits;
+    copy( hits1.begin(), hits1.end(),
+	  inserter( sorted_hits, sorted_hits.begin() ));
+
+    // See if any hits in the second bin match any in the first.
+    // This is not totally straightforward with partnered plane pairs.
+    // In that case, this really is a parallel search for hits in two planes
+    set<Hit*>::iterator found;
+    Int_t found_plane = -1;
+    for( ; it != hits2.end(); ++it ) {
+      found = sorted_hits.find( *it );
+      if( found != sorted_hits.end() ) {
+	if( do_pairs ) {
+	  // If this bin is for a plane pair, allow up to two matches	
+	  const WirePlane* wp2 = (*found)->GetWirePlane();
+	  assert(wp2);
+	  if( found_plane < 0 ) {   // no plane found yet
+	    found_plane = wp2->GetPlaneNum();
+	    ++matches;
+	  } else if( (Int_t)wp2->GetPlaneNum() != found_plane ) {
+	    assert( wp2->GetPlaneNum() == wp->GetPartner()->GetPlaneNum() );
+	    ++matches;
+	    break;
+	  }	    
+	} else {
+	  // If not a plane pair, we're done once we have the first match
+	  ++matches;
+	  break;
+	}
+      }
+    }
+  }
+  return matches;
+}
+
 
 //_____________________________________________________________________________
 #ifdef TESTCODE
