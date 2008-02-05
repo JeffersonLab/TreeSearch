@@ -24,7 +24,8 @@ void Hit::Print( Option_t* opt ) const
 {
   // Print hit info
 
-  cout << "Hit: wnum=" << GetWireNum()
+  cout << "Hit: wire=" << GetWireNum()
+       << "/" << (fWirePlane ? fWirePlane->GetName() : "??")
        << " wpos="     << GetWirePos()
        << " z="        << GetZ()
        << " res="      << GetResolution()
