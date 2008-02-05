@@ -7,7 +7,7 @@
 //                                                                           //
 // Generic function object to traverse a PatternTree.                        //
 //                                                                           //
-// This implements an internal iterator pattern [E. Gamma et al.,            //
+// TreeWalk implements an internal iterator pattern [E. Gamma et al.,        //
 // "Design Patterns", Addison-Wesley, 1995] that applies generic operation   //
 // to each tree element.  The operation itself represents a simplified form  //
 // of a visitor pattern [ibid.], where the simplification lies in the fact   //
@@ -20,6 +20,7 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
+#include <cassert>
 
 namespace TreeSearch {
 
@@ -35,9 +36,17 @@ namespace TreeSearch {
 
     NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
 		    UChar_t dep )
-      : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir) {}
+      : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir) 
+    { assert(ln && ln->GetPattern()); }
     virtual ~NodeDescriptor() {}
 
+    // operator[] returns actual bit value in the i-th plane
+    UInt_t  operator[](UInt_t i) const {
+      //    UInt_t   GetBit( UInt_t i ) const {
+      Pattern* pat = link->GetPattern();
+      if( mirrored ) return shift - (*pat)[i];
+      else           return shift + (*pat)[i];
+    }
     // Comparison operators for inserting into ordered STL containers.
     // Order nodes by ascending start bin.
     // NB: pattern bit[0] = 0, so nothing needs to be added to "shift"
@@ -46,6 +55,13 @@ namespace TreeSearch {
     }
     bool operator==( const NodeDescriptor& rhs ) const {
       return ( shift == rhs.shift );
+    }
+    // Additive arithmetic returns sum/difference of pattern start pos
+    Int_t operator+( const NodeDescriptor& rhs ) const {
+      return ( shift+rhs.shift );
+    }
+    Int_t operator-( const NodeDescriptor& rhs ) const {
+      return ( shift-rhs.shift );
     }
     ClassDef(NodeDescriptor, 0)  // Full description of a pattern
   };    
