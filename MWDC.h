@@ -62,7 +62,8 @@ namespace TreeSearch {
     enum {
       kDoTimeCut  = BIT(14), // Use TDC time cut in decoder (defined in planes)
       kPairsOnly  = BIT(15), // Accept only pairs of hits from plane pairs
-      kMCdata     = BIT(16)  // Assume input is Monte Carlo data
+      kMCdata     = BIT(16), // Assume input is Monte Carlo data
+      kNoPartner  = BIT(17)  // Never partner wire planes
     };
 
   protected:

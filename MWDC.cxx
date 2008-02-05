@@ -329,27 +329,29 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   sort( fPlanes.begin(), fPlanes.end(), WirePlane::ZIsLess() );
 
   // Associate planes and partners (names identical except trailing "p")
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    WirePlane* thePlane = fPlanes[iplane];
-    TString name( thePlane->GetName() );
-    if( name.EndsWith("p") ) {
-      TString other = name.Chop();
-      if( other.IsNull() )
-	continue;
-      vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			     WirePlane::NameEquals( other ) );
-      if( it != fPlanes.end() ) {
-	WirePlane* partner = *it;
-	// Partner planes must be of the same type!
-	if( thePlane->GetType() != partner->GetType() ) {
-	  Error( Here(here), "Partner planes %s and %s have different types! "
-		 "Fix database.", thePlane->GetName(), partner->GetName() );
-	  return fStatus = kInitError;
+  if( !TestBit(kNoPartner) ) {
+    for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+      WirePlane* thePlane = fPlanes[iplane];
+      TString name( thePlane->GetName() );
+      if( name.EndsWith("p") ) {
+	TString other = name.Chop();
+	if( other.IsNull() )
+	  continue;
+	vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
+			       WirePlane::NameEquals( other ) );
+	if( it != fPlanes.end() ) {
+	  WirePlane* partner = *it;
+	  // Partner planes must be of the same type!
+	  if( thePlane->GetType() != partner->GetType() ) {
+	    Error( Here(here), "Partner planes %s and %s have different types!"
+		   " Fix database.", thePlane->GetName(), partner->GetName() );
+	    return fStatus = kInitError;
+	  }
+	  if( fDebug > 0 )
+	    Info( Here(here), "Partnering plane %s with %s",
+		  thePlane->GetName(), partner->GetName() );
+	  partner->SetPartner( thePlane );
 	}
-	if( fDebug > 0 )
-	  Info( Here(here), "Partnering plane %s with %s",
-		thePlane->GetName(), partner->GetName() );
-	partner->SetPartner( thePlane );
       }
     }
   }
@@ -496,13 +498,14 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
   string planeconfig;
-  Int_t time_cut = 1, pairs_only = 0, mc_data = 0;
+  Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
   DBRequest request[] = {
     { "planeconfig",  &planeconfig, kString },
     { "cratemap",     cmap,         kIntM,    6 },
     { "timecut",      &time_cut,    kInt,     0, 1 },
     { "pairsonly",    &pairs_only,  kInt,     0, 1 },
     { "MCdata",       &mc_data,     kInt,     0, 1 },
+    { "nopartner",    &nopartner,   kInt,     0, 1 },
     { 0 }
   };
 
@@ -546,6 +549,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   SetBit( kDoTimeCut, time_cut );
   SetBit( kPairsOnly, pairs_only );
   SetBit( kMCdata,    mc_data );
+  SetBit( kNoPartner, nopartner );
 
   // Set up the wire planes
   for( ssiz_t i=0; i<planes.size(); ++i ) {
