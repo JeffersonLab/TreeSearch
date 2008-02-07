@@ -49,6 +49,7 @@ namespace TreeSearch {
     { return fProjection ? fProjection->GetMaxSlope() : kBig; }
     Double_t        GetWireStart() const { return fWireStart; }
     Double_t        GetWireSpacing() const { return fWireSpacing; }
+    virtual Double_t GetMaxLRdist() const { return GetWireSpacing(); }
 
     TimeToDistConv* GetTTDConv() const { return fTTDConv; }
 
