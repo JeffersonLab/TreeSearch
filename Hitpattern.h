@@ -14,6 +14,7 @@
 #include <cstring>
 #include <cassert>
 #include <vector>
+#include <utility>
 
 namespace TreeSearch {
 
@@ -36,6 +37,8 @@ namespace TreeSearch {
   class WirePlane;
   class Hit;
 
+  typedef std::pair<UInt_t,UInt_t> MatchCount_t; // # layers/planes matching
+
   class Hitpattern {
 
   public:
@@ -45,10 +48,10 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
-    UInt_t   CommonPlanes( const NodeDescriptor& nd1,
-			   const NodeDescriptor& nd2,
-			   UInt_t maxdist ) const;
+    UInt_t       ContainsPattern( const NodeDescriptor& nd ) const;
+    MatchCount_t CommonPlanes( const NodeDescriptor& nd1,
+			       const NodeDescriptor& nd2,
+			       const std::vector<UInt_t>& maxdist ) const;
 
     const std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, 
 						   UInt_t bin ) const {
@@ -61,7 +64,9 @@ namespace TreeSearch {
     UInt_t   GetNplanes() const { return fNplanes; }
     Double_t GetOffset()  const { return fOffset; }
     Double_t GetWidth()   const { return GetNbins()/fScale; }
-    
+    Double_t GetBinWidth() const { return 1.0/fScale; } // meters per bin
+    Double_t GetBinScale() const { return fScale; }     // bins per meter
+
     Bool_t   IsError()    const { return (fNplanes == 0); }
 
     void     SetPositionRange( Double_t start, Double_t end, UInt_t plane,
