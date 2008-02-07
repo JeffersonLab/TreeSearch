@@ -33,11 +33,13 @@ namespace TreeSearch {
     UShort_t shift;    // Shift of the base pattern to its actual position
     UChar_t  depth;    // Current recursion depth
     Bool_t   mirrored; // Pattern is mirrored
+    Bool_t   used;     // Pattern is used as part of a road
+    Bool_t   allused;  // All hits from this pattern are common hits of a road
 
     NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
 		    UChar_t dep )
-      : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir) 
-    { assert(ln && ln->GetPattern()); }
+      : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir), 
+	used(false), allused(false) { assert(ln && ln->GetPattern()); }
     virtual ~NodeDescriptor() {}
 
     // operator[] returns actual bit value in the i-th plane
