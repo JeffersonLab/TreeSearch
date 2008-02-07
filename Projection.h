@@ -40,7 +40,7 @@ namespace TreeSearch {
 
     Int_t           FillHitpattern();
     Int_t           Track();
-    Int_t           TreeCombine();
+    Int_t           MakeRoads();
 
 
     Double_t        GetAngle() const;
@@ -81,11 +81,14 @@ namespace TreeSearch {
 
     std::
     multiset<NodeDescriptor> fPatternsFound; // Patterns found by TreeSearch
+    std::vector<Road>   fRoads;    // Roads found by MakeRoads
+
+    std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
     UInt_t n_test, n_pat, n_roads;
-    Double_t t_treesearch, t_treecombine, t_track;
+    Double_t t_treesearch, t_roads, t_track;
 #endif
 
     void  SetAngle( Double_t a );

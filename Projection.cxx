@@ -26,6 +26,7 @@ namespace TreeSearch {
 
 typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<WirePlane*>::iterator  vwiter_t;
+typedef vector<Road*>::size_type vrsiz_t;
 
 //_____________________________________________________________________________
 Projection::Projection( Int_t type, const char* name, Double_t angle,
@@ -128,9 +129,10 @@ void Projection::Clear( Option_t* opt )
     fHitpattern->Clear();
 
   fPatternsFound.clear();
+  fRoads.clear();
 
 #ifdef TESTCODE
-  t_treesearch = t_treecombine = t_track = 0.0;
+  t_treesearch = t_roads = t_track = 0.0;
 #endif
 }
 
@@ -194,7 +196,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   tp.maxdepth = fNlevels-1;
   tp.width = fWidth;
   tp.maxslope = fMaxSlope;
-  for( vwsiz_t i = 0; i < fLayers.size(); ++i )
+  for( UInt_t i = 0; i < GetNlayers(); ++i )
     tp.zpos.push_back( GetLayerZ(i) );
 
   if( tp.Normalize() != 0 )
@@ -224,6 +226,35 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   fHitpattern = new Hitpattern( *fPatternTree );
   if( !fHitpattern || fHitpattern->IsError() )
     return fStatus = kInitError;
+
+  // Determine maximum search distance (in bins) for combining patterns
+  static const Double_t sqrt2 = TMath::Sqrt(2.0);
+  fMaxdist.clear();
+  assert( GetNlayers() == fHitpattern->GetNplanes() );
+  for( UInt_t i = 0; i < GetNlayers(); ++i ) {
+    UInt_t dist;
+    if( fLayers[i]->GetPartner() ) {
+      // Maximum number of bins that a single hit can cover in the midplane
+      // of a plane pair
+      WirePlane* wpl[2] = { fLayers[i], fLayers[i]->GetPartner() };
+      Double_t dx = 0;
+      Double_t dz = TMath::Abs( wpl[1]->GetZ() - wpl[0]->GetZ() );
+      for( Int_t i = 0; i < 2; ++i ) {
+	WirePlane* wp = wpl[i];
+	Double_t dx1 = 
+	  sqrt2 * wp->GetResolution()  + fMaxSlope * dz  + wp->GetMaxLRdist();
+	if( dx1 > dx )
+	  dx = dx1;
+      }
+      dist = TMath::FloorNint( dx * fHitpattern->GetBinScale() );
+    } else {
+      // Maximum distance of bins that can belong to the same hit in a single
+      // plane
+      dist = TMath::FloorNint( fHitpattern->GetBinScale() *
+        (fLayers[i]->GetMaxLRdist() + 2.0*fLayers[i]->GetResolution()) );
+    }    
+    fMaxdist.push_back( dist );
+  }
 
   return fStatus = kOK;
 }
@@ -365,12 +396,12 @@ Int_t Projection::Track()
 #endif
 
   // Combine patterns with common sets of hits into Roads
-  TreeCombine();
+  MakeRoads();
 
 #ifdef TESTCODE
   gettimeofday(&stop, 0 );
   timersub( &stop, &start2, &diff );
-  t_treecombine = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+  t_roads = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
   //  n_roads = fRoads.size();
 
@@ -400,25 +431,38 @@ Int_t Projection::Track()
 
 
 //_____________________________________________________________________________
-Int_t Projection::TreeCombine()
+Int_t Projection::MakeRoads()
 {
-  // Combine patterns with common sets of hits into Roads
-
-  Int_t maxdist = 2;  // Search range. TODO: calculate
+  // Combine patterns with common sets of hits into Roads.
+  //
+  // This is the primary de-ghosting algorithm. It groups patterns with
+  // common wires (not common hit positions!) in all planes together.
 
   multiset<NodeDescriptor>::iterator it1, it2;
-  for( it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); ++it1 ) {
+  while( it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); ++it1 ) {
+    // A pattern must be unused or partly used to be the basis for a new road
+    if( (*it1).allused )
+      continue;
+    bool doing_used = (*it1).used;
+    fRoads.push_back( Road(it1) );
     it2 = it1;
+    Road& rd = fRoads.back();
     while( ++it2 != fPatternsFound.end() && 
-	   TMath::Abs((*it2)-(*it1)) <= maxdist ) {
-
-      UInt_t n = fHitpattern->CommonPlanes( *it1, *it2, maxdist );
-      cout << n << endl;
-      
+	   (UInt_t)TMath::Abs((*it2)-(*it1)) <= fMaxdist[0] ) {
+      // Try adding unused or partly used pattern to the new road until there
+      // are no more patterns that could possibly have common hits
+      if( !(*it2).allused )
+	rd.Add(it2);
     }
-
-
-
+    // Delete roads that consist only of a single pattern that is already
+    // partly used elsewhere. These hits will be processed with the other road.
+    if( doing_used && rd.GetNpat() == 1 )
+      fRoads.pop_back();
+    else
+      // Do final status check of the road and its component patterns once all
+      // patterns with common hits have been added. This will update the 
+      // "allused" flags of the component patterns.
+      rd.Close();
   }
   return 0;
 }
