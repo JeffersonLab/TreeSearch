@@ -44,6 +44,7 @@ namespace TreeSearch {
     // operator[] returns actual bit value in the i-th plane
     UInt_t  operator[](UInt_t i) const {
       //    UInt_t   GetBit( UInt_t i ) const {
+      if( i == 0 ) return shift;
       Pattern& pat = *(link->GetPattern());
       if( mirrored ) return shift - pat[i];
       else           return shift + pat[i];
@@ -56,13 +57,6 @@ namespace TreeSearch {
     }
     bool operator==( const NodeDescriptor& rhs ) const {
       return ( shift == rhs.shift );
-    }
-    // Additive arithmetic returns sum/difference of pattern start pos
-    Int_t operator+( const NodeDescriptor& rhs ) const {
-      return ( shift+rhs.shift );
-    }
-    Int_t operator-( const NodeDescriptor& rhs ) const {
-      return ( shift-rhs.shift );
     }
     void Print() const;
     ClassDef(NodeDescriptor, 0)  // Full description of a pattern
