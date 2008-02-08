@@ -450,7 +450,7 @@ Int_t Projection::MakeRoads()
     // New roads must contain at least one unused pattern
     if( nd1.used )
       continue;
-    fRoads.push_back( &nd1 );
+    fRoads.push_back( Road(&nd1) );
     Road& rd = fRoads.back();
     it2 = ref_it1;
     // Search until end of list or too far right
