@@ -26,7 +26,7 @@ namespace TreeSearch {
 
 typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<WirePlane*>::iterator  vwiter_t;
-typedef vector<Road*>::size_type vrsiz_t;
+typedef vector<Road>::size_type vrsiz_t;
 
 //_____________________________________________________________________________
 Projection::Projection( Int_t type, const char* name, Double_t angle,
@@ -438,31 +438,38 @@ Int_t Projection::MakeRoads()
   // This is the primary de-ghosting algorithm. It groups patterns with
   // common wires (not common hit positions!) in all planes together.
 
-  multiset<NodeDescriptor>::iterator it1, it2;
-  while( it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); ++it1 ) {
-    // A pattern must be unused or partly used to be the basis for a new road
-    if( (*it1).allused )
+  multiset<NodeDescriptor>::iterator it1, it2, ref_it1;
+  for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
+       ++it1 ) {
+    // Some STL implementations declare the set iterator const to prevent
+    // modification of the sort key. For simplicity, we cast const away and
+    // promise never to change the pattern bits. Alternatively, we could use a
+    // multimap.
+    NodeDescriptor& nd1 = const_cast<NodeDescriptor&>(*it1);
+    assert(nd1.used < 3);
+    // New roads must contain at least one unused pattern
+    if( nd1.used )
       continue;
-    bool doing_used = (*it1).used;
-    fRoads.push_back( Road(it1) );
-    it2 = it1;
+    fRoads.push_back( &nd1 );
     Road& rd = fRoads.back();
-    while( ++it2 != fPatternsFound.end() && 
-	   (UInt_t)TMath::Abs((*it2)-(*it1)) <= fMaxdist[0] ) {
-      // Try adding unused or partly used pattern to the new road until there
-      // are no more patterns that could possibly have common hits
-      if( !(*it2).allused )
-	rd.Add(it2);
+    it2 = ref_it1;
+    // Search until end of list or too far right
+    while( ++it2 != fPatternsFound.end() and
+	   (*it2)[0] <= nd1[0] + fMaxdist[0] ) {
+      NodeDescriptor& nd2 = const_cast<NodeDescriptor&>(*it2);
+      if( nd1[0] <= nd2[0] + fMaxdist[0] ) {
+	// Try adding unused or partly used pattern to the new road until there
+	// are no more patterns that could possibly have common hits
+	if( nd2.used < 2 )
+	  rd.Add(&nd2);
+      } else {
+	// Save last position too far left of it1 (seed of road).
+	// This + 1 is where we start the next search.
+	ref_it1 = it2;
+      }
     }
-    // Delete roads that consist only of a single pattern that is already
-    // partly used elsewhere. These hits will be processed with the other road.
-    if( doing_used && rd.GetNpat() == 1 )
-      fRoads.pop_back();
-    else
-      // Do final status check of the road and its component patterns once all
-      // patterns with common hits have been added. This will update the 
-      // "allused" flags of the component patterns.
-      rd.Close();
+    // Update the "used" flags of the road's component patterns
+    rd.Close();
   }
   return 0;
 }

@@ -9,6 +9,7 @@
 
 #include "THaAnalysisObject.h"
 #include "TreeWalk.h"
+#include "Road.h"
 #include "TMath.h"
 #include <vector>
 #include <set>
