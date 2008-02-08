@@ -2,7 +2,7 @@
 
 SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx Hitpattern.cxx \
 	Projection.cxx Pattern.cxx PatternTree.cxx PatternGenerator.cxx \
-	TreeWalk.cxx
+	TreeWalk.cxx Road.cxx
 
 PACKAGE = TreeSearch
 
@@ -11,7 +11,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version
 export DEBUG = 1
-#export TESTCODE = 1
+export TESTCODE = 1
 export I387MATH = 1
 
 # Architecture to compile for
