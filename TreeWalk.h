@@ -42,7 +42,7 @@ namespace TreeSearch {
     virtual ~NodeDescriptor() {}
 
     // operator[] returns actual bit value in the i-th plane
-    UInt_t  operator[](UInt_t i) const {
+    UShort_t  operator[](UInt_t i) const {
       //    UInt_t   GetBit( UInt_t i ) const {
       if( i == 0 ) return shift;
       Pattern& pat = *(link->GetPattern());
