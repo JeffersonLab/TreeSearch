@@ -450,8 +450,10 @@ Int_t Projection::MakeRoads()
     // New roads must contain at least one unused pattern
     if( nd1.used )
       continue;
-    fRoads.push_back( Road(&nd1) );
-    Road& rd = fRoads.back();
+    Road rd(this);
+    // Adding the first pattern must make a good match
+    if( !rd.Add(nd1) )
+      continue;
     it2 = ref_it1;
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
@@ -461,7 +463,7 @@ Int_t Projection::MakeRoads()
 	// Try adding unused or partly used pattern to the new road until there
 	// are no more patterns that could possibly have common hits
 	if( nd2.used < 2 )
-	  rd.Add(&nd2);
+	  rd.Add( nd2 );
       } else {
 	// Save last position too far left of it1 (seed of road).
 	// This + 1 is where we start the next search.
@@ -469,7 +471,8 @@ Int_t Projection::MakeRoads()
       }
     }
     // Update the "used" flags of the road's component patterns
-    rd.Close();
+    rd.Finish();
+    fRoads.push_back(rd);
   }
   return 0;
 }
