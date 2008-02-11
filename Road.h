@@ -9,32 +9,41 @@
 
 #include "Rtypes.h"
 #include <vector>
-
-using std::vector;
+#include <set>
 
 namespace TreeSearch {
 
+  class Hit;
+  class Projection;
   class NodeDescriptor; // Defined in TreeWalk.h
   class BuildInfo_t;    // Defined in implementation
 
   class Road {
 
   public:
-    explicit Road( NodeDescriptor* nd ) {}
-    Road( const Road& ) {}
+    explicit Road( const Projection* proj );
+    Road( const Road& );
     Road& operator=( const Road& );
-    virtual ~Road() {}
+    virtual ~Road();
 
-    Bool_t Add( NodeDescriptor* nd );
-    void   Close();
+    Bool_t Add( NodeDescriptor& nd );
+    void   Finish();
 
     void Print( Option_t* opt="" ) const;
 
   protected:
 
+    // Corrdinates of hit positions for fitting
+    struct Point {
+      Double_t x, z;
+    };
+
     // Bin numbers defining the corners
-    UShort_t  fStart[2];
-    UShort_t  fEnd[2];
+    UShort_t  fLeft[2];   // Left corner bin, 0=lower, 1=upper
+    UShort_t  fRight[2];
+
+    std::set<Hit*>     fHits;   // All hits collected from this road's patterns
+    std::vector<Point> fPoints; // Hit positions within the road
 
     // Fit results
     Double_t  fSlope;
@@ -43,16 +52,10 @@ namespace TreeSearch {
     Double_t  fErr[2];
 
     // Data used while building
-    BuildInfo_t* fBifo;
-    //TODO:
-    // array of hit positions within the road (x/z coordinates)
-    // function to collect these
-    // array of NodeDescriptors* collected
-    // array of common hits
-    // array of counters of common hits per plane
-    // match evaluation function (deals with missing planes, 
-    //     1 out of 2 handling etc)
-    
+    BuildInfo_t* fBuild;
+
+    Bool_t CheckMatch( const std::set<Hit*>& hits ) const;
+    void   CollectCoordinates();
 
     ClassDef(Road,1)  // Region containing track candidate hits 
   };
