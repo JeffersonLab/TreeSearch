@@ -11,6 +11,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version
 export DEBUG = 1
+export VERBOSE = 1
 export TESTCODE = 1
 export I387MATH = 1
 
@@ -92,6 +93,9 @@ ifeq ($(CXX),)
 $(error $(ARCH) invalid architecture)
 endif
 
+ifdef VERBOSE
+DEFINES      += -DVERBOSE
+endif
 ifdef TESTCODE
 DEFINES      += -DTESTCODE
 endif
