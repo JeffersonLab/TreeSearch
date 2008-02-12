@@ -217,6 +217,7 @@ Int_t MWDC::FineTrack( TClonesArray& tracks )
     
     fProj[type]->Track();
   }
+  cout << "=========== end of event ==============" << endl;
   return 0;//fNtracks;
 }
 
