@@ -13,6 +13,7 @@
 #include "TMath.h"
 #include <vector>
 #include <set>
+#include <list>
 #include <cassert>
 
 class THaDetectorBase;
@@ -80,9 +81,8 @@ namespace TreeSearch {
 
     THaDetectorBase* fDetector;    //! Parent detector
 
-    std::
-    multiset<NodeDescriptor> fPatternsFound; // Patterns found by TreeSearch
-    std::vector<Road>   fRoads;    // Roads found by MakeRoads
+    std::set<NodeDescriptor> fPatternsFound; // Patterns found by TreeSearch
+    std::list<Road>  fRoads;    // Roads found by MakeRoads
 
     std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
 
@@ -106,7 +106,7 @@ namespace TreeSearch {
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( const Hitpattern* hitpat,
-		      std::multiset<NodeDescriptor>* matches )
+		      std::set<NodeDescriptor>* matches )
 	: fHitpattern(hitpat), fMatches(matches)
 #ifdef TESTCODE
 	, fNtest(0)
@@ -118,7 +118,7 @@ namespace TreeSearch {
 #endif
     private:
       const Hitpattern* fHitpattern;    // Hitpattern to compare to
-      std::multiset<NodeDescriptor>* fMatches; // Set of matching patterns
+      std::set<NodeDescriptor>* fMatches; // Set of matching patterns
 #ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
