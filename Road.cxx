@@ -15,6 +15,7 @@
 #include "TBits.h"
 #include <iostream>
 #include <algorithm>
+#include <list>
 
 using namespace std;
 
@@ -24,7 +25,7 @@ namespace TreeSearch {
 
 // Private class for use while building a Road
 struct BuildInfo_t {
-  vector<const NodeDescriptor*> fPatterns; // Patterns in this road
+  list<const NodeDescriptor*> fPatterns; // Patterns in this road
   set<Hit*>         fCommonHits;      // Hits common between all patterns
   Hitpattern*       fHitpattern;
   UInt_t            fNlayers;
@@ -32,11 +33,6 @@ struct BuildInfo_t {
   //TODO: add match requirements
   //TODO: use fMaxdist[] ??
 };
-
-static const vector<const NodeDescriptor*>::size_type kEstNumPat = 20;
-
-typedef vector<Hit*>::const_iterator viter_t;
-typedef vector<Hit*>::const_iterator vsiz_t;
 
 //_____________________________________________________________________________
 Road::Road( const Projection* proj )
@@ -54,7 +50,6 @@ Road::Road( const Projection* proj )
   fBuild->fHitpattern = proj->GetHitpattern();
   fBuild->fNlayers    = proj->GetNlayers();
   fBuild->fNplanes    = proj->GetNplanes();
-  fBuild->fPatterns.reserve( kEstNumPat );
 
   assert( fBuild->fHitpattern && fBuild->fNlayers && 
 	  fBuild->fNplanes >= fBuild->fNlayers );
@@ -71,9 +66,10 @@ Road::Road( const Road& orig )
   fRight[0] = orig.fRight[0]; fRight[1] = orig.fRight[1];
   fErr[0]   = orig.fErr[0];   fErr[1]   = orig.fErr[1];
 
-  delete fBuild; fBuild = 0;
   if( orig.fBuild )
     fBuild = new BuildInfo_t( *orig.fBuild );
+  else
+    fBuild = 0;
 }
 
 //_____________________________________________________________________________
@@ -89,9 +85,11 @@ Road& Road::operator=( const Road& rhs )
     fChi2   = rhs.fChi2;
     fErr[0] = rhs.fErr[0]; fErr[1] = rhs.fErr[1];
 
-    delete fBuild; fBuild = 0;
+    delete fBuild;
     if( rhs.fBuild )
       fBuild = new BuildInfo_t( *rhs.fBuild );
+    else
+      fBuild = 0;
   }
   return *this;
 }
@@ -106,6 +104,7 @@ Road::~Road()
 }
 
 //_____________________________________________________________________________
+#ifdef VERBOSE
 static void PrintHits( const set<Hit*>& hits )
 {
   //  cout << hits.size() << " hits" << endl;
@@ -116,7 +115,7 @@ static void PrintHits( const set<Hit*>& hits )
   }
   
 }
-
+#endif
 //_____________________________________________________________________________
 Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
 {
@@ -158,8 +157,10 @@ Bool_t Road::Add( const NodeDescriptor& nd )
   if( !fBuild )
     return kFALSE;
 
-  nd.Print();
+#ifdef VERBOSE
+  nd.Print(); nd.link->GetPattern()->Print(); nd.parent->Print();
   PrintHits(nd.hits);
+#endif
   bool first = fBuild->fPatterns.empty();
   if( first ) {
     if( !CheckMatch(nd.hits) )
@@ -171,9 +172,10 @@ Bool_t Road::Add( const NodeDescriptor& nd )
 		      fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
 		      inserter( new_commons, new_commons.end() ));
 
+#ifdef VERBOSE
     cout << "new/old commons = " << new_commons.size() << " "
-	 << fBuild->fCommonHits.size() << endl;
-    
+	  << fBuild->fCommonHits.size() << endl;
+#endif
     assert( new_commons.size() <= fBuild->fCommonHits.size() );
     if( new_commons.size() < fBuild->fCommonHits.size() ) {
       // The set of common hits shrank, so we must check if this would still
@@ -182,7 +184,9 @@ Bool_t Road::Add( const NodeDescriptor& nd )
 	// The new pattern would reduce the set of common hits in the road to
 	// too loose a fit, so we reject the new pattern and leave
 	// the road as it is
+#ifdef VERBOSE
 	cout << "failed" << endl;
+#endif
 	return kFALSE;
       }
       // The new set of common hits is good, so update the build data
@@ -191,17 +195,20 @@ Bool_t Road::Add( const NodeDescriptor& nd )
     set<Hit*> new_hits;
     set_union( fHits.begin(), fHits.end(), nd.hits.begin(), nd.hits.end(),
 	       inserter( new_hits, new_hits.begin() ));
+#ifdef VERBOSE
     cout << "new/old nhits = " << new_hits.size() << " " 
-	 << fHits.size() << endl;
+ 	 << fHits.size() << endl;
+#endif
     if( new_hits.size() != fHits.size() ) {
       swap( fHits, new_hits );
+#ifdef VERBOSE
       PrintHits( fHits );
+#endif
     }
   }
 
   // Save a pointer to this pattern so we can update it later
   fBuild->fPatterns.push_back(&nd);
-  cout << "new npat = " << fBuild->fPatterns.size() << endl;
 
   // Expand the road limits if necessary
   assert( nd.link->GetPattern()->GetNbits() == fBuild->fNlayers );
@@ -211,8 +218,11 @@ Bool_t Road::Add( const NodeDescriptor& nd )
   fRight[0] = TMath::Max( nd[0], fRight[0] );
   fRight[1] = TMath::Max( nd[n], fRight[1] );
 
+#ifdef VERBOSE
+  cout << "new npat = " << fBuild->fPatterns.size() << endl;
   cout << "new left/right = " << fLeft[0]<<" "<<fRight[0]<<" "
        << fLeft[1]<<" "<<fRight[1] << endl;
+#endif
 
   return kTRUE;
 }
@@ -223,7 +233,7 @@ void Road::Finish()
   // Finish building the road
 
   assert(fBuild);
-  for( vector<const NodeDescriptor*>::iterator it = 
+  for( list<const NodeDescriptor*>::iterator it = 
 	 fBuild->fPatterns.begin(); it != fBuild->fPatterns.end(); ++it ) {
     
     // Make the node writable so we can update the "used" field
@@ -231,19 +241,21 @@ void Road::Finish()
     assert( nd.used < 2 ); // cannot add previously fully used pattern
 
     // TODO: search only up to first element not in common?
-    vector<Hit*> not_in_common;
+    list<Hit*> not_in_common;
     set_difference( nd.hits.begin(), nd.hits.end(),
 		    fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
 		    back_inserter( not_in_common ) );
 
     nd.used = not_in_common.empty() ? 2 : 1;
+#ifdef VERBOSE
     cout << "used = " << (int)nd.used << " for ";
     nd.Print();
+#endif
   }
 
 
   // Put the tools away
-  // TODO: save npat
+  // TODO: save npat, nplanes
   delete fBuild; fBuild = 0;
 
   return;

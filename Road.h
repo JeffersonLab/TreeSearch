@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Rtypes.h"
-#include <vector>
+//#include <vector>
 #include <set>
 
 namespace TreeSearch {
@@ -43,7 +43,7 @@ namespace TreeSearch {
     UShort_t  fRight[2];
 
     std::set<Hit*>     fHits;   // All hits collected from this road's patterns
-    std::vector<Point> fPoints; // Hit positions within the road
+    //    std::vector<Point> fPoints; // Hit positions within the road
 
     // Fit results
     Double_t  fSlope;
