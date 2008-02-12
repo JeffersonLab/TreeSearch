@@ -217,7 +217,9 @@ Int_t MWDC::FineTrack( TClonesArray& tracks )
     
     fProj[type]->Track();
   }
+#ifdef VERBOSE
   cout << "=========== end of event ==============" << endl;
+#endif
   return 0;//fNtracks;
 }
 
