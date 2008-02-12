@@ -24,7 +24,7 @@ namespace TreeSearch {
 
 // Private class for use while building a Road
 struct BuildInfo_t {
-  vector<NodeDescriptor*> fPatterns;  // All patterns associated with this road
+  vector<const NodeDescriptor*> fPatterns; // Patterns in this road
   set<Hit*>         fCommonHits;      // Hits common between all patterns
   Hitpattern*       fHitpattern;
   UInt_t            fNlayers;
@@ -33,7 +33,7 @@ struct BuildInfo_t {
   //TODO: use fMaxdist[] ??
 };
 
-static const vector<NodeDescriptor*>::size_type kEstNumPat = 20;
+static const vector<const NodeDescriptor*>::size_type kEstNumPat = 20;
 
 typedef vector<Hit*>::const_iterator viter_t;
 typedef vector<Hit*>::const_iterator vsiz_t;
@@ -106,13 +106,13 @@ Road::~Road()
 }
 
 //_____________________________________________________________________________
-static void PrintHits( const vector<Hit*>& hits )
+static void PrintHits( const set<Hit*>& hits )
 {
-  cout << hits.size() << " hits" << endl;
+  //  cout << hits.size() << " hits" << endl;
 
-  for( vector<Hit*>::size_type i=0; i<hits.size(); ++i ) {
+  for( set<Hit*>::iterator it = hits.begin(); it != hits.end(); ++it ) {
     cout << " ";
-    hits[i]->Print();
+    (*it)->Print();
   }
   
 }
@@ -146,7 +146,7 @@ Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
 }
 
 //_____________________________________________________________________________
-Bool_t Road::Add( NodeDescriptor& nd )
+Bool_t Road::Add( const NodeDescriptor& nd )
 {
   // Check if the hits from the given NodeDescriptor pattern are common
   // with the common hit set already in this road. If so, add the pattern
@@ -159,31 +159,15 @@ Bool_t Road::Add( NodeDescriptor& nd )
     return kFALSE;
 
   nd.Print();
-
+  PrintHits(nd.hits);
   bool first = fBuild->fPatterns.empty();
-  // Adding a new pattern: find all the common hits that are also present
-  // in the new hit set.
-
-  // First, make a sorted list of all the new hits
-  // TODO: Do this only once per pattern, perhaps when we make the patterns
-  set<Hit*> new_hits;
-  for( UInt_t i = fBuild->fNlayers; i; ) {
-    --i;
-    const vector<Hit*>& hits = fBuild->fHitpattern->GetHits( i, nd[i] );
-    PrintHits(hits);
-    copy( hits.begin(), hits.end(), inserter( new_hits, new_hits.begin() ));
-  }
-
-  cout << "adding " << new_hits.size() << " hits" <<endl;
-
   if( first ) {
-    if( !CheckMatch(new_hits) )
+    if( !CheckMatch(nd.hits) )
       return kFALSE;
-    swap( fHits, new_hits );
-    fBuild->fCommonHits = fHits;
+    fBuild->fCommonHits = fHits = nd.hits;
   } else {
     set<Hit*> new_commons;
-    set_intersection( new_hits.begin(), new_hits.end(),
+    set_intersection( nd.hits.begin(), nd.hits.end(),
 		      fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
 		      inserter( new_commons, new_commons.end() ));
 
@@ -203,12 +187,15 @@ Bool_t Road::Add( NodeDescriptor& nd )
       }
       // The new set of common hits is good, so update the build data
       swap( fBuild->fCommonHits, new_commons );
-      set<Hit*> allhits;
-      set_union( fHits.begin(), fHits.end(), new_hits.begin(), new_hits.end(),
-		 inserter( allhits, allhits.begin() ));
-      cout << "new/old nhits = " << allhits.size() << " " 
-	   << fHits.size() << endl;
-      swap( fHits, allhits );
+    }
+    set<Hit*> new_hits;
+    set_union( fHits.begin(), fHits.end(), nd.hits.begin(), nd.hits.end(),
+	       inserter( new_hits, new_hits.begin() ));
+    cout << "new/old nhits = " << new_hits.size() << " " 
+	 << fHits.size() << endl;
+    if( new_hits.size() != fHits.size() ) {
+      swap( fHits, new_hits );
+      PrintHits( fHits );
     }
   }
 
@@ -236,34 +223,27 @@ void Road::Finish()
   // Finish building the road
 
   assert(fBuild);
-  for( vector<NodeDescriptor*>::iterator it = fBuild->fPatterns.begin();
-       it != fBuild->fPatterns.end(); ++it ) {
+  for( vector<const NodeDescriptor*>::iterator it = 
+	 fBuild->fPatterns.begin(); it != fBuild->fPatterns.end(); ++it ) {
     
-    NodeDescriptor& nd = **it;
+    // Make the node writable so we can update the "used" field
+    NodeDescriptor& nd = const_cast<NodeDescriptor&>(**it);
     assert( nd.used < 2 ); // cannot add previously fully used pattern
 
-    // First, make a sorted list of all the new hits
-    // TODO: Do this only once per pattern, perhaps when we make the patterns
-    set<Hit*> these_hits;
-    for( UInt_t i = fBuild->fNlayers; i; ) {
-      --i;
-      const vector<Hit*>& hits = fBuild->fHitpattern->GetHits( i, nd[i] );
-      copy( hits.begin(), hits.end(), 
-	    inserter( these_hits, these_hits.begin() ));
-    }
-    // TODO: search only to first element not in common
+    // TODO: search only up to first element not in common?
     vector<Hit*> not_in_common;
-    set_difference( these_hits.begin(), these_hits.end(),
+    set_difference( nd.hits.begin(), nd.hits.end(),
 		    fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
 		    back_inserter( not_in_common ) );
 
     nd.used = not_in_common.empty() ? 2 : 1;
-    cout << "used = " << (int)nd.used << "for ";
+    cout << "used = " << (int)nd.used << " for ";
     nd.Print();
   }
 
 
   // Put the tools away
+  // TODO: save npat
   delete fBuild; fBuild = 0;
 
   return;
@@ -283,110 +263,6 @@ void CollectCoordinates()
 
 }
 
-#if 0
-
-//_____________________________________________________________________________
-MatchCount_t Hitpattern::CommonPlanes( const NodeDescriptor& nd1,
-				       const NodeDescriptor& nd2,
-				       const vector<UInt_t>& maxdist ) const
-{
-  // Return the number of physical wire planes (not layers) in which the
-  // two patterns nd1 and nd2 share at least one hit
-
-  //TODO: remove this, replaced by Road::Add()
-
-  MatchCount_t matches(0,0);
-  bool top = true;
-  set<Hit*> sorted_hits;
-
-  for( UInt_t i=fNplanes; i; ) {
-    --i;
-    UInt_t bin1 = nd1[i];
-    UInt_t bin2 = nd2[i];
-
-    // Quit if top bins too far apart
-    if( top ) {
-      if( (bin1 > bin2 && bin1-bin2 > maxdist[i]) ||
-	  (bin1 < bin2 && bin2-bin1 > maxdist[i]) )
-	break;
-      top = false;
-    }
-
-    // Naturally, there are no matches if either hit list is empty
-    vsiz_t sz1 = GetHits(i,bin1).size();
-    vsiz_t sz2 = GetHits(i,bin2).size();
-    if( sz1 == 0 or sz2 == 0 )
-      continue;
-
-    // Ensure that hits1 is smaller than hits2 so we have a better chance
-    // of saving time later
-    if( sz1 > sz2 )
-      swap( bin1, bin2 );
-    const vector<Hit*>& hits1 = GetHits(i,bin1);
-    const vector<Hit*>& hits2 = GetHits(i,bin2);
-
-//     PrintHits( hits1 );
-//     PrintHits( hits2 );
-
-    // Determine if we are dealing with a wire plane pair
-    vector<Hit*>::const_iterator it = hits1.begin();
-    const WirePlane* wp = (*it)->GetWirePlane();
-    assert(wp);
-    bool doing_pair = (wp->GetPartner() != 0);
-
-    // Naturally, same bins always match
-    if( bin1 == bin2 ) {
-      ++matches.first;
-      ++matches.second;
-      if( doing_pair )
-	++matches.second;
-      continue;
-    }
-    
-    // Fast search for identical elements in the two arrays.
-    // This runs in N*log(N) time, like sorting all the hits would.
-    // N = hits1.size() + hits2.size() is small anyway.
-
-    // Put hits from the first bin into a sorted container, allowing only
-    // unique elements
-    sorted_hits.clear();
-    copy( hits1.begin(), hits1.end(),
-	  inserter( sorted_hits, sorted_hits.begin() ));
-
-    // See if any hits in the second bin match any in the first.
-    // This is not totally straightforward with partnered plane pairs.
-    // In that case, this really is a parallel search for hits in two planes
-    set<Hit*>::iterator found;
-    Int_t found_plane = -1;
-    for( it = hits2.begin(); it != hits2.end(); ++it ) {
-      found = sorted_hits.find( *it );
-      if( found != sorted_hits.end() ) {
-	if( doing_pair ) {
-	  // If this bin is for a plane pair, allow up to two matches	
-	  const WirePlane* wp2 = (*found)->GetWirePlane();
-	  assert(wp2);
-	  if( found_plane < 0 ) {   // no plane found yet
-	    found_plane = wp2->GetPlaneNum();
-	    ++matches.first;
-	    ++matches.second;
-	  } else if( (Int_t)wp2->GetPlaneNum() != found_plane ) {
-	    assert( wp2->GetPlaneNum() == wp->GetPartner()->GetPlaneNum() );
-	    ++matches.second;
-	    break;
-	  }	    
-	} else {
-	  // If not a plane pair, we're done once we have the first match
-	  ++matches.first;
-	  ++matches.second;
-	  break;
-	}
-      }
-    }
-  }
-  return matches;
-}
-#endif
+///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch
-
-///////////////////////////////////////////////////////////////////////////////

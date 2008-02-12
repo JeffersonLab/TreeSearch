@@ -26,7 +26,7 @@ namespace TreeSearch {
     Road& operator=( const Road& );
     virtual ~Road();
 
-    Bool_t Add( NodeDescriptor& nd );
+    Bool_t Add( const NodeDescriptor& nd );
     void   Finish();
 
     void Print( Option_t* opt="" ) const;
