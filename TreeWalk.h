@@ -34,15 +34,15 @@ namespace TreeSearch {
     Link*    link;     // Linked-list node pointing to a base pattern
     Pattern* parent;   // Parent node
     UShort_t shift;    // Shift of the base pattern to its actual position
-    UChar_t  depth;    // Current recursion depth
     Bool_t   mirrored; // Pattern is mirrored
+    UChar_t  depth;    // Current recursion depth
     UChar_t  used;     // 0=not in any road, 1=some hits used, 2=all hits used
-    std::set<Hit*> hits; // Hits associated with all the bins of this pattern
+    std::set<Hit*> hits; // Hits associated with the bins of this pattern
 
     NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
 		    UChar_t dep )
-      : link(ln), parent(p), shift(shft), depth(dep), mirrored(mir), 
-	used(0) { assert(ln && ln->GetPattern()); }
+      : link(ln), parent(p), shift(shft), mirrored(mir), depth(dep), used(0)
+    { assert(ln && ln->GetPattern()); }
     virtual ~NodeDescriptor() {}
 
     // operator[] returns actual bit value in the i-th plane
@@ -54,13 +54,16 @@ namespace TreeSearch {
       else           return shift + pat[i];
     }
     // Comparison operators for inserting into ordered STL containers.
-    // Order nodes by ascending start bin.
-    // NB: pattern bit[0] = 0, so nothing needs to be added to "shift"
     bool operator<( const NodeDescriptor& rhs ) const {
-      return ( shift < rhs.shift );
+      for( UInt_t i = 0; i < link->GetPattern()->GetNbits(); ++i ) {
+	if( (*this)[i] < rhs[i] )  return true;
+	if( (*this)[i] > rhs[i] )  return false;
+      }
+      return false; // Patterns are equal
     }
     bool operator==( const NodeDescriptor& rhs ) const {
-      return ( shift == rhs.shift );
+      return ( shift == rhs.shift && mirrored == rhs.mirrored &&
+	       *(link->GetPattern()) == *(rhs.link->GetPattern()) );
     }
     void Print() const;
     ClassDef(NodeDescriptor, 0)  // Full description of a pattern
