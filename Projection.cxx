@@ -20,6 +20,7 @@
 #include <iostream>
 #include <sys/time.h>  // for timing
 #include <algorithm>
+#include <utility>
 
 using namespace std;
 
@@ -50,7 +51,8 @@ Projection::Projection( const Projection& orig )
   : fType(orig.fType), fPlanes(orig.fPlanes), fLayers(orig.fLayers),
     fNlevels(orig.fNlevels), fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
     fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
-    fHitpattern(0), fPatternTree(0), fDetector(orig.fDetector)
+    fHitpattern(0), fPatternTree(0), fDetector(orig.fDetector),
+    fPatternsFound(), fRoads()
 {
   // Copying
 
@@ -84,6 +86,8 @@ const Projection& Projection::operator=( const Projection& rhs )
 //       fPatternTree = new PatternTree(*rhs.fPatternTree);
 //     else
     fPatternTree = 0;
+    fPatternsFound.clear();
+    fRoads.clear();
   }
   return *this;
 }
@@ -439,7 +443,7 @@ Int_t Projection::MakeRoads()
   // This is the primary de-ghosting algorithm. It groups patterns with
   // common wires (not common hit positions!) in all planes together.
 
-  multiset<NodeDescriptor>::iterator it1, it2, ref_it1;
+  set<NodeDescriptor>::iterator it1, it2, ref_it1;
   for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
     const NodeDescriptor& nd1 = *it1;
@@ -450,7 +454,9 @@ Int_t Projection::MakeRoads()
     Road rd(this);
     // Adding the first pattern must make a good match
     if( !rd.Add(nd1) ) {
+#ifdef VERBOSE
       cout << ">>>>>>>>> No match, skipped" << endl;
+#endif
       continue;
     }
     it2 = ref_it1;
@@ -460,8 +466,9 @@ Int_t Projection::MakeRoads()
       const NodeDescriptor& nd2 = *it2;
       if( nd1[0] <= nd2[0] + fMaxdist[0] ) {
 	// Try adding unused or partly used pattern to the new road until there
-	// are no more patterns that could possibly have common hits
-	if( nd2.used < 2 )
+	// are no more patterns that could possibly have common hits.
+	if( nd2.used < 2 &&
+	    it1 != it2 ) // skip the seed in case we run over it
 	  rd.Add( nd2 );
       } else {
 	// Save last position too far left of it1 (seed of road).
@@ -473,8 +480,15 @@ Int_t Projection::MakeRoads()
     rd.Finish();
     fRoads.push_back(rd);
   }
+#ifdef VERBOSE
+  if( !fRoads.empty() ) {
+    cout << fRoads.size() << " road";
+    if( fRoads.size()>1 ) cout << "s";
+    cout << endl;
+  }
   cout << "------------ end of projection  " << fName.Data() 
        << "------------" << endl;
+#endif
   return 0;
 }
 
@@ -570,13 +584,14 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
       return kRecurse;
 
     // Found a match at the bottom of the pattern tree.
-    // Add the pattern descriptor to the list of results,
-    // ordered by the start bin # (NodeDescriptor::operator<())
-    multiset<NodeDescriptor>::iterator ins = fMatches->insert( nd );
+    // Add the pattern descriptor to the set of matches,
+    // ordered by start bin number (NodeDescriptor::operator<)
+    pair<set<NodeDescriptor>::iterator,bool> ins = fMatches->insert( nd );
+    assert(ins.second);  // new matches must always be unique
 
     // Retrieve the node that was just inserted. We should be able to write
     // to it (to update its hit list), except that STL won't let us.
-    NodeDescriptor& node = const_cast<NodeDescriptor&>( *ins );
+    NodeDescriptor& node = const_cast<NodeDescriptor&>( *ins.first );
 
     // Collect all hits associated with the pattern's bins and save them
     // with the node descriptor in fPatternsFound
