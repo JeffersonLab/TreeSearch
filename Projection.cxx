@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <sys/time.h>  // for timing
+#include <algorithm>
 
 using namespace std;
 
@@ -324,7 +325,7 @@ Int_t Projection::DefineVariables( EMode mode )
     { "n_test", "Number of pattern comparisons", "n_test"  },
     { "n_pat", "Number of patterns found",   "n_pat"    },
     { "t_treesearch", "Time in TreeSearch (us)", "t_treesearch" },
-    { "t_treecombine", "Time in TreeCombine (us)", "t_treecombine" },
+    { "t_roads", "Time in MakeRoads (us)", "t_roads" },
     { "t_track", "Time in Track (us)", "t_track" },
     //    { "", "", "" },
 #endif
@@ -441,24 +442,22 @@ Int_t Projection::MakeRoads()
   multiset<NodeDescriptor>::iterator it1, it2, ref_it1;
   for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
-    // Some STL implementations declare the set iterator const to prevent
-    // modification of the sort key. For simplicity, we cast const away and
-    // promise never to change the pattern bits. Alternatively, we could use a
-    // multimap.
-    NodeDescriptor& nd1 = const_cast<NodeDescriptor&>(*it1);
+    const NodeDescriptor& nd1 = *it1;
     assert(nd1.used < 3);
     // New roads must contain at least one unused pattern
     if( nd1.used )
       continue;
     Road rd(this);
     // Adding the first pattern must make a good match
-    if( !rd.Add(nd1) )
+    if( !rd.Add(nd1) ) {
+      cout << ">>>>>>>>> No match, skipped" << endl;
       continue;
+    }
     it2 = ref_it1;
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
 	   (*it2)[0] <= nd1[0] + fMaxdist[0] ) {
-      NodeDescriptor& nd2 = const_cast<NodeDescriptor&>(*it2);
+      const NodeDescriptor& nd2 = *it2;
       if( nd1[0] <= nd2[0] + fMaxdist[0] ) {
 	// Try adding unused or partly used pattern to the new road until there
 	// are no more patterns that could possibly have common hits
@@ -474,6 +473,8 @@ Int_t Projection::MakeRoads()
     rd.Finish();
     fRoads.push_back(rd);
   }
+  cout << "------------ end of projection  " << fName.Data() 
+       << "------------" << endl;
   return 0;
 }
 
@@ -568,9 +569,25 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 
-    // Found a match at the bottom of the tree. Add it to the list of results,
+    // Found a match at the bottom of the pattern tree.
+    // Add the pattern descriptor to the list of results,
     // ordered by the start bin # (NodeDescriptor::operator<())
-    fMatches->insert( nd );
+    multiset<NodeDescriptor>::iterator ins = fMatches->insert( nd );
+
+    // Retrieve the node that was just inserted. We should be able to write
+    // to it (to update its hit list), except that STL won't let us.
+    NodeDescriptor& node = const_cast<NodeDescriptor&>( *ins );
+
+    // Collect all hits associated with the pattern's bins and save them
+    // with the node descriptor in fPatternsFound
+    assert( node.hits.empty() );
+    for( UInt_t i = fHitpattern->GetNplanes(); i; ) {
+      --i;
+      const vector<Hit*>& hits = fHitpattern->GetHits( i, node[i] );
+      copy( hits.begin(), hits.end(), 
+	    inserter( node.hits, node.hits.begin() ));
+    }
+
   }
   return kSkipChildNodes;
 }

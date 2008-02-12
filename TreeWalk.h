@@ -20,9 +20,12 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
+#include <set>
 #include <cassert>
 
 namespace TreeSearch {
+
+  class Hit;
 
   //___________________________________________________________________________
   // Structure to describe a tree node (an actual pattern, including shifts
@@ -34,6 +37,7 @@ namespace TreeSearch {
     UChar_t  depth;    // Current recursion depth
     Bool_t   mirrored; // Pattern is mirrored
     UChar_t  used;     // 0=not in any road, 1=some hits used, 2=all hits used
+    std::set<Hit*> hits; // Hits associated with all the bins of this pattern
 
     NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
 		    UChar_t dep )
