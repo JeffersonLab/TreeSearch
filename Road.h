@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Rtypes.h"
-//#include <vector>
+#include <vector>
 #include <set>
 
 namespace TreeSearch {
@@ -40,10 +40,10 @@ namespace TreeSearch {
 
     // Bin numbers defining the corners
     UShort_t  fLeft[2];   // Left corner bin, 0=lower, 1=upper
-    UShort_t  fRight[2];
+    UShort_t  fRight[2];  // Right corner bin, 0=lower, 1=upper
 
-    std::set<Hit*>     fHits;   // All hits collected from this road's patterns
-    //    std::vector<Point> fPoints; // Hit positions within the road
+    UInt_t    fNplanes;   // Number of planes
+    std::set<Hit*> fHits; // All hits collected from this road's patterns
 
     // Fit results
     Double_t  fSlope;
@@ -55,7 +55,8 @@ namespace TreeSearch {
     BuildInfo_t* fBuild;
 
     Bool_t CheckMatch( const std::set<Hit*>& hits ) const;
-    void   CollectCoordinates();
+    void   CollectCoordinates( UInt_t nplanes, std::vector<Int_t>& hitcount,
+			       std::vector<std::vector<Point> >& points );
 
     ClassDef(Road,1)  // Region containing track candidate hits 
   };

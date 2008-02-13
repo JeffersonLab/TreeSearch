@@ -29,8 +29,7 @@ struct BuildInfo_t {
   set<Hit*>         fCommonHits;      // Hits common between all patterns
   Hitpattern*       fHitpattern;
   UInt_t            fNlayers;
-  UInt_t            fNplanes;
-  //TODO: add match requirements
+  TBits*            fPlaneCombos;     // Bitfield for planecombo lookup
   //TODO: use fMaxdist[] ??
 };
 
@@ -47,18 +46,21 @@ Road::Road( const Projection* proj )
   assert(proj);
 
   fBuild = new BuildInfo_t;
-  fBuild->fHitpattern = proj->GetHitpattern();
-  fBuild->fNlayers    = proj->GetNlayers();
-  fBuild->fNplanes    = proj->GetNplanes();
+  fBuild->fHitpattern  = proj->GetHitpattern();
+  fBuild->fNlayers     = proj->GetNlayers();
+  fBuild->fPlaneCombos = proj->GetPlaneCombos();
+
+  fNplanes = proj->GetNplanes();
 
   assert( fBuild->fHitpattern && fBuild->fNlayers && 
-	  fBuild->fNplanes >= fBuild->fNlayers );
+	  fNplanes >= fBuild->fNlayers && fBuild->fPlaneCombos );
 
 }
 
 //_____________________________________________________________________________
 Road::Road( const Road& orig )
-  : fSlope(orig.fSlope), fPos(orig.fSlope), fChi2(orig.fChi2)
+  : fNplanes(orig.fNplanes), fSlope(orig.fSlope), fPos(orig.fSlope),
+    fChi2(orig.fChi2)
 {
   // Copy constructor
 
@@ -125,7 +127,7 @@ Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
 
   assert(fBuild);
 
-  TBits curpat( fBuild->fNplanes );
+  TBits curpat( fNplanes );
   for( set<Hit*>::const_iterator it = hits.begin(); it != hits.end(); ++it )
     curpat.SetBitNumber( (*it)->GetWirePlane()->GetPlaneNum() );
 
@@ -134,7 +136,7 @@ Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
   const UInt_t kMaxmiss = 1;
 
   UInt_t nmiss = 0;
-  for( UInt_t i = 0; i<fBuild->fNplanes; ++i ) {
+  for( UInt_t i = 0; i<fNplanes; ++i ) {
     if( !curpat[i] ) {
       ++nmiss;
       if( nmiss > kMaxmiss )
@@ -211,12 +213,10 @@ Bool_t Road::Add( const NodeDescriptor& nd )
   fBuild->fPatterns.push_back(&nd);
 
   // Expand the road limits if necessary
-  assert( nd.link->GetPattern()->GetNbits() == fBuild->fNlayers );
-  UInt_t n = fBuild->fNlayers-1;
-  fLeft[0]  = TMath::Min( nd[0], fLeft[0] );
-  fLeft[1]  = TMath::Min( nd[n], fLeft[1] );
-  fRight[0] = TMath::Max( nd[0], fRight[0] );
-  fRight[1] = TMath::Max( nd[n], fRight[1] );
+  fLeft[0]  = TMath::Min( nd.Start(), fLeft[0] );
+  fLeft[1]  = TMath::Min( nd.End(),   fLeft[1] );
+  fRight[0] = TMath::Max( nd.Start(), fRight[0] );
+  fRight[1] = TMath::Max( nd.End(),   fRight[1] );
 
 #ifdef VERBOSE
   cout << "new npat = " << fBuild->fPatterns.size() << endl;
@@ -269,7 +269,8 @@ void Road::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
-void CollectCoordinates()
+void Road::CollectCoordinates( UInt_t nplanes, std::vector<Int_t>& hitcount,
+			       std::vector<std::vector<Point> >& points )
 {
   // 
 

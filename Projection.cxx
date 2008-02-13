@@ -16,6 +16,7 @@
 
 #include "TMath.h"
 #include "TString.h"
+#include "TBits.h"
 
 #include <iostream>
 #include <sys/time.h>  // for timing
@@ -35,7 +36,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0),
-    fHitpattern(0), fPatternTree(0), fDetector(parent)
+    fHitpattern(0), fPatternTree(0), fDetector(parent), fPlaneCombos(0)
 {
   // Constructor
 
@@ -60,6 +61,8 @@ Projection::Projection( const Projection& orig )
     fHitpattern = new Hitpattern(*orig.fHitpattern);
 //   if( orig.fPatternTree )
 //     fPatternTree = new PatternTree(*orig.fPatternTree);
+  if( orig.fPlaneCombos )
+    fPlaneCombos = new TBits(*orig.fPlaneCombos);
 }
 
 //_____________________________________________________________________________
@@ -88,6 +91,11 @@ const Projection& Projection::operator=( const Projection& rhs )
     fPatternTree = 0;
     fPatternsFound.clear();
     fRoads.clear();
+    delete fPlaneCombos;
+    if( rhs.fPlaneCombos )
+      fPlaneCombos = new TBits(*rhs.fPlaneCombos);
+    else
+      fPlaneCombos = 0;
   }
   return *this;
 }
@@ -97,8 +105,9 @@ Projection::~Projection()
 {
   // Destructor
 
-  delete fPatternTree; fPatternTree = 0;
-  delete fHitpattern; fHitpattern = 0;
+  delete fPatternTree;
+  delete fHitpattern;
+  delete fPlaneCombos;
 }
 
 //_____________________________________________________________________________
@@ -260,6 +269,20 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
     }    
     fMaxdist.push_back( dist );
   }
+
+  // Set up the lookup table indicating which planes are allowed to have 
+  // missing hits. The bit pattern of plane hits is used as an index into
+  // this table; if the corresponding bit is set, the plane combo is allowed.
+
+  delete fPlaneCombos;
+  UInt_t n = 1U<<GetNplanes();
+  fPlaneCombos = new TBits( n );
+  // For now, allow any one plane to be missing
+  // TODO: read from database and allow more complex patterns
+  UInt_t word = n-1;
+  fPlaneCombos->SetBitNumber( word );
+  while(n>>=1)
+    fPlaneCombos->SetBitNumber( word ^ n );
 
   return fStatus = kOK;
 }

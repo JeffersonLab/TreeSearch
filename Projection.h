@@ -17,6 +17,7 @@
 #include <cassert>
 
 class THaDetectorBase;
+class TBits;
 
 namespace TreeSearch {
 
@@ -53,6 +54,7 @@ namespace TreeSearch {
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
+    TBits*          GetPlaneCombos() const { return fPlaneCombos; }
     Double_t        GetSinAngle() const { return fSinAngle; }
     Int_t           GetType()  const { return fType; }
     Double_t        GetWidth() const { return fWidth; }
@@ -85,6 +87,8 @@ namespace TreeSearch {
     std::list<Road>  fRoads;    // Roads found by MakeRoads
 
     std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
+
+    TBits*           fPlaneCombos; // Allowed plane combos with missing hits
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
