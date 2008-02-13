@@ -55,6 +55,7 @@ namespace TreeSearch {
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
     TBits*          GetPlaneCombos() const { return fPlaneCombos; }
+    TBits*          GetLayerCombos() const { return fLayerCombos; }
     Double_t        GetSinAngle() const { return fSinAngle; }
     Int_t           GetType()  const { return fType; }
     Double_t        GetWidth() const { return fWidth; }
@@ -89,6 +90,7 @@ namespace TreeSearch {
     std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
 
     TBits*           fPlaneCombos; // Allowed plane combos with missing hits
+    TBits*           fLayerCombos; // Allowed layer combos with missing hits
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
@@ -109,21 +111,22 @@ namespace TreeSearch {
     // added to the list of roads for further analysis
     class ComparePattern : public NodeVisitor {
     public:
-      ComparePattern( const Hitpattern* hitpat,
+      ComparePattern( const Hitpattern* hitpat, const TBits* combos,
 		      std::set<NodeDescriptor>* matches )
-	: fHitpattern(hitpat), fMatches(matches)
+	: fHitpattern(hitpat), fLayerCombos(combos), fMatches(matches)
 #ifdef TESTCODE
 	, fNtest(0)
 #endif
-      { assert(hitpat && matches); }
+      { assert(fHitpattern && fLayerCombos && fMatches); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
 #ifdef TESTCODE
       UInt_t GetNtest() const { return fNtest; }
 #endif
     private:
-      const Hitpattern* fHitpattern;    // Hitpattern to compare to
+      const Hitpattern* fHitpattern;   // Hitpattern to compare to
+      const TBits*      fLayerCombos;  // Allowed combos of missing layers
       std::set<NodeDescriptor>* fMatches; // Set of matching patterns
-#ifdef TESTCODE
+      #ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
     };

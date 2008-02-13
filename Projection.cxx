@@ -36,7 +36,8 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0),
-    fHitpattern(0), fPatternTree(0), fDetector(parent), fPlaneCombos(0)
+    fHitpattern(0), fPatternTree(0), fDetector(parent),
+    fPlaneCombos(0), fLayerCombos(0)
 {
   // Constructor
 
@@ -63,6 +64,8 @@ Projection::Projection( const Projection& orig )
 //     fPatternTree = new PatternTree(*orig.fPatternTree);
   if( orig.fPlaneCombos )
     fPlaneCombos = new TBits(*orig.fPlaneCombos);
+  if( orig.fLayerCombos )
+    fLayerCombos = new TBits(*orig.fLayerCombos);
 }
 
 //_____________________________________________________________________________
@@ -96,6 +99,10 @@ const Projection& Projection::operator=( const Projection& rhs )
       fPlaneCombos = new TBits(*rhs.fPlaneCombos);
     else
       fPlaneCombos = 0;
+    if( rhs.fLayerCombos )
+      fLayerCombos = new TBits(*rhs.fLayerCombos);
+    else
+      fLayerCombos = 0;
   }
   return *this;
 }
@@ -108,6 +115,7 @@ Projection::~Projection()
   delete fPatternTree;
   delete fHitpattern;
   delete fPlaneCombos;
+  delete fLayerCombos;
 }
 
 //_____________________________________________________________________________
@@ -275,14 +283,29 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   // this table; if the corresponding bit is set, the plane combo is allowed.
 
   delete fPlaneCombos;
-  UInt_t n = 1U<<GetNplanes();
-  fPlaneCombos = new TBits( n );
-  // For now, allow any one plane to be missing
+  UInt_t np = 1U<<GetNplanes();
+  fPlaneCombos = new TBits( np );
+  // For starters, allow any one plane to be missing
   // TODO: read from database and allow more complex patterns
-  UInt_t word = n-1;
-  fPlaneCombos->SetBitNumber( word );
-  while(n>>=1)
-    fPlaneCombos->SetBitNumber( word ^ n );
+  UInt_t allbits = np-1;
+  fPlaneCombos->SetBitNumber( allbits );
+  while(np>>=1)
+    fPlaneCombos->SetBitNumber( allbits ^ np );
+
+  delete fLayerCombos;
+  UInt_t nl = 1U<<GetNlayers();
+  fLayerCombos = new TBits( nl );
+  // Allow any one layer to be missing. However, layers made up of 
+  // partnered planes must always be present
+  //TODO: read from database
+  allbits = nl-1;
+  fLayerCombos->SetBitNumber( allbits );
+//   for( UInt_t i=GetNlayers(); i; ) {
+//     nl >>= 1;
+//     WirePlane* wp = fLayers[--i];
+//     if( !wp->GetPartner() )
+//       fLayerCombos->SetBitNumber( allbits ^ nl );
+//   }
 
   return fStatus = kOK;
 }
@@ -407,7 +430,7 @@ Int_t Projection::Track()
   gettimeofday( &start2, 0 );
 #endif
 
-  ComparePattern compare( fHitpattern, &fPatternsFound );
+  ComparePattern compare( fHitpattern, fLayerCombos, &fPatternsFound );
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
@@ -601,8 +624,9 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
 #ifdef TESTCODE
   ++fNtest;
 #endif
-  // Match?
-  if( fHitpattern->ContainsPattern(nd) == fHitpattern->GetNplanes() ) {
+  // Compute the match pattern and see if it is allowed
+  UInt_t matchpattern = fHitpattern->ContainsPattern(nd);
+  if( fLayerCombos->TestBitNumber(matchpattern)  ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 
@@ -610,7 +634,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // Add the pattern descriptor to the set of matches,
     // ordered by start bin number (NodeDescriptor::operator<)
     pair<set<NodeDescriptor>::iterator,bool> ins = fMatches->insert( nd );
-    assert(ins.second);  // new matches must always be unique
+    assert(ins.second);  // duplicate matches should never happen
 
     // Retrieve the node that was just inserted. We should be able to write
     // to it (to update its hit list), except that STL won't let us.
