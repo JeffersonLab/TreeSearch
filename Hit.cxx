@@ -8,6 +8,7 @@
 
 #include "Hit.h"
 #include "TSeqCollection.h"
+#include "WirePlane.h"
 
 #include <iostream>
 
@@ -18,6 +19,7 @@ using std::make_pair;
 ClassImp(TreeSearch::Hit)
 ClassImp(TreeSearch::MCHit)
 ClassImp(TreeSearch::HitPairIter)
+ClassImp(TreeSearch::HitSet)
 
 namespace TreeSearch {
 
@@ -36,6 +38,27 @@ void Hit::Print( Option_t* opt ) const
        << " trk="      << GetTrackDist();
   if( *opt != 'C' )
     cout << endl;
+}
+
+//_____________________________________________________________________________
+Double_t Hit::ConvertTimeToDist( Double_t slope )
+{
+  // Convert drift time to drift distance. 'slope' is the approximate
+  // slope of the track.
+  // Updates the internal variables fPosL and fPosR.
+  // Must be called before doing analysis of drift chamber hits.
+  Double_t dist = fWirePlane->GetTTDConv()->ConvertTimeToDist(fTime, slope);
+  fPosL = fPos-dist;
+  fPosR = fPos+dist;
+  return dist;
+}
+
+//_____________________________________________________________________________
+Double_t Hit::GetZ() const
+{
+  // Return z-position of the wire plane of this hit
+
+  return fWirePlane->GetZ();
 }
 
 //_____________________________________________________________________________

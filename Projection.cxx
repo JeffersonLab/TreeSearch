@@ -489,13 +489,13 @@ Int_t Projection::MakeRoads()
   // This is the primary de-ghosting algorithm. It groups patterns with
   // common wires (not common hit positions!) in all planes together.
 
-  set<NodeDescriptor>::iterator it1, it2, ref_it1;
+  map<const NodeDescriptor,HitSet>::iterator it1, it2, ref_it1;
   for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
-    const NodeDescriptor& nd1 = *it1;
-    assert(nd1.used < 3);
+    pair<const NodeDescriptor,HitSet>& nd1 = *it1;
+    assert(nd1.second.used < 3);
     // New roads must contain at least one unused pattern
-    if( nd1.used )
+    if( nd1.second.used )
       continue;
     Road rd(this);
     // Adding the first pattern must make a good match
@@ -508,12 +508,12 @@ Int_t Projection::MakeRoads()
     it2 = ref_it1;
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
-	   (*it2)[0] <= nd1[0] + fMaxdist[0] ) {
-      const NodeDescriptor& nd2 = *it2;
-      if( nd1[0] <= nd2[0] + fMaxdist[0] ) {
+	   (*it2).first[0] <= nd1.first[0] + fMaxdist[0] ) {
+      pair<const NodeDescriptor,HitSet>& nd2 = *it2;
+      if( nd1.first[0] <= nd2.first[0] + fMaxdist[0] ) {
 	// Try adding unused or partly used pattern to the new road until there
 	// are no more patterns that could possibly have common hits.
-	if( nd2.used < 2 &&
+	if( nd2.second.used < 2 &&
 	    it1 != it2 ) // skip the seed in case we run over it
 	  rd.Add( nd2 );
       } else {
@@ -633,21 +633,21 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // Found a match at the bottom of the pattern tree.
     // Add the pattern descriptor to the set of matches,
     // ordered by start bin number (NodeDescriptor::operator<)
-    pair<set<NodeDescriptor>::iterator,bool> ins = fMatches->insert( nd );
+    pair<map<const NodeDescriptor,HitSet>::iterator,bool> ins = 
+      fMatches->insert( make_pair(nd,HitSet()) );
     assert(ins.second);  // duplicate matches should never happen
 
-    // Retrieve the node that was just inserted. We should be able to write
-    // to it (to update its hit list), except that STL won't let us.
-    NodeDescriptor& node = const_cast<NodeDescriptor&>( *ins.first );
+    // Retrieve the node that was just inserted.
+    pair<const NodeDescriptor,HitSet>& node = *ins.first;
 
     // Collect all hits associated with the pattern's bins and save them
-    // with the node descriptor in fPatternsFound
-    assert( node.hits.empty() );
+    // in the node's HitSet
+    assert( node.second.hits.empty() );
     for( UInt_t i = fHitpattern->GetNplanes(); i; ) {
       --i;
-      const vector<Hit*>& hits = fHitpattern->GetHits( i, node[i] );
+      const vector<Hit*>& hits = fHitpattern->GetHits( i, node.first[i] );
       copy( hits.begin(), hits.end(), 
-	    inserter( node.hits, node.hits.begin() ));
+	    inserter( node.second.hits, node.second.hits.begin() ));
     }
 
   }

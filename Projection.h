@@ -10,9 +10,10 @@
 #include "THaAnalysisObject.h"
 #include "TreeWalk.h"
 #include "Road.h"
+#include "Hit.h"
 #include "TMath.h"
 #include <vector>
-#include <set>
+#include <map>
 #include <list>
 #include <cassert>
 
@@ -84,7 +85,8 @@ namespace TreeSearch {
 
     THaDetectorBase* fDetector;    //! Parent detector
 
-    std::set<NodeDescriptor> fPatternsFound; // Patterns found by TreeSearch
+    // Patterns found by TreeSearch
+    std::map<const NodeDescriptor,HitSet> fPatternsFound;
     std::list<Road>  fRoads;    // Roads found by MakeRoads
 
     std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
@@ -112,7 +114,7 @@ namespace TreeSearch {
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
-		      std::set<NodeDescriptor>* matches )
+		      std::map<const NodeDescriptor,HitSet>* matches )
 	: fHitpattern(hitpat), fLayerCombos(combos), fMatches(matches)
 #ifdef TESTCODE
 	, fNtest(0)
@@ -125,8 +127,9 @@ namespace TreeSearch {
     private:
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fLayerCombos;  // Allowed combos of missing layers
-      std::set<NodeDescriptor>* fMatches; // Set of matching patterns
-      #ifdef TESTCODE
+      // Set of matching patterns
+      std::map<const NodeDescriptor,HitSet>* fMatches;
+#ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
     };

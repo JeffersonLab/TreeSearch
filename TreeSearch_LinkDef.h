@@ -13,6 +13,7 @@
 #pragma link C++ class TreeSearch::Hit+;
 #pragma link C++ class TreeSearch::MCHit+;
 #pragma link C++ class TreeSearch::HitPairIter+;
+#pragma link C++ class TreeSearch::HitSet+;
 #pragma link C++ class TreeSearch::TimeToDistConv+;
 #pragma link C++ class TreeSearch::LinearTTD+;
 #pragma link C++ class TreeSearch::Bits+;
@@ -29,5 +30,7 @@
 #pragma link C++ class std::pair<TObject*,TObject*>;
 #pragma link C++ class std::vector<TreeSearch::WirePlane*>;
 #pragma link C++ class std::vector<TreeSearch::Projection*>;
+#pragma link C++ class std::pair<const TreeSearch::NodeDescriptor,
+                                 TreeSearch::HitSet>;
 
 #endif

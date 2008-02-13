@@ -8,14 +8,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Rtypes.h"
-#include <vector>
 #include <set>
+#include <utility>
+#include <vector>
 
 namespace TreeSearch {
 
-  class Hit;
   class Projection;
-  class NodeDescriptor; // Defined in TreeWalk.h
+  class NodeDescriptor;
+  class Hit;
+  class HitSet;
   class BuildInfo_t;    // Defined in implementation
 
   class Road {
@@ -26,7 +28,7 @@ namespace TreeSearch {
     Road& operator=( const Road& );
     virtual ~Road();
 
-    Bool_t Add( const NodeDescriptor& nd );
+    Bool_t Add( std::pair<const NodeDescriptor,HitSet>& nd );
     void   Finish();
 
     void Print( Option_t* opt="" ) const;

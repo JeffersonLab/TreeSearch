@@ -36,12 +36,10 @@ namespace TreeSearch {
     UShort_t shift;    // Shift of the base pattern to its actual position
     Bool_t   mirrored; // Pattern is mirrored
     UChar_t  depth;    // Current recursion depth
-    UChar_t  used;     // 0=not in any road, 1=some hits used, 2=all hits used
-    std::set<Hit*> hits; // Hits associated with the bins of this pattern
 
     NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
 		    UChar_t dep )
-      : link(ln), parent(p), shift(shft), mirrored(mir), depth(dep), used(0)
+      : link(ln), parent(p), shift(shft), mirrored(mir), depth(dep)
     { assert(ln && ln->GetPattern()); }
     virtual ~NodeDescriptor() {}
 
@@ -68,6 +66,8 @@ namespace TreeSearch {
     UShort_t Start() const { return shift; }
     UShort_t End()   const { return (*this)[link->GetPattern()->GetNbits()-1];}
     void     Print() const;
+  private:
+    NodeDescriptor() {}; // For linking ROOT dictionary
     ClassDef(NodeDescriptor, 0)  // Full description of a pattern
   };    
 

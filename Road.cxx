@@ -11,11 +11,13 @@
 #include "Projection.h"
 #include "Hitpattern.h"
 #include "Hit.h"
+#include "WirePlane.h"
 #include "TMath.h"
 #include "TBits.h"
 #include <iostream>
 #include <algorithm>
 #include <list>
+#include <utility>
 
 using namespace std;
 
@@ -25,7 +27,7 @@ namespace TreeSearch {
 
 // Private class for use while building a Road
 struct BuildInfo_t {
-  list<const NodeDescriptor*> fPatterns; // Patterns in this road
+  list<pair<const NodeDescriptor,HitSet>*> fPatterns; // Patterns in this road
   set<Hit*>         fCommonHits;      // Hits common between all patterns
   const Hitpattern* fHitpattern;
   UInt_t            fNlayers;
@@ -135,7 +137,7 @@ Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
 }
 
 //_____________________________________________________________________________
-Bool_t Road::Add( const NodeDescriptor& nd )
+Bool_t Road::Add( pair<const NodeDescriptor,HitSet>& nd )
 {
   // Check if the hits from the given NodeDescriptor pattern are common
   // with the common hit set already in this road. If so, add the pattern
@@ -148,17 +150,18 @@ Bool_t Road::Add( const NodeDescriptor& nd )
     return kFALSE;
 
 #ifdef VERBOSE
-  nd.Print(); nd.link->GetPattern()->Print(); nd.parent->Print();
-  PrintHits(nd.hits);
+  nd.first.Print(); nd.first.link->GetPattern()->Print();
+  nd.first.parent->Print();
+  PrintHits(nd.second.hits);
 #endif
   bool first = fBuild->fPatterns.empty();
   if( first ) {
-    if( !CheckMatch(nd.hits) )
+    if( !CheckMatch(nd.second.hits) )
       return kFALSE;
-    fBuild->fCommonHits = fHits = nd.hits;
+    fBuild->fCommonHits = fHits = nd.second.hits;
   } else {
     set<Hit*> new_commons;
-    set_intersection( nd.hits.begin(), nd.hits.end(),
+    set_intersection( nd.second.hits.begin(), nd.second.hits.end(),
 		      fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
 		      inserter( new_commons, new_commons.end() ));
 
@@ -183,7 +186,8 @@ Bool_t Road::Add( const NodeDescriptor& nd )
       swap( fBuild->fCommonHits, new_commons );
     }
     set<Hit*> new_hits;
-    set_union( fHits.begin(), fHits.end(), nd.hits.begin(), nd.hits.end(),
+    set_union( fHits.begin(), fHits.end(),
+	       nd.second.hits.begin(), nd.second.hits.end(),
 	       inserter( new_hits, new_hits.begin() ));
 #ifdef VERBOSE
     cout << "new/old nhits = " << new_hits.size() << " " 
@@ -201,10 +205,10 @@ Bool_t Road::Add( const NodeDescriptor& nd )
   fBuild->fPatterns.push_back(&nd);
 
   // Expand the road limits if necessary
-  fLeft[0]  = TMath::Min( nd.Start(), fLeft[0] );
-  fLeft[1]  = TMath::Min( nd.End(),   fLeft[1] );
-  fRight[0] = TMath::Max( nd.Start(), fRight[0] );
-  fRight[1] = TMath::Max( nd.End(),   fRight[1] );
+  fLeft[0]  = TMath::Min( nd.first.Start(), fLeft[0] );
+  fLeft[1]  = TMath::Min( nd.first.End(),   fLeft[1] );
+  fRight[0] = TMath::Max( nd.first.Start(), fRight[0] );
+  fRight[1] = TMath::Max( nd.first.End(),   fRight[1] );
 
 #ifdef VERBOSE
   cout << "new npat = " << fBuild->fPatterns.size() << endl;
@@ -221,23 +225,22 @@ void Road::Finish()
   // Finish building the road
 
   assert(fBuild);
-  for( list<const NodeDescriptor*>::iterator it = 
+  for( list<pair<const NodeDescriptor,HitSet>*>::iterator it = 
 	 fBuild->fPatterns.begin(); it != fBuild->fPatterns.end(); ++it ) {
     
-    // Make the node writable so we can update the "used" field
-    NodeDescriptor& nd = const_cast<NodeDescriptor&>(**it);
-    assert( nd.used < 2 ); // cannot add previously fully used pattern
+    HitSet& hs = (**it).second;
+    assert( hs.used < 2 ); // cannot add previously fully used pattern
 
     // TODO: search only up to first element not in common?
     list<Hit*> not_in_common;
-    set_difference( nd.hits.begin(), nd.hits.end(),
+    set_difference( hs.hits.begin(), hs.hits.end(),
 		    fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
 		    back_inserter( not_in_common ) );
 
-    nd.used = not_in_common.empty() ? 2 : 1;
+    hs.used = not_in_common.empty() ? 2 : 1;
 #ifdef VERBOSE
-    cout << "used = " << (int)nd.used << " for ";
-    nd.Print();
+    cout << "used = " << hs.used << " for ";
+    (**it).first.Print();
 #endif
   }
 

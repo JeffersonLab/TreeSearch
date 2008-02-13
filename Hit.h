@@ -8,9 +8,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "TObject.h"
-#include "WirePlane.h"
 #include "TimeToDistConv.h"
 #include <utility>
+#include <set>
+#include <cassert>
 
 class TSeqCollection;
 class TIterator;
@@ -18,6 +19,7 @@ class TIterator;
 namespace TreeSearch {
 
   extern const Double_t kBig;
+  class WirePlane;
 
   class Hit : public TObject {
 
@@ -29,7 +31,8 @@ namespace TreeSearch {
       fCl(0), fMulti(0), fTdiff(0.0),
 #endif
       fWireNum(wnum), fRawTDC(tdc), fTime(time), fPos(pos), fPosL(pos), 
-      fPosR(pos), fResolution(res), fTrackPos(kBig), fWirePlane(wp) {}
+      fPosR(pos), fResolution(res), fTrackPos(kBig), fWirePlane(wp)
+    { assert(fWirePlane); }
     //    Hit( const Hit& );
     //    Hit& operator=( const Hit& );
     virtual ~Hit() {}
@@ -43,7 +46,7 @@ namespace TreeSearch {
 
     Int_t    GetWireNum()    const { return fWireNum; }
     Double_t GetWirePos()    const { return fPos; }
-    Double_t GetZ() const { return fWirePlane ? fWirePlane->GetZ() : kBig; }
+    Double_t GetZ()          const;
     Double_t GetRawTDC()     const { return fRawTDC; }
     Double_t GetDriftTime()  const { return fTime; }
     Double_t GetDriftDist()  const { return fPosR-fPos; }
@@ -162,6 +165,17 @@ namespace TreeSearch {
     ClassDef(HitPairIter,0)  // Iterator over two lists of hits
   };
 
+  // Utility structure for storing sets of hits along with NodeDescriptors
+
+  struct HitSet {
+    std::set<Hit*> hits; // Hits associated with a pattern
+    UInt_t  used;  // 0=not in any road, 1=some hits used, 2=all hits used
+    HitSet() : used(0) {}
+    virtual ~HitSet() {}
+
+    ClassDef(HitSet, 0)  // A set of hits associated with a pattern
+  };
+
   //___________________________________________________________________________
   inline
   Int_t Hit::Compare( const TObject* obj ) const 
@@ -202,20 +216,6 @@ namespace TreeSearch {
     // The hits overlap within the maxdist tolerance
     return 0;
   }
-
-  //___________________________________________________________________________
-  inline
-  Double_t Hit::ConvertTimeToDist( Double_t slope )
-  {
-    // Convert drift time to drift distance. 'slope' is the approximate
-    // slope of the track.
-    // Updates the internal variables fPosL and fPosR.
-    // Must be called before doing analysis of drift chamber hits.
-    Double_t dist = fWirePlane->GetTTDConv()->ConvertTimeToDist(fTime, slope);
-    fPosL = fPos-dist;
-    fPosR = fPos+dist;
-    return dist;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
