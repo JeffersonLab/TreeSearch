@@ -65,7 +65,9 @@ namespace TreeSearch {
       return ( shift == rhs.shift && mirrored == rhs.mirrored &&
 	       *(link->GetPattern()) == *(rhs.link->GetPattern()) );
     }
-    void Print() const;
+    UShort_t Start() const { return shift; }
+    UShort_t End()   const { return (*this)[link->GetPattern()->GetNbits()-1];}
+    void     Print() const;
     ClassDef(NodeDescriptor, 0)  // Full description of a pattern
   };    
 
