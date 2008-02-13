@@ -27,9 +27,9 @@ namespace TreeSearch {
 struct BuildInfo_t {
   list<const NodeDescriptor*> fPatterns; // Patterns in this road
   set<Hit*>         fCommonHits;      // Hits common between all patterns
-  Hitpattern*       fHitpattern;
+  const Hitpattern* fHitpattern;
   UInt_t            fNlayers;
-  TBits*            fPlaneCombos;     // Bitfield for planecombo lookup
+  const TBits*      fPlaneCombos;     // Bitfield for plane combo lookup
   //TODO: use fMaxdist[] ??
 };
 
@@ -127,23 +127,11 @@ Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
 
   assert(fBuild);
 
-  TBits curpat( fNplanes );
+  UInt_t curpat = 0;
   for( set<Hit*>::const_iterator it = hits.begin(); it != hits.end(); ++it )
-    curpat.SetBitNumber( (*it)->GetWirePlane()->GetPlaneNum() );
+    curpat |= 1U << ((*it)->GetWirePlane()->GetPlaneNum());
 
-  // As a simple start, we allow exactly one arbitrary missing plane
-  //TODO: allow more general criteria
-  const UInt_t kMaxmiss = 1;
-
-  UInt_t nmiss = 0;
-  for( UInt_t i = 0; i<fNplanes; ++i ) {
-    if( !curpat[i] ) {
-      ++nmiss;
-      if( nmiss > kMaxmiss )
-	return false;
-    }
-  }
-  return true;
+  return fBuild->fPlaneCombos->TestBitNumber(curpat);
 }
 
 //_____________________________________________________________________________
