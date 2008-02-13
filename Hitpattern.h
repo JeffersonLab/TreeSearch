@@ -167,7 +167,7 @@ namespace TreeSearch {
     assert( nd.depth < fNlevels );
     // The offset of the hitpattern bits at this depth
     UInt_t offs = 1U<<nd.depth;
-    UInt_t n_found = 0;
+    UInt_t matchpattern = 0;
     // The start bit number of the tree pattern we are comparing to
     UInt_t startpos = offs + nd.shift;
     Pattern* pat = nd.link->GetPattern();
@@ -179,16 +179,16 @@ namespace TreeSearch {
       assert( startpos < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
 	if( fPattern[--i]->TestBitNumber(startpos - *--bitnum) )
-	  ++n_found;
+	  matchpattern |= (1U<<i);
       }
     } else {
       assert( startpos + pat->GetWidth() < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
 	if( fPattern[--i]->TestBitNumber(startpos + *--bitnum) )
-	  ++n_found;
+	  matchpattern |= (1U<<i);
       }
     }
-    return n_found;
+    return matchpattern;
   }
 
 
