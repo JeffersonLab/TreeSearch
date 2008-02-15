@@ -67,6 +67,7 @@ void Hitpattern::Init( Double_t width )
 
   assert( width >= 1e-2 );
   fScale = GetNbins() / width;
+  fBinWidth = 1.0/fScale;
 
   try {
     fPattern = new Bits*[fNplanes];
@@ -86,8 +87,8 @@ void Hitpattern::Init( Double_t width )
 Hitpattern::Hitpattern( const Hitpattern& orig ) 
 try
   : fNlevels(orig.fNlevels), fNplanes(orig.fNplanes),
-    fScale(orig.fScale), fOffset(orig.fOffset), fPattern(0),
-    fHits(orig.fHits), fHitList(orig.fHitList)
+    fScale(orig.fScale), fBinWidth(orig.fBinWidth), fOffset(orig.fOffset),
+    fPattern(0), fHits(orig.fHits), fHitList(orig.fHitList)
 #ifdef TESTCODE
   , fMaxhitBin(orig.fMaxhitBin)
 #endif
@@ -116,6 +117,7 @@ Hitpattern& Hitpattern::operator=( const Hitpattern& rhs )
     fNlevels = rhs.fNlevels;
     fNplanes = rhs.fNplanes;
     fScale   = rhs.fScale;
+    fBinWidth= rhs.fBinWidth;
     fOffset  = rhs.fOffset;
     delete fPattern; fPattern = 0;
     if( fNplanes > 0 ) {

@@ -13,6 +13,7 @@
 #include "PatternTree.h"
 #include "PatternGenerator.h"
 #include "TreeWalk.h"
+#include "Road.h"
 
 #include "TMath.h"
 #include "TString.h"
@@ -22,6 +23,9 @@
 #include <sys/time.h>  // for timing
 #include <algorithm>
 #include <utility>
+#ifdef TESTCODE
+#include <cstring>
+#endif
 
 using namespace std;
 
@@ -29,7 +33,7 @@ namespace TreeSearch {
 
 typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<WirePlane*>::iterator  vwiter_t;
-typedef vector<Road>::size_type vrsiz_t;
+typedef list<Road*>::iterator lrd_iter_t;
 
 //_____________________________________________________________________________
 Projection::Projection( Int_t type, const char* name, Double_t angle,
@@ -93,6 +97,8 @@ const Projection& Projection::operator=( const Projection& rhs )
 //     else
     fPatternTree = 0;
     fPatternsFound.clear();
+    for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it )
+      delete *it;
     fRoads.clear();
     delete fPlaneCombos;
     if( rhs.fPlaneCombos )
@@ -112,6 +118,8 @@ Projection::~Projection()
 {
   // Destructor
 
+  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it )
+    delete *it;
   delete fPatternTree;
   delete fHitpattern;
   delete fPlaneCombos;
@@ -151,10 +159,13 @@ void Projection::Clear( Option_t* opt )
     fHitpattern->Clear();
 
   fPatternsFound.clear();
+  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it )
+    delete *it;
   fRoads.clear();
 
 #ifdef TESTCODE
-  t_treesearch = t_roads = t_track = 0.0;
+  size_t nbytes = (char*)&t_track - (char*)&n_hits + sizeof(t_track);
+  memset( &n_hits, 0, nbytes );
 #endif
 }
 
@@ -191,6 +202,15 @@ void Projection::Reset()
   fMaxSlope = fWidth = 0.0;
   delete fHitpattern; fHitpattern = 0;
   delete fPatternTree; fPatternTree = 0;
+}
+
+//_____________________________________________________________________________
+Double_t Projection::GetPlaneZ( UInt_t i ) const
+{
+  // Return the z-position of the i-th wire plane.
+
+  assert( i<fPlanes.size() );
+  return fPlanes[i]->GetZ();
 }
 
 //_____________________________________________________________________________
@@ -374,9 +394,12 @@ Int_t Projection::DefineVariables( EMode mode )
     { "maxhits_per_bin", "Max number of hits per bin", "maxhits_bin" },
     { "n_test", "Number of pattern comparisons", "n_test"  },
     { "n_pat", "Number of patterns found",   "n_pat"    },
+    { "n_roads", "Number of roads found",   "n_roads"    },
+    { "n_badroads", "Number of roads found",   "n_badroads"    },
     { "t_treesearch", "Time in TreeSearch (us)", "t_treesearch" },
     { "t_roads", "Time in MakeRoads (us)", "t_roads" },
-    { "t_track", "Time in Track (us)", "t_track" },
+    { "t_fit", "Time for fitting Roads (us)", "t_fit" },
+    { "t_track", "Total time in Track (us)", "t_track" },
     //    { "", "", "" },
 #endif
     { 0 }
@@ -454,25 +477,35 @@ Int_t Projection::Track()
   timersub( &stop, &start2, &diff );
   t_roads = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
-  //  n_roads = fRoads.size();
+  n_roads = fRoads.size();
 
   gettimeofday( &start2, 0 );
 #endif
 
-  // RoadFit:
+  //TODO: check for identical or nearly identical roads
+
   // Fit hits within each road. Store fit parameters with Road. 
-  // Store list of best-fit hits with Road
+  // Also, store the hits & positions used by the best fit with Road.
 
-  //TODO: put in separate routine since the fit will need to be repeated
-
-  // FilterGhosts:
-  // Eliminate roads with high chi^2 and roads that appear to be essentially
-  // identical to others
-
-  //TODO...
+  vector<lrd_iter_t> rejects;
+  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it ) {
+    if( !(*it)->Fit() )
+      rejects.push_back(it);
+  }
+  // Erase roads with bad fits (too few planes occupied etc.)
+  for( vector<lrd_iter_t>::iterator it = rejects.begin();
+       it != rejects.end(); ++it ) {
+    delete **it;
+    fRoads.erase( *it );
+#ifdef TESTCODE
+    ++n_badroads;
+#endif
+  }
 
 #ifdef TESTCODE
   gettimeofday(&stop, 0 );
+  timersub( &stop, &start2, &diff );
+  t_fit = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
   timersub( &stop, &start, &diff );
   t_track = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 #endif
@@ -492,30 +525,31 @@ Int_t Projection::MakeRoads()
   map<const NodeDescriptor,HitSet>::iterator it1, it2, ref_it1;
   for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
-    pair<const NodeDescriptor,HitSet>& nd1 = *it1;
+    Road::Node_t& nd1 = *it1;
     assert(nd1.second.used < 3);
     // New roads must contain at least one unused pattern
     if( nd1.second.used )
       continue;
-    Road rd(this);
+    Road* rd = new Road(this);
     // Adding the first pattern must make a good match
-    if( !rd.Add(nd1) ) {
+    if( !rd->Add(nd1) ) {
 #ifdef VERBOSE
       cout << ">>>>>>>>> No match, skipped" << endl;
 #endif
+      delete rd;
       continue;
     }
     it2 = ref_it1;
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
 	   (*it2).first[0] <= nd1.first[0] + fMaxdist[0] ) {
-      pair<const NodeDescriptor,HitSet>& nd2 = *it2;
+      Road::Node_t& nd2 = *it2;
       if( nd1.first[0] <= nd2.first[0] + fMaxdist[0] ) {
 	// Try adding unused or partly used pattern to the new road until there
 	// are no more patterns that could possibly have common hits.
 	if( nd2.second.used < 2 &&
 	    it1 != it2 ) // skip the seed in case we run over it
-	  rd.Add( nd2 );
+	  rd->Add( nd2 );
       } else {
 	// Save last position too far left of it1 (seed of road).
 	// This + 1 is where we start the next search.
@@ -523,7 +557,8 @@ Int_t Projection::MakeRoads()
       }
     }
     // Update the "used" flags of the road's component patterns
-    rd.Finish();
+    rd->Finish();
+    //FIXME: this _copies_ the entire Road object. Use pointer?
     fRoads.push_back(rd);
   }
 #ifdef VERBOSE
@@ -638,7 +673,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     assert(ins.second);  // duplicate matches should never happen
 
     // Retrieve the node that was just inserted.
-    pair<const NodeDescriptor,HitSet>& node = *ins.first;
+    Road::Node_t& node = *ins.first;
 
     // Collect all hits associated with the pattern's bins and save them
     // in the node's HitSet

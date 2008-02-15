@@ -45,7 +45,7 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    UInt_t       ContainsPattern( const NodeDescriptor& nd ) const;
+    UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
 
     const std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, 
 						   UInt_t bin ) const {
@@ -58,7 +58,7 @@ namespace TreeSearch {
     UInt_t   GetNplanes() const { return fNplanes; }
     Double_t GetOffset()  const { return fOffset; }
     Double_t GetWidth()   const { return GetNbins()/fScale; }
-    Double_t GetBinWidth() const { return 1.0/fScale; } // meters per bin
+    Double_t GetBinWidth() const { return fBinWidth; }  // meters per bin
     Double_t GetBinScale() const { return fScale; }     // bins per meter
 
     Bool_t   IsError()    const { return (fNplanes == 0); }
@@ -93,6 +93,7 @@ namespace TreeSearch {
     UInt_t   fNlevels;  // Number of levels in the pattern tree 
     UInt_t   fNplanes;  // Number of wire planes contained in the pattern
     Double_t fScale;    // 1/(bin resolution) = 2^(fNlevels-1)/width (1/m)
+    Double_t fBinWidth; // 1/fScale (meters per bin)
     Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
     Bits**   fPattern;  // [fNplanes] pattern at all fNlevels resolutions
 

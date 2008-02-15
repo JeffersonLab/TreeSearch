@@ -9,7 +9,6 @@
 
 #include "THaAnalysisObject.h"
 #include "TreeWalk.h"
-#include "Road.h"
 #include "Hit.h"
 #include "TMath.h"
 #include <vector>
@@ -25,6 +24,7 @@ namespace TreeSearch {
   class Hitpattern;
   class PatternTree;
   class WirePlane;
+  class Road;
 
   class Projection : public THaAnalysisObject {
   public:
@@ -50,13 +50,16 @@ namespace TreeSearch {
     Double_t        GetAngle() const;
     Double_t        GetCosAngle() const { return fCosAngle; }
     Hitpattern*     GetHitpattern() const { return fHitpattern; }
+    TBits*          GetLayerCombos() const { return fLayerCombos; }
+    WirePlane*      GetLayer( UInt_t layer )  const { return fLayers[layer]; }
     Double_t        GetLayerZ( UInt_t layer ) const;
     Double_t        GetMaxSlope() const { return fMaxSlope; }
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
     TBits*          GetPlaneCombos() const { return fPlaneCombos; }
-    TBits*          GetLayerCombos() const { return fLayerCombos; }
+    WirePlane*      GetPlane( UInt_t plane )  const { return fPlanes[plane]; }
+    Double_t        GetPlaneZ( UInt_t plane ) const;
     Double_t        GetSinAngle() const { return fSinAngle; }
     Int_t           GetType()  const { return fType; }
     Double_t        GetWidth() const { return fWidth; }
@@ -67,8 +70,8 @@ namespace TreeSearch {
     void            SetWidth( Double_t width ) { fWidth = width; }
     
     //FIXME: for testing
-    std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
-    std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
+//  std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
+//  std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
 
   protected:
     Int_t           fType;        // Type of plane (u,v,x,y...)
@@ -87,7 +90,7 @@ namespace TreeSearch {
 
     // Patterns found by TreeSearch
     std::map<const NodeDescriptor,HitSet> fPatternsFound;
-    std::list<Road>  fRoads;    // Roads found by MakeRoads
+    std::list<Road*> fRoads;    // Roads found by MakeRoads
 
     std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
 
@@ -96,8 +99,8 @@ namespace TreeSearch {
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
-    UInt_t n_test, n_pat, n_roads;
-    Double_t t_treesearch, t_roads, t_track;
+    UInt_t n_test, n_pat, n_roads, n_badroads;
+    Double_t t_treesearch, t_roads, t_fit, t_track;
 #endif
 
     void  SetAngle( Double_t a );

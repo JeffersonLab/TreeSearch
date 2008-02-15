@@ -16,8 +16,6 @@
 #include "TBits.h"
 #include <iostream>
 #include <algorithm>
-#include <list>
-#include <utility>
 
 using namespace std;
 
@@ -27,48 +25,48 @@ namespace TreeSearch {
 
 // Private class for use while building a Road
 struct BuildInfo_t {
-  list<pair<const NodeDescriptor,HitSet>*> fPatterns; // Patterns in this road
-  set<Hit*>         fCommonHits;      // Hits common between all patterns
-  const Hitpattern* fHitpattern;
-  UInt_t            fNlayers;
-  const TBits*      fPlaneCombos;     // Bitfield for plane combo lookup
+  set<Hit*>         fCommonHits;  // Hits common between all patterns
+  vector<UShort_t>  fCornerBin;   // Bin numbers defining the corners
+                                  // 0=LL, 1=LR, 2=UR, 3=UL 
   //TODO: use fMaxdist[] ??
+  BuildInfo_t() : fCornerBin(4,0)
+  { fCornerBin[0] = fCornerBin[3] = kMaxUShort; }
 };
 
+// Number of points for polygon test
+static const vector<double>::size_type kNcorner = 5;
+
 //_____________________________________________________________________________
-Road::Road( const Projection* proj )
-  : fSlope(kBig), fPos(kBig), fChi2(kBig)
+Road::Road( const Projection* proj ) :
+  fProjection(proj), fCornerX(kNcorner), fZL(0), fZU(0),
+  fSlope(kBig), fPos(kBig), fChi2(kBig), fGood(false)
+#ifdef TESTCODE
+  , fSeed(0)
+#endif
 {
   // Constructor
 
-  fLeft[0] = fLeft[1] = kMaxUShort;
-  fRight[0] = fRight[1] = 0;
   fErr[0] = fErr[1] = kBig;
 
-  assert(proj);
+  assert(fProjection);
 
   fBuild = new BuildInfo_t;
-  fBuild->fHitpattern  = proj->GetHitpattern();
-  fBuild->fNlayers     = proj->GetNlayers();
-  fBuild->fPlaneCombos = proj->GetPlaneCombos();
-
-  fNplanes = proj->GetNplanes();
-
-  assert( fBuild->fHitpattern && fBuild->fNlayers && 
-	  fNplanes >= fBuild->fNlayers && fBuild->fPlaneCombos );
-
 }
 
 //_____________________________________________________________________________
-Road::Road( const Road& orig )
-  : fNplanes(orig.fNplanes), fSlope(orig.fSlope), fPos(orig.fSlope),
-    fChi2(orig.fChi2)
+Road::Road( const Road& orig ) :
+  fProjection(orig.fProjection),
+  fCornerX(orig.fCornerX), fZL(orig.fZL), fZU(orig.fZU),
+  fPatterns(orig.fPatterns), fHits(orig.fHits),
+  fSlope(orig.fSlope), fPos(orig.fSlope), fChi2(orig.fChi2), fGood(orig.fGood)
+#ifdef TESTCODE
+  , fSeed(orig.fSeed)
+#endif
 {
   // Copy constructor
 
-  fLeft[0]  = orig.fLeft[0];  fLeft[1]  = orig.fLeft[1];
-  fRight[0] = orig.fRight[0]; fRight[1] = orig.fRight[1];
-  fErr[0]   = orig.fErr[0];   fErr[1]   = orig.fErr[1];
+  fErr[0] = orig.fErr[0];
+  fErr[1] = orig.fErr[1];
 
   if( orig.fBuild )
     fBuild = new BuildInfo_t( *orig.fBuild );
@@ -82,12 +80,21 @@ Road& Road::operator=( const Road& rhs )
   // Print hit info
 
   if( this != &rhs ) {
-    fLeft[0]  = rhs.fLeft[0];  fLeft[1]  = rhs.fLeft[1];
-    fRight[0] = rhs.fRight[0]; fRight[1] = rhs.fRight[1];
-    fSlope  = rhs.fSlope;
-    fPos    = rhs.fPos;
-    fChi2   = rhs.fChi2;
-    fErr[0] = rhs.fErr[0]; fErr[1] = rhs.fErr[1];
+#ifdef TESTCODE
+    fSeed = rhs.fSeed;
+#endif
+    fProjection = rhs.fProjection;
+    fCornerX    = rhs.fCornerX;
+    fZL         = rhs.fZL;
+    fZU         = rhs.fZU;
+    fPatterns   = rhs.fPatterns;
+    fHits       = rhs.fHits;
+    fSlope      = rhs.fSlope;
+    fPos        = rhs.fPos;
+    fChi2       = rhs.fChi2;
+    fErr[0]     = rhs.fErr[0];
+    fErr[1]     = rhs.fErr[1];
+    fGood       = rhs.fGood;
 
     delete fBuild;
     if( rhs.fBuild )
@@ -133,11 +140,11 @@ Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
   for( set<Hit*>::const_iterator it = hits.begin(); it != hits.end(); ++it )
     curpat |= 1U << ((*it)->GetWirePlane()->GetPlaneNum());
 
-  return fBuild->fPlaneCombos->TestBitNumber(curpat);
+  return fProjection->GetPlaneCombos()->TestBitNumber(curpat);
 }
 
 //_____________________________________________________________________________
-Bool_t Road::Add( pair<const NodeDescriptor,HitSet>& nd )
+Bool_t Road::Add( Node_t& nd )
 {
   // Check if the hits from the given NodeDescriptor pattern are common
   // with the common hit set already in this road. If so, add the pattern
@@ -150,15 +157,18 @@ Bool_t Road::Add( pair<const NodeDescriptor,HitSet>& nd )
     return kFALSE;
 
 #ifdef VERBOSE
-  nd.first.Print(); nd.first.link->GetPattern()->Print();
-  nd.first.parent->Print();
+  nd.first.Print();
+  //nd.first.link->GetPattern()->Print(); nd.first.parent->Print();
   PrintHits(nd.second.hits);
 #endif
-  bool first = fBuild->fPatterns.empty();
+  bool first = fPatterns.empty();
   if( first ) {
     if( !CheckMatch(nd.second.hits) )
       return kFALSE;
     fBuild->fCommonHits = fHits = nd.second.hits;
+#ifdef TESTCODE
+    fSeed = &nd;
+#endif
   } else {
     set<Hit*> new_commons;
     set_intersection( nd.second.hits.begin(), nd.second.hits.end(),
@@ -183,7 +193,7 @@ Bool_t Road::Add( pair<const NodeDescriptor,HitSet>& nd )
 	return kFALSE;
       }
       // The new set of common hits is good, so update the build data
-      swap( fBuild->fCommonHits, new_commons );
+      fBuild->fCommonHits.swap( new_commons );
     }
     set<Hit*> new_hits;
     set_union( fHits.begin(), fHits.end(),
@@ -194,7 +204,7 @@ Bool_t Road::Add( pair<const NodeDescriptor,HitSet>& nd )
  	 << fHits.size() << endl;
 #endif
     if( new_hits.size() != fHits.size() ) {
-      swap( fHits, new_hits );
+      fHits.swap( new_hits );
 #ifdef VERBOSE
       PrintHits( fHits );
 #endif
@@ -202,18 +212,23 @@ Bool_t Road::Add( pair<const NodeDescriptor,HitSet>& nd )
   }
 
   // Save a pointer to this pattern so we can update it later
-  fBuild->fPatterns.push_back(&nd);
+  fPatterns.push_back(&nd);
 
   // Expand the road limits if necessary
-  fLeft[0]  = TMath::Min( nd.first.Start(), fLeft[0] );
-  fLeft[1]  = TMath::Min( nd.first.End(),   fLeft[1] );
-  fRight[0] = TMath::Max( nd.first.Start(), fRight[0] );
-  fRight[1] = TMath::Max( nd.first.End(),   fRight[1] );
-
+  for( Int_t i = 0; i < 4; i++ ) {
+    UShort_t bin = ( i<2 ) ? nd.first.Start() : nd.first.End(); // lower:upper
+    if( i==1 || i==2 )
+      // "right" edges
+      fBuild->fCornerBin[i] = TMath::Max( bin, fBuild->fCornerBin[i] );
+    else
+      // "left" edges
+      fBuild->fCornerBin[i] = TMath::Min( bin, fBuild->fCornerBin[i] );
+  }
 #ifdef VERBOSE
-  cout << "new npat = " << fBuild->fPatterns.size() << endl;
-  cout << "new left/right = " << fLeft[0]<<" "<<fRight[0]<<" "
-       << fLeft[1]<<" "<<fRight[1] << endl;
+  cout << "new npat = " << fPatterns.size() << endl;
+  cout << "new left/right = "
+       << fBuild->fCornerBin[0]<<" "<< fBuild->fCornerBin[1]<<" "
+       << fBuild->fCornerBin[3]<<" "<< fBuild->fCornerBin[2]<< endl;
 #endif
 
   return kTRUE;
@@ -225,8 +240,8 @@ void Road::Finish()
   // Finish building the road
 
   assert(fBuild);
-  for( list<pair<const NodeDescriptor,HitSet>*>::iterator it = 
-	 fBuild->fPatterns.begin(); it != fBuild->fPatterns.end(); ++it ) {
+  for( list<Node_t*>::iterator it = fPatterns.begin();
+       it != fPatterns.end(); ++it ) {
     
     HitSet& hs = (**it).second;
     assert( hs.used < 2 ); // cannot add previously fully used pattern
@@ -244,12 +259,54 @@ void Road::Finish()
 #endif
   }
 
+  // Calculate the corner coordinates
+  const UInt_t np1 = fProjection->GetNplanes()-1;
+  const UInt_t nl1 = fProjection->GetNlayers()-1;
+  const Double_t resL = 2.0*fProjection->GetPlane(0)->GetResolution();
+  const Double_t resU = 2.0*fProjection->GetPlane(np1)->GetResolution();
+  fCornerX[0] = GetBinX( fBuild->fCornerBin[0] )   - resL;
+  fCornerX[1] = GetBinX( fBuild->fCornerBin[1]+1 ) + resL;
+  fCornerX[2] = GetBinX( fBuild->fCornerBin[2]+1 ) + resU;
+  fCornerX[3] = GetBinX( fBuild->fCornerBin[3] )   - resU;
 
-  // Put the tools away
-  // TODO: save npat, nplanes
+  const Double_t eps = 1e-3;   // z-shift to include the planes proper
+  fZL = fProjection->GetPlaneZ(0) - eps;
+  fZU = fProjection->GetPlaneZ(np1) + eps;
+  assert( fZL < fZU );
+
+  // Apply correction for difference of layer-z and plane-z
+  Double_t dZlayer = fProjection->GetLayerZ(nl1) - fProjection->GetLayerZ(0);
+  assert( dZlayer > 1e-3 );
+  Double_t slopeL = ( fCornerX[3]-fCornerX[0] ) * (1.0/dZlayer);
+  Double_t slopeR = ( fCornerX[2]-fCornerX[1] ) * (1.0/dZlayer);
+  Double_t dZL = fProjection->GetLayerZ(0) - fZL;
+  Double_t dZU = fZU - fProjection->GetLayerZ(nl1);
+  assert( dZL >= 0.0 && dZU >= 0.0 );
+  fCornerX[0] -= slopeL * dZL;
+  fCornerX[1] -= slopeR * dZL;
+  fCornerX[2] += slopeR * dZU;
+  fCornerX[3] += slopeL * dZU;
+
+  fCornerX[4] = fCornerX[0];
+
+  assert( fCornerX[0] < fCornerX[1] );
+  assert( fCornerX[3] < fCornerX[2] );
+
+  // All done. Put the tools away
   delete fBuild; fBuild = 0;
 
   return;
+}
+
+//_____________________________________________________________________________
+Double_t Road::GetBinX( UInt_t bin ) const
+{
+  // Get X coordinate of left edge of given bin
+
+  const Hitpattern* hpat = fProjection->GetHitpattern();
+  return
+    static_cast<Double_t>(bin) * hpat->GetBinWidth() - hpat->GetOffset();
+
 }
 
 //_____________________________________________________________________________
@@ -260,11 +317,85 @@ void Road::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
-void Road::CollectCoordinates( UInt_t nplanes, std::vector<Int_t>& hitcount,
-			       std::vector<std::vector<Point> >& points )
+Bool_t Road::CollectCoordinates( vector<Point>& points,
+				 vector<vector<Point*> >& planepoints )
 {
-  // 
+  // Gather hit positions that lie within the Road area
 
+  assert( fCornerX.size() == kNcorner );
+  assert( static_cast<UInt_t>(planepoints.size())==fProjection->GetNplanes());
+
+#ifdef VERBOSE
+  cout << "Collecting coordinates from: (" << fPatterns.size() << " patterns)"
+       << endl;
+  PrintHits( fHits );
+#ifdef TESTCODE
+  cout << "Seed pattern: " << endl;
+  fSeed->first.Print();
+#endif
+#endif
+  Double_t zp[kNcorner] = { fZL, fZL, fZU, fZU, fZL };
+  UInt_t matchpattern = 0;
+  Bool_t good = true;
+
+  // Collect all hit coordinates that lie within the Road
+  for( set<Hit*>::iterator it = fHits.begin(); it != fHits.end(); ++it ) {
+    const Hit* hit = *it;
+    Double_t z = hit->GetZ();
+    UInt_t np = hit->GetWirePlane()->GetPlaneNum();
+    for( int i = 2; i--; ) {
+      Double_t x = i ? hit->GetPosL() : hit->GetPosR();
+      if( TMath::IsInside(x, z, kNcorner, &fCornerX[0], zp) ) {
+	points.push_back( Point(x,z) );
+	planepoints[np].push_back( &points.back() );
+	matchpattern |= 1U<<np;
+      }
+    }
+  }
+  // Check if this matchpattern is acceptable
+  good = fProjection->GetPlaneCombos()->TestBitNumber(matchpattern);
+
+#ifdef VERBOSE
+  cout << "Collected:" << endl;
+  for( vector<vector<Point*> >::size_type i = planepoints.size(); i; ) {
+    --i;
+    cout << " pl= " << i;
+    if( planepoints[i].empty() )
+      cout << " missing";
+    else {
+      Double_t z = planepoints[i][0]->z;
+      cout << " z=" << z << "\t x=";
+      for( vector<Point*>::size_type j = 0; j < planepoints[i].size(); ++j ) {
+	cout << " " << planepoints[i][j]->x;
+	assert( planepoints[i][j]->z == z );
+      }
+    }
+    cout << endl;
+  }
+  if( !good )
+    cout << "REJECTED" << endl;
+#endif
+  return good;
+}
+
+//_____________________________________________________________________________
+Bool_t Road::Fit()
+{
+
+  fGood = false;
+  vector<Point> points;
+  vector<vector<Point*> > planepoints( fProjection->GetNplanes() );
+  points.reserve( 2*fHits.size() );
+  if( !CollectCoordinates(points, planepoints) )
+    return false;
+
+  // Determine number of permutations
+  // Loop over permutations of hits in the planes
+  // Check each permutation for consistency with at least one pattern
+  // Fit the permutation
+  // Save best Chi2
+
+  return (fGood = true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
