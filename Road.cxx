@@ -25,9 +25,9 @@ namespace TreeSearch {
 
 // Private class for use while building a Road
 struct BuildInfo_t {
-  set<Hit*>         fCommonHits;  // Hits common between all patterns
-  vector<UShort_t>  fCornerBin;   // Bin numbers defining the corners
-                                  // 0=LL, 1=LR, 2=UR, 3=UL 
+  Hset_t            fClusterHits;  // Hits common between all patterns
+  vector<UShort_t>  fCornerBin;    // Bin numbers defining the corners
+                                   // 0=LL, 1=LR, 2=UR, 3=UL 
   //TODO: use fMaxdist[] ??
   BuildInfo_t() : fCornerBin(4,0)
   { fCornerBin[0] = fCornerBin[3] = kMaxUShort; }
@@ -35,6 +35,9 @@ struct BuildInfo_t {
 
 // Number of points for polygon test
 static const vector<double>::size_type kNcorner = 5;
+
+typedef Hset_t::iterator siter_t;
+#define ALL(c) (c).begin(), (c).end()
 
 //_____________________________________________________________________________
 Road::Road( const Projection* proj ) :
@@ -116,11 +119,11 @@ Road::~Road()
 
 //_____________________________________________________________________________
 #ifdef VERBOSE
-static void PrintHits( const set<Hit*>& hits )
+static void PrintHits( const Hset_t& hits )
 {
   //  cout << hits.size() << " hits" << endl;
 
-  for( set<Hit*>::iterator it = hits.begin(); it != hits.end(); ++it ) {
+  for( siter_t it = hits.begin(); it != hits.end(); ++it ) {
     cout << " ";
     (*it)->Print();
   }
@@ -128,16 +131,16 @@ static void PrintHits( const set<Hit*>& hits )
 }
 #endif
 //_____________________________________________________________________________
-Bool_t Road::CheckMatch( const set<Hit*>& hits ) const
+Bool_t Road::CheckMatch( const Hset_t& hits ) const
 {
-  // Match evaluation function. Return true if the numbers of hits in each
-  // plane contained in hitcount is sufficient for considering the road
-  // cohesive.
+  // Return true if the hits from the given set either cover all planes
+  // or, if planes are missing, the pattern of missing planes is allowed
+  // (based on what level of matching the user requests via the database)
 
   assert(fBuild);
 
   UInt_t curpat = 0;
-  for( set<Hit*>::const_iterator it = hits.begin(); it != hits.end(); ++it )
+  for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
     curpat |= 1U << ((*it)->GetWirePlane()->GetPlaneNum());
 
   return fProjection->GetPlaneCombos()->TestBitNumber(curpat);
@@ -157,58 +160,102 @@ Bool_t Road::Add( Node_t& nd )
     return kFALSE;
 
 #ifdef VERBOSE
+  cout << "Adding:" << endl;
   nd.first.Print();
   //nd.first.link->GetPattern()->Print(); nd.first.parent->Print();
   PrintHits(nd.second.hits);
 #endif
   bool first = fPatterns.empty();
   if( first ) {
+    // Check the hits of the first pattern of a new road for missing planes
     if( !CheckMatch(nd.second.hits) )
       return kFALSE;
-    fBuild->fCommonHits = fHits = nd.second.hits;
+    // A new road starts out with common hits and all hits that are the same
+    fBuild->fClusterHits = fHits = nd.second.hits;
 #ifdef TESTCODE
     fSeed = &nd;
 #endif
+#ifdef VERBOSE
+    cout << "New cluster:" << endl;
+    PrintHits( fBuild->fClusterHits );
+#endif
   } else {
-    set<Hit*> new_commons;
-    set_intersection( nd.second.hits.begin(), nd.second.hits.end(),
-		      fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
-		      inserter( new_commons, new_commons.end() ));
+    // Accept this pattern if all its hits are already in the cluster
+    if( !includes( ALL(fBuild->fClusterHits), ALL(nd.second.hits),
+		   nd.second.hits.key_comp() )) {
 
-#ifdef VERBOSE
-    cout << "new/old commons = " << new_commons.size() << " "
-	  << fBuild->fCommonHits.size() << endl;
-#endif
-    assert( new_commons.size() <= fBuild->fCommonHits.size() );
-    if( new_commons.size() < fBuild->fCommonHits.size() ) {
-      // The set of common hits shrank, so we must check if this would still
-      // be a good road
-      if( !CheckMatch(new_commons) ) {
-	// The new pattern would reduce the set of common hits in the road to
-	// too loose a fit, so we reject the new pattern and leave
-	// the road as it is
-#ifdef VERBOSE
-	cout << "failed" << endl;
-#endif
-	return kFALSE;
+      // Check how the new pattern fits into the current cluster
+
+      // Create an instance of the wire number distance comparison function.
+      // This allows clustering of wires that are up to maxdist apart.
+      Hit::WireDistLess comp( fProjection->GetClusterMaxDist() );
+
+      // Get the intersection of the new hits with the hits that are currently
+      // clustered together in this road.
+      // NB1: Because this comparison function allows for elements to be
+      // equivalent even if not equal, the result may contain hits that
+      // do not occur in both sets!
+      // NB2: We don't use std::set_intersection here because its idea of an
+      // intersection of identical elements is not what we need here.
+      // NB3: Neither input set is ordered according to comp(), but that is
+      // ok here since ordering by Hit::WireNumLess implies ordering by
+      // Hit::WireDistLess.
+      Hset_t intersection;
+      siter_t itnew = nd.second.hits.begin();
+      siter_t end1  = nd.second.hits.end();
+      siter_t itold = fBuild->fClusterHits.begin();
+      siter_t end2  = fBuild->fClusterHits.end();
+      while( itnew != end1 && itold != end2 ) {
+	if( comp(*itnew, *itold) )
+	  ++itnew;
+	else if( comp(*itold, *itnew) )
+	  ++itold;
+	else {
+	  intersection.insert( intersection.end(), *itnew );
+	  ++itnew;
+	}
       }
-      // The new set of common hits is good, so update the build data
-      fBuild->fCommonHits.swap( new_commons );
-    }
-    set<Hit*> new_hits;
-    set_union( fHits.begin(), fHits.end(),
-	       nd.second.hits.begin(), nd.second.hits.end(),
-	       inserter( new_hits, new_hits.begin() ));
 #ifdef VERBOSE
-    cout << "new/old nhits = " << new_hits.size() << " " 
- 	 << fHits.size() << endl;
+      cout << "candidate/intersecting hits = " << nd.second.hits.size() << " "
+	   << intersection.size() << endl;
+      cout << "Intersection:" << endl;
+      PrintHits( intersection );
 #endif
-    if( new_hits.size() != fHits.size() ) {
-      fHits.swap( new_hits );
+      assert( intersection.size() <= nd.second.hits.size() );
+      if( intersection.size() < nd.second.hits.size() ) {
+	if( !CheckMatch(intersection) ) {
+	  // The new pattern would reduce the set of common hits in the road to
+	  // too loose a fit, so we reject the new pattern and leave
+	  // the road as it is
 #ifdef VERBOSE
-      PrintHits( fHits );
+	  cout << "no longer a good plane pattern" << endl;
 #endif
-    }
+	  return false;
+	}
+      }
+      // Add the intersection to the prior hits, accumulating the cluster
+      fBuild->fClusterHits.insert( ALL(intersection) );
+#ifdef VERBOSE
+      cout << "New cluster:" << endl;
+      PrintHits( fBuild->fClusterHits );
+#endif
+      // Add the hits of the new pattern to the set of all hits of this road
+      Hset_t::size_type oldsize = fHits.size();
+      fHits.insert( ALL(nd.second.hits) );
+#ifdef VERBOSE
+      cout << "new/old nhits = " << fHits.size() << " " 
+	   << oldsize << endl;
+#endif
+      if( fHits.size() != oldsize ) {
+#ifdef VERBOSE
+	PrintHits( fHits );
+#endif
+      }
+    } 
+ #ifdef VERBOSE
+    else
+      cout << "All hits already in cluster" << endl;
+#endif
   }
 
   // Save a pointer to this pattern so we can update it later
@@ -246,13 +293,9 @@ void Road::Finish()
     HitSet& hs = (**it).second;
     assert( hs.used < 2 ); // cannot add previously fully used pattern
 
-    // TODO: search only up to first element not in common?
-    list<Hit*> not_in_common;
-    set_difference( hs.hits.begin(), hs.hits.end(),
-		    fBuild->fCommonHits.begin(), fBuild->fCommonHits.end(),
-		    back_inserter( not_in_common ) );
-
-    hs.used = not_in_common.empty() ? 2 : 1;
+    bool hs_in_cluster = includes( ALL(fBuild->fClusterHits), ALL(hs.hits),
+				   hs.hits.key_comp() );
+    hs.used = hs_in_cluster ? 2 : 1;
 #ifdef VERBOSE
     cout << "used = " << hs.used << " for ";
     (**it).first.Print();
@@ -339,7 +382,7 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
   Bool_t good = true;
 
   // Collect all hit coordinates that lie within the Road
-  for( set<Hit*>::iterator it = fHits.begin(); it != fHits.end(); ++it ) {
+  for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
     const Hit* hit = *it;
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetWirePlane()->GetPlaneNum();

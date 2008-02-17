@@ -17,6 +17,7 @@
 #include "TClass.h"
 #include "MWDC.h"
 #include "TimeToDistConv.h"
+#include "Projection.h"
 #include <iostream>
 #include <string>
 
@@ -532,6 +533,12 @@ Int_t WirePlane::Compare( const TObject* obj ) const
   if( GetZ() < other->GetZ() ) return -1;
   if( GetZ() > other->GetZ() ) return  1;
   return 0;
+}
+
+//_____________________________________________________________________________
+Double_t WirePlane::GetMaxSlope() const
+{ 
+  return fProjection ? fProjection->GetMaxSlope() : kBig;
 }
 
 //_____________________________________________________________________________

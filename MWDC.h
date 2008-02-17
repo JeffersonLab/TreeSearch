@@ -8,7 +8,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaTrackingDetector.h"
-#include "Projection.h"
 #include "THaDetMap.h"
 #include <vector>
 

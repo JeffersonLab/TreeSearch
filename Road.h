@@ -7,7 +7,8 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "Rtypes.h"
+//#include "Rtypes.h"
+#include "Hit.h"
 #include <set>
 #include <utility>
 #include <vector>
@@ -46,14 +47,14 @@ namespace TreeSearch {
       Point( Double_t _x, Double_t _z ) : x(_x), z(_z) {}
     };
 
-    const Projection* fProjection;     // Projection that this Road belongs to
+    const Projection*     fProjection; // Projection that this Road belongs to
 
     std::vector<Double_t> fCornerX;    // x positions of corners
     Double_t              fZL, fZU;    // z +/- eps of first/last plane 
 
 
-    std::list<Node_t*>     fPatterns;   // Patterns in this road
-    std::set<Hit*>         fHits;       // All hits linked to the patterns
+    std::list<Node_t*>    fPatterns;   // Patterns in this road
+    Hset_t                fHits;       // All hits linked to the patterns
 
     // Fit results
     Double_t  fSlope;
@@ -70,7 +71,7 @@ namespace TreeSearch {
     Node_t*   fSeed;
 #endif
 
-    Bool_t   CheckMatch( const std::set<Hit*>& hits ) const;
+    Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates( std::vector<Point>& points,
 		       std::vector<std::vector<Point*> >& planepoints);
     Double_t GetBinX( UInt_t bin ) const;

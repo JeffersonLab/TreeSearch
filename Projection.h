@@ -48,6 +48,8 @@ namespace TreeSearch {
 
 
     Double_t        GetAngle() const;
+    //TODO:
+    Int_t           GetClusterMaxDist() const { return 1; }
     Double_t        GetCosAngle() const { return fCosAngle; }
     Hitpattern*     GetHitpattern() const { return fHitpattern; }
     TBits*          GetLayerCombos() const { return fLayerCombos; }

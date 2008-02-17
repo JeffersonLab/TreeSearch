@@ -12,6 +12,7 @@
 #include "MWDC.h"
 #include <vector>
 #include <string>
+#include <cassert>
 #include <functional>
 
 using std::vector;
@@ -21,6 +22,7 @@ namespace TreeSearch {
 
   class TimeToDistConv;
   class Projection;
+  class MWDC;
   extern const Double_t kBig;
 
   class WirePlane : public THaSubDetector {
@@ -45,8 +47,7 @@ namespace TreeSearch {
     void            SetPartner( WirePlane* p );
 
     Double_t        GetResolution() const { return fResolution; }
-    Double_t        GetMaxSlope() const 
-    { return fProjection ? fProjection->GetMaxSlope() : kBig; }
+    Double_t        GetMaxSlope() const; 
     Double_t        GetWireStart() const { return fWireStart; }
     Double_t        GetWireSpacing() const { return fWireSpacing; }
     virtual Double_t GetMaxLRdist() const { return GetWireSpacing(); }
@@ -67,14 +68,14 @@ namespace TreeSearch {
       : public std::binary_function< WirePlane*, WirePlane*, bool >
     {
       bool operator() ( const WirePlane* a, const WirePlane* b ) const
-      { return ( a && b && a->GetZ() < b->GetZ() ); }
+      { assert(a&&b); return ( a->GetZ() < b->GetZ() ); }
     };
 
     class NameEquals : public std::unary_function< WirePlane*, bool > {
     public:
       NameEquals( const char* s ) : name(s?s:"") {}
       bool operator() ( const WirePlane* wp ) const
-      { return ( wp && name == wp->GetName() ); }
+      { assert(wp); return ( name == wp->GetName() ); }
     private:
       string name;
     };

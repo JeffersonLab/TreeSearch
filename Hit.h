@@ -9,9 +9,11 @@
 
 #include "TObject.h"
 #include "TimeToDistConv.h"
+#include "WirePlane.h"
 #include <utility>
 #include <set>
 #include <cassert>
+#include <functional>
 
 class TSeqCollection;
 class TIterator;
@@ -19,7 +21,6 @@ class TIterator;
 namespace TreeSearch {
 
   extern const Double_t kBig;
-  class WirePlane;
 
   class Hit : public TObject {
 
@@ -63,6 +64,39 @@ namespace TreeSearch {
     Int_t    fMulti;       // Additional hits present on same wire
     Double_t fTdiff;       // Time difference to previous multihit
 #endif
+
+    // Functors for ordering hits in sets
+    struct WireNumLess : public std::binary_function< Hit*, Hit*, bool >
+    {
+      bool operator() ( const Hit* a, const Hit* b ) const
+      { 
+	assert( a && b );
+	const WirePlane* A = a->GetWirePlane(), *B = b->GetWirePlane();
+	assert( A && B );
+	if( A->GetPlaneNum() < B->GetPlaneNum() ) return true;
+	if( A->GetPlaneNum() > B->GetPlaneNum() ) return false;
+	if( a->GetWireNum()  < b->GetWireNum()  ) return true;
+	if( a->GetWireNum()  > b->GetWireNum()  ) return false;
+	return ( a->GetDriftTime() < b->GetDriftTime() );
+      }
+    };
+
+    struct WireDistLess : public std::binary_function< Hit*, Hit*, bool >
+    {
+      WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) {}
+      bool operator() ( const Hit* a, const Hit* b ) const
+      { 
+	assert( a && b );
+	const WirePlane* A = a->GetWirePlane(), *B = b->GetWirePlane();
+	assert( A && B );
+	if( A->GetPlaneNum() < B->GetPlaneNum() ) return true;
+	if( A->GetPlaneNum() > B->GetPlaneNum() ) return false;
+	return ( a->GetWireNum() + fMaxDist < b->GetWireNum() );
+      }
+      Int_t GetMaxDist() const { return fMaxDist; }
+    private:
+      Int_t fMaxDist;
+    };
 
   protected:
     Int_t    fWireNum;     // Wire number
@@ -165,14 +199,15 @@ namespace TreeSearch {
     ClassDef(HitPairIter,0)  // Iterator over two lists of hits
   };
 
+  //___________________________________________________________________________
   // Utility structure for storing sets of hits along with NodeDescriptors
 
+  typedef std::set<Hit*,Hit::WireNumLess> Hset_t;
   struct HitSet {
-    std::set<Hit*> hits; // Hits associated with a pattern
+    Hset_t  hits;  // Hits associated with a pattern
     UInt_t  used;  // 0=not in any road, 1=some hits used, 2=all hits used
     HitSet() : used(0) {}
     virtual ~HitSet() {}
-
     ClassDef(HitSet, 0)  // A set of hits associated with a pattern
   };
 
