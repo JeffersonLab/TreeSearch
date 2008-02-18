@@ -268,35 +268,36 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   fHitpattern = new Hitpattern( *fPatternTree );
   if( !fHitpattern || fHitpattern->IsError() )
     return fStatus = kInitError;
-
-  // Determine maximum search distance (in bins) for combining patterns
-  static const Double_t sqrt2 = TMath::Sqrt(2.0);
-  fMaxdist.clear();
   assert( GetNlayers() == fHitpattern->GetNplanes() );
-  for( UInt_t i = 0; i < GetNlayers(); ++i ) {
-    UInt_t dist;
-    if( fLayers[i]->GetPartner() ) {
-      // Maximum number of bins that a single hit can cover in the midplane
-      // of a plane pair
-      WirePlane* wpl[2] = { fLayers[i], fLayers[i]->GetPartner() };
-      Double_t dx = 0;
-      Double_t dz = TMath::Abs( wpl[1]->GetZ() - wpl[0]->GetZ() );
-      for( Int_t i = 0; i < 2; ++i ) {
-	WirePlane* wp = wpl[i];
-	Double_t dx1 = 
-	  sqrt2 * wp->GetResolution()  + fMaxSlope * dz  + wp->GetMaxLRdist();
-	if( dx1 > dx )
-	  dx = dx1;
-      }
-      dist = TMath::FloorNint( dx * fHitpattern->GetBinScale() );
-    } else {
-      // Maximum distance of bins that can belong to the same hit in a single
-      // plane
-      dist = TMath::FloorNint( fHitpattern->GetBinScale() *
-        (fLayers[i]->GetMaxLRdist() + 2.0*fLayers[i]->GetResolution()) );
-    }    
-    fMaxdist.push_back( dist );
-  }
+
+  // Determine maximum search distance (in bins) for combining patterns.
+  // In principle, there is no limit if fClusterMaxDist > 0 because
+  // the algorithm could just keep adding neightboring hits to clusters.
+  // In practice, we set a cutoff of fClusterMaxDist+1 wire spacings
+  // (= typ 3 wires) that can be combined together
+  Double_t dx = 0;
+  WirePlane* wp = fLayers[0]; // The search is along the first layer
+  if( wp->GetPartner() ) {
+    // Maximum number of bins that fClusterMaxDist+1 hits can cover in the
+    // midplane of a plane pair
+    WirePlane* wpl[2] = { wp, wp->GetPartner() };
+    Double_t dz = TMath::Abs( wpl[1]->GetZ() - wpl[0]->GetZ() );
+    for( Int_t i = 0; i < 2; ++i ) {
+      wp = wpl[i];
+      Double_t dx1 = fMaxSlope * dz;
+      dx1 += wp->GetMaxLRdist() + 2.0*wp->GetResolution();
+      if( fClusterMaxDist )
+	dx1 += (fClusterMaxDist+1)*wp->GetWireSpacing();
+      if( dx1 > dx )
+	dx = dx1;
+    }
+  } else {
+    // Max distance of bins that can belong to the same hit in a single plane
+    dx = wp->GetMaxLRdist() + 2.0*wp->GetResolution();
+    if( fClusterMaxDist )
+      dx += (fClusterMaxDist+1)*wp->GetWireSpacing();
+  }    
+  fPatternMaxDist = TMath::CeilNint( dx * fHitpattern->GetBinScale() );
 
   // Set up the lookup table indicating which planes are allowed to have 
   // missing hits. The bit pattern of plane hits is used as an index into
@@ -344,10 +345,12 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   Reset();
 
   Double_t angle = kBig;
+  fClusterMaxDist = 1;
   const DBRequest request[] = {
     { "angle",        &angle,        kDouble, 0, 1 },
     { "maxslope",     &fMaxSlope,    kDouble, 0, 1, -1 },
     { "search_depth", &fNlevels,     kUInt,   0, 0, -1 },
+    { "cluster_maxdist", &fClusterMaxDist, kUInt, 0, 1, -1 },
     { 0 }
   };
 
@@ -487,19 +490,16 @@ Int_t Projection::Track()
   // Fit hits within each road. Store fit parameters with Road. 
   // Also, store the hits & positions used by the best fit with Road.
 
-  vector<lrd_iter_t> rejects;
-  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it ) {
-    if( !(*it)->Fit() )
-      rejects.push_back(it);
-  }
   // Erase roads with bad fits (too few planes occupied etc.)
-  for( vector<lrd_iter_t>::iterator it = rejects.begin();
-       it != rejects.end(); ++it ) {
-    delete **it;
-    fRoads.erase( *it );
+  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ) {
+    lrd_iter_t it2 = it++;
+    if( !(*it2)->Fit() ) {
+      delete *it2;
+      fRoads.erase(it2);
 #ifdef TESTCODE
-    ++n_badroads;
+      ++n_badroads;
 #endif
+    }
   }
 
 #ifdef TESTCODE
@@ -542,9 +542,9 @@ Int_t Projection::MakeRoads()
     it2 = ref_it1;
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
-	   (*it2).first[0] <= nd1.first[0] + fMaxdist[0] ) {
+	   (*it2).first[0] <= nd1.first[0] + fPatternMaxDist ) {
       Road::Node_t& nd2 = *it2;
-      if( nd1.first[0] <= nd2.first[0] + fMaxdist[0] ) {
+      if( nd1.first[0] <= nd2.first[0] + fPatternMaxDist ) {
 	// Try adding unused or partly used pattern to the new road until there
 	// are no more patterns that could possibly have common hits.
 	if( nd2.second.used < 2 &&
@@ -558,7 +558,6 @@ Int_t Projection::MakeRoads()
     }
     // Update the "used" flags of the road's component patterns
     rd->Finish();
-    //FIXME: this _copies_ the entire Road object. Use pointer?
     fRoads.push_back(rd);
   }
 #ifdef VERBOSE

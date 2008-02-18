@@ -48,8 +48,7 @@ namespace TreeSearch {
 
 
     Double_t        GetAngle() const;
-    //TODO:
-    Int_t           GetClusterMaxDist() const { return 1; }
+    UInt_t          GetClusterMaxDist() const { return fClusterMaxDist; }
     Double_t        GetCosAngle() const { return fCosAngle; }
     Hitpattern*     GetHitpattern() const { return fHitpattern; }
     TBits*          GetLayerCombos() const { return fLayerCombos; }
@@ -59,6 +58,7 @@ namespace TreeSearch {
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
+    UInt_t          GetPatternMaxDist() const { return fPatternMaxDist; }
     TBits*          GetPlaneCombos() const { return fPlaneCombos; }
     WirePlane*      GetPlane( UInt_t plane )  const { return fPlanes[plane]; }
     Double_t        GetPlaneZ( UInt_t plane ) const;
@@ -84,6 +84,9 @@ namespace TreeSearch {
     Double_t        fWidth;       // Width of tracking region (m)
     Double_t        fSinAngle;    // Sine of wire angle
     Double_t        fCosAngle;    // Cosine of wire angle
+    UInt_t          fClusterMaxDist; // Max allowed distance between hits for
+                                  // clustering patterns into roads
+    UInt_t          fPatternMaxDist; // Search distance for MakeRoads
 
     Hitpattern*     fHitpattern;  // Hitpattern of current event
     PatternTree*    fPatternTree; // Precomputed template database
@@ -93,8 +96,6 @@ namespace TreeSearch {
     // Patterns found by TreeSearch
     std::map<const NodeDescriptor,HitSet> fPatternsFound;
     std::list<Road*> fRoads;    // Roads found by MakeRoads
-
-    std::vector<UInt_t> fMaxdist;  // Search distances for MakeRoads
 
     TBits*           fPlaneCombos; // Allowed plane combos with missing hits
     TBits*           fLayerCombos; // Allowed layer combos with missing hits
