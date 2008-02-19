@@ -38,14 +38,15 @@ namespace TreeSearch {
     Bool_t IsGood() const { return fGood; }
     void   Print( Option_t* opt="" ) const;
 
-  protected:
-
     // Coordinates of hit positions, for track fitting
     struct Point {
-      Double_t x, z;
-      Point() : x(0), z(0) {}
-      Point( Double_t _x, Double_t _z ) : x(_x), z(_z) {}
+      Double_t x, z; // Coordinates
+      UInt_t np;     // Plane number
+      Point() : x(0), z(0), np(0) {}
+      Point( Double_t _x, Double_t _z, UInt_t _np ) : x(_x), z(_z), np(_np) {}
     };
+
+  protected:
 
     const Projection*     fProjection; // Projection that this Road belongs to
 
@@ -75,6 +76,9 @@ namespace TreeSearch {
     Bool_t   CollectCoordinates( std::vector<Point>& points,
 		       std::vector<std::vector<Point*> >& planepoints);
     Double_t GetBinX( UInt_t bin ) const;
+    void     NthPermutation( UInt_t n, 
+			     const std::vector<std::vector<Point*> >& pts,
+			     std::vector<Point*>& selected ) const;
 
     ClassDef(Road,1)  // Region containing track candidate hits 
   };

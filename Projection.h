@@ -48,17 +48,18 @@ namespace TreeSearch {
 
 
     Double_t        GetAngle() const;
-    UInt_t          GetClusterMaxDist() const { return fClusterMaxDist; }
     Double_t        GetCosAngle() const { return fCosAngle; }
+    UInt_t          GetHitMaxDist() const { return fHitMaxDist; }
     Hitpattern*     GetHitpattern() const { return fHitpattern; }
     TBits*          GetLayerCombos() const { return fLayerCombos; }
     WirePlane*      GetLayer( UInt_t layer )  const { return fLayers[layer]; }
     Double_t        GetLayerZ( UInt_t layer ) const;
     Double_t        GetMaxSlope() const { return fMaxSlope; }
+    UInt_t          GetMinFitPlanes() const { return 3; } //TODO
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
-    UInt_t          GetPatternMaxDist() const { return fPatternMaxDist; }
+    UInt_t          GetBinMaxDist() const { return fBinMaxDist; }
     TBits*          GetPlaneCombos() const { return fPlaneCombos; }
     WirePlane*      GetPlane( UInt_t plane )  const { return fPlanes[plane]; }
     Double_t        GetPlaneZ( UInt_t plane ) const;
@@ -84,9 +85,9 @@ namespace TreeSearch {
     Double_t        fWidth;       // Width of tracking region (m)
     Double_t        fSinAngle;    // Sine of wire angle
     Double_t        fCosAngle;    // Cosine of wire angle
-    UInt_t          fClusterMaxDist; // Max allowed distance between hits for
+    UInt_t          fHitMaxDist;  // Max allowed distance between hits for
                                   // clustering patterns into roads
-    UInt_t          fPatternMaxDist; // Search distance for MakeRoads
+    UInt_t          fBinMaxDist;  // Search distance for MakeRoads
 
     Hitpattern*     fHitpattern;  // Hitpattern of current event
     PatternTree*    fPatternTree; // Precomputed template database

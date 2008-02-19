@@ -16,6 +16,7 @@
 #include "TBits.h"
 #include <iostream>
 #include <algorithm>
+#include <numeric>
 
 using namespace std;
 
@@ -35,7 +36,11 @@ struct BuildInfo_t {
 
 // Number of points for polygon test
 static const vector<double>::size_type kNcorner = 5;
+static const UInt_t kMaxNhitCombos = 1000;
 
+typedef vector<Road::Point*> Pvec_t;
+typedef vector<Pvec_t>::iterator vvpiter_t;
+typedef Pvec_t::iterator vpiter_t;
 typedef Hset_t::iterator siter_t;
 #define ALL(c) (c).begin(), (c).end()
 
@@ -188,7 +193,7 @@ Bool_t Road::Add( Node_t& nd )
 
       // Create an instance of the wire number distance comparison function.
       // This allows clustering of wires that are up to maxdist apart.
-      Hit::WireDistLess comp( fProjection->GetClusterMaxDist() );
+      Hit::WireDistLess comp( fProjection->GetHitMaxDist() );
 
       // Get the intersection of the new hits with the hits that are currently
       // clustered together in this road.
@@ -205,7 +210,7 @@ Bool_t Road::Add( Node_t& nd )
       siter_t end1  = nd.second.hits.end();
       siter_t itold = fBuild->fClusterHits.begin();
       siter_t end2  = fBuild->fClusterHits.end();
-      while( itnew != end1 && itold != end2 ) {
+      while( itnew != end1 and itold != end2 ) {
 	if( comp(*itnew, *itold) )
 	  ++itnew;
 	else if( comp(*itold, *itnew) )
@@ -264,7 +269,7 @@ Bool_t Road::Add( Node_t& nd )
   // Expand the road limits if necessary
   for( Int_t i = 0; i < 4; i++ ) {
     UShort_t bin = ( i<2 ) ? nd.first.Start() : nd.first.End(); // lower:upper
-    if( i==1 || i==2 )
+    if( i==1 or i==2 )
       // "right" edges
       fBuild->fCornerBin[i] = TMath::Max( bin, fBuild->fCornerBin[i] );
     else
@@ -361,12 +366,11 @@ void Road::Print( Option_t* opt ) const
 
 //_____________________________________________________________________________
 Bool_t Road::CollectCoordinates( vector<Point>& points,
-				 vector<vector<Point*> >& planepoints )
+				 vector<Pvec_t>& planepoints )
 {
   // Gather hit positions that lie within the Road area
 
   assert( fCornerX.size() == kNcorner );
-  assert( static_cast<UInt_t>(planepoints.size())==fProjection->GetNplanes());
 
 #ifdef VERBOSE
   cout << "Collecting coordinates from: (" << fPatterns.size() << " patterns)"
@@ -378,10 +382,11 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
 #endif
 #endif
   Double_t zp[kNcorner] = { fZL, fZL, fZU, fZU, fZL };
-  UInt_t matchpattern = 0;
   Bool_t good = true;
 
   // Collect all hit coordinates that lie within the Road
+  TBits planepattern;
+  UInt_t last_np = kMaxUInt;
   for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
     const Hit* hit = *it;
     Double_t z = hit->GetZ();
@@ -389,29 +394,42 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
     for( int i = 2; i--; ) {
       Double_t x = i ? hit->GetPosL() : hit->GetPosR();
       if( TMath::IsInside(x, z, kNcorner, &fCornerX[0], zp) ) {
-	points.push_back( Point(x,z) );
-	planepoints[np].push_back( &points.back() );
-	matchpattern |= 1U<<np;
+	points.push_back( Point(x,z,np) );
+	// The hits are sorted by ascending plane number
+	if( np != last_np ) {
+	  planepoints.push_back( Pvec_t() );
+	  planepattern.SetBitNumber(np);
+	  last_np = np;
+	}
+	assert( !planepoints.empty() );
+	planepoints.back().push_back( &points.back() );
       }
     }
   }
   // Check if this matchpattern is acceptable
-  good = fProjection->GetPlaneCombos()->TestBitNumber(matchpattern);
-
+  UInt_t patternvalue = 0;
+  assert( planepattern.GetNbytes() <= sizeof(patternvalue) );
+  planepattern.Get( &patternvalue );
+  good = fProjection->GetPlaneCombos()->TestBitNumber(patternvalue)
+    // Need at least MinFitPlanes planes for fitting
+    and planepattern.CountBits() >= fProjection->GetMinFitPlanes();
+  
 #ifdef VERBOSE
   cout << "Collected:" << endl;
-  for( vector<vector<Point*> >::size_type i = planepoints.size(); i; ) {
-    --i;
+  vvpiter_t ipl = planepoints.begin();
+  for( UInt_t i = 0; i<fProjection->GetNplanes(); ++i ) {
     cout << " pl= " << i;
-    if( planepoints[i].empty() )
+    assert( ipl == planepoints.end() or !(*ipl).empty() );
+    if( ipl == planepoints.end() or i != (*ipl).front()->np )
       cout << " missing";
     else {
-      Double_t z = planepoints[i][0]->z;
+      Double_t z = (*ipl).front()->z;
       cout << " z=" << z << "\t x=";
-      for( vector<Point*>::size_type j = 0; j < planepoints[i].size(); ++j ) {
-	cout << " " << planepoints[i][j]->x;
-	assert( planepoints[i][j]->z == z );
+      for( vpiter_t it = (*ipl).begin(); it != (*ipl).end(); ++it ) {
+	cout << " " << (*it)->x;
+	assert( (*it)->z == z );
       }
+      ++ipl;
     }
     cout << endl;
   }
@@ -422,21 +440,84 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
 }
 
 //_____________________________________________________________________________
+void Road::NthPermutation( UInt_t n, const vector<Pvec_t>& planepoints,
+			   Pvec_t& selected ) const
+{
+  // Get the n-th permutation of the points in planepoints and
+  // put result in selected. selected[k] is one of the
+  // planepoints[k].size() points in the k-th plane.
+  // The output vector the_points must be resized to planepoints.size()
+  // before calling this function.
+
+  assert( !planepoints.empty() and selected.size() == planepoints.size() );
+
+  UInt_t npl = planepoints.size(), k;
+  for( UInt_t j = npl; j--; ) {
+    vector<Pvec_t>::size_type npt = planepoints[j].size();
+    assert(npt);
+    if( npt == 1 )
+      k = 0;
+    else {
+      k = n % npt;
+      n /= npt;
+    }
+    selected[j] = planepoints[j][k];
+  }
+}
+
+//_____________________________________________________________________________
+// Get the product of the sizes of the vectors in a vector, ignoring empty ones
+template< typename VectorElem > struct SizeMul :
+    public std::binary_function< typename std::vector<VectorElem>::size_type, 
+				 std::vector<VectorElem>, 
+				 typename std::vector<VectorElem>::size_type >
+{
+  typedef typename std::vector<VectorElem>::size_type vsiz_t;
+  vsiz_t operator() ( vsiz_t val, const std::vector<VectorElem>& vec ) const {
+    return ( vec.empty() ? val : val * vec.size() );
+  }
+};
+
+//_____________________________________________________________________________
 Bool_t Road::Fit()
 {
 
+  //TODO: clear fit results?
   fGood = false;
   vector<Point> points;
-  vector<vector<Point*> > planepoints( fProjection->GetNplanes() );
+  vector<Pvec_t> planepoints;
+  //TODO: do we need the points?
   points.reserve( 2*fHits.size() );
+  planepoints.reserve( fProjection->GetNplanes() );
   if( !CollectCoordinates(points, planepoints) )
     return false;
 
   // Determine number of permutations
+  //TODO: protect against overflow
+  UInt_t n_permutations = accumulate( ALL(planepoints),
+				      (UInt_t)1, SizeMul<Point*>() );
+  if( n_permutations > kMaxNhitCombos ) {
+    // TODO: keep statistics
+    return false;
+  }
+
   // Loop over permutations of hits in the planes
-  // Check each permutation for consistency with at least one pattern
+  Pvec_t selected( planepoints.size(), 0 );
+  for( UInt_t i = 0; i < n_permutations; ++i ) {
+    NthPermutation( i, planepoints, selected );
+
+  // Check each permutation for consistency with at least one pattern?
+
   // Fit the permutation
-  // Save best Chi2
+
+  // Save best Chi2 - OR - save all fit results for later analysis
+
+
+
+
+
+  }
+
 
   return (fGood = true);
 }
