@@ -41,9 +41,11 @@ namespace TreeSearch {
     // Coordinates of hit positions, for track fitting
     struct Point {
       Double_t x, z; // Coordinates
+      Double_t res;  // Resolution in x
       UInt_t np;     // Plane number
-      Point() : x(0), z(0), np(0) {}
-      Point( Double_t _x, Double_t _z, UInt_t _np ) : x(_x), z(_z), np(_np) {}
+      Point() : x(0), z(0), res(kBig), np(0) {}
+      Point( Double_t _x, Double_t _z, Double_t _res, UInt_t _np ) 
+	: x(_x), z(_z), res(_res), np(_np) {}
     };
 
   protected:
@@ -58,15 +60,25 @@ namespace TreeSearch {
     Hset_t                fHits;       // All hits linked to the patterns
 
     // Fit results
-    Double_t  fSlope;
-    Double_t  fPos;
-    Double_t  fChi2;
-    Double_t  fErr[2];
+    struct FitResult {
+      Double_t  fPos, fSlope, fChi2, fPosErr, fSlopeErr;
+      FitResult( Double_t pos, Double_t slope, Double_t chi2,
+		 Double_t pos_err, Double_t slope_err )
+	: fPos(pos), fSlope(slope), fChi2(chi2),
+	  fPosErr(pos_err), fSlopeErr(slope_err) {}
+      // Sort fit results by ascending chi2
+      bool operator<( const FitResult& rhs ) const 
+      { return ( fChi2 < rhs.fChi2 ); }
+    private:
+      FitResult() {}
+    };
+    std::multiset<FitResult>  fFitData;
 
+    UInt_t    fDof;      // Degrees of freedom of fits
     Bool_t    fGood;     // Road successfully built and fit
 
-    // Data used while building
-    BuildInfo_t* fBuild;
+
+    BuildInfo_t* fBuild; // Data used while building
 
 #ifdef TESTCODE
     Node_t*   fSeed;
@@ -76,6 +88,7 @@ namespace TreeSearch {
     Bool_t   CollectCoordinates( std::vector<Point>& points,
 		       std::vector<std::vector<Point*> >& planepoints);
     Double_t GetBinX( UInt_t bin ) const;
+    // TODO: make this a global template function since we'll need it elsewhere
     void     NthPermutation( UInt_t n, 
 			     const std::vector<std::vector<Point*> >& pts,
 			     std::vector<Point*>& selected ) const;

@@ -15,6 +15,7 @@
 #include <map>
 #include <list>
 #include <cassert>
+#include <utility>
 
 class THaDetectorBase;
 class TBits;
@@ -28,6 +29,8 @@ namespace TreeSearch {
 
   class Projection : public THaAnalysisObject {
   public:
+
+    typedef std::pair<Double_t,Double_t> pdbl_t;
 
     Projection( Int_t type, const char* name, Double_t angle,
 		THaDetectorBase* parent = 0 );
@@ -48,6 +51,9 @@ namespace TreeSearch {
 
 
     Double_t        GetAngle() const;
+    const pdbl_t&   GetChisqLimits( UInt_t i ) const 
+    { assert( i < fChisqLimits.size() ); return fChisqLimits[i]; }
+    Double_t        GetConfLevel() const { return fConfLevel; }
     Double_t        GetCosAngle() const { return fCosAngle; }
     UInt_t          GetHitMaxDist() const { return fHitMaxDist; }
     Hitpattern*     GetHitpattern() const { return fHitpattern; }
@@ -55,7 +61,7 @@ namespace TreeSearch {
     WirePlane*      GetLayer( UInt_t layer )  const { return fLayers[layer]; }
     Double_t        GetLayerZ( UInt_t layer ) const;
     Double_t        GetMaxSlope() const { return fMaxSlope; }
-    UInt_t          GetMinFitPlanes() const { return 3; } //TODO
+    UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
@@ -77,6 +83,8 @@ namespace TreeSearch {
 //  std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
 
   protected:
+    typedef std::vector<pdbl_t> vec_pdbl_t;
+
     Int_t           fType;        // Type of plane (u,v,x,y...)
     std::vector<WirePlane*> fPlanes; // Wire planes in this projection
     std::vector<WirePlane*> fLayers; // Effective detector planes (wp pairs)
@@ -100,6 +108,10 @@ namespace TreeSearch {
 
     TBits*           fPlaneCombos; // Allowed plane combos with missing hits
     TBits*           fLayerCombos; // Allowed layer combos with missing hits
+
+    UInt_t           fMinFitPlanes;// Min number of planes required for fitting
+    Double_t         fConfLevel;   // Requested confidence level for chi2 cut
+    vec_pdbl_t       fChisqLimits; // lo/hi onfidence interval limits on Chi2
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;

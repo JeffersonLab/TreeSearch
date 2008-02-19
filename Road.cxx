@@ -46,15 +46,12 @@ typedef Hset_t::iterator siter_t;
 
 //_____________________________________________________________________________
 Road::Road( const Projection* proj ) :
-  fProjection(proj), fCornerX(kNcorner), fZL(0), fZU(0),
-  fSlope(kBig), fPos(kBig), fChi2(kBig), fGood(false)
+  fProjection(proj), fCornerX(kNcorner), fZL(0), fZU(0), fDof(0), fGood(false)
 #ifdef TESTCODE
   , fSeed(0)
 #endif
 {
   // Constructor
-
-  fErr[0] = fErr[1] = kBig;
 
   assert(fProjection);
 
@@ -65,16 +62,13 @@ Road::Road( const Projection* proj ) :
 Road::Road( const Road& orig ) :
   fProjection(orig.fProjection),
   fCornerX(orig.fCornerX), fZL(orig.fZL), fZU(orig.fZU),
-  fPatterns(orig.fPatterns), fHits(orig.fHits),
-  fSlope(orig.fSlope), fPos(orig.fSlope), fChi2(orig.fChi2), fGood(orig.fGood)
+  fPatterns(orig.fPatterns), fHits(orig.fHits), fFitData(orig.fFitData),
+  fDof(orig.fDof), fGood(orig.fGood)
 #ifdef TESTCODE
   , fSeed(orig.fSeed)
 #endif
 {
   // Copy constructor
-
-  fErr[0] = orig.fErr[0];
-  fErr[1] = orig.fErr[1];
 
   if( orig.fBuild )
     fBuild = new BuildInfo_t( *orig.fBuild );
@@ -97,11 +91,8 @@ Road& Road::operator=( const Road& rhs )
     fZU         = rhs.fZU;
     fPatterns   = rhs.fPatterns;
     fHits       = rhs.fHits;
-    fSlope      = rhs.fSlope;
-    fPos        = rhs.fPos;
-    fChi2       = rhs.fChi2;
-    fErr[0]     = rhs.fErr[0];
-    fErr[1]     = rhs.fErr[1];
+    fFitData    = rhs.fFitData;
+    fDof        = rhs.fDof;
     fGood       = rhs.fGood;
 
     delete fBuild;
@@ -394,7 +385,7 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
     for( int i = 2; i--; ) {
       Double_t x = i ? hit->GetPosL() : hit->GetPosR();
       if( TMath::IsInside(x, z, kNcorner, &fCornerX[0], zp) ) {
-	points.push_back( Point(x,z,np) );
+	points.push_back( Point(x,z,hit->GetResolution(),np) );
 	// The hits are sorted by ascending plane number
 	if( np != last_np ) {
 	  planepoints.push_back( Pvec_t() );
@@ -503,18 +494,60 @@ Bool_t Road::Fit()
 
   // Loop over permutations of hits in the planes
   Pvec_t selected( planepoints.size(), 0 );
+  Pvec_t::size_type npts = selected.size();
+  fDof = npts-2;
+  Projection::pdbl_t chi2_limit = fProjection->GetChisqLimits(fDof);
   for( UInt_t i = 0; i < n_permutations; ++i ) {
     NthPermutation( i, planepoints, selected );
+    assert( selected.size() == npts );
 
-  // Check each permutation for consistency with at least one pattern?
+    // Fit the permutation. Note that we fit x = a1 + a2*z (z independent).
+    // Notation from: Review of Particle Properties, PRD 50, 1277 (1994)
+    Double_t S11 = 0, S12 = 0, S22 = 0, G1 = 0, G2 = 0, chi2 = 0;
+    for( Pvec_t::size_type j = 0; j < npts; j++) {
+      register Point* p = selected[j];
+      register Double_t w = 1.0 / ( p->res * p->res );
+      S11 += w;
+      S12 += p->z * w;
+      S22 += p->z * p->z * w;
+      G1  += p->x * w;
+      G2  += p->x * p->z * w;
+    }
+    Double_t D   = S11*S22 - S12*S12;
+    Double_t iD  = 1.0/D;
+    Double_t a1  = (G1*S22 - G2*S12)*iD;  // Intercept
+    Double_t a2  = (G2*S11 - G1*S12)*iD;  // Slope
+    Double_t V11 = S22*iD;                // Intercept error
+    Double_t V22 = S11*iD;                // Slope error
+    for( Pvec_t::size_type j = 0; j < npts; j++) {
+      register Point* p = selected[j];
+      register Double_t w = 1.0 / ( p->res * p->res );
+      Double_t d = a1 + a2*p->z - p->x;
+      chi2 += d*d * w;
+    }
 
-  // Fit the permutation
+#ifdef VERBOSE
+    cout << "Fit:"
+	 << " a1 = " << a1 << " (" << V11 << ")"
+	 << " a2 = " << a2 << " (" << V22 << ")"
+	 << " chi2/dof = " << chi2/fDof
+	 << endl;
+#endif
+    // Throw out Chi2's outside of selected confidence interval
+    // NB: Obviously, this requires accurate hit resolutions
+    //TODO: keep statistics
+    if( chi2 < chi2_limit.first )
+      continue;
+    if( chi2 > chi2_limit.second )
+      continue;
+#ifdef VERBOSE
+    cout << "ACCEPTED" << endl;
+#endif
 
-  // Save best Chi2 - OR - save all fit results for later analysis
+    // Save fits with acceptable Chi2
+    fFitData.insert( FitResult(a1,a2,chi2,V11,V22) );
 
-
-
-
+    //TODO: save pointer to hit(s) used, update hits, fill used hits array
 
   }
 

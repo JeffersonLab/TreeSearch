@@ -234,6 +234,8 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 {
   // Level-2 initialization - load pattern database and initialize hitpattern
 
+  static const char* const here = "InitLevel2";
+
   TreeParam_t tp;
   tp.maxdepth = fNlevels-1;
   tp.width = fWidth;
@@ -328,6 +330,22 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 //       fLayerCombos->SetBitNumber( allbits ^ nl );
 //   }
 
+  // Determine Chi2 confidence interval limits for the selected CL and the
+  // possible degrees of freedom (1...nplanes-2)
+  fChisqLimits.clear();
+  fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
+  for( vec_pdbl_t::size_type dof = 1; dof < fChisqLimits.size(); ++dof ) {
+    fChisqLimits[dof].first = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
+    fChisqLimits[dof].second = TMath::ChisquareQuantile( fConfLevel, dof );
+  }
+  
+  if( fMinFitPlanes < 3 || fMinFitPlanes > GetNplanes() ) {
+    Error( Here(here), "Illegal number of required planes for fitting = %u. "
+	   "Must be >= 3 and <= %u. "
+	   "Fix database.", fMinFitPlanes, GetNplanes() );
+    return kInitError;
+  }
+
   return fStatus = kOK;
 }
 
@@ -346,11 +364,15 @@ Int_t Projection::ReadDatabase( const TDatime& date )
 
   Double_t angle = kBig;
   fHitMaxDist = 1;
+  fMinFitPlanes = 3;
+  fConfLevel = 0.999;
   const DBRequest request[] = {
-    { "angle",        &angle,        kDouble, 0, 1 },
-    { "maxslope",     &fMaxSlope,    kDouble, 0, 1, -1 },
-    { "search_depth", &fNlevels,     kUInt,   0, 0, -1 },
-    { "cluster_maxdist", &fHitMaxDist, kUInt, 0, 1, -1 },
+    { "angle",           &angle,         kDouble, 0, 1 },
+    { "maxslope",        &fMaxSlope,     kDouble, 0, 1, -1 },
+    { "search_depth",    &fNlevels,      kUInt,   0, 0, -1 },
+    { "cluster_maxdist", &fHitMaxDist  , kUInt,   0, 1, -1 },
+    { "min_fit_planes",  &fMinFitPlanes, kUInt  , 0, 1, -1 },
+    { "chi2_conflevel",  &fConfLevel  ,  kDouble, 0, 1, -1 },
     { 0 }
   };
 
@@ -374,6 +396,12 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     Warning( Here(here), "Negative maxslope = %lf makes no sense. "
 	     "Using |maxslope|.", fMaxSlope );
     fMaxSlope = -fMaxSlope;
+  }
+
+  if( fConfLevel < 0.0 || fConfLevel > 1.0 ) {
+    Error( Here(here), "Illegal fit confidence level = %lf. "
+	   "Must be 0-1. Fix database.", fConfLevel );
+    return kInitError;
   }
 
   fIsInit = kTRUE;
