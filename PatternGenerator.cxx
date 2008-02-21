@@ -12,6 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <ctime>
+#include <cassert>
 #if ROOT_VERSION_CODE < ROOT_VERSION(5,8,0)
 #include <cstdlib>   // for atof()
 #endif

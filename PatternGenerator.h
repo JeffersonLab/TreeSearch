@@ -10,7 +10,6 @@
 #include "Pattern.h"
 #include "PatternTree.h"
 #include <vector>
-#include <cassert>
 
 using std::vector;
 
@@ -48,7 +47,7 @@ namespace TreeSearch {
 	if( depth < fMinDepth ) fMinDepth = depth;
       }
     public:
-      HashNode( Pattern* pat = 0 ) : fPattern(pat), fMinDepth(-1) {}
+      HashNode( Pattern* pat = 0 ) : fPattern(pat), fMinDepth(kMaxUInt) {}
       Pattern* GetPattern() const { return fPattern; }
     };
 
