@@ -31,7 +31,7 @@ namespace TreeSearch {
 //_____________________________________________________________________________
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
-  : THaSubDetector(name,description,parent), fPlaneNum(-1),
+  : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
     fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0), fHits(0)
@@ -247,7 +247,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
     }   // chans
   }     // modules
    
-  // If ncessary, sort the hits by wire position
+  // If necessary, sort the hits by wire position
   if( !sorted )
     fHits->Sort();
 
@@ -492,9 +492,13 @@ void WirePlane::SetPartner( WirePlane* p )
   // Partner this plane with plane 'p'. Partner planes are expected to
   // be located close to each other and usually to have staggered wires.
 
-  fPartner = p;
   if( p )
     p->fPartner = this;
+  else if( fPartner ) {
+    assert( this == fPartner->fPartner );
+    fPartner->fPartner = 0;
+  }
+  fPartner = p;
 
   return;
 }
