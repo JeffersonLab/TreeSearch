@@ -33,84 +33,30 @@ namespace TreeSearch {
 
 typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<WirePlane*>::iterator  vwiter_t;
-typedef list<Road*>::iterator lrd_iter_t;
 
 //_____________________________________________________________________________
 Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0),
-    fHitpattern(0), fPatternTree(0), fDetector(parent),
+    fHitpattern(0), fPatternTree(0), fDetector(parent), fRoads(0),
     fPlaneCombos(0), fLayerCombos(0)
 {
   // Constructor
+
+  assert( name && parent );
 
   // angle is the default value. It can be overridden via a database entry.
   SetAngle( angle );
 
   fTitle.Append(" projection");
-}
-
-
-//_____________________________________________________________________________
-Projection::Projection( const Projection& orig )
-  : fType(orig.fType), fPlanes(orig.fPlanes), fLayers(orig.fLayers),
-    fNlevels(orig.fNlevels), fMaxSlope(orig.fMaxSlope), fWidth(orig.fWidth),
-    fSinAngle(orig.fSinAngle), fCosAngle(orig.fCosAngle),
-    fHitpattern(0), fPatternTree(0), fDetector(orig.fDetector),
-    fPatternsFound(), fRoads()
-{
-  // Copying
-
-  if( orig.fHitpattern )
-    fHitpattern = new Hitpattern(*orig.fHitpattern);
-//   if( orig.fPatternTree )
-//     fPatternTree = new PatternTree(*orig.fPatternTree);
-  if( orig.fPlaneCombos )
-    fPlaneCombos = new TBits(*orig.fPlaneCombos);
-  if( orig.fLayerCombos )
-    fLayerCombos = new TBits(*orig.fLayerCombos);
-}
-
-//_____________________________________________________________________________
-const Projection& Projection::operator=( const Projection& rhs )
-{
-  // Assignment
-
-  if( this != &rhs ) {
-    fType     = rhs.fType;
-    fNlevels    = rhs.fNlevels;
-    fPlanes   = rhs.fPlanes;
-    fLayers   = rhs.fLayers;
-    fMaxSlope = rhs.fMaxSlope;
-    fWidth    = rhs.fWidth;
-    fSinAngle = rhs.fSinAngle;
-    fCosAngle = rhs.fCosAngle;
-    fDetector = rhs.fDetector;
-    delete fHitpattern;
-    if( rhs.fHitpattern )
-      fHitpattern = new Hitpattern(*rhs.fHitpattern);
-    else
-      fHitpattern = 0;
-//     if( rhs.fPatternTree )
-//       fPatternTree = new PatternTree(*rhs.fPatternTree);
-//     else
-    fPatternTree = 0;
-    fPatternsFound.clear();
-    for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it )
-      delete *it;
-    fRoads.clear();
-    delete fPlaneCombos;
-    if( rhs.fPlaneCombos )
-      fPlaneCombos = new TBits(*rhs.fPlaneCombos);
-    else
-      fPlaneCombos = 0;
-    if( rhs.fLayerCombos )
-      fLayerCombos = new TBits(*rhs.fLayerCombos);
-    else
-      fLayerCombos = 0;
+  fRoads = new TClonesArray("TreeSearch::Road", 3);
+  if( !fRoads ) {
+    Fatal( Here("Projection"), "Allocating road array for projection %s "
+	   "failed. Call expert.", name );
+    MakeZombie();
+    return;
   }
-  return *this;
 }
 
 //_____________________________________________________________________________
@@ -118,8 +64,7 @@ Projection::~Projection()
 {
   // Destructor
 
-  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it )
-    delete *it;
+  delete fRoads;
   delete fPatternTree;
   delete fHitpattern;
   delete fPlaneCombos;
@@ -158,10 +103,8 @@ void Projection::Clear( Option_t* opt )
   if( fHitpattern )
     fHitpattern->Clear();
 
+  fRoads->Delete();
   fPatternsFound.clear();
-  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ++it )
-    delete *it;
-  fRoads.clear();
 
 #ifdef TESTCODE
   size_t nbytes = (char*)&t_track - (char*)&n_hits + sizeof(t_track);
@@ -431,8 +374,17 @@ Int_t Projection::DefineVariables( EMode mode )
     { "t_roads", "Time in MakeRoads (us)", "t_roads" },
     { "t_fit", "Time for fitting Roads (us)", "t_fit" },
     { "t_track", "Total time in Track (us)", "t_track" },
-    //    { "", "", "" },
 #endif
+    { "rd.nfits", "Number of good fits in road",
+                                     "fRoads.TreeSearch::Road.GetNfits()" },
+    { "rd.pos",   "Fitted track origin (m)",
+                                           "fRoads.TreeSearch::Road.fPos" },
+    { "rd.slope", "Fitted track slope (dx/dz)",
+                                         "fRoads.TreeSearch::Road.fSlope" },
+    { "rd.chi2",  "Chi2 of fit", 
+                                          "fRoads.TreeSearch::Road.fChi2" },
+    { "rd.dof",   "Degrees of freedom of fit",
+                                           "fRoads.TreeSearch::Road.fDof" },
     { 0 }
   };
   DefineVarsFromList( vars, mode );
@@ -500,6 +452,9 @@ Int_t Projection::Track()
   gettimeofday( &start2, 0 );
 #endif
 
+  if( fPatternsFound.empty() )
+    return 0;
+
   // Combine patterns with common sets of hits into Roads
   MakeRoads();
 
@@ -508,7 +463,7 @@ Int_t Projection::Track()
   timersub( &stop, &start2, &diff );
   t_roads = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
-  n_roads = fRoads.size();
+  n_roads = GetNroads();
 
   gettimeofday( &start2, 0 );
 #endif
@@ -519,16 +474,20 @@ Int_t Projection::Track()
   // Also, store the hits & positions used by the best fit with Road.
 
   // Erase roads with bad fits (too few planes occupied etc.)
-  for( lrd_iter_t it = fRoads.begin(); it != fRoads.end(); ) {
-    lrd_iter_t it2 = it++;
-    if( !(*it2)->Fit() ) {
-      delete *it2;
-      fRoads.erase(it2);
+  bool changed = false;
+  for( Int_t i = 0; i < GetNroads(); ++i ) {
+    assert( i<fRoads->GetSize() );
+    Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
+    if( !rd->Fit() ) {
+      fRoads->RemoveAt(i);
+      changed = true;
 #ifdef TESTCODE
       ++n_badroads;
 #endif
     }
   }
+  if( changed )
+    fRoads->Compress();
 
 #ifdef TESTCODE
   gettimeofday(&stop, 0 );
@@ -558,13 +517,14 @@ Int_t Projection::MakeRoads()
     // New roads must contain at least one unused pattern
     if( nd1.second.used )
       continue;
-    Road* rd = new Road(this);
+    Road* rd = new( (*fRoads)[GetNroads()] ) Road(this);
     // Adding the first pattern must make a good match
     if( !rd->Add(nd1) ) {
 #ifdef VERBOSE
       cout << ">>>>>>>>> No match, skipped" << endl;
 #endif
-      delete rd;
+      assert(fRoads->GetLast() >= 0);
+      fRoads->RemoveAt( fRoads->GetLast() );
       continue;
     }
     it2 = ref_it1;
@@ -586,12 +546,12 @@ Int_t Projection::MakeRoads()
     }
     // Update the "used" flags of the road's component patterns
     rd->Finish();
-    fRoads.push_back(rd);
   }
 #ifdef VERBOSE
-  if( !fRoads.empty() ) {
-    cout << fRoads.size() << " road";
-    if( fRoads.size()>1 ) cout << "s";
+  if( !fRoads->IsEmpty() ) {
+    Int_t nroads = GetNroads();
+    cout << nroads << " road";
+    if( nroads>1 ) cout << "s";
     cout << endl;
   }
   cout << "------------ end of projection  " << fName.Data() 
@@ -687,8 +647,8 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
   ++fNtest;
 #endif
   // Compute the match pattern and see if it is allowed
-  UInt_t matchpattern = fHitpattern->ContainsPattern(nd);
-  if( fLayerCombos->TestBitNumber(matchpattern)  ) {
+  UInt_t matchvalue = fHitpattern->ContainsPattern(nd);
+  if( fLayerCombos->TestBitNumber(matchvalue)  ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 

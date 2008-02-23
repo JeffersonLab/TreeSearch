@@ -11,9 +11,9 @@
 #include "TreeWalk.h"
 #include "Hit.h"
 #include "TMath.h"
+#include "TClonesArray.h"
 #include <vector>
 #include <map>
-#include <list>
 #include <cassert>
 #include <utility>
 
@@ -34,8 +34,6 @@ namespace TreeSearch {
 
     Projection( Int_t type, const char* name, Double_t angle,
 		THaDetectorBase* parent = 0 );
-    Projection( const Projection& orig );
-    const Projection& operator=( const Projection& rhs );
     virtual ~Projection();
 
     void            AddPlane( WirePlane* wp, WirePlane* partner = 0 );
@@ -65,6 +63,7 @@ namespace TreeSearch {
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
+    Int_t           GetNroads()   const { return fRoads->GetLast()+1; }
     UInt_t          GetBinMaxDist() const { return fBinMaxDist; }
     TBits*          GetPlaneCombos() const { return fPlaneCombos; }
     WirePlane*      GetPlane( UInt_t plane )  const { return fPlanes[plane]; }
@@ -104,7 +103,7 @@ namespace TreeSearch {
 
     // Patterns found by TreeSearch
     std::map<const NodeDescriptor,HitSet> fPatternsFound;
-    std::list<Road*> fRoads;    // Roads found by MakeRoads
+    TClonesArray*    fRoads;    // Roads found by MakeRoads
 
     TBits*           fPlaneCombos; // Allowed plane combos with missing hits
     TBits*           fLayerCombos; // Allowed layer combos with missing hits
@@ -152,6 +151,12 @@ namespace TreeSearch {
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
     };
+
+  private:
+    // Prevent default construction, copying, assignment
+    Projection() {};
+    Projection( const Projection& orig );
+    const Projection& operator=( const Projection& rhs );
 
     ClassDef(Projection,0)  // A track projection plane
   };
