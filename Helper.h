@@ -28,9 +28,10 @@ namespace TreeSearch {
     // The output vector the_points must be resized to vec.size()
     // before calling this function.
 
-    assert( !vec.empty() and selected.size() == vec.size() );
+    assert( !vec.empty() );
 
     UInt_t vsiz = vec.size(), k;
+    selected.resize( vsiz );
     for( UInt_t j = vsiz; j--; ) {
       typename std::vector<VectorElem>::size_type npt = vec[j].size();
       assert(npt);
