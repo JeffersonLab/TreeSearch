@@ -4,6 +4,8 @@ SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx Hitpattern.cxx \
 	Projection.cxx Pattern.cxx PatternTree.cxx PatternGenerator.cxx \
 	TreeWalk.cxx Road.cxx
 
+EXTRAHDR = Helper.h
+
 PACKAGE = TreeSearch
 
 LINKDEF = $(PACKAGE)_LinkDef.h
@@ -11,9 +13,10 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version
 export DEBUG = 1
-export VERBOSE = 1
+#export VERBOSE = 1
 export TESTCODE = 1
 export I387MATH = 1
+export EXTRAWARN = 1
 
 # Architecture to compile for
 ARCH          = linux
@@ -80,6 +83,9 @@ else
 endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
+ifdef EXTRAWARN
+CXXFLAGS     += -Wextra -Wno-unused-parameter -Wno-missing-field-initializers 
+endif
 LD            = g++
 SOFLAGS       = -shared
 ifdef I387MATH
@@ -131,7 +137,7 @@ $(USERLIB):	$(HDR) $(OBJS)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $(OBJS)
 		@echo "$@ done"
 
-$(USERDICT).cxx: $(HDR) $(LINKDEF)
+$(USERDICT).cxx: $(HDR) $(EXTRAHDR) $(LINKDEF)
 	@echo "Generating dictionary $(USERDICT)..."
 	$(ROOTSYS)/bin/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
