@@ -26,6 +26,7 @@
 #pragma link C++ class TreeSearch::NodeDescriptor+;
 #pragma link C++ class TreeSearch::TreeParam_t+;
 #pragma link C++ class TreeSearch::Road+;
+#pragma link C++ class TreeSearch::FitCoord+;
 
 #pragma link C++ class std::pair<TObject*,TObject*>;
 #pragma link C++ class std::vector<TreeSearch::WirePlane*>;
