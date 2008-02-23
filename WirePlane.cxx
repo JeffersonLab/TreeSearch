@@ -34,7 +34,7 @@ WirePlane::WirePlane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
-    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0), fHits(0)
+    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0), fHits(0), fFitCoords(0)
 #ifdef TESTCODE
   , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
     fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
@@ -43,21 +43,21 @@ WirePlane::WirePlane( const char* name, const char* description,
   // Constructor
 
   static const char* const here = "WirePlane";
+  assert( name && parent );
 
   fMWDC = dynamic_cast<MWDC*>( GetDetector() );
-  if( !fMWDC ) {
-    Error( Here(here), "No parent detector (MWDC) defined. Call expert." );
-    MakeZombie();
-    return;
-  }
+  assert( fMWDC );
 
   if( fMWDC->TestBit(MWDC::kMCdata) ) // Monte Carlo data mode?
     fHits = new TClonesArray("TreeSearch::MCHit", 200);
   else
     fHits = new TClonesArray("TreeSearch::Hit", 200);
 
-  if( !fHits ) {
-    Fatal( Here(here), "Allocating hit array failed. Call expert." );
+  fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );
+
+  if( !fHits or !fFitCoords ) {
+    Fatal( Here(here), "Allocating hit array in wire plane %s failed. "
+	   "Call expert." );
     MakeZombie();
     return;
   }
@@ -73,7 +73,17 @@ WirePlane::~WirePlane()
   if( fIsSetup )
     RemoveVariables();
 
+  delete fFitCoords;
   delete fHits;
+}
+
+//_____________________________________________________________________________
+FitCoord* WirePlane::AddFitCoord( const FitCoord& coord )
+{ 
+  // Add given fit coordinate data to this plane's array of fit coordinates
+
+  return
+    new( (*fFitCoords)[GetNcoords()] ) FitCoord(coord);
 }
 
 //_____________________________________________________________________________
@@ -82,6 +92,7 @@ void WirePlane::Clear( Option_t* opt )
   // Clear event-by-event data (hits)
 
   fHits->Clear();
+  fFitCoords->Clear();
 #ifdef TESTCODE
   fWasSorted = 0;
   fNmiss = fNrej = fNhitwires = fNmultihit = fNmaxmul = 0;
@@ -277,10 +288,26 @@ Int_t WirePlane::DefineVariables( EMode mode )
     { "hit.time",    "Hit time (s)",       "fHits.TreeSearch::Hit.fTime" },
     { "hit.dist",    "Drift distance (m)",
                                     "fHits.TreeSearch::Hit.GetDriftDist()" },
-    { "hit.trkdist", "Track distance (m)",
-                                    "fHits.TreeSearch::Hit.GetTrackDist()"},
-    { "hit.trkpos",  "Track position (m)",
-                                    "fHits.TreeSearch::Hit.fTrackPos"},
+    { "ncoords",     "Num fit coords",     "GetNcoords()" },
+    { "coord.rank",  "Fit rank of coord",
+                                "fFitCoords.TreeSearch::FitCoord.fFitRank" },
+    { "coord.pos",   "Uncorr coord pos (m)",
+                                    "fFitCoords.TreeSearch::FitCoord.fPos" },
+    { "coord.trkpos","Track pos from fit (m)",
+                               "fFitCoords.TreeSearch::FitCoord.fTrackPos" },
+    { "coord.trkslope","Track slope from fit",
+                             "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },
+    { "coord.chi2",  "Chi2 of this coord's fit",
+                               "fFitCoords.TreeSearch::FitCoord.GetChi2()" },
+    { "coord.resid", "Residual of trkpos (m)",
+                           "fFitCoords.TreeSearch::FitCoord.GetResidual()" },
+    { "coord.trkdist", "Distance of trkpos to wire (m)",
+                          "fFitCoords.TreeSearch::FitCoord.GetTrackDist()" },
+    { "coord.driftdist", "Drift distance of hit (m)",
+                          "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
+    //TODO: need
+    // - coord.driftdist
+    // - coord.slope
 #ifdef TESTCODE
     { "nmiss",       "Decoder misses",     "fNmiss" },
     { "nrej",        "Time cut nopass",    "fNrej" },
@@ -522,22 +549,21 @@ void WirePlane::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
-Int_t WirePlane::Compare( const TObject* obj ) const 
-{
-  // Used to sort planes in a TCollection/TList by z-position
+// Int_t WirePlane::Compare( const TObject* obj ) const 
+// {
+//   // Used to sort planes in a TCollection/TList by z-position
 
-  // Fail if comparing to some other type of object
-  if( !obj || IsA() != obj->IsA() )
-    return -1;
+//   // Fail if comparing to some other type of object
+//   assert( obj && IsA() == obj->IsA() );
 
-  if( obj == this )
-    return 0;
+//   if( obj == this )
+//     return 0;
 
-  const WirePlane* other = static_cast<const WirePlane*>( obj );
-  if( GetZ() < other->GetZ() ) return -1;
-  if( GetZ() > other->GetZ() ) return  1;
-  return 0;
-}
+//   const WirePlane* other = static_cast<const WirePlane*>( obj );
+//   if( GetZ() < other->GetZ() ) return -1;
+//   if( GetZ() > other->GetZ() ) return  1;
+//   return 0;
+// }
 
 //_____________________________________________________________________________
 Double_t WirePlane::GetMaxSlope() const

@@ -9,6 +9,7 @@
 #include "Hit.h"
 #include "TSeqCollection.h"
 #include "WirePlane.h"
+#include "Road.h"
 
 #include <iostream>
 
@@ -34,8 +35,7 @@ void Hit::Print( Option_t* opt ) const
        << " z="        << GetZ()
        << " res="      << GetResolution()
        << " time="     << GetDriftTime()
-       << " drift="    << GetDriftDist()
-       << " trk="      << GetTrackDist();
+       << " drift="    << GetDriftDist();
   if( *opt != 'C' )
     cout << endl;
 }
@@ -69,6 +69,14 @@ void MCHit::Print( Option_t* opt ) const
   Hit::Print("C");
   cout << " MCpos=" << GetMCPos()
        << endl;
+}
+
+//_____________________________________________________________________________
+Double_t FitCoord::GetChi2() const
+{
+  // Return chi2 of the fit that used this coordinate
+
+  return fRoad ? fRoad->GetChi2( fFitRank ) : kBig;
 }
 
 //_____________________________________________________________________________

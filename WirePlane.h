@@ -23,6 +23,8 @@ namespace TreeSearch {
   class TimeToDistConv;
   class Projection;
   class MWDC;
+  class Hit;
+  class FitCoord;
   extern const Double_t kBig;
 
   class WirePlane : public THaSubDetector {
@@ -37,9 +39,10 @@ namespace TreeSearch {
     virtual EStatus Init( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
 
-    Int_t           Compare ( const TObject* obj ) const;
-    Bool_t          IsSortable () const { return kTRUE; }
+//     virtual Int_t   Compare ( const TObject* obj ) const;
+//     virtual Bool_t  IsSortable () const { return kTRUE; }
 
+    FitCoord*       AddFitCoord( const FitCoord& coord );
     EProjType       GetType() const { return fType; }
     Double_t        GetZ() const { return fOrigin.Z(); }
     Projection*     GetProjection() const { return fProjection; }
@@ -54,14 +57,19 @@ namespace TreeSearch {
 
     TimeToDistConv* GetTTDConv() const { return fTTDConv; }
 
-    TSeqCollection* GetHits() const { return fHits; }
-    Int_t           GetNhits() const { return fHits->GetLast()+1; }
+    TSeqCollection* GetHits()     const { return fHits; }
+    Int_t           GetNhits()    const { return fHits->GetLast()+1; }
+    TSeqCollection* GetCoords()   const { return fFitCoords; }
+    Int_t           GetNcoords()  const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum() const { return fPlaneNum; }
     UInt_t          GetLayerNum() const { return fLayerNum; }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
     void            SetLayerNum( UInt_t n ) { fLayerNum = n; }
     void            SetProjection( Projection* p ) { fProjection = p; }
+#ifdef TESTCODE
+    void            CheckCrosstalk();
+#endif
 
     // Helper functors for STL algorithms...
     struct ZIsLess
@@ -105,6 +113,8 @@ namespace TreeSearch {
     // Event data, hits etc.
 
     TClonesArray*   fHits;      // Hit data
+    TClonesArray*   fFitCoords; // Hit coordinates used by good fits in roads
+
 #ifdef TESTCODE
     UInt_t          fNmiss;     // Statistics: Decoder channel misses
     UInt_t          fNrej;      // Statistics: Rejected hits
@@ -115,9 +125,8 @@ namespace TreeSearch {
     UInt_t          fNcl;       // Statistics: number of hit "clusters"
     UInt_t          fNdbl;      // Statistics: num wires with neighboring hits
     UInt_t          fClsiz;     // Statistics: max cluster size
-
-    void CheckCrosstalk();
 #endif
+
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
 

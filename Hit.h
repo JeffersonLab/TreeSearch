@@ -20,6 +20,7 @@ class TIterator;
 
 namespace TreeSearch {
 
+  class Road;
   extern const Double_t kBig;
 
   class Hit : public TObject {
@@ -27,13 +28,14 @@ namespace TreeSearch {
   public:
     Hit() : fWirePlane(0) {}
     Hit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
-	 const WirePlane* wp ) :
-#ifdef TESTCODE
-      fCl(0), fMulti(0), fTdiff(0.0),
-#endif
+	 WirePlane* wp ) :
       fWireNum(wnum), fRawTDC(tdc), fTime(time), fPos(pos), fPosL(pos), 
-      fPosR(pos), fResolution(res), fTrackPos(kBig), fWirePlane(wp)
+      fPosR(pos), fResolution(res), fWirePlane(wp)
+#ifdef TESTCODE
+      , fCl(0), fMulti(0), fTdiff(0.0)
+#endif
     { assert(fWirePlane); }
+    // Default copy and assignment are fine
     //    Hit( const Hit& );
     //    Hit& operator=( const Hit& );
     virtual ~Hit() {}
@@ -53,17 +55,9 @@ namespace TreeSearch {
     Double_t GetDriftDist()  const { return fPosR-fPos; }
     Double_t GetPosL()       const { return fPosL; }
     Double_t GetPosR()       const { return fPosR; }
-    Double_t GetTrackPos()   const { return fTrackPos; }
-    Double_t GetTrackDist()  const { return fTrackPos-fPos; }
     Double_t GetResolution() const { return fResolution; }
 
-    const WirePlane* GetWirePlane() const { return fWirePlane; }
-
-#ifdef TESTCODE
-    Int_t    fCl;          // Neighboring wire also fired
-    Int_t    fMulti;       // Additional hits present on same wire
-    Double_t fTdiff;       // Time difference to previous multihit
-#endif
+    WirePlane* GetWirePlane() const { return fWirePlane; }
 
     // Functors for ordering hits in sets
     struct WireNumLess : public std::binary_function< Hit*, Hit*, bool >
@@ -95,7 +89,7 @@ namespace TreeSearch {
       }
       Int_t GetMaxDist() const { return fMaxDist; }
     private:
-      Int_t fMaxDist;
+      Int_t fMaxDist;      // Max allowed distance between hits in a cluster
     };
 
   protected:
@@ -106,11 +100,17 @@ namespace TreeSearch {
     Double_t fPosL;        // fPos - raw drift distance (m)
     Double_t fPosR;        // fPos + raw drift distance (m)
     Double_t fResolution;  // Resolution of fPosR/fPosL (m)
-    Double_t fTrackPos;    // Track crossing position from track fit (m)
 
-    const WirePlane* fWirePlane; //! Pointer to parent wire plane
+    WirePlane* fWirePlane; //! Pointer to parent wire plane
 
-    ClassDef(Hit,0)        // Horizontal drift chamber hit
+#ifdef TESTCODE
+    Int_t    fCl;          // Neighboring wire also fired
+    Int_t    fMulti;       // Additional hits present on same wire
+    Double_t fTdiff;       // Time difference to previous multihit
+    friend void WirePlane::CheckCrosstalk();
+#endif
+
+    ClassDef(Hit,1)        // Horizontal drift chamber hit
   };
 
 
@@ -124,7 +124,7 @@ namespace TreeSearch {
   public:
     MCHit() : fMCTrack(0) {}
     MCHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
-	   const WirePlane* wp, MCTrack* mctrk, Double_t mcpos )
+	   WirePlane* wp, MCTrack* mctrk, Double_t mcpos )
       : Hit(wnum, pos, tdc, time, res, wp), fMCTrack(mctrk), fMCPos(mcpos) {}
     virtual ~MCHit() {}
 
@@ -137,7 +137,7 @@ namespace TreeSearch {
     MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
     Double_t fMCPos;       // Exact MC track crossing position (m)
 
-    ClassDef(MCHit,0)      // Monte Carlo hit in horizontal drift chamber
+    ClassDef(MCHit,1)      // Monte Carlo hit in horizontal drift chamber
   };
 
   //___________________________________________________________________________
@@ -197,6 +197,44 @@ namespace TreeSearch {
     HitPairIter();
 
     ClassDef(HitPairIter,0)  // Iterator over two lists of hits
+  };
+
+  //___________________________________________________________________________
+  // Coordinate information derived from fitting hits in a wire plane.
+  // A given raw Hit may be associated with zero or more FitCoord objects.
+
+  class FitCoord : public TObject {
+
+  public:
+    FitCoord( Hit* hit, Road* road, UInt_t ifit,
+	      Double_t pos, Double_t trackpos, Double_t trackslope ) 
+      : fHit(hit), fRoad(road), fFitRank(ifit), fPos(pos), fTrackPos(trackpos),
+	fTrackSlope(trackslope)
+    { assert(fHit&&fRoad); }
+    FitCoord() {} // For internal ROOT use
+    virtual ~FitCoord() {}
+
+    Double_t  GetChi2()       const;
+    Hit*      GetHit()        const { return fHit; }
+    Road*     GetRoad()       const { return fRoad; }
+    UInt_t    GetRank()       const { return fFitRank; }
+    Double_t  GetPos()        const { return fPos; }
+    Double_t  GetDriftDist()  const { return fHit->GetDriftDist(); }
+    Double_t  GetTrackPos()   const { return fTrackPos; }
+    Double_t  GetTrackSlope() const { return fTrackSlope; }
+    Double_t  GetTrackDist()  const { return fTrackPos-fHit->GetWirePos(); }
+    Double_t  GetResidual()   const { return fTrackPos-fPos; }
+
+  private:
+    Hit*      fHit;      // Decoded raw hit data
+    Road*     fRoad;     // Road that created this fit
+    UInt_t    fFitRank;  // Fit rank by chi2 within the road (0 = best)
+    Double_t  fPos;      // Uncorrected hit position (posL/R) used in fit (m)
+    Double_t  fTrackPos; // Track crossing position from original track fit (m)
+    Double_t  fTrackSlope; // Track slope from original track fit (m)
+    //TODO: add more members (for correction data etc)
+
+    ClassDef(FitCoord,1) // Coordinate information from road fit
   };
 
   //___________________________________________________________________________
