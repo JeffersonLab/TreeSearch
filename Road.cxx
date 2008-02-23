@@ -12,6 +12,7 @@
 #include "Hitpattern.h"
 #include "Hit.h"
 #include "WirePlane.h"
+#include "Helper.h"
 #include "TMath.h"
 #include "TBits.h"
 #include <iostream>
@@ -20,7 +21,7 @@
 
 using namespace std;
 
-ClassImp(TreeSearch::Road);
+ClassImp(TreeSearch::Road)
 
 namespace TreeSearch {
 
@@ -29,7 +30,6 @@ struct BuildInfo_t {
   Hset_t            fClusterHits;  // Hits common between all patterns
   vector<UShort_t>  fCornerBin;    // Bin numbers defining the corners
                                    // 0=LL, 1=LR, 2=UR, 3=UL 
-  //TODO: use fMaxdist[] ??
   BuildInfo_t() : fCornerBin(4,0)
   { fCornerBin[0] = fCornerBin[3] = kMaxUShort; }
 };
@@ -38,37 +38,38 @@ struct BuildInfo_t {
 static const vector<double>::size_type kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
 
-typedef vector<Road::Point*> Pvec_t;
-typedef vector<Pvec_t>::iterator vvpiter_t;
-typedef Pvec_t::iterator vpiter_t;
+typedef vector<Road::Point> Pvec_t;
+typedef vector<Road::Point*> Pvecp_t;
 typedef Hset_t::iterator siter_t;
 #define ALL(c) (c).begin(), (c).end()
 
 //_____________________________________________________________________________
-Road::Road( const Projection* proj ) :
-  fProjection(proj), fCornerX(kNcorner), fZL(0), fZU(0), fDof(0), fGood(false)
-#ifdef TESTCODE
-  , fSeed(0)
-#endif
+Road::Road( const Projection* proj ) 
+  : TObject(), fProjection(proj), fCornerX(kNcorner), fZL(0), fZU(0), 
+    fDof(0), fGood(false)
 {
   // Constructor
 
-  assert(fProjection);
+  assert(fProjection);  // Invalid Projection* pointer
 
   fBuild = new BuildInfo_t;
 }
 
 //_____________________________________________________________________________
-Road::Road( const Road& orig ) :
-  fProjection(orig.fProjection),
+Road::Road( const Road& orig ) : 
+  TObject(orig), fProjection(orig.fProjection),
   fCornerX(orig.fCornerX), fZL(orig.fZL), fZU(orig.fZU),
-  fPatterns(orig.fPatterns), fHits(orig.fHits), fFitData(orig.fFitData),
+  fPatterns(orig.fPatterns), fHits(orig.fHits),
   fDof(orig.fDof), fGood(orig.fGood)
-#ifdef TESTCODE
-  , fSeed(orig.fSeed)
-#endif
 {
   // Copy constructor
+
+  if( !orig.fFitData.empty() ) {
+    fFitData.reserve( orig.fFitData.size() );
+    for( vector<FitResult*>::const_iterator it = orig.fFitData.begin();
+	 it != orig.fFitData.end(); ++it )
+      fFitData.push_back( new FitResult( **it ));
+  }
 
   if( orig.fBuild )
     fBuild = new BuildInfo_t( *orig.fBuild );
@@ -82,19 +83,22 @@ Road& Road::operator=( const Road& rhs )
   // Print hit info
 
   if( this != &rhs ) {
-#ifdef TESTCODE
-    fSeed = rhs.fSeed;
-#endif
+    TObject::operator=(rhs);
     fProjection = rhs.fProjection;
     fCornerX    = rhs.fCornerX;
     fZL         = rhs.fZL;
     fZU         = rhs.fZU;
     fPatterns   = rhs.fPatterns;
     fHits       = rhs.fHits;
-    fFitData    = rhs.fFitData;
     fDof        = rhs.fDof;
     fGood       = rhs.fGood;
-
+    DeleteFitResults();
+    if( !rhs.fFitData.empty() ) {
+      fFitData.reserve( rhs.fFitData.size() );
+      for( vector<FitResult*>::const_iterator it = rhs.fFitData.begin();
+	   it != rhs.fFitData.end(); ++it )
+	fFitData.push_back( new FitResult( **it ));
+    }
     delete fBuild;
     if( rhs.fBuild )
       fBuild = new BuildInfo_t( *rhs.fBuild );
@@ -109,6 +113,7 @@ Road::~Road()
 {
   // Destructor
 
+  DeleteFitResults();
   delete fBuild;
 
 }
@@ -133,7 +138,7 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
   // or, if planes are missing, the pattern of missing planes is allowed
   // (based on what level of matching the user requests via the database)
 
-  assert(fBuild);
+  assert(fBuild);  // Not in build mode
 
   UInt_t curpat = 0;
   for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
@@ -152,8 +157,7 @@ Bool_t Road::Add( Node_t& nd )
   //
   // Adding only works as long as the road is not yet finished
 
-  if( !fBuild )
-    return kFALSE;
+  assert(fBuild);  // Add() again after Finish() not allowed
 
 #ifdef VERBOSE
   cout << "Adding:" << endl;
@@ -168,9 +172,6 @@ Bool_t Road::Add( Node_t& nd )
       return kFALSE;
     // A new road starts out with common hits and all hits that are the same
     fBuild->fClusterHits = fHits = nd.second.hits;
-#ifdef TESTCODE
-    fSeed = &nd;
-#endif
 #ifdef VERBOSE
     cout << "New cluster:" << endl;
     PrintHits( fBuild->fClusterHits );
@@ -282,7 +283,7 @@ void Road::Finish()
 {
   // Finish building the road
 
-  assert(fBuild);
+  assert(fBuild);   // Already Finish()ed
   for( list<Node_t*>::iterator it = fPatterns.begin();
        it != fPatterns.end(); ++it ) {
     
@@ -298,7 +299,14 @@ void Road::Finish()
 #endif
   }
 
-  // Calculate the corner coordinates
+  // Calculate the corner coordinates. We are building a polygon 
+  // with points in the order LL (lower left), LR, UR, UL, LL, as 
+  // needed for TMath::IsInside().
+  // NB: To include points just at the edge of a road, the width is
+  // increased by 2*(average hit position resolution of the plane)
+  // on each the left and the right sides.
+  // Also, the upper and lower edges are shifted up and down, respectively,
+  // so that the points on the planes are guaranteed to be included.
   const UInt_t np1 = fProjection->GetNplanes()-1;
   const UInt_t nl1 = fProjection->GetNlayers()-1;
   const Double_t resL = 2.0*fProjection->GetPlane(0)->GetResolution();
@@ -314,6 +322,9 @@ void Road::Finish()
   assert( fZL < fZU );
 
   // Apply correction for difference of layer-z and plane-z
+  // If the first or last plane are part of a layer, then the x-coordinates
+  // obtained from GetBinX above refers to the layer, not the plane. In that
+  // case, we project the polygon's sides to the correct z-position (plane z)
   Double_t dZlayer = fProjection->GetLayerZ(nl1) - fProjection->GetLayerZ(0);
   assert( dZlayer > 1e-3 );
   Double_t slopeL = ( fCornerX[3]-fCornerX[0] ) * (1.0/dZlayer);
@@ -356,44 +367,41 @@ void Road::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
-Bool_t Road::CollectCoordinates( vector<Point>& points,
-				 vector<Pvec_t>& planepoints )
+Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
 {
   // Gather hit positions that lie within the Road area
 
   assert( fCornerX.size() == kNcorner );
+  points.clear();
 
 #ifdef VERBOSE
   cout << "Collecting coordinates from: (" << fPatterns.size() << " patterns)"
        << endl;
   PrintHits( fHits );
-#ifdef TESTCODE
   cout << "Seed pattern: " << endl;
-  fSeed->first.Print();
-#endif
+  fPatterns.front()->first.Print();
 #endif
   Double_t zp[kNcorner] = { fZL, fZL, fZU, fZU, fZL };
   Bool_t good = true;
 
-  // Collect all hit coordinates that lie within the Road
+  // Collect the hit coordinates within this Road
   TBits planepattern;
   UInt_t last_np = kMaxUInt;
   for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
-    const Hit* hit = *it;
+    Hit* hit = const_cast<Hit*>(*it);
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetWirePlane()->GetPlaneNum();
     for( int i = 2; i--; ) {
       Double_t x = i ? hit->GetPosL() : hit->GetPosR();
-      if( TMath::IsInside(x, z, kNcorner, &fCornerX[0], zp) ) {
-	points.push_back( Point(x,z,hit->GetResolution(),np) );
+      if( TMath::IsInside( x, z, kNcorner, 
+			   const_cast<Double_t*>(&fCornerX[0]), zp )) {
 	// The hits are sorted by ascending plane number
 	if( np != last_np ) {
-	  planepoints.push_back( Pvec_t() );
+	  points.push_back( Pvec_t() );
 	  planepattern.SetBitNumber(np);
 	  last_np = np;
 	}
-	assert( !planepoints.empty() );
-	planepoints.back().push_back( &points.back() );
+	points.back().push_back( Point(x, z, hit) );
       }
     }
   }
@@ -407,18 +415,19 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
   
 #ifdef VERBOSE
   cout << "Collected:" << endl;
-  vvpiter_t ipl = planepoints.begin();
+  vector<Pvec_t>::iterator ipl = points.begin();
   for( UInt_t i = 0; i<fProjection->GetNplanes(); ++i ) {
     cout << " pl= " << i;
-    assert( ipl == planepoints.end() or !(*ipl).empty() );
-    if( ipl == planepoints.end() or i != (*ipl).front()->np )
+    assert( ipl == points.end() or !(*ipl).empty() );
+    if( ipl == points.end() 
+	or i != (*ipl).front().hit->GetWirePlane()->GetPlaneNum() )
       cout << " missing";
     else {
-      Double_t z = (*ipl).front()->z;
+      Double_t z = (*ipl).front().z;
       cout << " z=" << z << "\t x=";
-      for( vpiter_t it = (*ipl).begin(); it != (*ipl).end(); ++it ) {
-	cout << " " << (*it)->x;
-	assert( (*it)->z == z );
+      for( Pvec_t::iterator it = (*ipl).begin(); it != (*ipl).end(); ++it ) {
+	cout << " " << (*it).x;
+	assert( (*it).z == z );
       }
       ++ipl;
     }
@@ -431,87 +440,49 @@ Bool_t Road::CollectCoordinates( vector<Point>& points,
 }
 
 //_____________________________________________________________________________
-void Road::NthPermutation( UInt_t n, const vector<Pvec_t>& planepoints,
-			   Pvec_t& selected ) const
-{
-  // Get the n-th permutation of the points in planepoints and
-  // put result in selected. selected[k] is one of the
-  // planepoints[k].size() points in the k-th plane.
-  // The output vector the_points must be resized to planepoints.size()
-  // before calling this function.
-
-  assert( !planepoints.empty() and selected.size() == planepoints.size() );
-
-  UInt_t npl = planepoints.size(), k;
-  for( UInt_t j = npl; j--; ) {
-    vector<Pvec_t>::size_type npt = planepoints[j].size();
-    assert(npt);
-    if( npt == 1 )
-      k = 0;
-    else {
-      k = n % npt;
-      n /= npt;
-    }
-    selected[j] = planepoints[j][k];
-  }
-}
-
-//_____________________________________________________________________________
-// Get the product of the sizes of the vectors in a vector, ignoring empty ones
-template< typename VectorElem > struct SizeMul :
-    public std::binary_function< typename std::vector<VectorElem>::size_type, 
-				 std::vector<VectorElem>, 
-				 typename std::vector<VectorElem>::size_type >
-{
-  typedef typename std::vector<VectorElem>::size_type vsiz_t;
-  vsiz_t operator() ( vsiz_t val, const std::vector<VectorElem>& vec ) const {
-    return ( vec.empty() ? val : val * vec.size() );
-  }
-};
-
-//_____________________________________________________________________________
 Bool_t Road::Fit()
 {
 
-  //TODO: clear fit results?
   fGood = false;
-  vector<Point> points;
-  vector<Pvec_t> planepoints;
-  //TODO: do we need the points?
-  points.reserve( 2*fHits.size() );
-  planepoints.reserve( fProjection->GetNplanes() );
-  if( !CollectCoordinates(points, planepoints) )
+  DeleteFitResults();
+  vector<Pvec_t> points;
+  points.reserve( fProjection->GetNplanes() );
+  // Collect coordinates of hits that are within the width of the road
+  if( !CollectCoordinates(points) )
     return false;
 
   // Determine number of permutations
   //TODO: protect against overflow
-  UInt_t n_permutations = accumulate( ALL(planepoints),
-				      (UInt_t)1, SizeMul<Point*>() );
+  UInt_t n_permutations = accumulate( ALL(points),
+				      (UInt_t)1, SizeMul<Point>() );
   if( n_permutations > kMaxNhitCombos ) {
     // TODO: keep statistics
     return false;
   }
 
-  // Loop over permutations of hits in the planes
-  Pvec_t selected( planepoints.size(), 0 );
-  Pvec_t::size_type npts = selected.size();
+  // Loop over all combinations of hits in the planes
+  Pvec_t::size_type npts = points.size();
+  Pvecp_t selected;
   fDof = npts-2;
-  Projection::pdbl_t chi2_limit = fProjection->GetChisqLimits(fDof);
+  Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
+  Double_t* w = new Double_t[npts];
   for( UInt_t i = 0; i < n_permutations; ++i ) {
-    NthPermutation( i, planepoints, selected );
+    NthPermutation( i, points, selected );
     assert( selected.size() == npts );
 
-    // Fit the permutation. Note that we fit x = a1 + a2*z (z independent).
+    // Do linear fit of the points, assuming uncorrelated measurements (x_i)
+    // and different resolutions for each point.
+    // We fit x = a1 + a2*z (z independent).
     // Notation from: Review of Particle Properties, PRD 50, 1277 (1994)
     Double_t S11 = 0, S12 = 0, S22 = 0, G1 = 0, G2 = 0, chi2 = 0;
-    for( Pvec_t::size_type j = 0; j < npts; j++) {
+    for( Pvecp_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
-      register Double_t w = 1.0 / ( p->res * p->res );
-      S11 += w;
-      S12 += p->z * w;
-      S22 += p->z * p->z * w;
-      G1  += p->x * w;
-      G2  += p->x * p->z * w;
+      register Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
+      S11 += r;
+      S12 += p->z * r;
+      S22 += p->z * p->z * r;
+      G1  += p->x * r;
+      G2  += p->x * p->z * r;
     }
     Double_t D   = S11*S22 - S12*S12;
     Double_t iD  = 1.0/D;
@@ -519,38 +490,66 @@ Bool_t Road::Fit()
     Double_t a2  = (G2*S11 - G1*S12)*iD;  // Slope
     Double_t V11 = S22*iD;                // Intercept error
     Double_t V22 = S11*iD;                // Slope error
-    for( Pvec_t::size_type j = 0; j < npts; j++) {
+    for( Pvecp_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
-      register Double_t w = 1.0 / ( p->res * p->res );
       Double_t d = a1 + a2*p->z - p->x;
-      chi2 += d*d * w;
+      chi2 += d*d * w[j];
     }
 
 #ifdef VERBOSE
     cout << "Fit:"
 	 << " a1 = " << a1 << " (" << V11 << ")"
 	 << " a2 = " << a2 << " (" << V22 << ")"
-	 << " chi2/dof = " << chi2/fDof
+	 << " chi2/dof = " << chi2
 	 << endl;
 #endif
     // Throw out Chi2's outside of selected confidence interval
     // NB: Obviously, this requires accurate hit resolutions
     //TODO: keep statistics
-    if( chi2 < chi2_limit.first )
+    //TODO: allow disabling of low cutoff via database switch
+    if( chi2 < chi2_interval.first )
       continue;
-    if( chi2 > chi2_limit.second )
+    if( chi2 > chi2_interval.second )
       continue;
 #ifdef VERBOSE
     cout << "ACCEPTED" << endl;
 #endif
 
     // Save fits with acceptable Chi2
-    fFitData.insert( FitResult(a1,a2,chi2,V11,V22) );
-
-    //TODO: save pointer to hit(s) used, update hits, fill used hits array
+    fFitData.push_back( new FitResult(a1,a2,chi2,V11,V22) );
+    // Save points used for this fit
+    fFitData.back()->fFitCoordinates.swap( selected );
 
   }
+  delete [] w;
 
+  if( fFitData.empty() )
+    return false;
+
+  // Sort fit results by ascending chi2
+  sort( ALL(fFitData), FitResult::Chi2IsLess() );
+
+  // Copy best fit results to member variables
+  const FitResult* best = fFitData.front();
+  fPos   = best->fPos;
+  fSlope = best->fSlope;
+  fChi2  = best->fChi2;
+  
+  
+  // Save with the wire planes the hit coordinates used in the good fits 
+  for( vector<FitResult*>::size_type ifit = 0;
+       ifit < fFitData.size(); ++ifit ) {
+    Pvecp_t& coord = fFitData[ifit]->fFitCoordinates;
+    for( Pvecp_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
+      Point* p = *it;
+      WirePlane* wp = p->hit->GetWirePlane();
+      Double_t slope = fFitData[ifit]->fSlope;
+      Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
+	wp->AddFitCoord( FitCoord( p->hit, this, ifit, p->x, x_track, slope ));
+    }
+    // At this point, we don't need the saved pointers anymore
+    coord.clear();
+  }
 
   return (fGood = true);
 }
