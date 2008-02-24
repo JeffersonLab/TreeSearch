@@ -30,7 +30,7 @@ try
 
   fPatterns.resize( nPatterns );
   fLinks.resize( nLinks );
-  fBits.resize( nPatterns * fParameters.zpos.size() );
+  fBits.resize( nPatterns * fParameters.zpos().size() );
 
   fParamOK = true;
 }
@@ -77,26 +77,28 @@ Int_t TreeParam_t::Normalize()
 
   static const char* const here = "TreeParam_t::Normalize";
 
-  if( maxdepth >= 16 ) {
-    ::Error( here, "Illegal maxdepth = %u. Must be < 16", maxdepth );
+  if( fNormalized )  return 0;
+
+  if( fMaxdepth >= 16 ) {
+    ::Error( here, "Illegal maxdepth = %u. Must be < 16", fMaxdepth );
     return -1;
   }
-  if( width < 1e-2 ) {
+  if( fWidth < 1e-2 ) {
     ::Error( here, "Illegal detector width %lf. Must be >= 0.01.", 
-	     width );
+	     fWidth );
     return -2;
   }
-  if( zpos.size() < 3 || zpos.size() > 16 ) {
+  if( fZpos.size() < 3 || fZpos.size() > 16 ) {
     ::Error( here, "Illegal number of planes = %u. Must be between 3-16.",
-	     zpos.size() );
+	     fZpos.size() );
     return -3;
   }
-  if( maxslope < 0.0 )
-    maxslope = -maxslope;
+  if( fMaxslope < 0.0 )
+    fMaxslope = -fMaxslope;
 
-  // Check zpos array for sorting and minimum spacing
-  for( vector<Double_t>::size_type i = 1; i < zpos.size(); ++i ) {
-    if( zpos[i] < zpos[i-1] + 1e-3 ) {
+  // Check fZpos array for sorting and minimum spacing
+  for( vector<Double_t>::size_type i = 1; i < fZpos.size(); ++i ) {
+    if( fZpos[i] < fZpos[i-1] + 1e-3 ) {
       ::Error( here, "Array of z-positions not sorted or planes not "
 	       "spaced by at least 0.001 at index = %u.", i );
       return -4;
@@ -104,16 +106,19 @@ Int_t TreeParam_t::Normalize()
   }
 
   // Normalize the z-positions to the interval [0,1]
-  Double_t zsize = zpos.back() - zpos.front();
-  for( vector<Double_t>::size_type i = 1; i+1 < zpos.size(); ++i ) {
-    zpos[i] -= zpos.front();
-    zpos[i] /= zsize;
+  Double_t zsize = fZpos.back() - fZpos.front();
+  for( vector<Double_t>::size_type i = 1; i+1 < fZpos.size(); ++i ) {
+    fZpos[i] -= fZpos.front();
+    fZpos[i] /= zsize;
   }
-  zpos.back()  = 1.0;
-  zpos.front() = 0.0;
+  fZpos.back()  = 1.0;
+  fZpos.front() = 0.0;
 
   // Scale maxslope to the new aspect ratio
-  maxslope *= zsize / width;
+  fMaxslope *= zsize / fWidth;
+
+  // NB: the width is not changed because we need it later
+  fNormalized = true;
 
   return 0;
 }

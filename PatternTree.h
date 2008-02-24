@@ -18,13 +18,23 @@ using std::vector;
 
 namespace TreeSearch {
 
-  struct TreeParam_t {
-    UInt_t    maxdepth;
-    Double_t  width;
-    Double_t  maxslope;
-    vector<Double_t > zpos;
-
+  class TreeParam_t {
+  public:
+    TreeParam_t( UInt_t maxdepth, Double_t width, Double_t maxslope,
+		 const vector<Double_t>& zpos ) 
+      : fMaxdepth(maxdepth), fNormalized(false), fWidth(width),
+	fMaxslope(maxslope), fZpos(zpos) {}
     Int_t Normalize();
+    UInt_t   maxdepth() const { return fMaxdepth; }
+    Double_t width()    const { return fWidth; }
+    Double_t maxslope() const { return fMaxslope; }
+    const vector<Double_t>& zpos() const { return fZpos; }
+  private: 
+    UInt_t    fMaxdepth;    // Depth of tree
+    Bool_t    fNormalized;  // maxslope and zpos are normalized
+    Double_t  fWidth;       // Physical detector width (needed in Hitpattern)
+    Double_t  fMaxslope;    // Max slope (dx/dz) of tracks
+    vector<Double_t> fZpos; // z-positions of pattern planes (layers)
   };
 
   class PatternTree {
@@ -41,11 +51,11 @@ namespace TreeSearch {
     Int_t  Write( const char* filename );
 
     Bool_t IsOK()       const { return fParamOK; }
-    UInt_t GetNlevels() const { return fParameters.maxdepth+1; }
-    UInt_t GetNplanes() const { return fParameters.zpos.size(); }
+    UInt_t GetNlevels() const { return fParameters.maxdepth()+1; }
+    UInt_t GetNplanes() const { return fParameters.zpos().size(); }
     const TreeParam_t& GetParameters() const { return fParameters; }
     Link*  GetRoot() { return fLinks.empty() ? 0 : &fLinks.front(); }
-    Double_t GetWidth() const { return fParameters.width; }
+    Double_t GetWidth() const { return fParameters.width(); }
 
     // Copy an arbitrary tree into the PatternTree array structures
     class CopyPattern : public NodeVisitor {

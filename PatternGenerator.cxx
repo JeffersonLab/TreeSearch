@@ -240,10 +240,10 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
 
   DeleteTree();
 
-  fNlevels  = parameters.maxdepth+1;
-  fZ        = parameters.zpos;
+  fNlevels  = parameters.maxdepth()+1;
+  fZ        = parameters.zpos();
   fNplanes  = fZ.size();
-  fMaxSlope = parameters.maxslope;
+  fMaxSlope = parameters.maxslope();
 
   // Benchmark the build
   clock_t cpu_ticks = clock();
@@ -305,11 +305,7 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth,
 {
   // Convenience function for use at the command line and in scripts
 
-  TreeParam_t param;
-  param.maxdepth = maxdepth;
-  param.width    = detector_width;
-  param.maxslope = maxslope;
-  
+  vector<Double_t> zvec;
   TString zlist( zpos );
   TString tok;
   Ssiz_t pos = 0;
@@ -321,10 +317,10 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth,
 #else
     Double_t val = tok.Atof();
 #endif
-    param.zpos.push_back( val );
+    zvec.push_back( val );
   }
-
-  return Generate( param );
+  
+  return Generate( TreeParam_t( maxdepth, detector_width, maxslope, zvec ));
 }
 
 //_____________________________________________________________________________
