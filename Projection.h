@@ -49,8 +49,7 @@ namespace TreeSearch {
 
 
     Double_t        GetAngle() const;
-    const pdbl_t&   GetChisqLimits( UInt_t i ) const 
-    { assert( i < fChisqLimits.size() ); return fChisqLimits[i]; }
+    const pdbl_t&   GetChisqLimits( UInt_t i ) const;
     Double_t        GetConfLevel() const { return fConfLevel; }
     Double_t        GetCosAngle() const { return fCosAngle; }
     UInt_t          GetHitMaxDist() const { return fHitMaxDist; }
@@ -62,6 +61,7 @@ namespace TreeSearch {
     UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
     UInt_t          GetNlevels()  const { return fNlevels; }
     UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
+    UInt_t          GetNpatterns() const;
     UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
     Int_t           GetNroads()   const { return fRoads->GetLast()+1; }
     UInt_t          GetBinMaxDist() const { return fBinMaxDist; }
@@ -101,9 +101,9 @@ namespace TreeSearch {
 
     THaDetectorBase* fDetector;    //! Parent detector
 
-    // Patterns found by TreeSearch
-    std::map<const NodeDescriptor,HitSet> fPatternsFound;
-    TClonesArray*    fRoads;    // Roads found by MakeRoads
+    typedef std::map<const NodeDescriptor,HitSet> NodeMap_t;
+    NodeMap_t        fPatternsFound; // Patterns found by TreeSearch
+    TClonesArray*    fRoads;       // Roads found by MakeRoads
 
     TBits*           fPlaneCombos; // Allowed plane combos with missing hits
     TBits*           fLayerCombos; // Allowed layer combos with missing hits
@@ -114,11 +114,13 @@ namespace TreeSearch {
 
 #ifdef TESTCODE
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
-    UInt_t n_test, n_pat, n_roads, n_badroads;
+    UInt_t n_test, n_pat, n_roads, n_dupl, n_badfits;
     Double_t t_treesearch, t_roads, t_fit, t_track;
 #endif
 
-    void  SetAngle( Double_t a );
+    Bool_t  FitRoads();
+    Bool_t  RemoveDuplicateRoads();
+    void    SetAngle( Double_t a );
 
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
@@ -163,13 +165,28 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Double_t Projection::GetAngle() const {
+  Double_t Projection::GetAngle() const
+  {
     // Return wire angle in rad, normalized to [-pi,pi]
     Double_t a = TMath::ASin(fSinAngle);
     if( fCosAngle < 0.0 )
       return (fSinAngle > 0.0) ? TMath::TwoPi() - a : -TMath::TwoPi() - a;
   
     return a;
+  }
+
+  //___________________________________________________________________________
+  inline const Projection::pdbl_t& Projection::GetChisqLimits( UInt_t i ) const
+  { 
+    assert( i < fChisqLimits.size() );
+    return fChisqLimits[i];
+  }
+
+  //___________________________________________________________________________
+  inline
+  UInt_t Projection::GetNpatterns() const
+  {
+    return static_cast<UInt_t>( fPatternsFound.size() );
   }
 
 ///////////////////////////////////////////////////////////////////////////////

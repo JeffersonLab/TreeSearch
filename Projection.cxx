@@ -64,6 +64,8 @@ Projection::~Projection()
 {
   // Destructor
 
+  if( fIsSetup )
+    RemoveVariables();
   delete fRoads;
   delete fPatternTree;
   delete fHitpattern;
@@ -179,13 +181,11 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
 
   static const char* const here = "InitLevel2";
 
-  TreeParam_t tp;
-  tp.maxdepth = fNlevels-1;
-  tp.width = fWidth;
-  tp.maxslope = fMaxSlope;
+  vector<Double_t> zpos;
   for( UInt_t i = 0; i < GetNlayers(); ++i )
-    tp.zpos.push_back( GetLayerZ(i) );
-
+    zpos.push_back( GetLayerZ(i) );
+  TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
+		  
   if( tp.Normalize() != 0 )
     return fStatus = kInitError;
 
@@ -368,13 +368,15 @@ Int_t Projection::DefineVariables( EMode mode )
     { "maxhits_per_bin", "Max number of hits per bin", "maxhits_bin" },
     { "n_test", "Number of pattern comparisons", "n_test"  },
     { "n_pat", "Number of patterns found",   "n_pat"    },
-    { "n_roads", "Number of roads found",   "n_roads"    },
-    { "n_badroads", "Number of roads found",   "n_badroads"    },
+    { "n_roads", "Number of roads before filter",   "n_roads"    },
+    { "n_dupl",  "Number of duplicate roads removed",   "n_dupl"    },
+    { "n_badfits", "Number of roads found",   "n_badfits"    },
     { "t_treesearch", "Time in TreeSearch (us)", "t_treesearch" },
     { "t_roads", "Time in MakeRoads (us)", "t_roads" },
     { "t_fit", "Time for fitting Roads (us)", "t_fit" },
     { "t_track", "Total time in Track (us)", "t_track" },
 #endif
+    { "nroads", "Number of good roads",     "GetNroads()"      },
     { "rd.nfits", "Number of good fits in road",
                                      "fRoads.TreeSearch::Road.GetNfits()" },
     { "rd.pos",   "Fitted track origin (m)",
@@ -468,24 +470,17 @@ Int_t Projection::Track()
   gettimeofday( &start2, 0 );
 #endif
 
-  //TODO: check for identical or nearly identical roads
-
-  // Fit hits within each road. Store fit parameters with Road. 
-  // Also, store the hits & positions used by the best fit with Road.
-
-  // Erase roads with bad fits (too few planes occupied etc.)
   bool changed = false;
-  for( Int_t i = 0; i < GetNroads(); ++i ) {
-    assert( i<fRoads->GetSize() );
-    Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
-    if( !rd->Fit() ) {
-      fRoads->RemoveAt(i);
-      changed = true;
-#ifdef TESTCODE
-      ++n_badroads;
-#endif
-    }
-  }
+  // Check for indentical roads or roads that include each other
+  if( GetNroads() > 1 )
+    changed = RemoveDuplicateRoads();
+
+  // Fit hit positions in the roads to straight lines
+  if( FitRoads() )
+    changed = true;
+
+  // If any of the above routines removed any roads, compact the roads
+  // array. Gaps of zero pointers tend to be hazardous to your health...
   if( changed )
     fRoads->Compress();
 
@@ -509,7 +504,7 @@ Int_t Projection::MakeRoads()
   // This is the primary de-ghosting algorithm. It groups patterns with
   // common wires (not common hit positions!) in all planes together.
 
-  map<const NodeDescriptor,HitSet>::iterator it1, it2, ref_it1;
+  NodeMap_t::iterator it1, it2, ref_it1;
   for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
     Road::Node_t& nd1 = *it1;
@@ -558,6 +553,68 @@ Int_t Projection::MakeRoads()
        << "------------" << endl;
 #endif
   return 0;
+}
+
+//_____________________________________________________________________________
+Bool_t Projection::RemoveDuplicateRoads()
+{
+  // Check for indentical roads or roads that include each other
+
+  // This runs in ~O(N^2), but if N>1, it is typically only 2-3.
+  bool changed = false;
+  for( Int_t i = 0; i < GetNroads(); ++i ) {
+    Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
+    if( !rd )
+      continue;
+    for( Int_t j = i+1; j < GetNroads(); ++j ) {
+      Road* rd2 = static_cast<Road*>(fRoads->UncheckedAt(j));
+      if( !rd2 )
+	continue;
+      if( rd->Includes(rd2) ) {
+	Bool_t chk = rd->Adopt(rd2);
+	assert(chk);
+	if( chk ) {
+	  fRoads->RemoveAt(j);
+	  changed = true;
+#ifdef TESTCODE
+	  ++n_dupl;
+#endif
+	}
+      } else if( rd2->Includes(rd) ) {
+	Bool_t chk = rd2->Adopt(rd);
+	assert(chk);
+	if( chk ) {
+	  fRoads->RemoveAt(i);
+	  changed = true;
+#ifdef TESTCODE
+	  ++n_dupl;
+#endif
+	}
+      }
+    }
+  }
+  return changed;
+}
+
+//_____________________________________________________________________________
+Bool_t Projection::FitRoads()
+{
+  // Fit hits within each road. Store fit parameters with Road. 
+  // Also, store the hits & positions used by the best fit with Road.
+  bool changed = false;
+
+  for( Int_t i = 0; i < GetNroads(); ++i ) {
+    Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
+    if( rd && !rd->Fit() ) {
+      // Erase roads with bad fits (too few planes occupied etc.)
+      fRoads->RemoveAt(i);
+      changed = true;
+#ifdef TESTCODE
+      ++n_badfits;
+#endif
+    }
+  }
+  return changed;
 }
 
 //_____________________________________________________________________________
@@ -655,7 +712,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // Found a match at the bottom of the pattern tree.
     // Add the pattern descriptor to the set of matches,
     // ordered by start bin number (NodeDescriptor::operator<)
-    pair<map<const NodeDescriptor,HitSet>::iterator,bool> ins = 
+    pair<NodeMap_t::iterator,bool> ins =
       fMatches->insert( make_pair(nd,HitSet()) );
     assert(ins.second);  // duplicate matches should never happen
 
