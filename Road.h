@@ -35,11 +35,13 @@ namespace TreeSearch {
     virtual ~Road();
 
     Bool_t         Add( Node_t& nd );
+    Bool_t         Adopt( const Road* other );
     virtual Int_t  Compare( const TObject* obj ) const;
     void           Finish();
     Bool_t         Fit();
     Double_t       GetChi2( UInt_t ifit ) const;
     UInt_t         GetNfits() const { return (UInt_t)fFitData.size(); }
+    Bool_t         Includes( const Road* other ) const;
     Bool_t         IsGood() const { return fGood; }
     virtual Bool_t IsSortable () const { return kTRUE; }
     virtual void   Print( Option_t* opt="" ) const;

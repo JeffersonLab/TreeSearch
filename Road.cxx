@@ -45,8 +45,9 @@ typedef Hset_t::iterator siter_t;
 
 //_____________________________________________________________________________
 Road::Road( const Projection* proj ) 
-  : TObject(), fProjection(proj), fCornerX(kNcorner), fZL(0), fZU(0), 
-    fDof(0), fGood(false)
+  : TObject(), fProjection(proj), fCornerX(kNcorner), fZL(kBig), fZU(kBig), 
+    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(false),
+    fBuild(0)
 {
   // Constructor
 
@@ -60,6 +61,7 @@ Road::Road( const Road& orig ) :
   TObject(orig), fProjection(orig.fProjection),
   fCornerX(orig.fCornerX), fZL(orig.fZL), fZU(orig.fZU),
   fPatterns(orig.fPatterns), fHits(orig.fHits),
+  fPos(orig.fPos), fSlope(orig.fSlope), fChi2(orig.fChi2),
   fDof(orig.fDof), fGood(orig.fGood)
 {
   // Copy constructor
@@ -90,6 +92,9 @@ Road& Road::operator=( const Road& rhs )
     fZU         = rhs.fZU;
     fPatterns   = rhs.fPatterns;
     fHits       = rhs.fHits;
+    fPos        = rhs.fPos;
+    fSlope      = rhs.fSlope;
+    fChi2       = rhs.fChi2;
     fDof        = rhs.fDof;
     fGood       = rhs.fGood;
     DeleteFitResults();
@@ -222,7 +227,7 @@ Bool_t Road::Add( Node_t& nd )
       if( intersection.size() < nd.second.hits.size() ) {
 	if( !CheckMatch(intersection) ) {
 	  // The new pattern would reduce the set of common hits in the road to
-	  // too loose a fit, so we reject the new pattern and leave
+	  // too loose a match, so we reject the new pattern and leave
 	  // the road as it is
 #ifdef VERBOSE
 	  cout << "no longer a good plane pattern" << endl;
@@ -259,15 +264,11 @@ Bool_t Road::Add( Node_t& nd )
   fPatterns.push_back(&nd);
 
   // Expand the road limits if necessary
-  for( Int_t i = 0; i < 4; i++ ) {
-    UShort_t bin = ( i<2 ) ? nd.first.Start() : nd.first.End(); // lower:upper
-    if( i==1 or i==2 )
-      // "right" edges
-      fBuild->fCornerBin[i] = TMath::Max( bin, fBuild->fCornerBin[i] );
-    else
-      // "left" edges
-      fBuild->fCornerBin[i] = TMath::Min( bin, fBuild->fCornerBin[i] );
-  }
+  fBuild->fCornerBin[0] = TMath::Min( nd.first.Start(), fBuild->fCornerBin[0]);
+  fBuild->fCornerBin[1] = TMath::Max( nd.first.Start(), fBuild->fCornerBin[1]);
+  fBuild->fCornerBin[2] = TMath::Max( nd.first.End(), fBuild->fCornerBin[2] );
+  fBuild->fCornerBin[3] = TMath::Min( nd.first.End(), fBuild->fCornerBin[3] );
+
 #ifdef VERBOSE
   cout << "new npat = " << fPatterns.size() << endl;
   cout << "new left/right = "
@@ -279,11 +280,38 @@ Bool_t Road::Add( Node_t& nd )
 }
 
 //_____________________________________________________________________________
+Bool_t Road::Adopt( const Road* other )
+{
+  // Widen the road if necessary to include the other road.
+  // This only affects the fCornerX data of this road.
+  // Returns false and does nothing if the roads are not compatible.
+
+  assert( other && !fBuild );
+  if( fBuild )
+    return false;
+
+  // Verify that z-limits agree and x-ranges overlap
+  const Double_t eps = 1e-6;
+  if( TMath::Abs(fZL-other->fZL) > eps or TMath::Abs(fZU-other->fZU) > eps or
+      other->fCornerX[1] < fCornerX[0] or fCornerX[1] < other->fCornerX[0] or
+      other->fCornerX[2] < fCornerX[3] or fCornerX[2] < other->fCornerX[3] )
+    return false;
+  
+  fCornerX[0] = TMath::Min( fCornerX[0], other->fCornerX[0] );
+  fCornerX[1] = TMath::Max( fCornerX[1], other->fCornerX[1] );
+  fCornerX[2] = TMath::Max( fCornerX[2], other->fCornerX[2] );
+  fCornerX[3] = TMath::Min( fCornerX[3], other->fCornerX[3] );
+  fCornerX[4] = fCornerX[0];
+
+  return true;
+}
+
+//_____________________________________________________________________________
 void Road::Finish()
 {
   // Finish building the road
 
-  assert(fBuild);   // Already Finish()ed
+  assert(fBuild);   // Road must be incomplete to be able to Finish()
   for( list<Node_t*>::iterator it = fPatterns.begin();
        it != fPatterns.end(); ++it ) {
     
@@ -360,10 +388,13 @@ Double_t Road::GetBinX( UInt_t bin ) const
 }
 
 //_____________________________________________________________________________
-void Road::Print( Option_t* opt ) const
+Bool_t Road::Includes( const Road* other ) const
 {
-  // Print road info
+  // Check if all the hits in the given other road are also present in this one
 
+  assert( other && !fBuild );
+
+  return includes( ALL(fHits), ALL(other->fHits), fHits.key_comp() );
 }
 
 //_____________________________________________________________________________
@@ -552,6 +583,13 @@ Bool_t Road::Fit()
   }
 
   return (fGood = true);
+}
+
+//_____________________________________________________________________________
+void Road::Print( Option_t* opt ) const
+{
+  // Print road info
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
