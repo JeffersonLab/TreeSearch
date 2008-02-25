@@ -9,6 +9,7 @@
 
 #include "THaTrackingDetector.h"
 #include "THaDetMap.h"
+#include "Types.h"
 #include <vector>
 
 class THaTrack;
@@ -23,10 +24,6 @@ namespace TreeSearch {
   class Projection;
 
   extern const Double_t kBig;
-
-  // Types of projections supported by the MWDC. See also operator++ below
-  enum EProjType { kUndefinedType = -1, kUPlane, kTypeBegin = kUPlane,
-		   kVPlane, kXPlane, kTypeEnd };
 
   class MWDC : public THaTrackingDetector {
     friend class WirePlane;
@@ -84,21 +81,6 @@ namespace TreeSearch {
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
-
-  // Overloaded operator++ allows us to iterate over the EProjType enum.
-  inline
-  EProjType& operator++( EProjType& e )
-  { switch(e) { 
-    case kUndefinedType: return e=kUPlane;
-    case kUPlane: return e=kVPlane;
-    case kVPlane: return e=kXPlane;
-    case kXPlane: return e=kTypeEnd;
-    case kTypeEnd: default: return e=kUndefinedType;
-    }
-  }
-  inline
-  const EProjType operator++( EProjType e, int )
-  { EProjType r(e); ++e; return r; }
 
 }
 

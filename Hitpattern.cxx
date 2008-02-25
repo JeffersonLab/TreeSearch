@@ -10,6 +10,7 @@
 #include "PatternTree.h"
 #include "TError.h"
 #include "TMath.h"
+#include "MWDC.h"
 
 #include <iostream>
 #include <stdexcept>

@@ -9,7 +9,7 @@
 
 #include "THaSubDetector.h"
 #include "TClonesArray.h"
-#include "MWDC.h"
+#include "Types.h"
 #include <vector>
 #include <string>
 #include <cassert>
