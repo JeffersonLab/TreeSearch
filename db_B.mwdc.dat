@@ -40,15 +40,18 @@ B.mwdc.cratemap =  3     6       21      1877   500     96  \
 #-----------------------------------------------------------
 
 B.mwdc.wire.spacing = 0.01
-B.mwdc.xp.res = 2.5e-04
+# B.mwdc.xp.res = 2.5e-04
 B.mwdc.drift.min = 0
 B.mwdc.drift.max = 150
 B.mwdc.timecut = 1
 B.mwdc.pairsonly = 0
 B.mwdc.ttd.converter = LinearTTD
 
-B.mwdc.maxmiss = 2
+B.mwdc.maxmiss = 1
 B.mwdc.req1of2 = 1
+B.mwdc.u2.required = 1
+B.mwdc.v2.required = 1
+B.mwdc.x2.required = 1
 
 #-----------------------------------------------------------
 #   U PLANES
@@ -69,6 +72,7 @@ B.mwdc.u1.position  = 0.0 0.0 0.0
 B.mwdc.u1.size      = 1.4 0.35 0.0
 B.mwdc.u1.wire.pos  = -0.7025
 B.mwdc.u1.ttd.param = 4.487e04
+B.mwdc.u1.xp.res    = 2.9e-4
 B.mwdc.u1.tdc.offsets = \
  758 \
  758 758 758 758 758 758 758 758 758 758 \
@@ -101,6 +105,7 @@ B.mwdc.u1p.position  = 0.0  0.0  0.0064
 B.mwdc.u1p.size      = 1.4  0.35 0.0
 B.mwdc.u1p.wire.pos  = -0.6975
 B.mwdc.u1p.ttd.param = 4.506e04
+B.mwdc.u1p.xp.res    = 2.9e-4
 B.mwdc.u1p.tdc.offsets = \
  758 \
  758 758 758 758 758 758 758 758 758 758 \
@@ -137,6 +142,7 @@ B.mwdc.u2.position  = 0.0  0.0  0.3598
 B.mwdc.u2.size      = 2.0  0.5  0.0
 B.mwdc.u2.wire.pos  = -0.99271
 B.mwdc.u2.ttd.param = 4.276e04
+B.mwdc.u2.xp.res    = 3.2e-4
 B.mwdc.u2.tdc.offsets = \
  999 \
  999 999 999 999 999 999 999 999 999 999 \
@@ -180,6 +186,7 @@ B.mwdc.u3.position  = 0.0  0.0  0.74435
 B.mwdc.u3.size      = 2.0  0.5  0.0
 B.mwdc.u3.wire.pos  = -1.0023
 B.mwdc.u3.ttd.param = 4.306e04
+B.mwdc.u3.xp.res    = 2.6e-4
 B.mwdc.u3.tdc.offsets = \
  780 \
  780 780 780 780 780 780 780 780 780 780 \
@@ -223,6 +230,7 @@ B.mwdc.u3p.position  = 0.0  0.0  0.73845   #ummm.. z(u3p) < z(u3)?!?
 B.mwdc.u3p.size      = 2.0  0.5  0.0
 B.mwdc.u3p.wire.pos  = -0.9973
 B.mwdc.u3p.ttd.param = 4.18e04
+B.mwdc.u3p.xp.res    = 2.6e-4
 B.mwdc.u3p.tdc.offsets = \
  775 \
  775 775 775 775 775 775 775 775 775 775 \
@@ -263,6 +271,7 @@ B.mwdc.x1.position  = 0.0  0.0  0.0128
 B.mwdc.x1.size      = 1.4  0.35 0.0
 B.mwdc.x1.wire.pos  = -0.7025
 B.mwdc.x1.ttd.param = 4.726e04
+B.mwdc.x1.xp.res    = 2.7e-4
 B.mwdc.x1.tdc.offsets = \
  754 \
  754 754 754 754 754 754 754 754 754 754 \
@@ -296,6 +305,7 @@ B.mwdc.x1p.position  = 0.0  0.0  0.022375
 B.mwdc.x1p.size      = 1.4  0.35 0.0
 B.mwdc.x1p.wire.pos  = -0.7075
 B.mwdc.x1p.ttd.param = 4.627e04
+B.mwdc.x1p.xp.res    = 2.7e-4
 B.mwdc.x1p.tdc.offsets = \
  757 \
  757 757 757 757 757 757 757 757 757 757 \
@@ -333,6 +343,7 @@ B.mwdc.x2.position  = 0.0  0.0  0.3662
 B.mwdc.x2.size      = 2.0  0.5  0.0
 B.mwdc.x2.wire.pos  = -0.9975
 B.mwdc.x2.ttd.param = 4.409e04
+B.mwdc.x2.xp.res    = 3.2e-4
 B.mwdc.x2.tdc.offsets = \
  999 \
  999 999 999 999 999 999 999 999 999 999 \
@@ -376,6 +387,7 @@ B.mwdc.x3.position  = 0.0  0.0  0.73155
 B.mwdc.x3.size      = 2.0  0.5  0.0
 B.mwdc.x3.wire.pos  = -1.01358
 B.mwdc.x3.ttd.param = 4.3e04
+B.mwdc.x3.xp.res    = 2.5e-4
 B.mwdc.x3.tdc.offsets = \
  775 \
  775 775 775 775 775 775 775 775 775 775 \
@@ -419,6 +431,7 @@ B.mwdc.x3p.position  = 0.0  0.0  0.7178   # urgh:  z< z_previous!
 B.mwdc.x3p.size      = 2.0  0.5 0.0
 B.mwdc.x3p.wire.pos  = -1.00851
 B.mwdc.x3p.ttd.param = 4.305e04
+B.mwdc.x3p.xp.res    = 2.5e-4
 B.mwdc.x3p.tdc.offsets = \
  769 \
  769 769 769 769 769 769 769 769 769 769 \
@@ -460,6 +473,7 @@ B.mwdc.v1.position  = 0.0  0.0  0.028775
 B.mwdc.v1.size      = 1.4  0.35 0.0
 B.mwdc.v1.wire.pos  = -0.7025
 B.mwdc.v1.ttd.param = 4.464e04
+B.mwdc.v1.xp.res    = 2.75e-4
 B.mwdc.v1.tdc.offsets = \
  762 \
  762 762 762 762 762 762 762 762 762 762 \
@@ -492,6 +506,7 @@ B.mwdc.v1p.position  = 0.0  0.0  0.035175
 B.mwdc.v1p.size      = 1.4  0.35 0.0
 B.mwdc.v1p.wire.pos  = -0.6975
 B.mwdc.v1p.ttd.param = 4.609e04
+B.mwdc.v1p.xp.res    = 2.75e-4
 B.mwdc.v1p.tdc.offsets = \
  760 \
  760 760 760 760 760 760 760 760 760 760 \
@@ -528,6 +543,7 @@ B.mwdc.v2.position  = 0.0  0.0  0.3825
 B.mwdc.v2.size      = 2.0  0.5  0.0
 B.mwdc.v2.wire.pos  = -0.9939
 B.mwdc.v2.ttd.param = 4.396e04
+B.mwdc.v2.xp.res    = 3.2e-4
 B.mwdc.v2.tdc.offsets = \
  999 \
  999 999 999 999 999 999 999 999 999 999 \
@@ -571,6 +587,7 @@ B.mwdc.v3.position  = 0.0  0.0  0.7109
 B.mwdc.v3.size      = 2.0  0.5  0.0
 B.mwdc.v3.wire.pos  = -1.00305
 B.mwdc.v3.ttd.param = 4.37e04
+B.mwdc.v3.xp.res    = 2.6e-4
 B.mwdc.v3.tdc.offsets = \
  780 \
  780 780 780 780 780 780 780 780 780 780 \
@@ -614,6 +631,7 @@ B.mwdc.v3p.position  = 0.0  0.0  0.705   #NB: z < z_previous
 B.mwdc.v3p.size      = 2.0  0.5  0.0
 B.mwdc.v3p.wire.pos  = -0.99805
 B.mwdc.v3p.ttd.param = 4.171e04
+B.mwdc.v3p.xp.res    = 2.6e-4
 B.mwdc.v3p.tdc.offsets = \
  773 \
  773 773 773 773 773 773 773 773 773 773 \
