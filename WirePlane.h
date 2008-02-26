@@ -63,6 +63,7 @@ namespace TreeSearch {
     Int_t           GetNcoords()  const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum() const { return fPlaneNum; }
     UInt_t          GetLayerNum() const { return fLayerNum; }
+    Bool_t          IsRequired()  const { return false; } //TODO: use user bit
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
     void            SetLayerNum( UInt_t n ) { fLayerNum = n; }

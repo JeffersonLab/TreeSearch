@@ -14,6 +14,7 @@
 #include "PatternGenerator.h"
 #include "TreeWalk.h"
 #include "Road.h"
+#include "Helper.h"
 
 #include "TMath.h"
 #include "TString.h"
@@ -38,9 +39,11 @@ typedef vector<WirePlane*>::iterator  vwiter_t;
 Projection::Projection( Int_t type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
-    fMaxSlope(0.0), fWidth(0.0),
-    fHitpattern(0), fPatternTree(0), fDetector(parent), fRoads(0),
-    fPlaneCombos(0), fLayerCombos(0)
+    fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
+    fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
+    fPlaneCombos(0), fLayerCombos(0),
+    fHitMaxDist(1), fBinMaxDist(kMaxUInt), fConfLevel(1.0),
+    fHitpattern(0), fRoads(0)
 {
   // Constructor
 
@@ -244,51 +247,90 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
   }    
   fBinMaxDist = TMath::CeilNint( dx * fHitpattern->GetBinScale() );
 
-  // Set up the lookup table indicating which planes are allowed to have 
-  // missing hits. The bit pattern of plane hits is used as an index into
-  // this table; if the corresponding bit is set, the plane combo is allowed.
-
-  delete fPlaneCombos;
-  UInt_t np = 1U<<GetNplanes();
-  fPlaneCombos = new TBits( np );
-  // For starters, allow any one plane to be missing
-  // TODO: read from database and allow more complex patterns
-  UInt_t allbits = np-1;
-  fPlaneCombos->SetBitNumber( allbits );
-  while(np>>=1)
-    fPlaneCombos->SetBitNumber( allbits ^ np );
-
-  delete fLayerCombos;
-  UInt_t nl = 1U<<GetNlayers();
-  fLayerCombos = new TBits( nl );
-  // Allow any one layer to be missing. However, layers made up of 
-  // partnered planes must always be present
-  //TODO: read from database
-  allbits = nl-1;
-  fLayerCombos->SetBitNumber( allbits );
-//   for( UInt_t i=GetNlayers(); i; ) {
-//     nl >>= 1;
-//     WirePlane* wp = fLayers[--i];
-//     if( !wp->GetPartner() )
-//       fLayerCombos->SetBitNumber( allbits ^ nl );
-//   }
-
-  // Determine Chi2 confidence interval limits for the selected CL and the
-  // possible degrees of freedom (1...nplanes-2)
-  fChisqLimits.clear();
-  fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
-  for( vec_pdbl_t::size_type dof = 1; dof < fChisqLimits.size(); ++dof ) {
-    fChisqLimits[dof].first = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
-    fChisqLimits[dof].second = TMath::ChisquareQuantile( fConfLevel, dof );
-  }
-  
+  // Check range of fMinFitPlanes (minimum number of planes require for fit)
+  // and fMaxMiss (maximum number of missing planes allowed in a hitpattern).
+  // This is here instead of in ReadDatabase because we need GetNplanes()
   if( fMinFitPlanes < 3 || fMinFitPlanes > GetNplanes() ) {
     Error( Here(here), "Illegal number of required planes for fitting = %u. "
 	   "Must be >= 3 and <= %u. "
 	   "Fix database.", fMinFitPlanes, GetNplanes() );
     return kInitError;
   }
+  if( fMaxMiss > GetNplanes()-1 ) {
+    Error( Here(here), "Illegal number of allowed missing planes = %u. "
+	   "Must be <= %u. Fix database.", fMaxMiss, GetNplanes()-1 );
+    return kInitError;
+  }
+  // There cannot be so many planes missing that we don't have at least
+  // fMinFitPlanes left
+  UInt_t maxmiss = GetNplanes()-fMinFitPlanes;
+  if( fMaxMiss > maxmiss ) {
+    Warning( Here(here), "Allowed number of missing planes = %u reduced to %u "
+	     "to satisfy min_fit_planes = %u.  Fix database.", 
+	     fMaxMiss, maxmiss, fMinFitPlanes );
+    fMaxMiss = maxmiss;
+  }
 
+  // Set up the lookup bitpattern indicating which planes are allowed to have 
+  // missing hits. The value of the bit pattern of plane hits is used as an
+  // index into this table; if the corresponding bit is set, the plane 
+  // combination is allowed.
+  delete fPlaneCombos;
+  UInt_t np = 1U<<GetNplanes();
+  fPlaneCombos = new TBits( np );
+  fPlaneCombos->SetBitNumber( np-1 );  // Always allow full occupancy
+  for( UInt_t i = 1; i <= fMaxMiss; ++i ) {
+    UniqueCombo c( GetNplanes(), i );
+    while( c ) {
+      // Clear the bit numbers from this combination
+      UInt_t bitval = np-1;
+      for( vector<int>::size_type j = 0; j < c().size(); ++j )
+	bitval &= ~( 1U << c()[j] );
+      // Test if this pattern satisfies other constraints
+      UInt_t k = 0;
+      for( ; k < GetNplanes(); ++k ) {
+	// Disallow bit pattern if a required plane is missing
+	if( 0 == (bitval & (1U<<k)) and fPlanes[k]->IsRequired() )
+	  break;
+	// If requested, ensure that at least one plane of a plane pair is set
+	if( fRequire1of2 and fPlanes[k]->GetPartner() and
+	    0 == (bitval & (1U<<k)) and
+	    0 == (bitval & (1U<<fPlanes[k]->GetPartner()->GetPlaneNum())) )
+	  break;
+      }
+      assert( bitval < np );
+      if( k == GetNplanes() )
+	fPlaneCombos->SetBitNumber( bitval );
+      ++c;
+    }
+  }
+
+  delete fLayerCombos;
+  UInt_t nl = 1U<<GetNlayers();
+  fLayerCombos = new TBits( nl );
+  // Build the layer patterns from the plane patterns
+  for( UInt_t planeval = (1U<<GetNplanes()); planeval; ) {
+    if( fPlaneCombos->TestBitNumber( --planeval ) ) {
+      UInt_t layerval = 0;
+      for( UInt_t i = 0; i < GetNplanes(); ++i ) {
+	if( planeval & (1U<<i) )
+	  layerval |= 1U << fPlanes[i]->GetLayerNum();
+      }
+      assert( layerval < nl );
+      fLayerCombos->SetBitNumber( layerval );
+    }
+  }
+
+  // Determine Chi2 confidence interval limits for the selected CL and the
+  // possible degrees of freedom (minfit-2...nplanes-2)
+  fChisqLimits.clear();
+  fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
+  for( vec_pdbl_t::size_type dof = fMinFitPlanes-2;
+       dof < fChisqLimits.size(); ++dof ) {
+    fChisqLimits[dof].first = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
+    fChisqLimits[dof].second = TMath::ChisquareQuantile( fConfLevel, dof );
+  }
+  
   return fStatus = kOK;
 }
 
@@ -308,14 +350,18 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   Double_t angle = kBig;
   fHitMaxDist = 1;
   fMinFitPlanes = 3;
+  fMaxMiss = 0;
   fConfLevel = 0.999;
+  Int_t req1of2 = 1;
   const DBRequest request[] = {
     { "angle",           &angle,         kDouble, 0, 1 },
     { "maxslope",        &fMaxSlope,     kDouble, 0, 1, -1 },
     { "search_depth",    &fNlevels,      kUInt,   0, 0, -1 },
-    { "cluster_maxdist", &fHitMaxDist  , kUInt,   0, 1, -1 },
-    { "min_fit_planes",  &fMinFitPlanes, kUInt  , 0, 1, -1 },
-    { "chi2_conflevel",  &fConfLevel  ,  kDouble, 0, 1, -1 },
+    { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, -1 },
+    { "min_fit_planes",  &fMinFitPlanes, kUInt,   0, 1, -1 },
+    { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, -1 },
+    { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, -1 },
+    { "req1of2",         &req1of2,       kInt,    0, 1, -1 },
     { 0 }
   };
 
@@ -346,6 +392,8 @@ Int_t Projection::ReadDatabase( const TDatime& date )
 	   "Must be 0-1. Fix database.", fConfLevel );
     return kInitError;
   }
+
+  fRequire1of2 = (req1of2 != 0);
 
   fIsInit = kTRUE;
   return kOK;
@@ -476,8 +524,7 @@ Int_t Projection::Track()
     changed = RemoveDuplicateRoads();
 
   // Fit hit positions in the roads to straight lines
-  if( FitRoads() )
-    changed = true;
+  changed |= FitRoads();
 
   // If any of the above routines removed any roads, compact the roads
   // array. Gaps of zero pointers tend to be hazardous to your health...

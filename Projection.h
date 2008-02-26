@@ -83,36 +83,43 @@ namespace TreeSearch {
 
   protected:
     typedef std::vector<pdbl_t> vec_pdbl_t;
+    typedef std::map<const NodeDescriptor,HitSet> NodeMap_t;
 
-    Int_t           fType;        // Type of plane (u,v,x,y...)
+    // Configuration
+    Int_t            fType;          // Type of plane (u,v,x,y...)
     std::vector<WirePlane*> fPlanes; // Wire planes in this projection
     std::vector<WirePlane*> fLayers; // Effective detector planes (wp pairs)
-    UInt_t          fNlevels;     // Number of levels of search tree
-    Double_t        fMaxSlope;    // Maximum physical track slope (0=perp)
-    Double_t        fWidth;       // Width of tracking region (m)
-    Double_t        fSinAngle;    // Sine of wire angle
-    Double_t        fCosAngle;    // Cosine of wire angle
-    UInt_t          fHitMaxDist;  // Max allowed distance between hits for
-                                  // clustering patterns into roads
-    UInt_t          fBinMaxDist;  // Search distance for MakeRoads
+    UInt_t           fNlevels;       // Number of levels of search tree
+    Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
+    Double_t         fWidth;         // Width of tracking region (m)
+    Double_t         fSinAngle;      // Sine of wire angle
+    Double_t         fCosAngle;      // Cosine of wire angle
+    THaDetectorBase* fDetector;      //! Parent detector
+    PatternTree*     fPatternTree;   // Precomputed template database
 
-    Hitpattern*     fHitpattern;  // Hitpattern of current event
-    PatternTree*    fPatternTree; // Precomputed template database
+    // Plane occupancy parameters
+    UInt_t           fMinFitPlanes;  // Min num of planes required for fitting
+    UInt_t           fMaxMiss;       // Allowed number of missing planes
+    Bool_t           fRequire1of2;   // Require one plane of a plane pair
+    TBits*           fPlaneCombos;   // Allowed plane combos with missing hits
+    TBits*           fLayerCombos;   // Allowed layer combos with missing hits
 
-    THaDetectorBase* fDetector;    //! Parent detector
+    // Road construction control
+    UInt_t           fHitMaxDist;    // Max allowed distance between hits for
+                                     // clustering patterns into roads
+    UInt_t           fBinMaxDist;    // Search distance for MakeRoads
 
-    typedef std::map<const NodeDescriptor,HitSet> NodeMap_t;
+    // Fit statistics cut parameters
+    Double_t         fConfLevel;     // Requested confidence level for chi2 cut
+    vec_pdbl_t       fChisqLimits;   // lo/hi onfidence interval limits on Chi2
+
+    // Rsults
+    Hitpattern*      fHitpattern;    // Hitpattern of current event
     NodeMap_t        fPatternsFound; // Patterns found by TreeSearch
-    TClonesArray*    fRoads;       // Roads found by MakeRoads
-
-    TBits*           fPlaneCombos; // Allowed plane combos with missing hits
-    TBits*           fLayerCombos; // Allowed layer combos with missing hits
-
-    UInt_t           fMinFitPlanes;// Min number of planes required for fitting
-    Double_t         fConfLevel;   // Requested confidence level for chi2 cut
-    vec_pdbl_t       fChisqLimits; // lo/hi onfidence interval limits on Chi2
+    TClonesArray*    fRoads;         // Roads found by MakeRoads
 
 #ifdef TESTCODE
+    // Statistics
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
     UInt_t n_test, n_pat, n_roads, n_dupl, n_badfits;
     Double_t t_treesearch, t_roads, t_fit, t_track;

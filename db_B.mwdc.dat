@@ -47,6 +47,9 @@ B.mwdc.timecut = 1
 B.mwdc.pairsonly = 0
 B.mwdc.ttd.converter = LinearTTD
 
+B.mwdc.maxmiss = 2
+B.mwdc.req1of2 = 1
+
 #-----------------------------------------------------------
 #   U PLANES
 #-----------------------------------------------------------
