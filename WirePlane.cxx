@@ -291,11 +291,15 @@ Int_t WirePlane::DefineVariables( EMode mode )
     { "ncoords",     "Num fit coords",     "GetNcoords()" },
     { "coord.rank",  "Fit rank of coord",
                                 "fFitCoords.TreeSearch::FitCoord.fFitRank" },
-    { "coord.pos",   "Uncorr coord pos (m)",
+    { "coord.time", "Drift time of hit (s)",
+                          "fFitCoords.TreeSearch::FitCoord.GetDriftTime()" },
+    { "coord.dist", "Drift distance of hit (m)",
+                          "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
+    { "coord.pos",   "Position used in uncorrected fit (m)",
                                     "fFitCoords.TreeSearch::FitCoord.fPos" },
-    { "coord.trkpos","Track pos from fit (m)",
+    { "coord.trkpos","Track pos from uncorrected fit (m)",
                                "fFitCoords.TreeSearch::FitCoord.fTrackPos" },
-    { "coord.trkslope","Track slope from fit",
+    { "coord.trkslope","Track slope from uncorrected fit",
                              "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },
     { "coord.chi2",  "Chi2 of this coord's fit",
                                "fFitCoords.TreeSearch::FitCoord.GetChi2()" },
@@ -303,11 +307,6 @@ Int_t WirePlane::DefineVariables( EMode mode )
                            "fFitCoords.TreeSearch::FitCoord.GetResidual()" },
     { "coord.trkdist", "Distance of trkpos to wire (m)",
                           "fFitCoords.TreeSearch::FitCoord.GetTrackDist()" },
-    { "coord.driftdist", "Drift distance of hit (m)",
-                          "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
-    //TODO: need
-    // - coord.driftdist
-    // - coord.slope
 #ifdef TESTCODE
     { "nmiss",       "Decoder misses",     "fNmiss" },
     { "nrej",        "Time cut nopass",    "fNrej" },
@@ -381,7 +380,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   // Default values for optional parameters
   fMinTime = -kBig;
   fMaxTime =  kBig;
-
+  Int_t required = 0;
   const DBRequest request[] = {
     { "detmap",        detmap,        kIntV },
     { "nwires",        &fNelem,       kInt },
@@ -395,7 +394,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "description",   &fTitle,       kTString, 0, 1 },
     { "drift.min",     &fMinTime,     kDouble,  0, 1, -1 },
     { "drift.max",     &fMaxTime,     kDouble,  0, 1, -1 },
-    //    { "maxhits",       &fMaxHits,     kInt,     0, 1, -1 },
+    { "required",      &required,     kInt,     0, 1 },
     { 0 }
   };
 
@@ -508,6 +507,9 @@ ttderr:
 	   "%s. Fix database.", name.Data(), names.Data() );
     return kInitError;
   }
+
+  if( required )
+    SetBit( kIsRequired );
 
   fIsInit = true;
   return kOK;

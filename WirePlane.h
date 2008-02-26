@@ -63,7 +63,7 @@ namespace TreeSearch {
     Int_t           GetNcoords()  const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum() const { return fPlaneNum; }
     UInt_t          GetLayerNum() const { return fLayerNum; }
-    Bool_t          IsRequired()  const { return false; } //TODO: use user bit
+    Bool_t          IsRequired()  const { return TestBit(kIsRequired); }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
     void            SetLayerNum( UInt_t n ) { fLayerNum = n; }
@@ -131,7 +131,12 @@ namespace TreeSearch {
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
 
-    ClassDef(WirePlane,0)    // One MWDC wire plane
+    // Bits for WirePlanes
+    enum {
+      kIsRequired   = BIT(14)  // Tracks must have a hit in this plane
+    };
+
+    ClassDef(WirePlane,0)      // One MWDC wire plane
   };
 }
 

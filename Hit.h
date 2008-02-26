@@ -219,6 +219,7 @@ namespace TreeSearch {
     Road*     GetRoad()       const { return fRoad; }
     UInt_t    GetRank()       const { return fFitRank; }
     Double_t  GetPos()        const { return fPos; }
+    Double_t  GetDriftTime()  const { return fHit->GetDriftTime(); }
     Double_t  GetDriftDist()  const { return fHit->GetDriftDist(); }
     Double_t  GetTrackPos()   const { return fTrackPos; }
     Double_t  GetTrackSlope() const { return fTrackSlope; }
