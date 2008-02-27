@@ -38,8 +38,7 @@ struct BuildInfo_t {
 static const vector<double>::size_type kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
 
-typedef vector<Road::Point> Pvec_t;
-typedef vector<Road::Point*> Pvecp_t;
+typedef vector<Road::Point*> Pvec_t;
 typedef Hset_t::iterator siter_t;
 #define ALL(c) (c).begin(), (c).end()
 
@@ -97,7 +96,7 @@ Road& Road::operator=( const Road& rhs )
     fChi2       = rhs.fChi2;
     fDof        = rhs.fDof;
     fGood       = rhs.fGood;
-    DeleteFitResults();
+    DeleteContainer( fFitData );
     if( !rhs.fFitData.empty() ) {
       fFitData.reserve( rhs.fFitData.size() );
       for( vector<FitResult*>::const_iterator it = rhs.fFitData.begin();
@@ -118,7 +117,7 @@ Road::~Road()
 {
   // Destructor
 
-  DeleteFitResults();
+  DeleteContainer( fFitData );
   delete fBuild;
 
 }
@@ -400,10 +399,14 @@ Bool_t Road::Includes( const Road* other ) const
 //_____________________________________________________________________________
 Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
 {
-  // Gather hit positions that lie within the Road area
+  // Gather hit positions that lie within the Road area.
+  // Return true if the plane occupancy pattern of the selected points 
+  // is allowed by Projection::fPlaneCombos, otherwise false.
+  // If true is returned, the caller must delete the elements of the 
+  // returned vector, otherwise the vector is empty.
 
   assert( fCornerX.size() == kNcorner );
-  points.clear();
+  DeleteContainerOfContainers( points );
 
 #ifdef VERBOSE
   cout << "Collecting coordinates from: (" << fPatterns.size() << " patterns)"
@@ -432,7 +435,7 @@ Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
 	  planepattern.SetBitNumber(np);
 	  last_np = np;
 	}
-	points.back().push_back( Point(x, z, hit) );
+	points.back().push_back( new Point(x, z, hit) );
       }
     }
   }
@@ -451,31 +454,42 @@ Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
     cout << " pl= " << i;
     assert( ipl == points.end() or !(*ipl).empty() );
     if( ipl == points.end() 
-	or i != (*ipl).front().hit->GetWirePlane()->GetPlaneNum() )
+	or i != (*ipl).front()->hit->GetWirePlane()->GetPlaneNum() )
       cout << " missing";
     else {
-      Double_t z = (*ipl).front().z;
+      Double_t z = (*ipl).front()->z;
       cout << " z=" << z << "\t x=";
       for( Pvec_t::iterator it = (*ipl).begin(); it != (*ipl).end(); ++it ) {
-	cout << " " << (*it).x;
-	assert( (*it).z == z );
+	cout << " " << (*it)->x;
+	assert( (*it)->z == z );
       }
       ++ipl;
     }
     cout << endl;
   }
-  if( !good )
+#endif
+  if( !good ) {
+    DeleteContainerOfContainers( points );
+#ifdef VERBOSE
     cout << "REJECTED" << endl;
 #endif
+  }
   return good;
 }
 
 //_____________________________________________________________________________
 Bool_t Road::Fit()
 {
+  // Collect hit positions within the Road limits and, if enough points
+  // found, fit them to a straight line. If several points found in one
+  // or more planes, fit all possible combinations of them.
+  // Fit results with acceptable chi2 (Projection::fChisqLimits) are
+  // sorted into fFitData, lowest chi2 first.
 
   fGood = false;
-  DeleteFitResults();
+
+
+  DeleteContainer( fFitData );
   vector<Pvec_t> points;
   points.reserve( fProjection->GetNplanes() );
   // Collect coordinates of hits that are within the width of the road
@@ -484,21 +498,22 @@ Bool_t Road::Fit()
 
   // Determine number of permutations
   //TODO: protect against overflow
-  UInt_t n_permutations = accumulate( ALL(points),
-				      (UInt_t)1, SizeMul<Point>() );
-  if( n_permutations > kMaxNhitCombos ) {
+  UInt_t n_combinations = accumulate( ALL(points),
+				      (UInt_t)1, SizeMul<Point*>() );
+  if( n_combinations > kMaxNhitCombos ) {
     // TODO: keep statistics
+    DeleteContainerOfContainers( points );
     return false;
   }
 
   // Loop over all combinations of hits in the planes
   Pvec_t::size_type npts = points.size();
-  Pvecp_t selected;
+  Pvec_t selected;
   fDof = npts-2;
   Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
   Double_t* w = new Double_t[npts];
-  for( UInt_t i = 0; i < n_permutations; ++i ) {
-    NthPermutation( i, points, selected );
+  for( UInt_t i = 0; i < n_combinations; ++i ) {
+    NthCombination( i, points, selected );
     assert( selected.size() == npts );
 
     // Do linear fit of the points, assuming uncorrelated measurements (x_i)
@@ -506,7 +521,7 @@ Bool_t Road::Fit()
     // We fit x = a1 + a2*z (z independent).
     // Notation from: Review of Particle Properties, PRD 50, 1277 (1994)
     Double_t S11 = 0, S12 = 0, S22 = 0, G1 = 0, G2 = 0, chi2 = 0;
-    for( Pvecp_t::size_type j = 0; j < npts; j++) {
+    for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
       register Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
       S11 += r;
@@ -521,7 +536,7 @@ Bool_t Road::Fit()
     Double_t a2  = (G2*S11 - G1*S12)*iD;  // Slope
     Double_t V11 = S22*iD;                // Intercept error
     Double_t V22 = S11*iD;                // Slope error
-    for( Pvecp_t::size_type j = 0; j < npts; j++) {
+    for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
       Double_t d = a1 + a2*p->z - p->x;
       chi2 += d*d * w[j];
@@ -554,8 +569,11 @@ Bool_t Road::Fit()
   }
   delete [] w;
 
-  if( fFitData.empty() )
+  if( fFitData.empty() ) {
+    //TODO: keep statistics
+    DeleteContainerOfContainers( points );
     return false;
+  }
 
   // Sort fit results by ascending chi2
   sort( ALL(fFitData), FitResult::Chi2IsLess() );
@@ -566,12 +584,11 @@ Bool_t Road::Fit()
   fSlope = best->fSlope;
   fChi2  = best->fChi2;
   
-  
   // Save with the wire planes the hit coordinates used in the good fits 
   for( vector<FitResult*>::size_type ifit = 0;
        ifit < fFitData.size(); ++ifit ) {
-    Pvecp_t& coord = fFitData[ifit]->fFitCoordinates;
-    for( Pvecp_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
+    Pvec_t& coord = fFitData[ifit]->fFitCoordinates;
+    for( Pvec_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
       Point* p = *it;
       WirePlane* wp = p->hit->GetWirePlane();
       Double_t slope = fFitData[ifit]->fSlope;
@@ -582,6 +599,7 @@ Bool_t Road::Fit()
     coord.clear();
   }
 
+  DeleteContainerOfContainers( points );
   return (fGood = true);
 }
 

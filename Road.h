@@ -103,8 +103,7 @@ namespace TreeSearch {
     BuildInfo_t* fBuild; //! Working data for building
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
-    Bool_t   CollectCoordinates( std::vector< std::vector<Point> >& ) const;
-    void     DeleteFitResults();
+    Bool_t   CollectCoordinates( std::vector< std::vector<Point*> >& ) const;
     Double_t GetBinX( UInt_t bin ) const;
 
     ClassDef(Road,1)  // Region containing track candidate hits and fit results
@@ -127,18 +126,6 @@ namespace TreeSearch {
     return 0;
   }
 
-  //---------------------------------------------------------------------------
-  inline
-  void Road::DeleteFitResults()
-  {
-    // Delete all elements of fFitData
-
-    for( std::vector<FitResult*>::iterator it = fFitData.begin();
-	 it != fFitData.end(); ++it )
-      delete *it;
-    fFitData.clear();
-  }
-  
   //---------------------------------------------------------------------------
   inline
   Double_t Road::GetChi2( UInt_t ifit ) const

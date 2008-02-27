@@ -18,15 +18,13 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   template< typename VectorElem > void 
-  NthPermutation( UInt_t n, 
+  NthCombination( UInt_t n, 
 		  std::vector<std::vector<VectorElem> >& vec,
-		  std::vector<VectorElem*>& selected )
+		  std::vector<VectorElem>& selected )
   {
     // Get the n-th permutation of the elements in vec and
     // put result in selected. selected[k] is one of the
     // vec[k].size() elements in the k-th plane.
-    // The output vector the_points must be resized to vec.size()
-    // before calling this function.
 
     assert( !vec.empty() );
 
@@ -41,8 +39,8 @@ namespace TreeSearch {
 	k = n % npt;
 	n /= npt;
       }
-      // Put pointer to selected element in result
-      selected[j] = &vec[j][k];
+      // Copy the selected element
+      selected[j] = vec[j][k];
     }
   }
 
@@ -55,7 +53,7 @@ namespace TreeSearch {
     // Function object to get the product of the sizes of the vectors in a 
     // vector, ignoring empty ones
     typedef typename std::vector<VectorElem>::size_type vsiz_t;
-    vsiz_t operator() ( vsiz_t val, const std::vector<VectorElem>& vec ) const 
+    vsiz_t operator() ( vsiz_t val, const std::vector<VectorElem>& vec ) const
     { return ( vec.empty() ? val : val * vec.size() ); }
   };
 
@@ -100,6 +98,29 @@ namespace TreeSearch {
     bool   fGood;
   };
 
+  //___________________________________________________________________________
+  template< typename Container >
+  void DeleteContainer( Container& c )
+  {
+    // Delete all elements of given container of pointers
+    for( typename Container::iterator it = c.begin(); it != c.end(); ++it ) {
+      delete *it;
+    }
+    c.clear();
+  }
+
+  //___________________________________________________________________________
+  template< typename ContainerOfContainers >
+  void DeleteContainerOfContainers( ContainerOfContainers& cc )
+  {
+    // Delete all elements of given container of containers of pointers
+    for( typename ContainerOfContainers::iterator it = cc.begin();
+	 it != cc.end(); ++it ) {
+      DeleteContainer( *it );
+    }
+    cc.clear();
+  }
+  
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch
