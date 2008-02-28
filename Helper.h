@@ -18,8 +18,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   template< typename VectorElem > void 
-  NthCombination( UInt_t n, 
-		  std::vector<std::vector<VectorElem> >& vec,
+  NthCombination( UInt_t n, std::vector<std::vector<VectorElem> >& vec,
 		  std::vector<VectorElem>& selected )
   {
     // Get the n-th permutation of the elements in vec and
@@ -45,16 +44,15 @@ namespace TreeSearch {
   }
 
   //___________________________________________________________________________
-  template< typename VectorElem > struct SizeMul :
-    public std::binary_function< typename std::vector<VectorElem>::size_type, 
-				 std::vector<VectorElem>, 
-				 typename std::vector<VectorElem>::size_type >
+  template< typename Container > struct SizeMul :
+    public std::binary_function< typename Container::size_type, Container,
+				 typename Container::size_type >
   {
-    // Function object to get the product of the sizes of the vectors in a 
-    // vector, ignoring empty ones
-    typedef typename std::vector<VectorElem>::size_type vsiz_t;
-    vsiz_t operator() ( vsiz_t val, const std::vector<VectorElem>& vec ) const
-    { return ( vec.empty() ? val : val * vec.size() ); }
+    // Function object to get the product of the sizes of the containers in a 
+    // container, ignoring empty ones
+    typedef typename Container::size_type csiz_t;
+    csiz_t operator() ( csiz_t val, const Container& c ) const
+    { return ( c.empty() ? val : val * c.size() ); }
   };
 
   //___________________________________________________________________________

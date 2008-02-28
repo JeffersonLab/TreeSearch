@@ -499,7 +499,7 @@ Bool_t Road::Fit()
   // Determine number of permutations
   //TODO: protect against overflow
   UInt_t n_combinations = accumulate( ALL(points),
-				      (UInt_t)1, SizeMul<Point*>() );
+				      (UInt_t)1, SizeMul<Pvec_t>() );
   if( n_combinations > kMaxNhitCombos ) {
     // TODO: keep statistics
     DeleteContainerOfContainers( points );
@@ -507,7 +507,7 @@ Bool_t Road::Fit()
   }
 
   // Loop over all combinations of hits in the planes
-  Pvec_t::size_type npts = points.size();
+  vector<Pvec_t>::size_type npts = points.size();
   Pvec_t selected;
   fDof = npts-2;
   Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
