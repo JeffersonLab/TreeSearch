@@ -12,10 +12,15 @@
 B.mwdc.planeconfig = u1 u1p x1 x1p v1 v1p \
                      u2 x2 v2 \
                      u3 u3p x3 x3p v3 v3p
-B.mwdc.search_depth = 11
+B.mwdc.search_depth = 10
 B.mwdc.maxslope = 2.5
-B.mwdc.u.angle = -60.0
-B.mwdc.v.angle = 60.0
+
+# Wire angles. Specify the angle of the _normal_ to the wires, pointing
+# along the direction of increasing wire number. Positive angles mean 
+# rotation from x towards y (so the y-axis is at +90deg).
+B.mwdc.u.angle = 30.0
+B.mwdc.v.angle = -30.0
+B.mwdc.x.angle = 0.0
 
 
 # "Crate map" for the MWDC. Specifies DAQ module configuration.
