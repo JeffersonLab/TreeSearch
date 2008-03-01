@@ -139,7 +139,7 @@ namespace TreeSearch {
   class CountPattern : public NodeVisitor {
   public:
     CountPattern() : fCount(0) {}
-    virtual ETreeOp operator() ( const NodeDescriptor& nd )
+    virtual ETreeOp operator() ( const NodeDescriptor& )
     { fCount++; return kRecurse; }
     ULong64_t GetCount() const { return fCount; }
 

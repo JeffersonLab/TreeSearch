@@ -62,7 +62,7 @@ Double_t Hit::GetZ() const
 }
 
 //_____________________________________________________________________________
-void MCHit::Print( Option_t* opt ) const
+void MCHit::Print( Option_t* ) const
 {
   // Print hit info
 

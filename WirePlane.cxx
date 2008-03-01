@@ -91,8 +91,8 @@ void WirePlane::Clear( Option_t* opt )
 {    
   // Clear event-by-event data (hits)
 
-  fHits->Clear();
-  fFitCoords->Clear();
+  fHits->Clear(opt);
+  fFitCoords->Clear(opt);
 #ifdef TESTCODE
   fWasSorted = 0;
   fNmiss = fNrej = fNhitwires = fNmultihit = fNmaxmul = 0;
@@ -533,7 +533,7 @@ void WirePlane::SetPartner( WirePlane* p )
 }
 
 //_____________________________________________________________________________
-void WirePlane::Print( Option_t* opt ) const
+void WirePlane::Print( Option_t* ) const
 {    
   // Print plane info
 

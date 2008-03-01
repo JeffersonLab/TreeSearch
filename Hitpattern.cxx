@@ -161,7 +161,7 @@ void Hitpattern::AddHit( UInt_t plane, UInt_t bin, Hit* hit ) {
 }
 
 //_____________________________________________________________________________
-void Hitpattern::Clear( Option_t* opt )
+void Hitpattern::Clear( Option_t* )
 {
   // Clear the hitpattern
 
@@ -312,7 +312,7 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 
 
 //_____________________________________________________________________________
-void Hitpattern::Print( Option_t* opt ) const
+void Hitpattern::Print( Option_t* ) const
 {
   // Print basic info about hitpattern.
 

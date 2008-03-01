@@ -26,8 +26,8 @@ namespace TreeSearch {
     virtual Double_t ConvertTimeToDist( Double_t time, 
 					Double_t slope ) const = 0;
             Int_t    GetNparam() const { return fNparam; }
-    virtual Double_t GetParameter( UInt_t i ) const { return kBig; }
-    virtual Int_t    SetParameters( const vector<double>& param ) { return 0; }
+    virtual Double_t GetParameter( UInt_t ) const { return kBig; }
+    virtual Int_t    SetParameters( const vector<double>& ) { return 0; }
 
   protected:
 
