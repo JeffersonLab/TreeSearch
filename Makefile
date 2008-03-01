@@ -12,8 +12,8 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 
 #------------------------------------------------------------------------------
 # Compile debug version
-#export DEBUG = 1
-#export VERBOSE = 1
+export DEBUG = 1
+export VERBOSE = 1
 export TESTCODE = 1
 export I387MATH = 1
 export EXTRAWARN = 1
@@ -84,7 +84,7 @@ endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
 ifdef EXTRAWARN
-CXXFLAGS     += -Wextra -Wno-unused-parameter -Wno-missing-field-initializers 
+CXXFLAGS     += -Wextra -Wno-missing-field-initializers 
 endif
 LD            = g++
 SOFLAGS       = -shared
