@@ -8,12 +8,14 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Hit.h"
+#include "TVector2.h"
 #include <set>
 #include <utility>
 #include <vector>
 #include <list>
 #include <functional>
 #include <cassert>
+#include <cstring>
 
 namespace TreeSearch {
 
@@ -39,9 +41,14 @@ namespace TreeSearch {
     virtual Int_t  Compare( const TObject* obj ) const;
     void           Finish();
     Bool_t         Fit();
-    Double_t       GetChi2( UInt_t ifit ) const;
+    Double_t       GetChi2( UInt_t ifit=0 ) const;
     UInt_t         GetNfits() const { return (UInt_t)fFitData.size(); }
-    Bool_t         Includes( const Road* other ) const;
+    Double_t       GetPos     ( Double_t z = 0 ) const;
+    Double_t       GetPosErrsq( Double_t z = 0 ) const;
+    const Projection* GetProjection() const { return fProjection; }
+    Double_t       GetSlope() const { return fSlope; }
+    Bool_t         Includes ( const Road* other ) const;
+    TVector2       Intersect( const Road* other, Double_t z ) const;
     Bool_t         IsGood() const { return fGood; }
     virtual Bool_t IsSortable () const { return kTRUE; }
     virtual void   Print( Option_t* opt="" ) const;
@@ -70,12 +77,11 @@ namespace TreeSearch {
     
     // Fit results
     struct FitResult {
-      Double_t  fPos, fSlope, fChi2, fPosErr, fSlopeErr;
+      Double_t fPos, fSlope, fChi2, fV[3];
       std::vector<Point*>   fFitCoordinates;
-      FitResult( Double_t pos, Double_t slope, Double_t chi2,
-		 Double_t pos_err, Double_t slope_err )
-	: fPos(pos), fSlope(slope), fChi2(chi2),
-	  fPosErr(pos_err), fSlopeErr(slope_err) {}
+      FitResult( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov )
+	: fPos(pos), fSlope(slope), fChi2(chi2)
+      { assert(cov); memcpy(fV, cov, 3*sizeof(Double_t)); }
       FitResult() {}
       // Sort fit results by ascending chi2
       bool operator<( const FitResult& rhs ) const 
@@ -95,6 +101,7 @@ namespace TreeSearch {
     Double_t  fPos;      // Track origin
     Double_t  fSlope;    // Track slope
     Double_t  fChi2;     // Chi2 of fit
+    Double_t  fV[3];     // Covariance matrix of param (V11, V12=V21, V22)
     UInt_t    fDof;      // Degrees of freedom of fit (nhits-2)
 
     Bool_t    fGood;     // Road successfully built and fit
@@ -130,9 +137,27 @@ namespace TreeSearch {
   inline
   Double_t Road::GetChi2( UInt_t ifit ) const
   {
-    // Return chi2 of i-th fit
+    // Return unnormalized chi2 of the i-th fit
     assert( ifit < GetNfits() );
     return fFitData[ifit]->fChi2;
+  }
+
+  //---------------------------------------------------------------------------
+  inline
+  Double_t Road::GetPos( Double_t z ) const
+  {
+    // Return x = a1+a2*z for best fit (in m)
+    
+    return fPos + z*fSlope;
+  }
+
+  //---------------------------------------------------------------------------
+  inline
+  Double_t Road::GetPosErrsq( Double_t z ) const
+  {
+    // Return square of uncertainty in x = a1+z2*z for best fit (in m^2)
+    
+    return fV[0] + 2.0*fV[1]*z + fV[2]*z*z;
   }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -15,6 +15,7 @@
 #include "TreeWalk.h"
 #include "Road.h"
 #include "Helper.h"
+#include "Hit.h"
 
 #include "TMath.h"
 #include "TString.h"
@@ -101,7 +102,7 @@ void Projection::AddPlane( WirePlane* wp, WirePlane* partner )
 }
 
 //_____________________________________________________________________________
-void Projection::Clear( Option_t* opt )
+void Projection::Clear( Option_t* )
 {    
   // Clear event-by-event data
 
@@ -178,7 +179,7 @@ Double_t Projection::GetLayerZ( UInt_t i ) const
 }
 
 //_____________________________________________________________________________
-THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& date )
+THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
 {
   // Level-2 initialization - load pattern database and initialize hitpattern
 
@@ -424,7 +425,7 @@ Int_t Projection::DefineVariables( EMode mode )
     { "t_fit", "Time for fitting Roads (us)", "t_fit" },
     { "t_track", "Total time in Track (us)", "t_track" },
 #endif
-    { "nroads", "Number of good roads",     "GetNroads()"      },
+    { "nroads", "Number of good roads",     "fNgoodRoads"      },
     { "rd.nfits", "Number of good fits in road",
                                      "fRoads.TreeSearch::Road.GetNfits()" },
     { "rd.pos",   "Fitted track origin (m)",
@@ -609,11 +610,11 @@ Bool_t Projection::RemoveDuplicateRoads()
 
   // This runs in ~O(N^2), but if N>1, it is typically only 2-3.
   bool changed = false;
-  for( Int_t i = 0; i < GetNroads(); ++i ) {
+  for( UInt_t i = 0; i < GetNroads(); ++i ) {
     Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
     if( !rd )
       continue;
-    for( Int_t j = i+1; j < GetNroads(); ++j ) {
+    for( UInt_t j = i+1; j < GetNroads(); ++j ) {
       Road* rd2 = static_cast<Road*>(fRoads->UncheckedAt(j));
       if( !rd2 )
 	continue;
@@ -650,7 +651,7 @@ Bool_t Projection::FitRoads()
   // Also, store the hits & positions used by the best fit with Road.
   bool changed = false;
 
-  for( Int_t i = 0; i < GetNroads(); ++i ) {
+  for( UInt_t i = 0; i < GetNroads(); ++i ) {
     Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
     if( rd && !rd->Fit() ) {
       // Erase roads with bad fits (too few planes occupied etc.)

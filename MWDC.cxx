@@ -13,14 +13,22 @@
 #include "MWDC.h"
 #include "WirePlane.h"
 #include "Projection.h"
+#include "Hit.h"
+#include "Road.h"
+#include "Helper.h"
+
 #include "TString.h"
 #include "TMath.h"
 #include "THaDetMap.h"
 #include "THaEvData.h"
 #include "THashTable.h"
+#include "TVector2.h"
 
-#include <algorithm>
 #include <iostream>
+#include <algorithm>
+#include <numeric>
+#include <map>
+#include <utility>
 
 using namespace std;
 typedef string::size_type ssiz_t;
@@ -63,7 +71,7 @@ public:
     m->fCrate = fCrate; m->fSlot = fSlot; m->fModel = fModel;
     m->fResolution = fResolution, m->fNchan = fNchan;
   }
-  virtual void Print( Option_t* opt="" ) const {
+  virtual void Print( Option_t* ) const {
     cout << "DAQmodule: "
 	 << " crate = " << fCrate
 	 << " slot = "  << fSlot
@@ -87,13 +95,17 @@ typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<WirePlane*>::iterator vwiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
+typedef vector<Road*> Rvec_t;
+
+#define ALL(c) (c).begin(), (c).end()
 
 // Global constant indicating invalid/uninitialized data
 const Double_t kBig = 1e38;
 
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
-  : THaTrackingDetector(name,desc,app), fCrateMap(0)
+  : THaTrackingDetector(name,desc,app), fCrateMap(0),
+    f3dSimpleMatch(false), f3dMatchvalScalefact(1), f3dMatchCut(0)
 { 
   // Constructor
 
@@ -102,8 +114,9 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   // Set up the projection objects (describing wire planes of same type)
   fProj.resize( kTypeEnd, 0 );
   // Default plane angles and names. Angles can be overridden via the database
-  Double_t p_angle[]   = { -60.0, 60.0, 90.0 };
-  const char* p_name[] = { "u", "v", "x" };
+  Double_t p_angle[]   = { -60.0, 60.0, 0.0, 90.0 };
+  //FIXME: the names should be part of the enum
+  const char* p_name[] = { "u", "v", "x", "y" };
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* proj = new Projection( type, 
 				       p_name[type], 
@@ -127,10 +140,10 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
 MWDC::~MWDC()
 {
   // Destructor. Delete objects & subdetectors and unregister variables
- if (fIsSetup)
-   RemoveVariables();
+  if (fIsSetup)
+    RemoveVariables();
   
- //  delete fBench;
+  //  delete fBench;
 
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     delete fPlanes[iplane];
@@ -207,16 +220,135 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 //_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
+  // Find tracks from the hitpatterns, using the coarse hit drift times
+  // uncorrected for track slope, timing offset, fringe field effects etc.
+
+  vector<Rvec_t>::size_type nproj = 0;
+  vector<Rvec_t> roads;
+  roads.reserve( kTypeEnd-kTypeBegin );
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+    Projection* proj = fProj[type];
+
+    // For each projection separately, do TreeSearch, build roads, and
+    // fit tracks to uncorrected hit positions
+    proj->Track();
+
+    if( proj->GetNgoodRoads() > 0 ) {
+      // Count number of projections with at least one road
+      ++nproj;
+      // Add pointers to the good roads to the appropriate vector
+      roads.push_back( Rvec_t() );
+      roads.back().reserve( proj->GetNgoodRoads() );
+      for( UInt_t i = 0; i < proj->GetNroads(); ++i ) {
+	Road* rd = proj->GetRoad(i);
+	assert(rd);
+	if( rd->IsGood() )
+	  roads.back().push_back(rd);
+      }
+    }
+  }
+  assert( roads.size() == nproj );
+
+  // Combine track projections to 3D tracks
+  // The standard method requires at least 3 projections. This helps reject
+  // noise and, if there is more than one u or v road, correlates u and v
+  if( nproj >= 3 ) {
+    multimap<Double_t,Rvec_t> proj_combos;
+    TVector2 xax( fProj[kTypeBegin+2]->GetCosAngle(),
+		  fProj[kTypeBegin+2]->GetSinAngle() ); // for n==3 algo
+    Rvec_t selected;
+    selected.reserve(nproj);
+    UInt_t n_combos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
+    for( UInt_t i = 0; i < n_combos; ++i ) {
+      NthCombination( i, roads, selected );
+      assert( selected.size() == nproj );
+
+      Double_t matchval = 0.0;
+      Double_t zback = fPlanes.back()->GetZ();
+      if( f3dSimpleMatch ) {
+	assert( nproj == 3 );
+	// special case n==3 and symmetric angles of planes 0 and 1:
+	//  - intersect first two proj in front and back
+	//  - calc perp distances to 3rd, add in quadrature -> matchval
+
+	TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
+	TVector2 back  = selected[0]->Intersect( selected[1], zback );
+	TVector2 xf    = selected[2]->GetPos(0.0)   * xax;
+	TVector2 xb    = selected[2]->GetPos(zback) * xax;
+ 	TVector2 d1    = front.Proj(xax) - xf;
+ 	TVector2 d2    = back.Proj(xax)  - xb;
+ 	matchval = ( d1.Mod2() + d2.Mod2() ) * f3dMatchvalScalefact;
+      } else {
+	// general algorithm:
+	//  - find all front and back intersections [ n(n-1)/2 each ] 
+	//  - compute center of gravity of intersection points
+	//  - sum dist^2 of points to center of gravity -> matchval
+	vector<TVector2> fxpts, bxpts;
+	fxpts.reserve( nproj*(nproj-1)/2 );
+	bxpts.reserve( nproj*(nproj-1)/2 );
+	TVector2 fctr, bctr;
+	for( Rvec_t::iterator it1 = selected.begin();
+	     it1 != selected.end(); ++it1 ) {
+	  for( Rvec_t::iterator it2 = it1+1; it2 != selected.end(); ++it2 ) {
+	    fxpts.push_back( (*it1)->Intersect(*it2, 0.0) );
+	    bxpts.push_back( (*it1)->Intersect(*it2, zback) );
+	    fctr += fxpts.back();
+	    bctr += bxpts.back();
+#ifdef VERBOSE
+	    cout << (*it1)->GetProjection()->GetName()
+		 << (*it2)->GetProjection()->GetName()
+		 << " front(" << fxpts.size() << ") = ";
+	    fxpts.back().Print();
+	    cout << (*it1)->GetProjection()->GetName()
+		 << (*it2)->GetProjection()->GetName()
+		 << " back (" << bxpts.size() << ") = ";
+	    bxpts.back().Print();
+#endif
+	  }
+	}
+	assert( fxpts.size() == nproj*(nproj-1)/2 );
+	assert( bxpts.size() == fxpts.size() );
+	Double_t norm = 1.0/static_cast<Double_t>( fxpts.size() );
+	fctr *= norm;
+	bctr *= norm;
+#ifdef VERBOSE
+	cout << "fctr = "; fctr.Print();
+	cout << "bctr = "; bctr.Print();
+#endif
+	for( vector<TVector2>::size_type k = 0; k < fxpts.size(); ++k ) {
+	  matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
+	}
+      }
+
+      // Map of proj combos sorted by matchval
+      if( matchval < f3dMatchCut ) {
+	proj_combos.insert( make_pair(matchval,selected) );
+      }
+    } // n_combos
+
+    //TODO:
+    // now make tracks from the best combos 
+  }
+  // TODO: optional recovery code for missing projection
+
+  // Quit here to let detectors CoarseProcess() the approximate tracks,
+  // so that they can determine the corrections that we need when we
+  // continue in FineTrack
   return 0;
 }
 
 //_____________________________________________________________________________
 Int_t MWDC::FineTrack( TClonesArray& tracks )
 {
-  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    
-    fProj[type]->Track();
-  }
+  // Second-level tracking, applying fine corrections.
+  //
+  // - Correct the hit drift distances using timing, track slope,
+  //   track momentum, magnet fringe field, etc., as applicable.
+  // - Re-collect hits of roads and re-fit roads
+  // - Re-combine track projections in 3D and re-fit 3D track
+
+  //TODO
+
 #ifdef VERBOSE
   cout << "=========== end of event ==============" << endl;
 #endif
@@ -329,7 +461,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   fRefTime.assign( fRefMap->GetSize(), kBig );
 
   // Sort planes by increasing z-position
-  sort( fPlanes.begin(), fPlanes.end(), WirePlane::ZIsLess() );
+  sort( ALL(fPlanes), WirePlane::ZIsLess() );
 
   // Associate planes and partners (names identical except trailing "p")
   if( !TestBit(kNoPartner) ) {
@@ -340,8 +472,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	TString other = name.Chop();
 	if( other.IsNull() )
 	  continue;
-	vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			       WirePlane::NameEquals( other ) );
+	vwiter_t it = find_if( ALL(fPlanes),WirePlane::NameEquals( other ) );
 	if( it != fPlanes.end() ) {
 	  WirePlane* partner = *it;
 	  // Partner planes must be of the same type!
@@ -386,6 +517,22 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	   "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
     return fStatus = kInitError;
   }
+
+  // Check if we can use the simplified 3D matching algorithm
+  if( fProj.size() == 3 ) {
+    // This assumes that the first two planes are the rotated ones
+    assert( kUPlane < 2 && kVPlane < 2 );
+    // The abs(angle) of the two rotated planes should be (nearly) the same
+    Double_t uang =
+      TMath::Abs( TVector2::Phi_mpi_pi(fProj[kUPlane]->GetAngle()) );
+    if( (TMath::Abs( TVector2::Phi_mpi_pi(fProj[kVPlane]->GetAngle()) )-uang )
+	<  0.5*TMath::DegToRad() ) {
+      f3dSimpleMatch = true;
+      Double_t tan = TMath::Tan( 0.5*TMath::Pi()-uang );
+      f3dMatchvalScalefact = 2.0*(1.0/3.0 + tan*tan );
+    }
+  } else
+    f3dSimpleMatch = false;
 
   // Determine the width of and add the wire planes to the projections
   // TODO: this can be multithreaded, too - I think
@@ -502,6 +649,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 
   string planeconfig;
   Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
+  f3dMatchCut = 1e-4;
   DBRequest request[] = {
     { "planeconfig",  &planeconfig, kString },
     { "cratemap",     cmap,         kIntM,    6 },
@@ -509,6 +657,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     { "pairsonly",    &pairs_only,  kInt,     0, 1 },
     { "MCdata",       &mc_data,     kInt,     0, 1 },
     { "nopartner",    &nopartner,   kInt,     0, 1 },
+    { "3d_matchcut",  &f3dMatchCut, kDouble,  0, 1 },
     { 0 }
   };
 
@@ -559,8 +708,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     TString name(planes[i].c_str());
     if( name.IsNull() )
       continue;
-    vwiter_t it = find_if( fPlanes.begin(), fPlanes.end(),
-			   WirePlane::NameEquals( name ) );
+    vwiter_t it = find_if( ALL(fPlanes), WirePlane::NameEquals( name ) );
     if( it != fPlanes.end() ) {
       Error( Here(here), "Duplicate plane name: %s. Fix database.", 
 	     name.Data() );
@@ -622,10 +770,10 @@ void MWDC::SetDebug( Int_t level )
 }
 
 //_____________________________________________________________________________
-void MWDC::EnableBenchmarks( Bool_t b )
-{
-  //  fDoBench = b;
-}
+// void MWDC::EnableBenchmarks( Bool_t b )
+// {
+//   fDoBench = b;
+// }
 
 //_____________________________________________________________________________
 EProjType MWDC::NameToType( const char* name )

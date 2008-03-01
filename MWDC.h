@@ -72,6 +72,11 @@ namespace TreeSearch {
 
     THashTable*     fCrateMap;  // Map of MWDC DAQ modules
 
+    // Paremeters for 3D projection matching
+    Bool_t          f3dSimpleMatch;       // Use simplified algorithm
+    Double_t        f3dMatchvalScalefact; // Correction for simple 3D matchval
+    Double_t        f3dMatchCut;          // Maximum allowed 3D match error
+
     virtual Int_t   ReadDatabase( const TDatime& date );
 
     // Helper functions for getting DAQ module parameters - used by Init

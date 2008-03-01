@@ -8,8 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaAnalysisObject.h"
-#include "TreeWalk.h"
-#include "Hit.h"
+#include "TreeWalk.h"  // for NodeVisitor
 #include "TMath.h"
 #include "TClonesArray.h"
 #include <vector>
@@ -26,6 +25,7 @@ namespace TreeSearch {
   class PatternTree;
   class WirePlane;
   class Road;
+  class HitSet;
 
   class Projection : public THaAnalysisObject {
   public:
@@ -48,30 +48,32 @@ namespace TreeSearch {
     Int_t           MakeRoads();
 
 
-    Double_t        GetAngle() const;
+    Double_t        GetAngle()        const;
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
-    Double_t        GetConfLevel() const { return fConfLevel; }
-    Double_t        GetCosAngle() const { return fCosAngle; }
-    UInt_t          GetHitMaxDist() const { return fHitMaxDist; }
-    Hitpattern*     GetHitpattern() const { return fHitpattern; }
-    TBits*          GetLayerCombos() const { return fLayerCombos; }
-    WirePlane*      GetLayer( UInt_t layer )  const { return fLayers[layer]; }
+    Double_t        GetConfLevel()    const { return fConfLevel; }
+    Double_t        GetCosAngle()     const { return fCosAngle; }
+    UInt_t          GetHitMaxDist()   const { return fHitMaxDist; }
+    Hitpattern*     GetHitpattern()   const { return fHitpattern; }
+    TBits*          GetLayerCombos()  const { return fLayerCombos; }
+    WirePlane*      GetLayer ( UInt_t layer ) const { return fLayers[layer]; }
     Double_t        GetLayerZ( UInt_t layer ) const;
-    Double_t        GetMaxSlope() const { return fMaxSlope; }
+    Double_t        GetMaxSlope()     const { return fMaxSlope; }
     UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
-    UInt_t          GetNlevels()  const { return fNlevels; }
-    UInt_t          GetNlayers()  const { return (UInt_t)fLayers.size(); }
-    UInt_t          GetNpatterns() const;
-    UInt_t          GetNplanes()  const { return (UInt_t)fPlanes.size(); }
-    Int_t           GetNroads()   const { return fRoads->GetLast()+1; }
-    UInt_t          GetBinMaxDist() const { return fBinMaxDist; }
-    TBits*          GetPlaneCombos() const { return fPlaneCombos; }
-    WirePlane*      GetPlane( UInt_t plane )  const { return fPlanes[plane]; }
+    UInt_t          GetNgoodRoads()   const { return GetNroads(); } //TODO
+    UInt_t          GetNlevels()      const { return fNlevels; }
+    UInt_t          GetNlayers()      const { return (UInt_t)fLayers.size(); }
+    UInt_t          GetNpatterns()    const;
+    UInt_t          GetNplanes()      const { return (UInt_t)fPlanes.size(); }
+    UInt_t          GetNroads()       const;
+    UInt_t          GetBinMaxDist()   const { return fBinMaxDist; }
+    TBits*          GetPlaneCombos()  const { return fPlaneCombos; }
+    WirePlane*      GetPlane ( UInt_t plane ) const { return fPlanes[plane]; }
     Double_t        GetPlaneZ( UInt_t plane ) const;
-    Double_t        GetSinAngle() const { return fSinAngle; }
-    Int_t           GetType()  const { return fType; }
-    Double_t        GetWidth() const { return fWidth; }
-    Double_t        GetZsize() const;
+    Road*           GetRoad  ( UInt_t i )     const;
+    Double_t        GetSinAngle()     const { return fSinAngle; }
+    Int_t           GetType()         const { return fType; }
+    Double_t        GetWidth()        const { return fWidth; }
+    Double_t        GetZsize()        const;
 
     void            SetMaxSlope( Double_t m ) { fMaxSlope = m; }
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
@@ -113,10 +115,11 @@ namespace TreeSearch {
     Double_t         fConfLevel;     // Requested confidence level for chi2 cut
     vec_pdbl_t       fChisqLimits;   // lo/hi onfidence interval limits on Chi2
 
-    // Rsults
+    // Event-by-event results
     Hitpattern*      fHitpattern;    // Hitpattern of current event
     NodeMap_t        fPatternsFound; // Patterns found by TreeSearch
     TClonesArray*    fRoads;         // Roads found by MakeRoads
+    UInt_t           fNgoodRoads;    // Good roads in fRoads
 
 #ifdef TESTCODE
     // Statistics
@@ -194,6 +197,27 @@ namespace TreeSearch {
   UInt_t Projection::GetNpatterns() const
   {
     return static_cast<UInt_t>( fPatternsFound.size() );
+  }
+
+  //___________________________________________________________________________
+  inline
+  UInt_t Projection::GetNroads() const
+  { 
+    // Return total number of roads found (including voided ones)
+    assert( fRoads->GetLast()+1 >= 0  );
+    return static_cast<UInt_t>( fRoads->GetLast()+1 );
+  }
+
+  //___________________________________________________________________________
+  inline
+  Road* Projection::GetRoad( UInt_t i ) const
+  {
+    // Get i-th road (i=0..GetNroads()-1) found in this projection.
+    // The pointer should always be non-zero, but check with Road::IsGood()
+    // whether the road is good
+
+    assert( fRoads && i < GetNroads() );
+    return (Road*)fRoads->UncheckedAt(i); //static_cast would require Road.h
   }
 
 ///////////////////////////////////////////////////////////////////////////////

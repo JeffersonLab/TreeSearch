@@ -534,8 +534,8 @@ Bool_t Road::Fit()
     Double_t iD  = 1.0/D;
     Double_t a1  = (G1*S22 - G2*S12)*iD;  // Intercept
     Double_t a2  = (G2*S11 - G1*S12)*iD;  // Slope
-    Double_t V11 = S22*iD;                // Intercept error
-    Double_t V22 = S11*iD;                // Slope error
+    // Covariance matrix of the fitted parameters
+    Double_t V[3] = { S22*iD, -S12*iD, S11*iD };
     for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
       Double_t d = a1 + a2*p->z - p->x;
@@ -544,9 +544,10 @@ Bool_t Road::Fit()
 
 #ifdef VERBOSE
     cout << "Fit:"
-	 << " a1 = " << a1 << " (" << V11 << ")"
-	 << " a2 = " << a2 << " (" << V22 << ")"
-	 << " chi2/dof = " << chi2
+	 << " a1 = " << a1 << " (" << TMath::Sqrt(V[0]) << ")"
+	 << " a2 = " << a2
+	 << " chi2 = " << chi2
+	 << " ndof = " << fDof
 	 << endl;
 #endif
     // Throw out Chi2's outside of selected confidence interval
@@ -562,7 +563,7 @@ Bool_t Road::Fit()
 #endif
 
     // Save fits with acceptable Chi2
-    fFitData.push_back( new FitResult(a1,a2,chi2,V11,V22) );
+    fFitData.push_back( new FitResult(a1,a2,chi2,V) );
     // Save points used for this fit
     fFitData.back()->fFitCoordinates.swap( selected );
 
@@ -604,7 +605,33 @@ Bool_t Road::Fit()
 }
 
 //_____________________________________________________________________________
-void Road::Print( Option_t* opt ) const
+TVector2 Road::Intersect( const Road* other, Double_t z ) const
+{
+  // Find intersection point in x/y coordinates of the best fit of this
+  // road with the best fit of the other in the given z-plane.
+  // Both roads must have a good fit and must be from different projections.
+  // This function commutes, i.e. a->Intersect(b) == b->Intersect(a)
+
+  assert(other);
+  assert(fGood && other->fGood);
+  assert(fProjection->GetType() != other->fProjection->GetType());
+
+  Double_t su = fProjection->GetSinAngle();
+  Double_t cu = fProjection->GetCosAngle();
+  Double_t sv = other->fProjection->GetSinAngle();
+  Double_t cv = other->fProjection->GetCosAngle();
+  // FIXME: this should be calculated only once
+  Double_t inv_denom = 1.0/(sv*cu-su*cv);
+
+  // Standard formulae for the intersection of non-orthogonal coordinates
+  // (cf. THaVDCUVTrack.C)
+  Double_t x = (GetPos(z) * sv - other->GetPos(z) * su) * inv_denom;
+  Double_t y = (other->GetPos(z) * cu - GetPos(z) * cv) * inv_denom;
+  return TVector2(x, y);
+}
+
+//_____________________________________________________________________________
+void Road::Print( Option_t* ) const
 {
   // Print road info
 
