@@ -53,6 +53,7 @@ Road::Road( const Projection* proj )
   assert(fProjection);  // Invalid Projection* pointer
 
   fBuild = new BuildInfo_t;
+  fPoints.reserve( fProjection->GetNplanes() );
 }
 
 //_____________________________________________________________________________
@@ -64,6 +65,8 @@ Road::Road( const Road& orig ) :
   fDof(orig.fDof), fGood(orig.fGood)
 {
   // Copy constructor
+
+  //TODO: copy points?
 
   if( !orig.fFitData.empty() ) {
     fFitData.reserve( orig.fFitData.size() );
@@ -96,6 +99,8 @@ Road& Road::operator=( const Road& rhs )
     fChi2       = rhs.fChi2;
     fDof        = rhs.fDof;
     fGood       = rhs.fGood;
+    //TODO: assign points?
+    //    DeleteContainerOfContainers( fPoints );
     DeleteContainer( fFitData );
     if( !rhs.fFitData.empty() ) {
       fFitData.reserve( rhs.fFitData.size() );
@@ -118,6 +123,7 @@ Road::~Road()
   // Destructor
 
   DeleteContainer( fFitData );
+  DeleteContainerOfContainers( fPoints );
   delete fBuild;
 
 }
@@ -397,16 +403,15 @@ Bool_t Road::Includes( const Road* other ) const
 }
 
 //_____________________________________________________________________________
-Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
+Bool_t Road::CollectCoordinates()
 {
   // Gather hit positions that lie within the Road area.
   // Return true if the plane occupancy pattern of the selected points 
   // is allowed by Projection::fPlaneCombos, otherwise false.
-  // If true is returned, the caller must delete the elements of the 
-  // returned vector, otherwise the vector is empty.
+  // Results are in fPoints.
 
   assert( fCornerX.size() == kNcorner );
-  DeleteContainerOfContainers( points );
+  DeleteContainerOfContainers( fPoints );
 
 #ifdef VERBOSE
   cout << "Collecting coordinates from: (" << fPatterns.size() << " patterns)"
@@ -427,15 +432,14 @@ Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
     UInt_t np = hit->GetWirePlane()->GetPlaneNum();
     for( int i = 2; i--; ) {
       Double_t x = i ? hit->GetPosL() : hit->GetPosR();
-      if( TMath::IsInside( x, z, kNcorner, 
-			   const_cast<Double_t*>(&fCornerX[0]), zp )) {
+      if( TMath::IsInside( x, z, kNcorner, &fCornerX[0], zp )) {
 	// The hits are sorted by ascending plane number
 	if( np != last_np ) {
-	  points.push_back( Pvec_t() );
+	  fPoints.push_back( Pvec_t() );
 	  planepattern.SetBitNumber(np);
 	  last_np = np;
 	}
-	points.back().push_back( new Point(x, z, hit) );
+	fPoints.back().push_back( new Point(x, z, hit) );
       }
     }
   }
@@ -449,11 +453,11 @@ Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
   
 #ifdef VERBOSE
   cout << "Collected:" << endl;
-  vector<Pvec_t>::iterator ipl = points.begin();
+  vector<Pvec_t>::iterator ipl = fPoints.begin();
   for( UInt_t i = 0; i<fProjection->GetNplanes(); ++i ) {
     cout << " pl= " << i;
-    assert( ipl == points.end() or !(*ipl).empty() );
-    if( ipl == points.end() 
+    assert( ipl == fPoints.end() or !(*ipl).empty() );
+    if( ipl == fPoints.end() 
 	or i != (*ipl).front()->hit->GetWirePlane()->GetPlaneNum() )
       cout << " missing";
     else {
@@ -467,13 +471,11 @@ Bool_t Road::CollectCoordinates( vector<Pvec_t>& points ) const
     }
     cout << endl;
   }
-#endif
   if( !good ) {
-    DeleteContainerOfContainers( points );
-#ifdef VERBOSE
     cout << "REJECTED" << endl;
-#endif
   }
+#endif
+
   return good;
 }
 
@@ -487,33 +489,29 @@ Bool_t Road::Fit()
   // sorted into fFitData, lowest chi2 first.
 
   fGood = false;
-
-
   DeleteContainer( fFitData );
-  vector<Pvec_t> points;
-  points.reserve( fProjection->GetNplanes() );
+
   // Collect coordinates of hits that are within the width of the road
-  if( !CollectCoordinates(points) )
+  if( !CollectCoordinates() )
     return false;
 
   // Determine number of permutations
   //TODO: protect against overflow
-  UInt_t n_combinations = accumulate( ALL(points),
+  UInt_t n_combinations = accumulate( ALL(fPoints),
 				      (UInt_t)1, SizeMul<Pvec_t>() );
   if( n_combinations > kMaxNhitCombos ) {
     // TODO: keep statistics
-    DeleteContainerOfContainers( points );
     return false;
   }
 
   // Loop over all combinations of hits in the planes
-  vector<Pvec_t>::size_type npts = points.size();
+  vector<Pvec_t>::size_type npts = fPoints.size();
   Pvec_t selected;
   fDof = npts-2;
   Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
   Double_t* w = new Double_t[npts];
   for( UInt_t i = 0; i < n_combinations; ++i ) {
-    NthCombination( i, points, selected );
+    NthCombination( i, fPoints, selected );
     assert( selected.size() == npts );
 
     // Do linear fit of the points, assuming uncorrelated measurements (x_i)
@@ -572,7 +570,6 @@ Bool_t Road::Fit()
 
   if( fFitData.empty() ) {
     //TODO: keep statistics
-    DeleteContainerOfContainers( points );
     return false;
   }
 
@@ -596,11 +593,8 @@ Bool_t Road::Fit()
       Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
 	wp->AddFitCoord( FitCoord( p->hit, this, ifit, p->x, x_track, slope ));
     }
-    // At this point, we don't need the saved pointers anymore
-    coord.clear();
   }
 
-  DeleteContainerOfContainers( points );
   return (fGood = true);
 }
 

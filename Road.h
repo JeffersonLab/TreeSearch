@@ -30,6 +30,38 @@ namespace TreeSearch {
   public:
     typedef std::pair<const NodeDescriptor,HitSet> Node_t;
 
+    // Coordinates of hit positions, for track fitting
+    struct Point {
+      Point() : x(0), hit(0) {}
+      Point( Double_t _x, Double_t _z, Hit* _hit ) 
+	: x(_x), z(_z), hit(_hit) { assert(hit); }
+      Double_t res() const { return hit->GetResolution(); }
+      Double_t x;    // Selected x coordinates
+      Double_t z;    // z coordinate
+      Hit*     hit;  // Associated hit (stored in WirePlane)
+    };
+
+    // Fit results
+    struct FitResult {
+      Double_t fPos, fSlope, fChi2, fV[3];
+      std::vector<Point*>   fFitCoordinates;
+      FitResult( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov )
+	: fPos(pos), fSlope(slope), fChi2(chi2)
+      { assert(cov); memcpy(fV, cov, 3*sizeof(Double_t)); }
+      FitResult() {}
+      // Sort fit results by ascending chi2
+      bool operator<( const FitResult& rhs ) const 
+      { return ( fChi2 < rhs.fChi2 ); }
+      const std::vector<Point*>& GetPoints() const { return fFitCoordinates; }
+
+      struct Chi2IsLess
+	: public std::binary_function< FitResult*, FitResult*, bool >
+      {
+	bool operator() ( const FitResult* a, const FitResult* b ) const
+	{ assert(a&&b); return ( a->fChi2 < b->fChi2 ); }
+      };
+    };
+
     explicit Road( const Projection* proj );
     Road() {} // For internal ROOT use
     Road( const Road& );
@@ -42,6 +74,7 @@ namespace TreeSearch {
     void           Finish();
     Bool_t         Fit();
     Double_t       GetChi2( UInt_t ifit=0 ) const;
+    FitResult*     GetFitResult( UInt_t ifit=0 ) const;
     UInt_t         GetNfits() const { return (UInt_t)fFitData.size(); }
     Double_t       GetPos     ( Double_t z = 0 ) const;
     Double_t       GetPosErrsq( Double_t z = 0 ) const;
@@ -52,17 +85,6 @@ namespace TreeSearch {
     Bool_t         IsGood() const { return fGood; }
     virtual Bool_t IsSortable () const { return kTRUE; }
     virtual void   Print( Option_t* opt="" ) const;
-
-    // Coordinates of hit positions, for track fitting
-    struct Point {
-      Point() : x(0), hit(0) {}
-      Point( Double_t _x, Double_t _z, Hit* _hit ) 
-	: x(_x), z(_z), hit(_hit) { assert(hit); }
-      Double_t res() const { return hit->GetResolution(); }
-      Double_t x;    // Selected x coordinates
-      Double_t z;    // z coordinate
-      Hit*     hit;  // Associated hit (stored in WirePlane)
-    };
 
   protected:
 
@@ -75,27 +97,8 @@ namespace TreeSearch {
     std::list<Node_t*>    fPatterns;   // Patterns in this road
     Hset_t                fHits;       // All hits linked to the patterns
     
-    // Fit results
-    struct FitResult {
-      Double_t fPos, fSlope, fChi2, fV[3];
-      std::vector<Point*>   fFitCoordinates;
-      FitResult( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov )
-	: fPos(pos), fSlope(slope), fChi2(chi2)
-      { assert(cov); memcpy(fV, cov, 3*sizeof(Double_t)); }
-      FitResult() {}
-      // Sort fit results by ascending chi2
-      bool operator<( const FitResult& rhs ) const 
-      { return ( fChi2 < rhs.fChi2 ); }
-
-      struct Chi2IsLess
-	: public std::binary_function< FitResult*, FitResult*, bool >
-      {
-	bool operator() ( const FitResult* a, const FitResult* b ) const
-	{ assert(a&&b); return ( a->fChi2 < b->fChi2 ); }
-      };
-    };
-
-    std::vector<FitResult*> fFitData; // Good fit results, sorted by chi2
+    std::vector< std::vector<Point*> > fPoints; // Hit pos within road
+    std::vector<FitResult*>  fFitData; // Good fit results, sorted by chi2
 
     // Best fit results (copy of fFitData.begin() for global variable access)
     Double_t  fPos;      // Track origin
@@ -110,7 +113,7 @@ namespace TreeSearch {
     BuildInfo_t* fBuild; //! Working data for building
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
-    Bool_t   CollectCoordinates( std::vector< std::vector<Point*> >& ) const;
+    Bool_t   CollectCoordinates();
     Double_t GetBinX( UInt_t bin ) const;
 
     ClassDef(Road,1)  // Region containing track candidate hits and fit results
@@ -140,6 +143,15 @@ namespace TreeSearch {
     // Return unnormalized chi2 of the i-th fit
     assert( ifit < GetNfits() );
     return fFitData[ifit]->fChi2;
+  }
+
+  //---------------------------------------------------------------------------
+  inline
+  Road::FitResult* Road::GetFitResult( UInt_t ifit ) const
+  {
+    // Return fit results of i-th fit
+    assert( ifit < GetNfits() );
+    return fFitData[ifit];
   }
 
   //---------------------------------------------------------------------------
