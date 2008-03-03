@@ -23,11 +23,11 @@
 #include "THaEvData.h"
 #include "THashTable.h"
 #include "TVector2.h"
+#include "TDecompChol.h"
 
 #include <iostream>
 #include <algorithm>
 #include <numeric>
-#include <map>
 #include <utility>
 
 using namespace std;
@@ -218,6 +218,68 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
+Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef )
+{
+
+  // Fill the (At W A) matrix and (At W y) vector
+  TMatrixDSym AtA(4);
+  TVectorD Atb(4);
+  Double_t s2, Ai[4];
+  UInt_t npoints = 0;
+  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
+    const Projection* proj = (*it)->GetProjection();
+    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
+
+    for( vector<Road::Point*>::const_iterator it2 = points.begin();
+	 it2 != points.end(); ++it2 ) {
+      const Road::Point* p = (*it2);
+      ++npoints;
+      s2 = 1.0/(p->res()*p->res());
+      Ai[0] = proj->GetCosAngle();
+      Ai[1] = proj->GetCosAngle() * p->z;
+      Ai[2] = proj->GetSinAngle();
+      Ai[3] = proj->GetSinAngle() * p->z;
+      for( int j = 0; j<4; ++j ) {
+	for( int k = j; k<4; ++k ) {
+	  AtA(j,k) += Ai[j] * s2 * Ai[k];
+	}
+	Atb(j) += Ai[j] * s2 * p->x;
+      }
+    }
+  }
+  for( int j = 0; j<4; ++j )
+    for( int k = j+1; k<4; ++k )
+      AtA(k,j) = AtA(j,k);
+
+  assert( npoints > 0 );
+
+  // Invert the characteristic matrix and solve the normal equations.
+  // As in ROOT's TLinearFitter, we use the standard Cholesky decomposition
+  // to do this (since AtA is symmetric and positive-definite).
+  // For more speed but less accuracy, one could use TMatrixDSymCramerInv.
+  TDecompChol chol(AtA);
+  Bool_t ok = chol.Solve(Atb);
+  if( !ok ) {
+    return 1; //Urgh, inversion failed
+  }
+  // Copy results to output vector in order x, x', y, y'
+  assert( Atb.GetNrows() == 4 );
+  coef.assign( Atb.GetMatrixArray(), Atb.GetMatrixArray()+Atb.GetNrows() );
+//   fParCovar=chol.Invert();
+
+  // Calculate chi2
+
+
+#ifdef VERBOSE
+  cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
+       << "mx/my = " << coef[1] << " " << coef[3]
+       << endl;
+#endif
+  
+  return 0;
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   // Find tracks from the hitpatterns, using the coarse hit drift times
@@ -253,12 +315,19 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   // The standard method requires at least 3 projections. This helps reject
   // noise and, if there is more than one u or v road, correlates u and v
   if( nproj >= 3 ) {
-    multimap<Double_t,Rvec_t> proj_combos;
+    //TODO: each Projection should provide its own axis unit vector
     TVector2 xax( fProj[kTypeBegin+2]->GetCosAngle(),
 		  fProj[kTypeBegin+2]->GetSinAngle() ); // for n==3 algo
     Rvec_t selected;
     selected.reserve(nproj);
     UInt_t n_combos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
+    // Vector holding the results (vectors of roads with good matchval)
+    vector< pair<Double_t,Rvec_t> > road_combos;
+    road_combos.reserve(n_combos);
+#ifdef VERBOSE
+    cout << "Matching " << nproj << " track projections in 3D (trying "
+	 << n_combos << " combinations):" << endl;
+#endif
     for( UInt_t i = 0; i < n_combos; ++i ) {
       NthCombination( i, roads, selected );
       assert( selected.size() == nproj );
@@ -270,18 +339,33 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	// special case n==3 and symmetric angles of planes 0 and 1:
 	//  - intersect first two proj in front and back
 	//  - calc perp distances to 3rd, add in quadrature -> matchval
-
 	TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
 	TVector2 back  = selected[0]->Intersect( selected[1], zback );
+	//TVector2& xax = selected[2]->GetProjection()->GetAxis();
 	TVector2 xf    = selected[2]->GetPos(0.0)   * xax;
 	TVector2 xb    = selected[2]->GetPos(zback) * xax;
  	TVector2 d1    = front.Proj(xax) - xf;
  	TVector2 d2    = back.Proj(xax)  - xb;
+	// The scale factor converts this matchvalue to the one computed by
+	// the general algorithm below
+	//TODO; weigh with uncertainties
  	matchval = ( d1.Mod2() + d2.Mod2() ) * f3dMatchvalScalefact;
+#ifdef VERBOSE
+	cout << selected[0]->GetProjection()->GetName()
+	     << selected[1]->GetProjection()->GetName()
+	     << " front = "; front.Print();
+	cout << "front x  = "; xf.Print();
+	cout << "front dist = " << d1.Mod() << endl;
+	cout << selected[0]->GetProjection()->GetName()
+	     << selected[1]->GetProjection()->GetName()
+	     << " back = "; back.Print();
+	cout << "back x =  "; xb.Print();
+	cout << "back dist = " << d2.Mod() << endl;
+#endif
       } else {
 	// general algorithm:
 	//  - find all front and back intersections [ n(n-1)/2 each ] 
-	//  - compute center of gravity of intersection points
+	//  - compute weighted center of gravity of intersection points
 	//  - sum dist^2 of points to center of gravity -> matchval
 	vector<TVector2> fxpts, bxpts;
 	fxpts.reserve( nproj*(nproj-1)/2 );
@@ -290,6 +374,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	for( Rvec_t::iterator it1 = selected.begin();
 	     it1 != selected.end(); ++it1 ) {
 	  for( Rvec_t::iterator it2 = it1+1; it2 != selected.end(); ++it2 ) {
+	    //TODO: weigh with uncertainties of coordinates
 	    fxpts.push_back( (*it1)->Intersect(*it2, 0.0) );
 	    bxpts.push_back( (*it1)->Intersect(*it2, zback) );
 	    fctr += fxpts.back();
@@ -308,9 +393,8 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	}
 	assert( fxpts.size() == nproj*(nproj-1)/2 );
 	assert( bxpts.size() == fxpts.size() );
-	Double_t norm = 1.0/static_cast<Double_t>( fxpts.size() );
-	fctr *= norm;
-	bctr *= norm;
+	fctr /= static_cast<Double_t>( fxpts.size() );
+	bctr /= static_cast<Double_t>( fxpts.size() );
 #ifdef VERBOSE
 	cout << "fctr = "; fctr.Print();
 	cout << "bctr = "; bctr.Print();
@@ -318,16 +402,32 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	for( vector<TVector2>::size_type k = 0; k < fxpts.size(); ++k ) {
 	  matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
 	}
-      }
+	// We could just connect fctr and bctr here to get the 3D track.
+	// But the linear minimization below gives more accurate results
+	// and also a well-defined covariance matrix
 
-      // Map of proj combos sorted by matchval
+      } //if f3dSimpleMatch else
+
       if( matchval < f3dMatchCut ) {
-	proj_combos.insert( make_pair(matchval,selected) );
+	road_combos.push_back( make_pair(matchval,selected) );
       }
-    } // n_combos
+    } //for n_combos
 
-    //TODO:
-    // now make tracks from the best combos 
+    // Fit each set of matched roads using linear least squares, yielding 
+    // the 3D track parameters, x, x'(=mx), y, y'(=my)
+    //FIXME: what about roads that are selected more than once? mark used?
+    vector<Double_t> fit_param( 4, kBig );
+    for( vector< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
+	 it != road_combos.end(); ++it ) {
+      Rvec_t& these_roads = (*it).second;
+      Int_t err = FitTrack( these_roads, fit_param );
+      //CONTINUE HERE
+      if( !err ) {
+	// Add this track
+      } else {
+	// Print warning
+      }
+    }
   }
   // TODO: optional recovery code for missing projection
 

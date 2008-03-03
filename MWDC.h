@@ -22,6 +22,7 @@ using std::vector;
 namespace TreeSearch {
   class WirePlane;
   class Projection;
+  class Road;
 
   extern const Double_t kBig;
 
@@ -39,6 +40,8 @@ namespace TreeSearch {
     virtual EStatus Init( const TDatime& date );
     virtual Int_t   CoarseTrack( TClonesArray& tracks );
     virtual Int_t   FineTrack( TClonesArray& tracks );
+            Int_t  FitTrack( const std::vector<TreeSearch::Road*>& roads,
+			      std::vector<Double_t>& coef );
     virtual Int_t   DefineVariables( EMode mode = kDefine );
     virtual Int_t   FindVertices(TClonesArray&) {return 0;}
     virtual void    Print(const Option_t* opt) const;
