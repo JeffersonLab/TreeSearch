@@ -40,8 +40,6 @@ namespace TreeSearch {
     virtual EStatus Init( const TDatime& date );
     virtual Int_t   CoarseTrack( TClonesArray& tracks );
     virtual Int_t   FineTrack( TClonesArray& tracks );
-            Int_t  FitTrack( const std::vector<TreeSearch::Road*>& roads,
-			      std::vector<Double_t>& coef );
     virtual Int_t   DefineVariables( EMode mode = kDefine );
     virtual Int_t   FindVertices(TClonesArray&) {return 0;}
     virtual void    Print(const Option_t* opt) const;
@@ -67,6 +65,8 @@ namespace TreeSearch {
 
   protected:
 
+    typedef vector<TreeSearch::Road*> Rvec_t;
+
     vector<WirePlane*>   fPlanes;  // Wire planes
     vector<Projection*>  fProj;    // Plane projections
 
@@ -80,6 +80,10 @@ namespace TreeSearch {
     Double_t        f3dMatchvalScalefact; // Correction for simple 3D matchval
     Double_t        f3dMatchCut;          // Maximum allowed 3D match error
 
+    static  Double_t CalcChisquare( const Rvec_t& rds,
+				    const vector<Double_t>& coef );
+    static  Int_t   FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
+			      Double_t& chi2 );
     virtual Int_t   ReadDatabase( const TDatime& date );
 
     // Helper functions for getting DAQ module parameters - used by Init

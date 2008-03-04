@@ -95,7 +95,6 @@ typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<WirePlane*>::iterator vwiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
-typedef vector<Road*> Rvec_t;
 
 #define ALL(c) (c).begin(), (c).end()
 
@@ -218,27 +217,51 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
-Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef )
+Double_t MWDC::CalcChisquare( const Rvec_t& roads, 
+			      const vector<Double_t>& coef )
+{
+  Double_t chi2 = 0;
+  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
+    const Projection* proj = (*it)->GetProjection();
+    Double_t cosa = proj->GetCosAngle();
+    Double_t sina = proj->GetSinAngle();
+
+    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
+    for( vector<Road::Point*>::const_iterator it2 = points.begin();
+	 it2 != points.end(); ++it2 ) {
+      const Road::Point* p = (*it2);
+      Double_t y = coef[0]*cosa + coef[1]*cosa*p->z
+	+ coef[2]*sina + coef[3]*sina*p->z;
+      Double_t diff = y - p->x;
+      diff /= p->res();
+      diff *= diff;
+      chi2 += diff;
+    }
+  }
+  return chi2;
+}
+
+//_____________________________________________________________________________
+  Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
+			Double_t& chi2 )
 {
 
   // Fill the (At W A) matrix and (At W y) vector
   TMatrixDSym AtA(4);
   TVectorD Atb(4);
-  Double_t s2, Ai[4];
   UInt_t npoints = 0;
   for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
     const Projection* proj = (*it)->GetProjection();
-    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
+    Double_t cosa = proj->GetCosAngle();
+    Double_t sina = proj->GetSinAngle();
 
+    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
     for( vector<Road::Point*>::const_iterator it2 = points.begin();
 	 it2 != points.end(); ++it2 ) {
       const Road::Point* p = (*it2);
       ++npoints;
-      s2 = 1.0/(p->res()*p->res());
-      Ai[0] = proj->GetCosAngle();
-      Ai[1] = proj->GetCosAngle() * p->z;
-      Ai[2] = proj->GetSinAngle();
-      Ai[3] = proj->GetSinAngle() * p->z;
+      Double_t Ai[4] = { cosa, cosa * p->z, sina, sina * p->z };
+      Double_t s2 = 1.0/(p->res()*p->res());
       for( int j = 0; j<4; ++j ) {
 	for( int k = j; k<4; ++k ) {
 	  AtA(j,k) += Ai[j] * s2 * Ai[k];
@@ -251,7 +274,7 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef )
     for( int k = j+1; k<4; ++k )
       AtA(k,j) = AtA(j,k);
 
-  assert( npoints > 0 );
+  assert( npoints > 4 );
 
   // Invert the characteristic matrix and solve the normal equations.
   // As in ROOT's TLinearFitter, we use the standard Cholesky decomposition
@@ -259,20 +282,22 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef )
   // For more speed but less accuracy, one could use TMatrixDSymCramerInv.
   TDecompChol chol(AtA);
   Bool_t ok = chol.Solve(Atb);
-  if( !ok ) {
+  assert(ok);
+  if( !ok )
     return 1; //Urgh, inversion failed
-  }
+
   // Copy results to output vector in order x, x', y, y'
   assert( Atb.GetNrows() == 4 );
   coef.assign( Atb.GetMatrixArray(), Atb.GetMatrixArray()+Atb.GetNrows() );
 //   fParCovar=chol.Invert();
 
   // Calculate chi2
-
+  chi2 = CalcChisquare( roads, coef );
 
 #ifdef VERBOSE
   cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
-       << "mx/my = " << coef[1] << " " << coef[3]
+       << "mx/my = " << coef[1] << " " << coef[3] << " "
+       << "ndof = " << npoints << " chi2 = " << chi2
        << endl;
 #endif
   
@@ -420,7 +445,8 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     for( vector< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
 	 it != road_combos.end(); ++it ) {
       Rvec_t& these_roads = (*it).second;
-      Int_t err = FitTrack( these_roads, fit_param );
+      Double_t chi2;
+      Int_t err = FitTrack( these_roads, fit_param, chi2 );
       //CONTINUE HERE
       if( !err ) {
 	// Add this track
