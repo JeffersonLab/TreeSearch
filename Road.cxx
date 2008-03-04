@@ -13,8 +13,10 @@
 #include "Hit.h"
 #include "WirePlane.h"
 #include "Helper.h"
+
 #include "TMath.h"
 #include "TBits.h"
+
 #include <iostream>
 #include <algorithm>
 #include <numeric>
@@ -134,7 +136,7 @@ static void PrintHits( const Hset_t& hits )
 {
   //  cout << hits.size() << " hits" << endl;
 
-  for( siter_t it = hits.begin(); it != hits.end(); ++it ) {
+  for( Hset_t::reverse_iterator it = hits.rbegin(); it != hits.rend(); ++it ) {
     cout << " ";
     (*it)->Print();
   }
@@ -629,6 +631,27 @@ void Road::Print( Option_t* ) const
 {
   // Print road info
 
+  cout << "Road: " << fProjection->GetName() << " type, "
+       << fHits.size() << " hits" << endl;
+  cout << " TL = (" << fCornerX[3] << "," << fZU << ") "
+       << " TR = (" << fCornerX[2] << "," << fZU << ")"
+       << endl
+       << " BL = (" << fCornerX[0] << "," << fZL << ") "
+       << " BR = (" << fCornerX[1] << "," << fZL << ")"
+       << endl;
+
+  for( Hset_t::reverse_iterator it = fHits.rbegin(); it != fHits.rend();
+       ++it ) {
+    cout << " ";
+    (*it)->Print();
+  }
+  if( fGood ) {
+    cout << " fitpos = " << fPos << " (" << TMath::Sqrt(fV[0]) << ")"
+	 << " slope = " << fSlope
+	 << " chi2 = " << fChi2
+	 << " ndof = " << fDof
+	 << endl;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
