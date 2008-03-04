@@ -20,6 +20,7 @@
 #include "TMath.h"
 #include "TString.h"
 #include "TBits.h"
+#include "TError.h"
 
 #include <iostream>
 #include <sys/time.h>  // for timing
@@ -619,9 +620,11 @@ Bool_t Projection::RemoveDuplicateRoads()
       if( !rd2 )
 	continue;
       if( rd->Includes(rd2) ) {
-	Bool_t chk = rd->Adopt(rd2);
-	assert(chk);
-	if( chk ) {
+	Bool_t ok = rd->Adopt(rd2);
+#ifndef NDEBUG
+	R__CHECK(ok);
+#endif
+	if( ok ) {
 	  fRoads->RemoveAt(j);
 	  changed = true;
 #ifdef TESTCODE
@@ -629,9 +632,11 @@ Bool_t Projection::RemoveDuplicateRoads()
 #endif
 	}
       } else if( rd2->Includes(rd) ) {
-	Bool_t chk = rd2->Adopt(rd);
-	assert(chk);
-	if( chk ) {
+	Bool_t ok = rd2->Adopt(rd);
+#ifndef NDEBUG
+	R__CHECK(ok);
+#endif
+	if( ok ) {
 	  fRoads->RemoveAt(i);
 	  changed = true;
 #ifdef TESTCODE
