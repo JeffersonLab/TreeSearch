@@ -10,6 +10,7 @@
 #include "THaTrackingDetector.h"
 #include "THaDetMap.h"
 #include "Types.h"
+#include "TMatrixDSym.h"
 #include <vector>
 
 class THaTrack;
@@ -51,21 +52,22 @@ namespace TreeSearch {
 
     EProjType       NameToType( const char* name );
 
-    //FIXME: for testing
+#ifdef TESTCODE
+    Int_t           GetEvNum() const { return fEvNum; }
     vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
     vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
-
-    // Analysis control flags. Set via database. Defaults are usually fine.
+#endif
+    // Analysis control flags. Set via database.
     enum {
       kDoTimeCut  = BIT(14), // Use TDC time cut in decoder (defined in planes)
       kPairsOnly  = BIT(15), // Accept only pairs of hits from plane pairs
       kMCdata     = BIT(16), // Assume input is Monte Carlo data
-      kNoPartner  = BIT(17)  // Never partner wire planes
+      kNoPartner  = BIT(17), // Never partner wire planes
+      k3dFastMatch= BIT(18)  // Use fast 3D matching algorithm (auto detected)
     };
 
   protected:
-
-    typedef vector<TreeSearch::Road*> Rvec_t;
+    typedef vector<Road*> Rvec_t;
 
     vector<WirePlane*>   fPlanes;  // Wire planes
     vector<Projection*>  fProj;    // Plane projections
@@ -76,20 +78,25 @@ namespace TreeSearch {
     THashTable*     fCrateMap;  // Map of MWDC DAQ modules
 
     // Paremeters for 3D projection matching
-    Bool_t          f3dSimpleMatch;       // Use simplified algorithm
-    Double_t        f3dMatchvalScalefact; // Correction for simple 3D matchval
+    Double_t        f3dMatchvalScalefact; // Correction for fast 3D matchval
     Double_t        f3dMatchCut;          // Maximum allowed 3D match error
 
-    static  Double_t CalcChisquare( const Rvec_t& rds,
-				    const vector<Double_t>& coef );
-    static  Int_t   FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
-			      Double_t& chi2 );
-    virtual Int_t   ReadDatabase( const TDatime& date );
+    // Event data
+#ifdef TESTCODE
+    Int_t           fEvNum;     // Current event number (for diagnostics)
+#endif
+    static Double_t CalcChisquare( const Rvec_t& roads,
+				   const vector<Double_t>& coef );
+    static Int_t    FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
+			      Double_t& chi2, TMatrixDSym* coef_covar = 0 );
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t   LoadDAQmodel( THaDetMap::Module* m ) const;
     Double_t LoadDAQresolution( THaDetMap::Module* m ) const;
     UInt_t   GetDAQnchan( THaDetMap::Module* m ) const;
+
+    // Podd interface
+    virtual Int_t   ReadDatabase( const TDatime& date );
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };

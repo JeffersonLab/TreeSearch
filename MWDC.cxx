@@ -17,10 +17,12 @@
 #include "Road.h"
 #include "Helper.h"
 
-#include "TString.h"
-#include "TMath.h"
 #include "THaDetMap.h"
 #include "THaEvData.h"
+#include "THaTrack.h"
+
+#include "TString.h"
+#include "TMath.h"
 #include "THashTable.h"
 #include "TVector2.h"
 #include "TDecompChol.h"
@@ -104,7 +106,7 @@ const Double_t kBig = 1e38;
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
-    f3dSimpleMatch(false), f3dMatchvalScalefact(1), f3dMatchCut(0)
+    f3dMatchvalScalefact(1), f3dMatchCut(0)
 { 
   // Constructor
 
@@ -178,6 +180,11 @@ Int_t MWDC::Decode( const THaEvData& evdata )
   
   static const char* const here = "Decode";
 
+#ifdef TESTCODE
+  // Save current event number for diagnostics
+  fEvNum = evdata.GetEvNum();
+#endif
+
   // Decode reference channels of the VME readout (if any)
   for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
     THaDetMap::Module* d = fRefMap->GetModule(imod);
@@ -200,7 +207,6 @@ Int_t MWDC::Decode( const THaEvData& evdata )
     }
   }   // modules
 
-
   // Decode the planes, then fill the hitpatterns in the projections
   //TODO: multithread
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
@@ -217,9 +223,12 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
-Double_t MWDC::CalcChisquare( const Rvec_t& roads, 
+Double_t MWDC::CalcChisquare( const Rvec_t& roads,
 			      const vector<Double_t>& coef )
 {
+  // Calculate chi2 of the fit with given parameters coef with respect
+  // to the measured coordinates contained in the given set of roads.
+
   Double_t chi2 = 0;
   for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
     const Projection* proj = (*it)->GetProjection();
@@ -232,24 +241,53 @@ Double_t MWDC::CalcChisquare( const Rvec_t& roads,
       const Road::Point* p = (*it2);
       Double_t y = coef[0]*cosa + coef[1]*cosa*p->z
 	+ coef[2]*sina + coef[3]*sina*p->z;
-      Double_t diff = y - p->x;
-      diff /= p->res();
-      diff *= diff;
-      chi2 += diff;
+      Double_t diff = (y - p->x) / p->res();
+      chi2 += diff*diff;
     }
   }
   return chi2;
 }
 
 //_____________________________________________________________________________
-  Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
-			Double_t& chi2 )
+Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
+		      Double_t& chi2, TMatrixDSym* coef_covar )
 {
+  // Linear minimization routine to fit a physical straight line track through
+  // the hits registered in the different projection planes.
+  //
+  // This is a much streamlined version of ROOT's TLinearFitter that solves
+  // the normal equation with weights, (At W A) a = (At W) y, using Cholesky
+  // decomposition, TDecompChol. The model used is
+  //   y_i = P_i * T_i
+  //       = ( x + z_i * mx, y + z_i * my) * ( cos(a_i), sin(a_i) )
+  // where
+  //   y_i is the measured coordinate in the i-th wire plane at z_i
+  //   P_i is the physical track intersection point with the z_i plane
+  //   T_i is the axis unit vector of the i-th plane
+  //   a_i is the angle of the coordinate axis of the i-th plane w.r.t. x
+  //   x,mx,y,my are the track parameters to be fitted, origin x,y and
+  //       slopes mx,my.
+  //   
+  // "roads" contains a set of Roads that successfully combine in 3-d, one
+  // Road* per projection. Each road, in turn, contains a set of (y_i,z_i)
+  // coordinates, at most one per wire plane of the projection type, that
+  // give the best 2D track fit within the road.
+  //
+  // "coef" are the fitted track parameters, x, x'(=mx), y, y'(=my).
+  // The reference system is the z=0 plane (usually the first chamber).
+  //
+  // "chi2" is the chi2 of the fit (not normalized).
+  //
+  // "coef_covar" is the covariance matrix of the fit results. Since it is
+  // expensive to calculate, it is only filled if the argument is supplied.
+  //
+  // The return value is the number of degrees of freedom of the fit, i.e.
+  // npoints-4 > 0, or negative if too few points or matrix inversion error
 
-  // Fill the (At W A) matrix and (At W y) vector
+  // Fill the (At W A) matrix and (At W y) vector with the measured points
   TMatrixDSym AtA(4);
-  TVectorD Atb(4);
-  UInt_t npoints = 0;
+  TVectorD Aty(4);
+  Int_t npoints = 0;
   for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
     const Projection* proj = (*it)->GetProjection();
     Double_t cosa = proj->GetCosAngle();
@@ -266,7 +304,7 @@ Double_t MWDC::CalcChisquare( const Rvec_t& roads,
 	for( int k = j; k<4; ++k ) {
 	  AtA(j,k) += Ai[j] * s2 * Ai[k];
 	}
-	Atb(j) += Ai[j] * s2 * p->x;
+	Aty(j) += Ai[j] * s2 * p->x;
       }
     }
   }
@@ -275,33 +313,41 @@ Double_t MWDC::CalcChisquare( const Rvec_t& roads,
       AtA(k,j) = AtA(j,k);
 
   assert( npoints > 4 );
+  if( npoints <=4 ) return -1; // Meaningful fit not possible
 
   // Invert the characteristic matrix and solve the normal equations.
-  // As in ROOT's TLinearFitter, we use the standard Cholesky decomposition
+  // As in ROOT's TLinearFitter, we use a Cholesky decomposition
   // to do this (since AtA is symmetric and positive-definite).
   // For more speed but less accuracy, one could use TMatrixDSymCramerInv.
   TDecompChol chol(AtA);
-  Bool_t ok = chol.Solve(Atb);
+  Bool_t ok = chol.Solve(Aty);
   assert(ok);
-  if( !ok )
-    return 1; //Urgh, inversion failed
+  if( !ok ) return -2; //Urgh, decomposition failed. Should never happen
 
   // Copy results to output vector in order x, x', y, y'
-  assert( Atb.GetNrows() == 4 );
-  coef.assign( Atb.GetMatrixArray(), Atb.GetMatrixArray()+Atb.GetNrows() );
-//   fParCovar=chol.Invert();
+  assert( Aty.GetNrows() == 4 );
+  coef.assign( Aty.GetMatrixArray(), Aty.GetMatrixArray()+Aty.GetNrows() );
 
   // Calculate chi2
   chi2 = CalcChisquare( roads, coef );
 
+  // Calculate covariance matrix of the parameters, if requested
+  if( coef_covar ) {
+    if( coef_covar->GetNrows() != 4 )
+      coef_covar->ResizeTo(4,4);
+    Bool_t ok = chol.Invert(*coef_covar);
+    assert(ok);
+    if( !ok ) return -3; // Urgh, inversion failed. Should never happen
+  }
+
 #ifdef VERBOSE
   cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
        << "mx/my = " << coef[1] << " " << coef[3] << " "
-       << "ndof = " << npoints << " chi2 = " << chi2
+       << "ndof = " << npoints-4 << " chi2 = " << chi2
        << endl;
 #endif
   
-  return 0;
+  return npoints-4;
 }
 
 //_____________________________________________________________________________
@@ -309,6 +355,8 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   // Find tracks from the hitpatterns, using the coarse hit drift times
   // uncorrected for track slope, timing offset, fringe field effects etc.
+
+  static const char* const here = "CoarseTrack";
 
   vector<Rvec_t>::size_type nproj = 0;
   vector<Rvec_t> roads;
@@ -340,9 +388,6 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   // The standard method requires at least 3 projections. This helps reject
   // noise and, if there is more than one u or v road, correlates u and v
   if( nproj >= 3 ) {
-    //TODO: each Projection should provide its own axis unit vector
-    TVector2 xax( fProj[kTypeBegin+2]->GetCosAngle(),
-		  fProj[kTypeBegin+2]->GetSinAngle() ); // for n==3 algo
     Rvec_t selected;
     selected.reserve(nproj);
     UInt_t n_combos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
@@ -359,14 +404,14 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 
       Double_t matchval = 0.0;
       Double_t zback = fPlanes.back()->GetZ();
-      if( f3dSimpleMatch ) {
+      if( TestBit(k3dFastMatch) ) {
 	assert( nproj == 3 );
 	// special case n==3 and symmetric angles of planes 0 and 1:
 	//  - intersect first two proj in front and back
 	//  - calc perp distances to 3rd, add in quadrature -> matchval
+	const TVector2& xax = selected[2]->GetProjection()->GetAxis();
 	TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
 	TVector2 back  = selected[0]->Intersect( selected[1], zback );
-	//TVector2& xax = selected[2]->GetProjection()->GetAxis();
 	TVector2 xf    = selected[2]->GetPos(0.0)   * xax;
 	TVector2 xb    = selected[2]->GetPos(zback) * xax;
  	TVector2 d1    = front.Proj(xax) - xf;
@@ -420,22 +465,29 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	assert( bxpts.size() == fxpts.size() );
 	fctr /= static_cast<Double_t>( fxpts.size() );
 	bctr /= static_cast<Double_t>( fxpts.size() );
-#ifdef VERBOSE
-	cout << "fctr = "; fctr.Print();
-	cout << "bctr = "; bctr.Print();
-#endif
 	for( vector<TVector2>::size_type k = 0; k < fxpts.size(); ++k ) {
 	  matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
 	}
-	// We could just connect fctr and bctr here to get the 3D track.
-	// But the linear minimization below gives more accurate results
-	// and also a well-defined covariance matrix
+#ifdef VERBOSE
+	cout << "fctr = "; fctr.Print();
+	cout << "bctr = "; bctr.Print();
+	cout << "matchval = " << matchval;
+#endif
+	// We could just connect fctr and bctr here to get an approximate
+	// 3D track. But the linear minimization below is the right way
+	// to do this.
 
-      } //if f3dSimpleMatch else
+      } //if k3dFastMatch else
 
       if( matchval < f3dMatchCut ) {
 	road_combos.push_back( make_pair(matchval,selected) );
+#ifdef VERBOSE
+	cout << "ACCEPTED";
+#endif
       }
+#ifdef VERBOSE
+      cout << endl;;
+#endif
     } //for n_combos
 
     // Fit each set of matched roads using linear least squares, yielding 
@@ -445,13 +497,27 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     for( vector< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
 	 it != road_combos.end(); ++it ) {
       Rvec_t& these_roads = (*it).second;
-      Double_t chi2;
-      Int_t err = FitTrack( these_roads, fit_param, chi2 );
-      //CONTINUE HERE
-      if( !err ) {
+      Double_t chi2 = 0;
+      Int_t ndof = FitTrack( these_roads, fit_param, chi2 );
+      if( ndof > 0 ) {
 	// Add this track
+	THaTrack* newTrack = AddTrack( tracks,
+				       fit_param[0], fit_param[2],
+				       fit_param[1], fit_param[3] );
+	//TODO: make a TrackID?
+	assert( newTrack );
+	// The "detector" and "fp" TRANSPORT systems are the same for BigBite
+	newTrack->SetD( newTrack->GetX(), newTrack->GetY(),
+			newTrack->GetTheta(), newTrack->GetPhi() );
+	newTrack->SetChi2( chi2, ndof );
       } else {
-	// Print warning
+#ifdef TESTCODE
+	Error( Here(here), "Event %d: Failure fitting 3D track, err = %d. "
+	       "Should never happen. Call expert.", fEvNum, ndof );
+#else
+	Error( Here(here), "Failure fitting 3D track, err = %d. "
+	       "Should never happen. Call expert.", ndof );
+#endif
       }
     }
   }
@@ -645,6 +711,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   }
 
   // Check if we can use the simplified 3D matching algorithm
+  ResetBit(k3dFastMatch);
   if( fProj.size() == 3 ) {
     // This assumes that the first two planes are the rotated ones
     assert( kUPlane < 2 && kVPlane < 2 );
@@ -653,12 +720,11 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
       TMath::Abs( TVector2::Phi_mpi_pi(fProj[kUPlane]->GetAngle()) );
     if( (TMath::Abs( TVector2::Phi_mpi_pi(fProj[kVPlane]->GetAngle()) )-uang )
 	<  0.5*TMath::DegToRad() ) {
-      f3dSimpleMatch = true;
+      SetBit(k3dFastMatch);
       Double_t tan = TMath::Tan( 0.5*TMath::Pi()-uang );
       f3dMatchvalScalefact = 2.0*(1.0/3.0 + tan*tan );
     }
-  } else
-    f3dSimpleMatch = false;
+  }
 
   // Determine the width of and add the wire planes to the projections
   // TODO: this can be multithreaded, too - I think
