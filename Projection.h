@@ -11,6 +11,7 @@
 #include "TreeWalk.h"  // for NodeVisitor
 #include "TMath.h"
 #include "TClonesArray.h"
+#include "TVector2.h"
 #include <vector>
 #include <map>
 #include <cassert>
@@ -49,9 +50,10 @@ namespace TreeSearch {
 
 
     Double_t        GetAngle()        const;
+    const TVector2& GetAxis()         const { return fAxis; }
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
     Double_t        GetConfLevel()    const { return fConfLevel; }
-    Double_t        GetCosAngle()     const { return fCosAngle; }
+    Double_t        GetCosAngle()     const { return fAxis.X(); }
     UInt_t          GetHitMaxDist()   const { return fHitMaxDist; }
     Hitpattern*     GetHitpattern()   const { return fHitpattern; }
     TBits*          GetLayerCombos()  const { return fLayerCombos; }
@@ -70,7 +72,7 @@ namespace TreeSearch {
     WirePlane*      GetPlane ( UInt_t plane ) const { return fPlanes[plane]; }
     Double_t        GetPlaneZ( UInt_t plane ) const;
     Road*           GetRoad  ( UInt_t i )     const;
-    Double_t        GetSinAngle()     const { return fSinAngle; }
+    Double_t        GetSinAngle()     const { return fAxis.Y(); }
     Int_t           GetType()         const { return fType; }
     Double_t        GetWidth()        const { return fWidth; }
     Double_t        GetZsize()        const;
@@ -79,9 +81,10 @@ namespace TreeSearch {
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
     void            SetWidth( Double_t width ) { fWidth = width; }
     
-    //FIXME: for testing
-//  std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
-//  std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
+#ifdef TESTCODE
+    std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
+    std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
+#endif
 
   protected:
     typedef std::vector<pdbl_t> vec_pdbl_t;
@@ -94,8 +97,7 @@ namespace TreeSearch {
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
     Double_t         fWidth;         // Width of tracking region (m)
-    Double_t         fSinAngle;      // Sine of wire angle
-    Double_t         fCosAngle;      // Cosine of wire angle
+    TVector2         fAxis;          // Nominal projection axis normal to wires
     THaDetectorBase* fDetector;      //! Parent detector
     PatternTree*     fPatternTree;   // Precomputed template database
 
@@ -178,11 +180,8 @@ namespace TreeSearch {
   Double_t Projection::GetAngle() const
   {
     // Return wire angle in rad, normalized to [-pi,pi]
-    Double_t a = TMath::ASin(fSinAngle);
-    if( fCosAngle < 0.0 )
-      return (fSinAngle > 0.0) ? TMath::TwoPi() - a : -TMath::TwoPi() - a;
-  
-    return a;
+    
+    return TMath::ATan2( fAxis.Y(), fAxis.X() );
   }
 
   //___________________________________________________________________________
@@ -204,7 +203,7 @@ namespace TreeSearch {
   UInt_t Projection::GetNroads() const
   { 
     // Return total number of roads found (including voided ones)
-    assert( fRoads->GetLast()+1 >= 0  );
+    assert( fRoads && fRoads->GetLast()+1 >= 0  );
     return static_cast<UInt_t>( fRoads->GetLast()+1 );
   }
 

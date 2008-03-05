@@ -710,8 +710,7 @@ void Projection::SetAngle( Double_t angle )
 {
   // Set wire angle (rad)
   
-  fSinAngle = TMath::Sin( angle );
-  fCosAngle = TMath::Cos( angle );
+  fAxis.Set( TMath::Cos(angle), TMath::Sin(angle) );
 }
 
 //_____________________________________________________________________________
