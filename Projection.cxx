@@ -16,6 +16,7 @@
 #include "Road.h"
 #include "Helper.h"
 #include "Hit.h"
+#include "MWDC.h"   // for MWDC bits
 
 #include "TMath.h"
 #include "TString.h"
@@ -45,7 +46,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
     fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
     fPlaneCombos(0), fLayerCombos(0),
     fHitMaxDist(1), fBinMaxDist(kMaxUInt), fConfLevel(1.0),
-    fHitpattern(0), fRoads(0)
+    fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
 {
   // Constructor
 
@@ -56,12 +57,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
 
   fTitle.Append(" projection");
   fRoads = new TClonesArray("TreeSearch::Road", 3);
-  if( !fRoads ) {
-    Fatal( Here("Projection"), "Allocating road array for projection %s "
-	   "failed. Call expert.", name );
-    MakeZombie();
-    return;
-  }
+  R__ASSERT(fRoads);
 }
 
 //_____________________________________________________________________________
@@ -72,6 +68,7 @@ Projection::~Projection()
   if( fIsSetup )
     RemoveVariables();
   delete fRoads;
+  delete fRoadCorners;
   delete fPatternTree;
   delete fHitpattern;
   delete fPlaneCombos;
@@ -112,6 +109,10 @@ void Projection::Clear( Option_t* )
 
   fRoads->Delete();
   fPatternsFound.clear();
+  fNgoodRoads = 0;
+
+  if( TestBit(kEventDisplay) )
+    fRoadCorners->Clear();
 
 #ifdef TESTCODE
   size_t nbytes = (char*)&t_track - (char*)&n_hits + sizeof(t_track);
@@ -142,19 +143,6 @@ Int_t Projection::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
-void Projection::Reset()
-{
-  // Reset parameters, clear list of planes, delete Hitpattern
-  
-  fIsInit = kFALSE;
-  fPlanes.clear();
-  fLayers.clear();
-  fMaxSlope = fWidth = 0.0;
-  delete fHitpattern; fHitpattern = 0;
-  delete fPatternTree; fPatternTree = 0;
-}
-
-//_____________________________________________________________________________
 Double_t Projection::GetPlaneZ( UInt_t i ) const
 {
   // Return the z-position of the i-th wire plane.
@@ -180,9 +168,45 @@ Double_t Projection::GetLayerZ( UInt_t i ) const
 }
 
 //_____________________________________________________________________________
+void Projection::Reset()
+{
+  // Reset parameters, clear list of planes, delete Hitpattern
+  
+  fIsInit = kFALSE;
+  fPlanes.clear();
+  fLayers.clear();
+  fMaxSlope = fWidth = 0.0;
+  delete fHitpattern; fHitpattern = 0;
+  delete fPatternTree; fPatternTree = 0;
+  delete fRoadCorners; fRoadCorners = 0;
+}
+
+//_____________________________________________________________________________
+THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
+{
+  // Initialize the Projection object. Called after MWDC basic initialization.
+  // Sets up event display support, then continues with standard 
+  // initialization.
+
+  Reset();
+
+  // Set up the event display support if corresponding bit is set in the MWDC
+  if( fDetector->TestBit(MWDC::kEventDisplay) ) {
+    fRoadCorners = new TClonesArray("TreeSearch::Road::Corners", 3);
+    R__ASSERT(fRoadCorners);
+    // Set local bit to indicate that initialization is done
+    SetBit(kEventDisplay);
+  }
+
+  // Standard initialization. This calls ReadDatabase() and DefineVariables()
+  return THaAnalysisObject::Init(date);
+}
+
+//_____________________________________________________________________________
 THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
 {
-  // Level-2 initialization - load pattern database and initialize hitpattern
+  // Level-2 initialization - load pattern database and initialize hitpattern.
+  // Requires the wire planes to be fiully initialized.
 
   static const char* const here = "InitLevel2";
 
@@ -346,9 +370,6 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  //FIXME: move elsewhere?
-  Reset();
-
   Double_t angle = kBig;
   fHitMaxDist = 1;
   fMinFitPlanes = 3;
@@ -426,7 +447,8 @@ Int_t Projection::DefineVariables( EMode mode )
     { "t_fit", "Time for fitting Roads (us)", "t_fit" },
     { "t_track", "Total time in Track (us)", "t_track" },
 #endif
-    { "nroads", "Number of good roads",     "fNgoodRoads"      },
+    { "nroads","Number of roads (good or bad)",        "GetNroads()"      },
+    { "ngood", "Number of good roads",                 "fNgoodRoads"      },
     { "rd.nfits", "Number of good fits in road",
                                      "fRoads.TreeSearch::Road.GetNfits()" },
     { "rd.pos",   "Fitted track origin (m)",
@@ -437,9 +459,36 @@ Int_t Projection::DefineVariables( EMode mode )
                                           "fRoads.TreeSearch::Road.fChi2" },
     { "rd.dof",   "Degrees of freedom of fit",
                                            "fRoads.TreeSearch::Road.fDof" },
+    { "rd.good",  "Road has valid data",
+                                          "fRoads.TreeSearch::Road.fGood" },
+    { "rd.xcorner","x coordinates of 4 corners",
+                                               "fRoadCorners.TVector2.fX" },
+    { "rd.zcorner","z coordinate of 4 corners",
+                                               "fRoadCorners.TVector2.fY" },
     { 0 }
   };
   DefineVarsFromList( vars, mode );
+ 
+  // Additional information about the roads found, for event display
+  if( TestBit(kEventDisplay) ) {
+    RVarDef vars_evtdisp[] = {
+      { "rd.xLL","Lower left corner x coordinate (m)",
+	              "fRoadCorners.TreeSearch::Road::Corners.fXLL" },
+      { "rd.xLR","Lower right corner x coordinate (m)",
+	              "fRoadCorners.TreeSearch::Road::Corners.fXLR" },
+      { "rd.zL", "Lower edge z coordinate (m)",
+                       "fRoadCorners.TreeSearch::Road::Corners.fZL" },
+      { "rd.xUL","Upper left corner x coordinate (m)",
+	              "fRoadCorners.TreeSearch::Road::Corners.fXUL" },
+      { "rd.xUR","Upper right corner x coordinate (m)",
+	              "fRoadCorners.TreeSearch::Road::Corners.fXUR" },
+      { "rd.zU", "Upper edge z coordinate (m)",
+                       "fRoadCorners.TreeSearch::Road::Corners.fZU" },
+      { 0 }
+    };
+    DefineVarsFromList( vars_evtdisp, mode );
+  }
+ 
   return 0;
 }
 
@@ -520,18 +569,16 @@ Int_t Projection::Track()
   gettimeofday( &start2, 0 );
 #endif
 
-  bool changed = false;
-  // Check for indentical roads or roads that include each other
-  if( GetNroads() > 1 )
-    changed = RemoveDuplicateRoads();
+  // Check for indentical roads or roads that include each other.
+  // Any roads that are eliminated are marked as void.
+  if( GetNroads() > 1 ) {
+    if( RemoveDuplicateRoads() )
+      // Remove empty slots caused by removed duplicate roads
+      fRoads->Compress();
+  }
 
   // Fit hit positions in the roads to straight lines
-  changed |= FitRoads();
-
-  // If any of the above routines removed any roads, compact the roads
-  // array. Gaps of zero pointers tend to be hazardous to your health...
-  if( changed )
-    fRoads->Compress();
+  FitRoads();
 
 #ifdef TESTCODE
   gettimeofday(&stop, 0 );
@@ -556,7 +603,7 @@ Int_t Projection::MakeRoads()
   NodeMap_t::iterator it1, it2, ref_it1;
   for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
-    Road::Node_t& nd1 = *it1;
+    Node_t& nd1 = *it1;
     assert(nd1.second.used < 3);
     // New roads must contain at least one unused pattern
     if( nd1.second.used )
@@ -575,7 +622,7 @@ Int_t Projection::MakeRoads()
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
 	   (*it2).first[0] <= nd1.first[0] + fBinMaxDist ) {
-      Road::Node_t& nd2 = *it2;
+      Node_t& nd2 = *it2;
       if( nd1.first[0] <= nd2.first[0] + fBinMaxDist ) {
 	// Try adding unused or partly used pattern to the new road until there
 	// are no more patterns that could possibly have common hits.
@@ -590,6 +637,10 @@ Int_t Projection::MakeRoads()
     }
     // Update the "used" flags of the road's component patterns
     rd->Finish();
+    if( TestBit(kEventDisplay) ) {
+      assert( fRoads->GetLast() == fRoadCorners->GetLast()+1 );
+      new( (*fRoadCorners)[fRoads->GetLast()] ) Road::Corners(rd);
+    }
   }
 #ifdef VERBOSE
   if( !fRoads->IsEmpty() ) {
@@ -658,13 +709,19 @@ Bool_t Projection::FitRoads()
 
   for( UInt_t i = 0; i < GetNroads(); ++i ) {
     Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
-    if( rd && !rd->Fit() ) {
-      // Erase roads with bad fits (too few planes occupied etc.)
-      fRoads->RemoveAt(i);
-      changed = true;
+    assert(rd);
+    if( rd->IsGood() ) {
+      if( rd->Fit() )
+	// Count good roads (not void and good fit)
+	++fNgoodRoads;
+      else {
+	// Void roads with bad fits
+	rd->Void();
+	changed = true;
 #ifdef TESTCODE
-      ++n_badfits;
+	++n_badfits;
 #endif
+      }
     }
   }
   return changed;
@@ -769,7 +826,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     assert(ins.second);  // duplicate matches should never happen
 
     // Retrieve the node that was just inserted.
-    Road::Node_t& node = *ins.first;
+    Node_t& node = *ins.first;
 
     // Collect all hits associated with the pattern's bins and save them
     // in the node's HitSet

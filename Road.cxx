@@ -24,6 +24,7 @@
 using namespace std;
 
 ClassImp(TreeSearch::Road)
+ClassImp(TreeSearch::Road::Corners)
 
 namespace TreeSearch {
 
@@ -47,7 +48,7 @@ typedef Hset_t::iterator siter_t;
 //_____________________________________________________________________________
 Road::Road( const Projection* proj ) 
   : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
-    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(false),
+    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fBuild(0)
 {
   // Constructor
@@ -491,7 +492,7 @@ Bool_t Road::Fit()
   // Fit results with acceptable chi2 (Projection::fChisqLimits) are
   // sorted into fFitData, lowest chi2 first.
 
-  fGood = false;
+  assert( fGood );
   DeleteContainer( fFitData );
 
   // Collect coordinates of hits that are within the width of the road
@@ -598,7 +599,7 @@ Bool_t Road::Fit()
     }
   }
 
-  return (fGood = true);
+  return true;
 }
 
 //_____________________________________________________________________________

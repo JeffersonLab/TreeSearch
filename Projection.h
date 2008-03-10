@@ -34,12 +34,13 @@ namespace TreeSearch {
     typedef std::pair<Double_t,Double_t> pdbl_t;
 
     Projection( Int_t type, const char* name, Double_t angle,
-		THaDetectorBase* parent = 0 );
+		THaDetectorBase* parent );
     virtual ~Projection();
 
     void            AddPlane( WirePlane* wp, WirePlane* partner = 0 );
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
+    virtual EStatus Init( const TDatime& date );
     EStatus         InitLevel2( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
     void            Reset();
@@ -61,7 +62,7 @@ namespace TreeSearch {
     Double_t        GetLayerZ( UInt_t layer ) const;
     Double_t        GetMaxSlope()     const { return fMaxSlope; }
     UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
-    UInt_t          GetNgoodRoads()   const { return GetNroads(); } //TODO
+    UInt_t          GetNgoodRoads()   const { return fNgoodRoads; }
     UInt_t          GetNlevels()      const { return fNlevels; }
     UInt_t          GetNlayers()      const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNpatterns()    const;
@@ -85,6 +86,11 @@ namespace TreeSearch {
     std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
     std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
 #endif
+
+    // Analysis control flags
+    enum {
+      kEventDisplay = BIT(14) // Support event display
+    };
 
   protected:
     typedef std::vector<pdbl_t> vec_pdbl_t;
@@ -122,6 +128,7 @@ namespace TreeSearch {
     NodeMap_t        fPatternsFound; // Patterns found by TreeSearch
     TClonesArray*    fRoads;         // Roads found by MakeRoads
     UInt_t           fNgoodRoads;    // Good roads in fRoads
+    TClonesArray*    fRoadCorners;   // Road corners, for event display
 
 #ifdef TESTCODE
     // Statistics

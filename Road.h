@@ -25,11 +25,11 @@ namespace TreeSearch {
   class HitSet;
   class BuildInfo_t;    // Defined in implementation
 
+  typedef std::pair<const NodeDescriptor,HitSet> Node_t;
+
   class Road : public TObject {
 
   public:
-    typedef std::pair<const NodeDescriptor,HitSet> Node_t;
-
     // Coordinates of hit positions, for track fitting
     struct Point {
       Point() : x(0), hit(0) {}
@@ -44,7 +44,7 @@ namespace TreeSearch {
     // Fit results
     struct FitResult {
       Double_t fPos, fSlope, fChi2, fV[3];
-      std::vector<Point*>   fFitCoordinates;
+      std::vector<TreeSearch::Road::Point*>   fFitCoordinates;
       FitResult( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov )
 	: fPos(pos), fSlope(slope), fChi2(chi2)
       { assert(cov); memcpy(fV, cov, 3*sizeof(Double_t)); }
@@ -52,7 +52,8 @@ namespace TreeSearch {
       // Sort fit results by ascending chi2
       bool operator<( const FitResult& rhs ) const 
       { return ( fChi2 < rhs.fChi2 ); }
-      const std::vector<Point*>& GetPoints() const { return fFitCoordinates; }
+      const std::vector<TreeSearch::Road::Point*>& GetPoints() const 
+      { return fFitCoordinates; }
 
       struct Chi2IsLess
 	: public std::binary_function< FitResult*, FitResult*, bool >
@@ -60,6 +61,25 @@ namespace TreeSearch {
 	bool operator() ( const FitResult* a, const FitResult* b ) const
 	{ assert(a&&b); return ( a->fChi2 < b->fChi2 ); }
       };
+    };
+
+    // For global variable access/event display
+    friend class Corners;
+    class Corners : public TObject {
+    public:
+      explicit Corners( Road* rd ) 
+	: fXLL(rd->fCornerX[0]), fXLR(rd->fCornerX[1]), fZL(rd->fZL), 
+	  fXUL(rd->fCornerX[3]), fXUR(rd->fCornerX[2]), fZU(rd->fZU) {} 
+      Corners() {}  // For ROOT RTTI
+      virtual ~Corners() {}
+    private:
+      Double_t fXLL;  // Lower left corner x coord
+      Double_t fXLR;  // Lower right corner x coord
+      Double_t fZL;   // Lower edge z coord
+      Double_t fXUL;  // Upper left corner x coord
+      Double_t fXUR;  // Upper right corner x coord
+      Double_t fZU;   // Upper edge z coord
+      ClassDef(Corners,0)
     };
 
     explicit Road( const Projection* proj );
@@ -84,7 +104,9 @@ namespace TreeSearch {
     TVector2       Intersect( const Road* other, Double_t z ) const;
     Bool_t         IsGood() const { return fGood; }
     virtual Bool_t IsSortable () const { return kTRUE; }
+    Bool_t         IsVoid() const { return !fGood; }
     virtual void   Print( Option_t* opt="" ) const;
+    void           Void() { fGood = false; }
 
   protected:
 
