@@ -42,11 +42,11 @@ namespace TreeSearch {
     virtual Int_t   CoarseTrack( TClonesArray& tracks );
     virtual Int_t   FineTrack( TClonesArray& tracks );
     virtual Int_t   DefineVariables( EMode mode = kDefine );
-    virtual Int_t   FindVertices(TClonesArray&) {return 0;}
     virtual void    Print(const Option_t* opt) const;
     virtual void    SetDebug( Int_t level );
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
+    void            EnableEventDisplay( Bool_t enable = true );
     Double_t        GetRefTime( UInt_t i ) const 
     { return (i<(UInt_t)fRefMap->GetSize()) ? fRefTime[i] : kBig; }
 
@@ -63,7 +63,8 @@ namespace TreeSearch {
       kPairsOnly  = BIT(15), // Accept only pairs of hits from plane pairs
       kMCdata     = BIT(16), // Assume input is Monte Carlo data
       kNoPartner  = BIT(17), // Never partner wire planes
-      k3dFastMatch= BIT(18)  // Use fast 3D matching algorithm (auto detected)
+      k3dFastMatch= BIT(18), // Use fast 3D matching algorithm (auto detected)
+      kEventDisplay = BIT(19)  // Support event display
     };
 
   protected:

@@ -559,6 +559,7 @@ Int_t MWDC::DefineVariables( EMode mode )
   // Register variables in global list
   
   RVarDef vars[] = {
+    //TODO: useful global variables
 #if 0
     { "trackskipped", "Tracking skipped or truncated", "fTooBusy"       },
     { "cproctime",    "Coarse Processing Time",        "fCoarseProcTime"},
@@ -842,6 +843,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   string planeconfig;
   Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
   f3dMatchCut = 1e-4;
+  Int_t event_display = false;
   DBRequest request[] = {
     { "planeconfig",  &planeconfig, kString },
     { "cratemap",     cmap,         kIntM,    6 },
@@ -850,6 +852,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     { "MCdata",       &mc_data,     kInt,     0, 1 },
     { "nopartner",    &nopartner,   kInt,     0, 1 },
     { "3d_matchcut",  &f3dMatchCut, kDouble,  0, 1 },
+    { "event_display",&event_display, kInt,   0, 1 },
     { 0 }
   };
 
@@ -919,6 +922,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   if( fDebug > 0 )
     Info( Here(here), "Loaded %u planes", fPlanes.size() );
 
+  SetBit( kEventDisplay, (event_display != 0) );
+
   fIsInit = kTRUE;
   return kOK;
 }
@@ -966,6 +971,20 @@ void MWDC::SetDebug( Int_t level )
 // {
 //   fDoBench = b;
 // }
+
+//_____________________________________________________________________________
+void MWDC::EnableEventDisplay( Bool_t b )
+{
+  // Enable event display support. Can only be called before initialization.
+
+  if( !fIsInit ) {
+    Error( Here("EnableEventDisplay"), "Cannot enable/disable event display "
+	   "support after initialization." );
+    return;
+  }
+
+  SetBit( kEventDisplay, b );
+}
 
 //_____________________________________________________________________________
 EProjType MWDC::NameToType( const char* name )
