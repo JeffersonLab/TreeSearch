@@ -2,7 +2,7 @@
 
 SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx Hitpattern.cxx \
 	Projection.cxx Pattern.cxx PatternTree.cxx PatternGenerator.cxx \
-	TreeWalk.cxx Road.cxx
+	TreeWalk.cxx Road.cxx BigBite.cxx
 
 EXTRAHDR = Helper.h Types.h
 
@@ -13,7 +13,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version
 export DEBUG = 1
-export VERBOSE = 1
+#export VERBOSE = 1
 export TESTCODE = 1
 export I387MATH = 1
 export EXTRAWARN = 1
