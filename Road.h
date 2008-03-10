@@ -88,14 +88,14 @@ namespace TreeSearch {
 
   protected:
 
-    const Projection*     fProjection; //! Projection that this Road belongs to
+    const Projection*  fProjection; //! Projection that this Road belongs to
 
-    std::vector<Double_t> fCornerX;    // x positions of corners
-    Double_t              fZL, fZU;    // z +/- eps of first/last plane 
+    Double_t           fCornerX[5]; // x positions of corners
+    Double_t           fZL, fZU;    // z +/- eps of first/last plane 
 
 
-    std::list<Node_t*>    fPatterns;   // Patterns in this road
-    Hset_t                fHits;       // All hits linked to the patterns
+    std::list<Node_t*> fPatterns;   // Patterns in this road
+    Hset_t             fHits;       // All hits linked to the patterns
     
     std::vector< std::vector<Point*> > fPoints; // Hit pos within road
     std::vector<FitResult*>  fFitData; // Good fit results, sorted by chi2

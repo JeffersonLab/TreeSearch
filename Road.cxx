@@ -37,7 +37,7 @@ struct BuildInfo_t {
 };
 
 // Number of points for polygon test
-static const vector<double>::size_type kNcorner = 5;
+static const size_t kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
 
 typedef vector<Road::Point*> Pvec_t;
@@ -46,7 +46,7 @@ typedef Hset_t::iterator siter_t;
 
 //_____________________________________________________________________________
 Road::Road( const Projection* proj ) 
-  : TObject(), fProjection(proj), fCornerX(kNcorner), fZL(kBig), fZU(kBig), 
+  : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(false),
     fBuild(0)
 {
@@ -54,22 +54,24 @@ Road::Road( const Projection* proj )
 
   assert(fProjection);  // Invalid Projection* pointer
 
-  fBuild = new BuildInfo_t;
+  memset( fCornerX, 0, kNcorner*sizeof(Double_t) );
   fPoints.reserve( fProjection->GetNplanes() );
+  fBuild = new BuildInfo_t;
 }
 
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) : 
   TObject(orig), fProjection(orig.fProjection),
-  fCornerX(orig.fCornerX), fZL(orig.fZL), fZU(orig.fZU),
+  fZL(orig.fZL), fZU(orig.fZU),
   fPatterns(orig.fPatterns), fHits(orig.fHits),
   fPos(orig.fPos), fSlope(orig.fSlope), fChi2(orig.fChi2),
   fDof(orig.fDof), fGood(orig.fGood)
 {
   // Copy constructor
 
+  memcpy( fCornerX, orig.fCornerX, kNcorner*sizeof(Double_t) );
   //TODO: copy points?
-
+  
   if( !orig.fFitData.empty() ) {
     fFitData.reserve( orig.fFitData.size() );
     for( vector<FitResult*>::const_iterator it = orig.fFitData.begin();
@@ -91,7 +93,7 @@ Road& Road::operator=( const Road& rhs )
   if( this != &rhs ) {
     TObject::operator=(rhs);
     fProjection = rhs.fProjection;
-    fCornerX    = rhs.fCornerX;
+    memcpy( fCornerX, rhs.fCornerX, kNcorner*sizeof(Double_t) );
     fZL         = rhs.fZL;
     fZU         = rhs.fZU;
     fPatterns   = rhs.fPatterns;
@@ -412,7 +414,6 @@ Bool_t Road::CollectCoordinates()
   // is allowed by Projection::fPlaneCombos, otherwise false.
   // Results are in fPoints.
 
-  assert( fCornerX.size() == kNcorner );
   DeleteContainerOfContainers( fPoints );
 
 #ifdef VERBOSE
