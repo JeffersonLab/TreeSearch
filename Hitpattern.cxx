@@ -258,7 +258,7 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   Double_t maxdist = A->GetMaxSlope() * dz;
   Double_t maxdist2 = 0.5*maxdist;
   bool do_single_hits =
-    ( A->GetDetector()->TestBit(MWDC::kPairsOnly) == kFALSE || B == 0 );
+    ( A->GetMWDC()->TestBit(MWDC::kPairsOnly) == kFALSE || B == 0 );
 
   Int_t nhits = 0;
 

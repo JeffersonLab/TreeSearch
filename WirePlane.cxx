@@ -45,7 +45,8 @@ WirePlane::WirePlane( const char* name, const char* description,
   static const char* const here = "WirePlane";
   assert( name && parent );
 
-  fMWDC = dynamic_cast<MWDC*>( GetDetector() );
+  // Wire planes must be subdetectors of an MWDC
+  fMWDC = dynamic_cast<MWDC*>( GetMainDetector() );
   assert( fMWDC );
 
   if( fMWDC->TestBit(MWDC::kMCdata) ) // Monte Carlo data mode?

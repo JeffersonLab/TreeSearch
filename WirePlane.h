@@ -48,7 +48,7 @@ namespace TreeSearch {
     Projection*     GetProjection() const { return fProjection; }
     WirePlane*      GetPartner() const { return fPartner; }
     void            SetPartner( WirePlane* p );
-
+    MWDC*           GetMWDC() const { return fMWDC; }
     Double_t        GetResolution() const { return fResolution; }
     Double_t        GetMaxSlope() const; 
     Double_t        GetWireStart() const { return fWireStart; }
