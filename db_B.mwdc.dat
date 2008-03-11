@@ -22,6 +22,8 @@ B.mwdc.u.angle = 30.0
 B.mwdc.v.angle = -30.0
 B.mwdc.x.angle = 0.0
 
+# Enable support for event display
+B.mwdc.event_display = 1
 
 # "Crate map" for the MWDC. Specifies DAQ module configuration.
 # Allows mixing of Fastbus/VME and modules with different resolutions.
