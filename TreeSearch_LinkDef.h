@@ -16,6 +16,7 @@
 #pragma link C++ class TreeSearch::HitSet+;
 #pragma link C++ class TreeSearch::TimeToDistConv+;
 #pragma link C++ class TreeSearch::LinearTTD+;
+#pragma link C++ class TreeSearch::TanhFitTTD+;
 #pragma link C++ class TreeSearch::Bits+;
 #pragma link C++ class TreeSearch::Hitpattern+;
 #pragma link C++ class TreeSearch::Projection+;
