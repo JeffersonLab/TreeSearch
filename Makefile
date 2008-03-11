@@ -127,17 +127,17 @@ DISTFILE      = $(PKG).tar.gz
 
 #------------------------------------------------------------------------------
 OBJ           = $(SRC:.cxx=.o)
-HDR           = $(SRC:.cxx=.h)
+HDR           = $(SRC:.cxx=.h) $(EXTRAHDR)
 DEP           = $(SRC:.cxx=.d)
 OBJS          = $(OBJ) $(USERDICT).o
 
 all:		$(USERLIB)
 
-$(USERLIB):	$(HDR) $(OBJS)
+$(USERLIB):	$(OBJS)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $(OBJS)
 		@echo "$@ done"
 
-$(USERDICT).cxx: $(HDR) $(EXTRAHDR) $(LINKDEF)
+$(USERDICT).cxx: $(HDR) $(LINKDEF)
 	@echo "Generating dictionary $(USERDICT)..."
 	$(ROOTSYS)/bin/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
@@ -156,7 +156,7 @@ srcdist:
 		rm -f $(DISTFILE)
 		rm -rf $(PKG)
 		mkdir $(PKG)
-		cp -p $(SRC) $(HDR) $(LINKDEF) db*.dat README Makefile $(PKG)
+		cp -p $(SRC) $(HDR) $(LINKDEF) db*.dat Makefile $(PKG)
 		gtar czvf $(DISTFILE) --ignore-failed-read \
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)
