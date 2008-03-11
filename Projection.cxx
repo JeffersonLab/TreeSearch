@@ -461,10 +461,6 @@ Int_t Projection::DefineVariables( EMode mode )
                                            "fRoads.TreeSearch::Road.fDof" },
     { "rd.good",  "Road has valid data",
                                           "fRoads.TreeSearch::Road.fGood" },
-    { "rd.xcorner","x coordinates of 4 corners",
-                                               "fRoadCorners.TVector2.fX" },
-    { "rd.zcorner","z coordinate of 4 corners",
-                                               "fRoadCorners.TVector2.fY" },
     { 0 }
   };
   DefineVarsFromList( vars, mode );
