@@ -127,9 +127,9 @@ Double_t TanhFitTTD::ConvertTimeToDist( Double_t time, Double_t slope ) const
   // Slope is used to project the distance of closest approach onto the wire
   // plane (1/cos correction).
 
-  if( time <= 0.0 )
-    return 0.0;
   Double_t t = time - fT0;
+  if( t <= 0.0 )
+    return 0.0;
   Double_t d = fC0 * TMath::TanH( (fDriftVel*t +  fC2*t*t) * fInvC0 );
   // NB: 1/cos = sqrt(1+tan^2)
   return d * TMath::Sqrt( 1.0 + slope*slope );
