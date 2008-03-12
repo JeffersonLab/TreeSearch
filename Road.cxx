@@ -587,8 +587,13 @@ Bool_t Road::Fit()
   fChi2  = best->fChi2;
   
   // Save with the wire planes the hit coordinates used in the good fits 
+  // Unless building TESTCODE, save only hits of best fit
+#ifdef TESTCODE
   for( vector<FitResult*>::size_type ifit = 0;
        ifit < fFitData.size(); ++ifit ) {
+#else
+    UInt_t ifit = 0;
+#endif
     Pvec_t& coord = fFitData[ifit]->fFitCoordinates;
     for( Pvec_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
       Point* p = *it;
@@ -597,7 +602,9 @@ Bool_t Road::Fit()
       Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
 	wp->AddFitCoord( FitCoord( p->hit, this, ifit, p->x, x_track, slope ));
     }
+#ifdef TESTCODE
   }
+#endif
 
   return true;
 }
