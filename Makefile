@@ -12,7 +12,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 
 #------------------------------------------------------------------------------
 # Compile debug version
-export DEBUG = 1
+#export DEBUG = 1
 #export VERBOSE = 1
 export TESTCODE = 1
 export I387MATH = 1
@@ -77,14 +77,14 @@ ifdef DEBUG
   LDFLAGS     = -g -O0
   DEFINES     =
 else
-  CXXFLAGS    = -O
+  CXXFLAGS    = -O2 -march=pentium4
   LDFLAGS     = -O
   DEFINES     = -DNDEBUG
 endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
 ifdef EXTRAWARN
-CXXFLAGS     += -Wextra -Wno-missing-field-initializers 
+CXXFLAGS     += -Wextra -Wno-missing-field-initializers
 endif
 LD            = g++
 SOFLAGS       = -shared
@@ -136,6 +136,11 @@ all:		$(USERLIB)
 $(USERLIB):	$(OBJS)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $(OBJS)
 		@echo "$@ done"
+
+ifeq ($(ARCH),linux)
+$(USERDICT).o:	$(USERDICT).cxx
+	$(CXX) $(CXXFLAGS) -Wno-strict-aliasing -o $@ -c $^
+endif
 
 $(USERDICT).cxx: $(HDR) $(LINKDEF)
 	@echo "Generating dictionary $(USERDICT)..."
