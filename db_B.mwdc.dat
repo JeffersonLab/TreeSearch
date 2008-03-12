@@ -59,30 +59,6 @@ B.mwdc.v2.required = 1
 B.mwdc.x2.required = 1
 
 #-----------------------------------------------------------
-#  Linear time-to-distance conversion. 
-#  There is one parameter, the effective drift velocity.
-#  The velocity may differ slightly from plane to plane.
-#-----------------------------------------------------------
-#
-#-- Not used, see TanhFitTTD below
-# B.mwdc.ttd.converter = LinearTTD
-# B.mwdc.u1.ttd.param  = 4.487e04
-# B.mwdc.u1p.ttd.param = 4.506e04
-# B.mwdc.u2.ttd.param  = 4.276e04
-# B.mwdc.u3.ttd.param  = 4.306e04
-# B.mwdc.u3p.ttd.param = 4.18e04
-# B.mwdc.x1.ttd.param  = 4.726e04
-# B.mwdc.x1p.ttd.param = 4.627e04
-# B.mwdc.x2.ttd.param  = 4.409e04
-# B.mwdc.x3.ttd.param  = 4.3e04
-# B.mwdc.x3p.ttd.param = 4.305e04
-# B.mwdc.v1.ttd.param  = 4.464e04
-# B.mwdc.v1p.ttd.param = 4.609e04
-# B.mwdc.v2.ttd.param  = 4.396e04
-# B.mwdc.v3.ttd.param  = 4.37e04
-# B.mwdc.v3p.ttd.param = 4.171e04
-
-#-----------------------------------------------------------
 #  TanH fit time-to-distance conversion. 
 #  The parameters are drift vel (m/s), c0 (m), c2 (m/s^2),
 #  and t0 (s). Data from S. Riordan's thesis, CMU, 2008
@@ -90,7 +66,7 @@ B.mwdc.x2.required = 1
 #-----------------------------------------------------------
 
 B.mwdc.ttd.converter = TanhFitTTD
-B.mwdc.ttd.param = 5.02e4 5e-3 1.95e-7 6.1e-9
+B.mwdc.ttd.param = 5.02e4 5e-3 1.95e11 6.1e-9
 
 #-----------------------------------------------------------
 #   U PLANES
