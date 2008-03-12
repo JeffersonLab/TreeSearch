@@ -348,13 +348,13 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
   }
 
   // Determine Chi2 confidence interval limits for the selected CL and the
-  // possible degrees of freedom (minfit-2...nplanes-2)
+  // possible degrees of freedom (minfit-2...nplanes-2) of the projection fit
   fChisqLimits.clear();
   fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
   for( vec_pdbl_t::size_type dof = fMinFitPlanes-2;
        dof < fChisqLimits.size(); ++dof ) {
-    fChisqLimits[dof].first = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
-    fChisqLimits[dof].second = TMath::ChisquareQuantile( fConfLevel, dof );
+    fChisqLimits[dof].first = TMath::ChisquareQuantile( fConfLevel, dof );
+    fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
   }
   
   return fStatus = kOK;
