@@ -12,7 +12,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 
 #------------------------------------------------------------------------------
 # Compile debug version
-#export DEBUG = 1
+export DEBUG = 1
 #export VERBOSE = 1
 export TESTCODE = 1
 export I387MATH = 1
@@ -67,6 +67,7 @@ DEFINES      += -DSUNVERS -DHAS_SSTREAM
 CXXFLAGS     += -KPIC
 LD            = CC
 SOFLAGS       = -G
+DICTCXXFLG   :=
 endif
 
 ifeq ($(ARCH),linux)
@@ -83,8 +84,14 @@ else
 endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
+DICTCXXFLG   :=
 ifdef EXTRAWARN
+#FIXME: should be configure'd:
+CXXVER       := $(shell g++ --version | head -1 | sed 's/.* \([0-9]\)\..*/\1/')
+ifeq ($(CXXVER),4)
 CXXFLAGS     += -Wextra -Wno-missing-field-initializers
+DICTCXXFLG   := -Wno-strict-aliasing 
+endif
 endif
 LD            = g++
 SOFLAGS       = -shared
@@ -139,7 +146,7 @@ $(USERLIB):	$(OBJS)
 
 ifeq ($(ARCH),linux)
 $(USERDICT).o:	$(USERDICT).cxx
-	$(CXX) $(CXXFLAGS) -Wno-strict-aliasing -o $@ -c $^
+	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
 endif
 
 $(USERDICT).cxx: $(HDR) $(LINKDEF)
