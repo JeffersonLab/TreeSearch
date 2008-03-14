@@ -600,7 +600,9 @@ Bool_t Road::Fit()
       WirePlane* wp = p->hit->GetWirePlane();
       Double_t slope = fFitData[ifit]->fSlope;
       Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
-	wp->AddFitCoord( FitCoord( p->hit, this, ifit, p->x, x_track, slope ));
+      FitCoord* fc = wp->AddFitCoord
+	( FitCoord( p->hit, this, ifit, p->x, x_track, slope, kBig, kBig ));
+      p->coord.push_back(fc);
     }
 #ifdef TESTCODE
   }

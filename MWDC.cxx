@@ -223,32 +223,6 @@ Int_t MWDC::Decode( const THaEvData& evdata )
 }
 
 //_____________________________________________________________________________
-Double_t MWDC::CalcChisquare( const Rvec_t& roads,
-			      const vector<Double_t>& coef )
-{
-  // Calculate chi2 of the fit with given parameters coef with respect
-  // to the measured coordinates contained in the given set of roads.
-
-  Double_t chi2 = 0;
-  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
-    const Projection* proj = (*it)->GetProjection();
-    Double_t cosa = proj->GetCosAngle();
-    Double_t sina = proj->GetSinAngle();
-
-    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
-    for( vector<Road::Point*>::const_iterator it2 = points.begin();
-	 it2 != points.end(); ++it2 ) {
-      const Road::Point* p = (*it2);
-      Double_t y = coef[0]*cosa + coef[1]*cosa*p->z
-	+ coef[2]*sina + coef[3]*sina*p->z;
-      Double_t diff = (y - p->x) / p->res();
-      chi2 += diff*diff;
-    }
-  }
-  return chi2;
-}
-
-//_____________________________________________________________________________
 Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 		      Double_t& chi2, TMatrixDSym* coef_covar )
 {
@@ -328,8 +302,28 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   assert( Aty.GetNrows() == 4 );
   coef.assign( Aty.GetMatrixArray(), Aty.GetMatrixArray()+Aty.GetNrows() );
 
-  // Calculate chi2
-  chi2 = CalcChisquare( roads, coef );
+  // Calculate chi2 and update FitCoord data in the WirePlanes
+  chi2 = 0;
+  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
+    const Projection* proj = (*it)->GetProjection();
+    Double_t cosa = proj->GetCosAngle();
+    Double_t sina = proj->GetSinAngle();
+    
+    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
+    for( vector<Road::Point*>::const_iterator it2 = points.begin();
+	 it2 != points.end(); ++it2 ) {
+      const Road::Point* p = (*it2);
+      Double_t slope = coef[1]*cosa + coef[3]*sina;
+      Double_t y = coef[0]*cosa + coef[2]*sina + slope*p->z;
+      Double_t diff = (y - p->x) / p->res();
+      chi2 += diff*diff;
+      assert( !p->coord.empty() );
+      for( vector<FitCoord*>::const_iterator icoord = p->coord.begin();
+	   icoord != p->coord.end(); ++icoord ) {
+	(*icoord)->Set3DTrkInfo( y, slope );
+      }
+    }
+  }
 
   // Calculate covariance matrix of the parameters, if requested
   if( coef_covar ) {

@@ -39,6 +39,7 @@ namespace TreeSearch {
       Double_t x;    // Selected x coordinates
       Double_t z;    // z coordinate
       Hit*     hit;  // Associated hit (stored in WirePlane)
+      std::vector<FitCoord*> coord; // Associated FitCoord(s) (in WirePlane)
     };
 
     // Fit results
