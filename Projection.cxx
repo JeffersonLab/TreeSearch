@@ -374,7 +374,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   fHitMaxDist = 1;
   fMinFitPlanes = 3;
   fMaxMiss = 0;
-  fConfLevel = 0.999;
+  fConfLevel = 1e-3;
   Int_t req1of2 = 1;
   const DBRequest request[] = {
     { "angle",           &angle,         kDouble, 0, 1 },
@@ -449,15 +449,15 @@ Int_t Projection::DefineVariables( EMode mode )
 #endif
     { "nroads","Number of roads (good or bad)",        "GetNroads()"      },
     { "ngood", "Number of good roads",                 "fNgoodRoads"      },
-    { "rd.nfits", "Number of good fits in road",
+    { "rd.nfits", "Number of acceptable fits in road",
                                      "fRoads.TreeSearch::Road.GetNfits()" },
-    { "rd.pos",   "Fitted track origin (m)",
+    { "rd.pos",   "Origin of best track (m)",
                                            "fRoads.TreeSearch::Road.fPos" },
-    { "rd.slope", "Fitted track slope (dx/dz)",
+    { "rd.slope", "Slope (dx/dz) of best track",
                                          "fRoads.TreeSearch::Road.fSlope" },
-    { "rd.chi2",  "Chi2 of fit", 
+    { "rd.chi2",  "Chi2 of best fit", 
                                           "fRoads.TreeSearch::Road.fChi2" },
-    { "rd.dof",   "Degrees of freedom of fit",
+    { "rd.dof",   "Degrees of freedom of best fit",
                                            "fRoads.TreeSearch::Road.fDof" },
     { "rd.good",  "Road has valid data",
                                           "fRoads.TreeSearch::Road.fGood" },
