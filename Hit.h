@@ -212,7 +212,7 @@ namespace TreeSearch {
 	fTrackPos(trkpos2d), fTrackSlope(trkslope2d),
 	f3DTrkPos(trkpos), f3DTrkSlope(trkslope)
     { assert(fHit&&fRoad); }
-    FitCoord() {} // For ROOT RTTI
+    FitCoord() :fHit(0), fRoad(0) {} // For ROOT RTTI
     virtual ~FitCoord() {}
 
     Double_t  GetChi2()       const;
