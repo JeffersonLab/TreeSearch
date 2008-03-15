@@ -35,11 +35,13 @@ namespace TreeSearch {
       Point() : x(0), hit(0) {}
       Point( Double_t _x, Double_t _z, Hit* _hit ) 
 	: x(_x), z(_z), hit(_hit) { assert(hit); }
+      virtual ~Point() {}
       Double_t res() const { return hit->GetResolution(); }
       Double_t x;    // Selected x coordinates
       Double_t z;    // z coordinate
       Hit*     hit;  // Associated hit (stored in WirePlane)
       std::vector<FitCoord*> coord; // Associated FitCoord(s) (in WirePlane)
+      ClassDef(Point,0)
     };
 
     // Fit results
@@ -84,7 +86,7 @@ namespace TreeSearch {
     };
 
     explicit Road( const Projection* proj );
-    Road() {} // For internal ROOT use
+    Road() : fProjection(0), fBuild(0) {} // For internal ROOT use
     Road( const Road& );
     Road& operator=( const Road& );
     virtual ~Road();

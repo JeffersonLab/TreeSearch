@@ -30,12 +30,13 @@
 #pragma link C++ class TreeSearch::FitCoord+;
 #pragma link C++ class TreeSearch::Road::FitResult+;
 #pragma link C++ class TreeSearch::Road::Corners+;
+#pragma link C++ class TreeSearch::Road::Point+;
 #pragma link C++ class TreeSearch::BigBite+;
 
-#pragma link C++ class std::pair<TObject*,TObject*>;
-#pragma link C++ class std::vector<TreeSearch::WirePlane*>;
-#pragma link C++ class std::vector<TreeSearch::Projection*>;
+#pragma link C++ class std::pair<TObject*,TObject*>+;
+#pragma link C++ class std::vector<TreeSearch::WirePlane*>+;
+#pragma link C++ class std::vector<TreeSearch::Projection*>+;
 #pragma link C++ class std::pair<const TreeSearch::NodeDescriptor,
-                                 TreeSearch::HitSet>;
+                                 TreeSearch::HitSet>+;
 
 #endif

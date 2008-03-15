@@ -24,6 +24,7 @@
 using namespace std;
 
 ClassImp(TreeSearch::Road)
+ClassImp(TreeSearch::Road::Point)
 ClassImp(TreeSearch::Road::Corners)
 
 namespace TreeSearch {
