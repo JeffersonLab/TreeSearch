@@ -86,8 +86,6 @@ namespace TreeSearch {
 #ifdef TESTCODE
     Int_t           fEvNum;     // Current event number (for diagnostics)
 #endif
-    static Double_t CalcChisquare( const Rvec_t& roads,
-				   const vector<Double_t>& coef );
     static Int_t    FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 			      Double_t& chi2, TMatrixDSym* coef_covar = 0 );
 

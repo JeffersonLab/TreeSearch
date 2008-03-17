@@ -267,8 +267,9 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
     Double_t cosa = proj->GetCosAngle();
     Double_t sina = proj->GetSinAngle();
 
-    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
-    for( vector<Road::Point*>::const_iterator it2 = points.begin();
+    // Fit the 3D track using the points from the best fit in each Road
+    const Road::Pvec_t& points = (*it)->GetPoints();
+    for( Road::Pvec_t::const_iterator it2 = points.begin();
 	 it2 != points.end(); ++it2 ) {
       const Road::Point* p = (*it2);
       ++npoints;
@@ -305,23 +306,36 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   // Calculate chi2 and update FitCoord data in the WirePlanes
   chi2 = 0;
   for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
-    const Projection* proj = (*it)->GetProjection();
+    Road* rd = *it;
+    const Projection* proj = rd->GetProjection();
     Double_t cosa = proj->GetCosAngle();
     Double_t sina = proj->GetSinAngle();
     
-    const vector<Road::Point*>& points = (*it)->GetFitResult()->GetPoints();
-    for( vector<Road::Point*>::const_iterator it2 = points.begin();
+    const Road::Pvec_t& points = rd->GetPoints();
+    for( Road::Pvec_t::const_iterator it2 = points.begin();
 	 it2 != points.end(); ++it2 ) {
-      const Road::Point* p = (*it2);
+      const Road::Point* p = *it2;
       Double_t slope = coef[1]*cosa + coef[3]*sina;
-      Double_t y = coef[0]*cosa + coef[2]*sina + slope*p->z;
-      Double_t diff = (y - p->x) / p->res();
+      Double_t x = coef[0]*cosa + coef[2]*sina + slope*p->z;
+      Double_t diff = (x - p->x) / p->res();
       chi2 += diff*diff;
+#ifdef TESTCODE
+      // TESTCODE adds 3D results to existing used hit data in WirePlanes.
+      // These all have rank==0.
       assert( !p->coord.empty() );
       for( vector<FitCoord*>::const_iterator icoord = p->coord.begin();
 	   icoord != p->coord.end(); ++icoord ) {
-	(*icoord)->Set3DTrkInfo( y, slope );
+	assert( (*icoord)->GetRank() == 0 );
+	(*icoord)->Set3DTrkInfo( x, slope );
       }
+#else
+      // Production code creates the hit coordinates in the WirePlanes
+      // using only the points from the 3D track fit(s)
+      Double_t slope2d  = rd->GetSlope();
+      Double_t trkpos2d = rd->GetPos() + p->z * slope2d;
+      p->hit->GetWirePlane()->AddFitCoord
+	( FitCoord( p->hit, rd, p->x, trkpos2d, slope2d, x, slope ));
+#endif
     }
   }
 

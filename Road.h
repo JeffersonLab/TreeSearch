@@ -40,23 +40,33 @@ namespace TreeSearch {
       Double_t x;    // Selected x coordinates
       Double_t z;    // z coordinate
       Hit*     hit;  // Associated hit (stored in WirePlane)
+#ifdef TESTCODE
       std::vector<FitCoord*> coord; // Associated FitCoord(s) (in WirePlane)
+#endif
       ClassDef(Point,0)
     };
+
+    typedef std::vector<Road::Point*>  Pvec_t;
 
     // Fit results
     struct FitResult {
       Double_t fPos, fSlope, fChi2, fV[3];
-      std::vector<TreeSearch::Road::Point*>   fFitCoordinates;
+      Pvec_t   fFitCoordinates;
+
       FitResult( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov )
 	: fPos(pos), fSlope(slope), fChi2(chi2)
       { assert(cov); memcpy(fV, cov, 3*sizeof(Double_t)); }
       FitResult() {}
+      void Set( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov ) {
+	assert(cov);
+	fPos = pos; fSlope = slope; fChi2 = chi2;
+	memcpy(fV, cov, 3*sizeof(Double_t));
+      }
+
       // Sort fit results by ascending chi2
       bool operator<( const FitResult& rhs ) const 
       { return ( fChi2 < rhs.fChi2 ); }
-      const std::vector<TreeSearch::Road::Point*>& GetPoints() const 
-      { return fFitCoordinates; }
+      const Pvec_t& GetPoints() const  { return fFitCoordinates; }
 
       struct Chi2IsLess
 	: public std::binary_function< FitResult*, FitResult*, bool >
@@ -99,8 +109,10 @@ namespace TreeSearch {
     Double_t       GetChi2( UInt_t ifit=0 ) const;
     FitResult*     GetFitResult( UInt_t ifit=0 ) const;
     UInt_t         GetNfits() const { return (UInt_t)fFitData.size(); }
-    Double_t       GetPos     ( Double_t z = 0 ) const;
-    Double_t       GetPosErrsq( Double_t z = 0 ) const;
+    const Pvec_t&  GetPoints( UInt_t ifit=0 ) const;
+    Double_t       GetPos() const { return fPos; }
+    Double_t       GetPos( Double_t z ) const { return fPos + z*fSlope; }
+    Double_t       GetPosErrsq( Double_t z ) const;
     const Projection* GetProjection() const { return fProjection; }
     Double_t       GetSlope() const { return fSlope; }
     Bool_t         Includes ( const Road* other ) const;
@@ -122,8 +134,8 @@ namespace TreeSearch {
     std::list<Node_t*> fPatterns;   // Patterns in this road
     Hset_t             fHits;       // All hits linked to the patterns
     
-    std::vector< std::vector<Point*> > fPoints; // Hit pos within road
-    std::vector<FitResult*>  fFitData; // Good fit results, sorted by chi2
+    std::vector<Pvec_t>     fPoints;  // Hit pos within road
+    std::vector<FitResult*> fFitData; // Good fit results, sorted by chi2
 
     // Best fit results (copy of fFitData.begin() for global variable access)
     Double_t  fPos;      // Track origin
@@ -172,20 +184,20 @@ namespace TreeSearch {
 
   //---------------------------------------------------------------------------
   inline
+  const TreeSearch::Road::Pvec_t& Road::GetPoints( UInt_t ifit ) const
+  {
+    // Return points used by i-th fit
+    assert( ifit < GetNfits() );
+    return fFitData[ifit]->GetPoints();
+  }
+
+  //---------------------------------------------------------------------------
+  inline
   Road::FitResult* Road::GetFitResult( UInt_t ifit ) const
   {
     // Return fit results of i-th fit
     assert( ifit < GetNfits() );
     return fFitData[ifit];
-  }
-
-  //---------------------------------------------------------------------------
-  inline
-  Double_t Road::GetPos( Double_t z ) const
-  {
-    // Return x = a1+a2*z for best fit (in m)
-    
-    return fPos + z*fSlope;
   }
 
   //---------------------------------------------------------------------------

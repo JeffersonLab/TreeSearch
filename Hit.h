@@ -205,12 +205,20 @@ namespace TreeSearch {
   class FitCoord : public TObject {
 
   public:
-    FitCoord( Hit* hit, Road* road, UInt_t ifit, Double_t pos,
+    FitCoord( Hit* hit, Road* road, Double_t pos,
 	      Double_t trkpos2d, Double_t trkslope2d,
-	      Double_t trkpos, Double_t trkslope ) 
-      : fHit(hit), fRoad(road), fFitRank(ifit), fPos(pos),
-	fTrackPos(trkpos2d), fTrackSlope(trkslope2d),
-	f3DTrkPos(trkpos), f3DTrkSlope(trkslope)
+	      Double_t trkpos, Double_t trkslope
+#ifdef TESTCODE
+	      , UInt_t ifit
+#endif
+	      ) 
+      : fHit(hit), fRoad(road), fPos(pos), fTrackPos(trkpos2d), 
+	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope)
+#ifdef TESTCODE
+      , fFitRank(ifit)
+#else
+      , fFitRank(0)
+#endif
     { assert(fHit&&fRoad); }
     FitCoord() :fHit(0), fRoad(0) {} // For ROOT RTTI
     virtual ~FitCoord() {}
@@ -218,7 +226,6 @@ namespace TreeSearch {
     Double_t  GetChi2()       const;
     Hit*      GetHit()        const { return fHit; }
     Road*     GetRoad()       const { return fRoad; }
-    UInt_t    GetRank()       const { return fFitRank; }
     Double_t  GetPos()        const { return fPos; }
     Double_t  GetDriftTime()  const { return fHit->GetDriftTime(); }
     Double_t  GetDriftDist()  const { return fHit->GetDriftDist(); }
@@ -231,19 +238,23 @@ namespace TreeSearch {
     Double_t  Get3DTrkDist()  const { return f3DTrkPos-fHit->GetWirePos(); }
     Double_t  Get3DTrkResid() const { return f3DTrkPos-fPos; }
 
+#ifdef TESTCODE
+    UInt_t    GetRank()       const { return fFitRank; }
     void      Set3DTrkInfo( Double_t pos, Double_t slope )
     { f3DTrkPos = pos; f3DTrkSlope = slope; }
-      
+#endif
+
   private:
     Hit*      fHit;      // Decoded raw hit data
     Road*     fRoad;     // Road that created this fit
-    UInt_t    fFitRank;  // Fit rank by chi2 within the road (0 = best)
     Double_t  fPos;      // Uncorrected hit position (posL/R) used in fit (m)
     Double_t  fTrackPos; // Track crossing position from projection fit (m)
     Double_t  fTrackSlope; // Track slope from projection fit
     Double_t  f3DTrkPos; // Crossing position of fitted 3D track (m)
     Double_t  f3DTrkSlope; // Slope of fitted 3D track
     //TODO: add more members (for correction data etc)
+
+    UInt_t    fFitRank;  // Fit rank by chi2 within the road (0 = best)
 
     ClassDef(FitCoord,1) // Coordinate information from road fit
   };

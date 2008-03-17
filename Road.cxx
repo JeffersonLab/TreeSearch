@@ -42,7 +42,6 @@ struct BuildInfo_t {
 static const size_t kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
 
-typedef vector<Road::Point*> Pvec_t;
 typedef Hset_t::iterator siter_t;
 #define ALL(c) (c).begin(), (c).end()
 
@@ -565,11 +564,21 @@ Bool_t Road::Fit()
     cout << "ACCEPTED" << endl;
 #endif
 
-    // Save fits with acceptable Chi2
+#ifdef TESTCODE
+    // TESTCODE saves all fits with acceptable Chi2
     fFitData.push_back( new FitResult(a1,a2,chi2,V) );
-    // Save points used for this fit
     fFitData.back()->fFitCoordinates.swap( selected );
-
+#else
+    // Production code saves only the best fit
+    if( fFitData.empty() || chi2 < fFitData.back()->fChi2 ) {
+      if( fFitData.empty() )
+	fFitData.push_back( new FitResult(a1,a2,chi2,V) );
+      else 
+	fFitData.back()->Set(a1,a2,chi2,V);
+      // Save points used for this fit
+      fFitData.back()->fFitCoordinates.swap( selected );
+    }
+#endif
   }
   delete [] w;
 
@@ -578,37 +587,32 @@ Bool_t Road::Fit()
     return false;
   }
 
+#ifdef TESTCODE
   // Sort fit results by ascending chi2
   sort( ALL(fFitData), FitResult::Chi2IsLess() );
 
+  // Save with the WirePlanes the hit coordinates used in all the good
+  // projection (2D) fits 
+  for( vector<FitResult*>::size_type ifit = 0; ifit < fFitData.size();
+       ++ifit ) {
+    Pvec_t& coord = fFitData[ifit]->fFitCoordinates;
+    for( Pvec_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
+      Point* p = *it;
+      Double_t slope   = fFitData[ifit]->fSlope;
+      Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
+      FitCoord* fc = p->hit->GetWirePlane()->AddFitCoord
+	( FitCoord( p->hit, this, p->x, x_track, slope, kBig, kBig, ifit ));
+      p->coord.push_back(fc);
+    }
+  }
+#endif
+
   // Copy best fit results to member variables
-  const FitResult* best = fFitData.front();
+  FitResult* best = fFitData.front();
   fPos   = best->fPos;
   fSlope = best->fSlope;
   fChi2  = best->fChi2;
   
-  // Save with the wire planes the hit coordinates used in the good fits 
-  // Unless building TESTCODE, save only hits of best fit
-#ifdef TESTCODE
-  for( vector<FitResult*>::size_type ifit = 0;
-       ifit < fFitData.size(); ++ifit ) {
-#else
-    UInt_t ifit = 0;
-#endif
-    Pvec_t& coord = fFitData[ifit]->fFitCoordinates;
-    for( Pvec_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
-      Point* p = *it;
-      WirePlane* wp = p->hit->GetWirePlane();
-      Double_t slope = fFitData[ifit]->fSlope;
-      Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
-      FitCoord* fc = wp->AddFitCoord
-	( FitCoord( p->hit, this, ifit, p->x, x_track, slope, kBig, kBig ));
-      p->coord.push_back(fc);
-    }
-#ifdef TESTCODE
-  }
-#endif
-
   return true;
 }
 
