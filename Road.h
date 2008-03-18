@@ -53,11 +53,24 @@ namespace TreeSearch {
       Double_t fPos, fSlope, fChi2, fV[3];
       Pvec_t   fFitCoordinates;
 
-      FitResult( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov )
+      FitResult( Double_t pos, Double_t slope, Double_t chi2, 
+		 const Double_t* cov )
 	: fPos(pos), fSlope(slope), fChi2(chi2)
       { assert(cov); memcpy(fV, cov, 3*sizeof(Double_t)); }
       FitResult() {}
-      void Set( Double_t pos, Double_t slope, Double_t chi2, Double_t* cov ) {
+      // Copying and assignment do not transfer the fFitCoordinates!
+      FitResult( const FitResult& orig )
+	: fPos(orig.fPos), fSlope(orig.fSlope), fChi2(orig.fChi2)
+      { memcpy(fV, orig.fV, 3*sizeof(Double_t)); }
+      FitResult& operator=( const FitResult& rhs ) {
+	if( this != &rhs ) {
+	  fPos = rhs.fPos; fSlope = rhs.fSlope; fChi2 = rhs.fChi2;
+	  memcpy(fV, rhs.fV, 3*sizeof(Double_t));
+	}
+	return *this;
+      }
+      void Set( Double_t pos, Double_t slope, Double_t chi2, 
+		const Double_t* cov ) {
 	assert(cov);
 	fPos = pos; fSlope = slope; fChi2 = chi2;
 	memcpy(fV, cov, 3*sizeof(Double_t));
@@ -130,13 +143,6 @@ namespace TreeSearch {
     Double_t           fCornerX[5]; // x positions of corners
     Double_t           fZL, fZU;    // z +/- eps of first/last plane 
 
-
-    std::list<Node_t*> fPatterns;   // Patterns in this road
-    Hset_t             fHits;       // All hits linked to the patterns
-    
-    std::vector<Pvec_t>     fPoints;  // Hit pos within road
-    std::vector<FitResult*> fFitData; // Good fit results, sorted by chi2
-
     // Best fit results (copy of fFitData.begin() for global variable access)
     Double_t  fPos;      // Track origin
     Double_t  fSlope;    // Track slope
@@ -146,12 +152,20 @@ namespace TreeSearch {
 
     Bool_t    fGood;     // Road successfully built and fit
 
+    std::list<Node_t*> fPatterns;   // Patterns in this road
+    Hset_t             fHits;       // All hits linked to the patterns
+    
+    std::vector<Pvec_t>     fPoints;  // Hit pos within road
+    std::vector<FitResult*> fFitData; // Good fit results, sorted by chi2
 
     BuildInfo_t* fBuild; //! Working data for building
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();
     Double_t GetBinX( UInt_t bin ) const;
+
+  private:
+    void     CopyPointData( const Road& orig );
 
     ClassDef(Road,1)  // Region containing track candidate hits and fit results
   };

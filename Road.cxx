@@ -20,6 +20,8 @@
 #include <iostream>
 #include <algorithm>
 #include <numeric>
+#include <map>
+#include <utility>
 
 using namespace std;
 
@@ -62,23 +64,14 @@ Road::Road( const Projection* proj )
 
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) : 
-  TObject(orig), fProjection(orig.fProjection),
-  fZL(orig.fZL), fZU(orig.fZU),
-  fPatterns(orig.fPatterns), fHits(orig.fHits),
-  fPos(orig.fPos), fSlope(orig.fSlope), fChi2(orig.fChi2),
-  fDof(orig.fDof), fGood(orig.fGood)
+  TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits)
 {
   // Copy constructor
 
-  memcpy( fCornerX, orig.fCornerX, kNcorner*sizeof(Double_t) );
-  //TODO: copy points?
+  size_t nbytes = (char*)&fGood - (char*)&fProjection + sizeof(fGood);
+  memcpy( &fProjection, &orig.fProjection, nbytes );
   
-  if( !orig.fFitData.empty() ) {
-    fFitData.reserve( orig.fFitData.size() );
-    for( vector<FitResult*>::const_iterator it = orig.fFitData.begin();
-	 it != orig.fFitData.end(); ++it )
-      fFitData.push_back( new FitResult( **it ));
-  }
+  CopyPointData( orig );
 
   if( orig.fBuild )
     fBuild = new BuildInfo_t( *orig.fBuild );
@@ -93,26 +86,13 @@ Road& Road::operator=( const Road& rhs )
 
   if( this != &rhs ) {
     TObject::operator=(rhs);
-    fProjection = rhs.fProjection;
-    memcpy( fCornerX, rhs.fCornerX, kNcorner*sizeof(Double_t) );
-    fZL         = rhs.fZL;
-    fZU         = rhs.fZU;
-    fPatterns   = rhs.fPatterns;
-    fHits       = rhs.fHits;
-    fPos        = rhs.fPos;
-    fSlope      = rhs.fSlope;
-    fChi2       = rhs.fChi2;
-    fDof        = rhs.fDof;
-    fGood       = rhs.fGood;
-    //TODO: assign points?
-    //    DeleteContainerOfContainers( fPoints );
+    size_t nbytes = (char*)&fGood - (char*)&fProjection + sizeof(fGood);
+    memcpy( &fProjection, &rhs.fProjection, nbytes );
+
     DeleteContainer( fFitData );
-    if( !rhs.fFitData.empty() ) {
-      fFitData.reserve( rhs.fFitData.size() );
-      for( vector<FitResult*>::const_iterator it = rhs.fFitData.begin();
-	   it != rhs.fFitData.end(); ++it )
-	fFitData.push_back( new FitResult( **it ));
-    }
+    DeleteContainerOfContainers( fPoints );
+    CopyPointData( rhs );
+
     delete fBuild;
     if( rhs.fBuild )
       fBuild = new BuildInfo_t( *rhs.fBuild );
@@ -133,6 +113,56 @@ Road::~Road()
 
 }
 
+//_____________________________________________________________________________
+void Road::CopyPointData( const Road& orig )
+{
+  // Copy fPoints and fFitData. Used by copy c'tor and assignment operator.
+  // Creates actual copies of Points because they are managed by the Roads.
+
+  if( orig.fPoints.empty() )
+    assert( orig.fFitData.empty() ); // Can't have fit data but no points :-/
+  else {
+    typedef map<Point*,Point*> Pmap_t;
+    Pmap_t xref;
+    fPoints.resize( orig.fPoints.size() );
+    for( vector<Pvec_t>::size_type i = 0; i < orig.fPoints.size(); ++i ) {
+      const Pvec_t& old_planepoints = orig.fPoints[i];
+      fPoints[i].reserve( old_planepoints.size() );
+      for( Pvec_t::const_iterator it = old_planepoints.begin(); it !=
+	     old_planepoints.end(); ++it ) {
+	Point* old_point = *it;
+	Point* new_point = new Point( *old_point );
+	fPoints[i].push_back( new_point );
+	// It gets a bit tricky here: To be able to copy the fFitData, which
+	// contain pointers to some of the Points in fPoints, we need to keep 
+	// track of which old point was copied to which new point.
+	pair<Pmap_t::iterator,bool> 
+	  ins = xref.insert( make_pair(old_point,new_point) );
+	assert( ins.second );  // Duplicate points should never occur
+      }
+    }
+
+    // Copy fit results
+    fFitData.reserve( orig.fFitData.size() );
+    for( vector<FitResult*>::const_iterator it = orig.fFitData.begin();
+	 it != orig.fFitData.end(); ++it ) {
+      // The FitResult copy c'tor does not copy the fFitCoordinates array
+      fFitData.push_back( new FitResult( **it ));
+      // The copied FitResult must reference the copied Points
+      const Pvec_t& old_points = (*it)->GetPoints();
+      Pvec_t&       new_points = fFitData.back()->fFitCoordinates;
+      new_points.reserve( old_points.size() );
+      for( Pvec_t::const_iterator it2 = old_points.begin(); it2 !=
+	     old_points.end(); ++it2 ) {
+	Point* old_point = *it2;
+	Pmap_t::iterator found = xref.find( old_point );
+	assert( found != xref.end() );
+	new_points.push_back( (*found).second );
+      }
+    }
+  }
+}
+  
 //_____________________________________________________________________________
 #ifdef VERBOSE
 static void PrintHits( const Hset_t& hits )
@@ -612,7 +642,8 @@ Bool_t Road::Fit()
   fPos   = best->fPos;
   fSlope = best->fSlope;
   fChi2  = best->fChi2;
-  
+  memcpy( fV, best->fV, 3*sizeof(Double_t) );
+
   return true;
 }
 
