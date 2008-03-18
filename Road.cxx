@@ -638,11 +638,7 @@ Bool_t Road::Fit()
 #endif
 
   // Copy best fit results to member variables
-  FitResult* best = fFitData.front();
-  fPos   = best->fPos;
-  fSlope = best->fSlope;
-  fChi2  = best->fChi2;
-  memcpy( fV, best->fV, 3*sizeof(Double_t) );
+  memcpy( &fPos, &(fFitData.front()->fPos), 6*sizeof(Double_t) );
 
   return true;
 }
