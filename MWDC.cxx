@@ -320,14 +320,9 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
       Double_t diff = (x - p->x) / p->res();
       chi2 += diff*diff;
 #ifdef TESTCODE
-      // TESTCODE adds 3D results to existing used hit data in WirePlanes.
-      // These all have rank==0.
-      assert( !p->coord.empty() );
-      for( vector<FitCoord*>::const_iterator icoord = p->coord.begin();
-	   icoord != p->coord.end(); ++icoord ) {
-	assert( (*icoord)->GetRank() == 0 );
-	(*icoord)->Set3DTrkInfo( x, slope );
-      }
+      // TESTCODE adds 3D results to existing rank 0 hit coords in WirePlanes
+      assert( !p->coord.empty() && p->coord.front()->GetRank() == 0 );
+      p->coord.front()->Set3DTrkInfo( x, slope );
 #else
       // Production code creates the hit coordinates in the WirePlanes
       // using only the points from the 3D track fit(s)
