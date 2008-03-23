@@ -57,14 +57,10 @@ namespace TreeSearch {
     Double_t        GetCosAngle()     const { return fAxis.X(); }
     UInt_t          GetHitMaxDist()   const { return fHitMaxDist; }
     Hitpattern*     GetHitpattern()   const { return fHitpattern; }
-    TBits*          GetLayerCombos()  const { return fLayerCombos; }
-    WirePlane*      GetLayer ( UInt_t layer ) const { return fLayers[layer]; }
-    Double_t        GetLayerZ( UInt_t layer ) const;
     Double_t        GetMaxSlope()     const { return fMaxSlope; }
     UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
     UInt_t          GetNgoodRoads()   const { return fNgoodRoads; }
     UInt_t          GetNlevels()      const { return fNlevels; }
-    UInt_t          GetNlayers()      const { return (UInt_t)fLayers.size(); }
     UInt_t          GetNpatterns()    const;
     UInt_t          GetNplanes()      const { return (UInt_t)fPlanes.size(); }
     UInt_t          GetNroads()       const;
@@ -84,7 +80,6 @@ namespace TreeSearch {
     
 #ifdef TESTCODE
     std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
-    std::vector<TreeSearch::WirePlane*>& GetListOfLayers() { return fLayers; }
 #endif
 
     // Analysis control flags
@@ -99,7 +94,6 @@ namespace TreeSearch {
     // Configuration
     Int_t            fType;          // Type of plane (u,v,x,y...)
     std::vector<WirePlane*> fPlanes; // Wire planes in this projection
-    std::vector<WirePlane*> fLayers; // Effective detector planes (wp pairs)
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
     Double_t         fWidth;         // Width of tracking region (m)
@@ -111,8 +105,7 @@ namespace TreeSearch {
     UInt_t           fMinFitPlanes;  // Min num of planes required for fitting
     UInt_t           fMaxMiss;       // Allowed number of missing planes
     Bool_t           fRequire1of2;   // Require one plane of a plane pair
-    TBits*           fPlaneCombos;   // Allowed plane combos with missing hits
-    TBits*           fLayerCombos;   // Allowed layer combos with missing hits
+    TBits*           fPlaneCombos;   // Allowed plane occupancy patterns
 
     // Road construction control
     UInt_t           fHitMaxDist;    // Max allowed distance between hits for
@@ -154,18 +147,18 @@ namespace TreeSearch {
     public:
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
 		      std::map<const NodeDescriptor,HitSet>* matches )
-	: fHitpattern(hitpat), fLayerCombos(combos), fMatches(matches)
+	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches)
 #ifdef TESTCODE
 	, fNtest(0)
 #endif
-      { assert(fHitpattern && fLayerCombos && fMatches); }
+      { assert(fHitpattern && fPlaneCombos && fMatches); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
 #ifdef TESTCODE
       UInt_t GetNtest() const { return fNtest; }
 #endif
     private:
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
-      const TBits*      fLayerCombos;  // Allowed combos of missing layers
+      const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
       // Set of matching patterns
       std::map<const NodeDescriptor,HitSet>* fMatches;
 #ifdef TESTCODE

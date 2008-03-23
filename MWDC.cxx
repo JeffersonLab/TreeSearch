@@ -304,6 +304,9 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   coef.assign( Aty.GetMatrixArray(), Aty.GetMatrixArray()+Aty.GetNrows() );
 
   // Calculate chi2 and update FitCoord data in the WirePlanes
+#ifdef VERBOSE
+  cout << "Points in 3D fit:" << endl;
+#endif
   chi2 = 0;
   for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
     Road* rd = *it;
@@ -319,6 +322,10 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
       Double_t x = coef[0]*cosa + coef[2]*sina + slope*p->z;
       Double_t diff = (x - p->x) / p->res();
       chi2 += diff*diff;
+#ifdef VERBOSE
+      cout << p->hit->GetWirePlane()->GetName() << " " 
+	   << "z = " << p->z << " x = " << p->x << endl;
+#endif
 #ifdef TESTCODE
       // TESTCODE adds 3D results to existing rank 0 hit coords in WirePlanes
       assert( !p->coord.empty() && p->coord.front()->GetRank() == 0 );
@@ -743,8 +750,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	if( !thePlane->GetProjection() ) {
 	  WirePlane* partner = thePlane->GetPartner();
 	  assert( !partner || partner->GetProjection() == 0 );
-	  // AddPlane() takes care of setting the plane and layer numbers in
-	  // the WirePlane objects
+	  // AddPlane() sets the plane number in the WirePlane objects
 	  theProj->AddPlane( thePlane, partner );
 	  // Save pointer to the projection object with each plane and partner
 	  thePlane->SetProjection(theProj);
@@ -774,8 +780,8 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	  width = w;
       }
     }
-    UInt_t n = theProj->GetNlayers();
-    // Require at least 3 layers per projection
+    UInt_t n = theProj->GetNplanes();
+    // Require at least 3 planes per projection
     if( n < 3 ) {
       Error( Here(here), "Too few planes of type \"%s\" defined. "
 	     "Need >= 3, have %u. Fix database.", theProj->GetName(), n );

@@ -173,8 +173,8 @@ NodeVisitor::ETreeOp PrintPattern::operator() ( const NodeDescriptor& nd )
   if( fDump )
     os << setw(2) << nd.depth;
 
-  UInt_t nlayers = nd.link->GetPattern()->GetNbits();
-  for( UInt_t i = 0; i < nlayers; i++ ) {
+  UInt_t nplanes = nd.link->GetPattern()->GetNbits();
+  for( UInt_t i = 0; i < nplanes; i++ ) {
     UInt_t v = nd[i];
 
     // In dump mode, write out one pattern n-tuple per line

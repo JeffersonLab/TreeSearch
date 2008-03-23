@@ -196,12 +196,12 @@ UInt_t Hitpattern::GetBinsSet() const
 
 //_____________________________________________________________________________
 void Hitpattern::SetPositionRange( Double_t start, Double_t end,
-				   UInt_t plane, Hit* hitA, Hit* hitB )
+				   UInt_t plane, Hit* hit )
 {
   // Set pattern bins corresponding to the exact physical positions
   // between start and end (in m) in the given plane. 
   // Positions may range from 0.0 to width.
-  // Associate these bins with hitA and (optional) hitB.
+  // Associate these bins with given hit
 
   assert( plane<fNplanes && start<=end );
   Int_t hi = TMath::FloorNint( fScale*end );
@@ -218,11 +218,8 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
   // Save the hit pointer(s) in the hit array so that we can efficiently
   // retrieve later the hit(s) that caused the bits to be set.
   // NB: This is quite expensive
-  for( Int_t i = lo; i <= hi; ++i ) {
-    AddHit( plane, i, hitA );
-    if( hitB )
-      AddHit( plane, i, hitB );
-  }
+  for( Int_t i = lo; i <= hi; ++i )
+    AddHit( plane, i, hit );
 
   // Loop through the tree levels, starting at the highest resolution.
   // In practice, we usually have hi-lo <= 1 even at the highest resolution.
@@ -247,16 +244,16 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
   //
   // Returns number of hits processed
 
-  static const Double_t inv2sqrt2 = 1.0/(2.0*TMath::Sqrt(2.0));
-
   if( !A ) return 0;
-  // NB: a "plane" in the hitpattern is a "layer" in the projection
-  // (= single plane or plane pair, as appropriate) 
-  UInt_t plane = A->GetLayerNum();
-  assert( plane < fNplanes );
-  Double_t dz = B ? B->GetZ() - A->GetZ() : 0.0;
-  Double_t maxdist = A->GetMaxSlope() * dz;
-  Double_t maxdist2 = 0.5*maxdist;
+  UInt_t planeA = A->GetPlaneNum();
+  assert( planeA < fNplanes );
+  Double_t maxdist = 0.0;
+  UInt_t planeB = fNplanes;
+  if( B ) {
+    maxdist = A->GetMaxSlope() * (B->GetZ() - A->GetZ());
+    planeB = B->GetPlaneNum();
+    assert( planeB < fNplanes );
+  }
   bool do_single_hits =
     ( A->GetMWDC()->TestBit(MWDC::kPairsOnly) == kFALSE || B == 0 );
 
@@ -264,45 +261,52 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
 
   HitPairIter it( A->GetHits(), B ? B->GetHits() : 0, maxdist );
   while( it ) {
+    // At least one hit found
     nhits++;
     Hit* hitA = static_cast<Hit*>((*it).first);
     Hit* hitB = static_cast<Hit*>((*it).second);
-    bool found = false;
+    assert( hitA || hitB );
     if( hitA && hitB ) {
-      // Combined resolution of the two hits (assuming their individual
-      // resolutions are similar):
-      Double_t res = inv2sqrt2*(hitA->GetResolution()+hitB->GetResolution());
+      // A pair of hits registered in partner planes, so we know that at
+      // least one combination of hit positions is within maxdist of each
+      // other. Determine which combinations these are and set their bins.
+      UInt_t set = 0, bitA, bitB;
+      Double_t posA, posB;
+      // Prevent duplicate entries for zero-drift hits
+      if( hitA->GetDriftDist() == 0 ) set |= 8;
+      if( hitB->GetDriftDist() == 0 ) set |= 2;
+      bool found = false;
       for( int i=4; i--; ) {
-	Double_t posA = (i&2 ? hitA->GetPosL() : hitA->GetPosR()) + fOffset;
-	Double_t posB = (i&1 ? hitB->GetPosL() : hitB->GetPosR()) + fOffset;
-	if( TMath::Abs( posA-posB ) < maxdist ) {
+	if( i&2 ) { posA = hitA->GetPosL(); bitA = 8; }
+	else      { posA = hitA->GetPosR(); bitA = 4; }
+	if( i&1 ) { posB = hitB->GetPosL(); bitB = 2; }
+	else      { posB = hitB->GetPosR(); bitB = 1; }
+	if( TMath::Abs( posA-posB ) <= maxdist ) {
 	  found = true;
-	  SetPosition( 0.5*(posA+posB), res, plane, hitA, hitB );
+	  if( (bitA & set) == 0 ) {
+	    SetPosition( posA+fOffset, hitA->GetResolution(), planeA, hitA );
+	    set |= bitA;
+	  }
+	  if( (bitB & set) == 0 ) {
+	    SetPosition( posB+fOffset, hitB->GetResolution(), planeB, hitB );
+	    set |= bitB;
+	  }
 	}
       }
+      assert(found); // If !found here, HitPairIter is faulty
     }
-    if( !found && do_single_hits ) {
-      // Here, we have either an unpaired hit or a pair whose positions do
-      // not match within maxdist (probably rare unless maxdist is very small).
-      // Either way, we set the hits individually by projecting their left
-      // and right positions onto the reference plane (either plane A, if no B,
-      // or the midplane between A and B).
-      for( int i=2; i--; ) {
-	Hit* hit = i ? hitA : hitB;
-	if( hit ) {
-	  // If projecting onto the midplane (maxdist != 0), the effective
-	  // resolution is larger by 0.5*maxdist so that we set all the bits
-	  // the hit position can project to. If maxdist is big enough,
-	  // this will probably cause some ghosts, which is unavoidable to
-	  // maintain high tracking efficiency. The full hit resolution
-	  // is recovered when the hit positions are fit within each road.
-	  //
-	  // The bigger issue with unpaired hits is that the LR-ambiguity
-	  // is not resolved, so two entries have to be made into the pattern.
-	  Double_t res = hit->GetResolution() + maxdist2;
-	  SetPosition( hit->GetPosL() + fOffset, res, plane, hit );
-	  SetPosition( hit->GetPosR() + fOffset, res, plane, hit );
-	}
+    else if( do_single_hits ) {
+      // Unpaired hit in only one plane
+      if( hitA ) {
+	SetPosition( hitA->GetPosL()+fOffset, hitA->GetResolution(),
+		     planeA, hitA );
+	SetPosition( hitA->GetPosR()+fOffset, hitA->GetResolution(),
+		     planeA, hitA );
+      } else {
+	SetPosition( hitB->GetPosL()+fOffset, hitB->GetResolution(),
+		     planeB, hitB );
+	SetPosition( hitB->GetPosR()+fOffset, hitB->GetResolution(),
+		     planeB, hitB );
       }
     }
     ++it;

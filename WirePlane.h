@@ -62,11 +62,9 @@ namespace TreeSearch {
     TSeqCollection* GetCoords()   const { return fFitCoords; }
     Int_t           GetNcoords()  const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum() const { return fPlaneNum; }
-    UInt_t          GetLayerNum() const { return fLayerNum; }
     Bool_t          IsRequired()  const { return TestBit(kIsRequired); }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
-    void            SetLayerNum( UInt_t n ) { fLayerNum = n; }
     void            SetProjection( Projection* p ) { fProjection = p; }
 #ifdef TESTCODE
     void            CheckCrosstalk();
@@ -94,7 +92,6 @@ namespace TreeSearch {
     // Geometry, configuration
 
     UInt_t      fPlaneNum;     // Ordinal of this plane within its projection
-    UInt_t      fLayerNum;     // Layer number of this plane within its proj
     EProjType   fType;         // Plane type (x,y,u,v)
     Double_t    fWireStart;    // Position of 1st wire (along wire coord) (m)
     Double_t    fWireSpacing;  // Wire spacing (assumed constant) (m)

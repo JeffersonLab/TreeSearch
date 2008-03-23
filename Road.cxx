@@ -183,7 +183,7 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
   // or, if planes are missing, the pattern of missing planes is allowed
   // (based on what level of matching the user requests via the database)
 
-  assert(fBuild);  // Not in build mode
+  assert(fBuild);  // This function used only in build mode
 
   UInt_t curpat = 0;
   for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
@@ -210,12 +210,11 @@ Bool_t Road::Add( Node_t& nd )
   //nd.first.link->GetPattern()->Print(); nd.first.parent->Print();
   PrintHits(nd.second.hits);
 #endif
-  bool first = fPatterns.empty();
-  if( first ) {
+  if( fPatterns.empty() ) {
     // Check the hits of the first pattern of a new road for missing planes
     if( !CheckMatch(nd.second.hits) )
       return kFALSE;
-    // A new road starts out with common hits and all hits that are the same
+    // The sets of all hits and of the common hits in a new road are identical
     fBuild->fClusterHits = fHits = nd.second.hits;
 #ifdef VERBOSE
     cout << "New cluster:" << endl;
@@ -275,7 +274,12 @@ Bool_t Road::Add( Node_t& nd )
 	  return false;
 	}
       }
-      // Add the intersection to the prior hits, accumulating the cluster
+      // Add the intersection to the prior hits, accumulating the cluster.
+      // It may seem like nonsense to insert a subset of a set into itself,
+      // but note that "intersection" is not a strict subset of fClusterHits.
+      // It may contain equivalent hits present in the new pattern but not in
+      // the cluster. So the following line actually does something.
+      // TODO: could this be done more efficiently?
       fBuild->fClusterHits.insert( ALL(intersection) );
 #ifdef VERBOSE
       cout << "New cluster:" << endl;
@@ -373,10 +377,7 @@ void Road::Finish()
   // NB: To include points just at the edge of a road, the width is
   // increased by 2*(average hit position resolution of the plane)
   // on each the left and the right sides.
-  // Also, the upper and lower edges are shifted up and down, respectively,
-  // so that the points on the planes are guaranteed to be included.
   const UInt_t np1 = fProjection->GetNplanes()-1;
-  const UInt_t nl1 = fProjection->GetNlayers()-1;
   const Double_t resL = 2.0*fProjection->GetPlane(0)->GetResolution();
   const Double_t resU = 2.0*fProjection->GetPlane(np1)->GetResolution();
   fCornerX[0] = GetBinX( fBuild->fCornerBin[0] )   - resL;
@@ -384,26 +385,23 @@ void Road::Finish()
   fCornerX[2] = GetBinX( fBuild->fCornerBin[2]+1 ) + resU;
   fCornerX[3] = GetBinX( fBuild->fCornerBin[3] )   - resU;
 
-  const Double_t eps = 1e-3;   // z-shift to include the planes proper
+  // z-shift to include the planes proper.
+  // The upper and lower edges are shifted up and down, respectively,
+  // so that the points on the planes are guaranteed to be included.
+  const Double_t eps = 1e-3;
   fZL = fProjection->GetPlaneZ(0) - eps;
   fZU = fProjection->GetPlaneZ(np1) + eps;
   assert( fZL < fZU );
 
-  // Apply correction for difference of layer-z and plane-z
-  // If the first or last plane are part of a layer, then the x-coordinates
-  // obtained from GetBinX above refers to the layer, not the plane. In that
-  // case, we project the polygon's sides to the correct z-position (plane z)
-  Double_t dZlayer = fProjection->GetLayerZ(nl1) - fProjection->GetLayerZ(0);
-  assert( dZlayer > 1e-3 );
-  Double_t slopeL = ( fCornerX[3]-fCornerX[0] ) * (1.0/dZlayer);
-  Double_t slopeR = ( fCornerX[2]-fCornerX[1] ) * (1.0/dZlayer);
-  Double_t dZL = fProjection->GetLayerZ(0) - fZL;
-  Double_t dZU = fZU - fProjection->GetLayerZ(nl1);
-  assert( dZL >= 0.0 && dZU >= 0.0 );
-  fCornerX[0] -= slopeL * dZL;
-  fCornerX[1] -= slopeR * dZL;
-  fCornerX[2] += slopeR * dZU;
-  fCornerX[3] += slopeL * dZU;
+  // Adjust x coordinates for the z shift
+  Double_t dZplanes = fProjection->GetPlaneZ(np1) - fProjection->GetPlaneZ(0);
+  assert( dZplanes > 1e-3 );
+  Double_t slopeL = ( fCornerX[3]-fCornerX[0] ) * (1.0/dZplanes);
+  Double_t slopeR = ( fCornerX[2]-fCornerX[1] ) * (1.0/dZplanes);
+  fCornerX[0] -= slopeL * eps;
+  fCornerX[1] -= slopeR * eps;
+  fCornerX[2] += slopeR * eps;
+  fCornerX[3] += slopeL * eps;
 
   fCornerX[4] = fCornerX[0];
 
@@ -464,8 +462,10 @@ Bool_t Road::CollectCoordinates()
     Hit* hit = const_cast<Hit*>(*it);
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetWirePlane()->GetPlaneNum();
-    for( int i = 2; i--; ) {
-      Double_t x = i ? hit->GetPosL() : hit->GetPosR();
+    // Prevent duplicate entries for hits with zero drift
+    int i = (hit->GetDriftDist() == 0.0) ? 1 : 2;
+    do {
+      Double_t x = (--i != 0) ? hit->GetPosL() : hit->GetPosR();
       if( TMath::IsInside( x, z, kNcorner, &fCornerX[0], zp )) {
 	// The hits are sorted by ascending plane number
 	if( np != last_np ) {
@@ -475,7 +475,7 @@ Bool_t Road::CollectCoordinates()
 	}
 	fPoints.back().push_back( new Point(x, z, hit) );
       }
-    }
+    } while( i );
   }
   // Check if this matchpattern is acceptable
   UInt_t patternvalue = 0;
@@ -487,11 +487,11 @@ Bool_t Road::CollectCoordinates()
   
 #ifdef VERBOSE
   cout << "Collected:" << endl;
-  vector<Pvec_t>::iterator ipl = fPoints.begin();
-  for( UInt_t i = 0; i<fProjection->GetNplanes(); ++i ) {
+  vector<Pvec_t>::reverse_iterator ipl = fPoints.rbegin();
+  for( UInt_t i = fProjection->GetNplanes(); i--; ) {
     cout << " pl= " << i;
-    assert( ipl == fPoints.end() or !(*ipl).empty() );
-    if( ipl == fPoints.end() 
+    assert( ipl == fPoints.rend() or !(*ipl).empty() );
+    if( ipl == fPoints.rend() 
 	or i != (*ipl).front()->hit->GetWirePlane()->GetPlaneNum() )
       cout << " missing";
     else {
@@ -625,8 +625,9 @@ Bool_t Road::Fit()
   // projection (2D) fits 
   for( vector<FitResult*>::size_type ifit = 0; ifit < fFitData.size();
        ++ifit ) {
-    Pvec_t& coord = fFitData[ifit]->fFitCoordinates;
-    for( Pvec_t::iterator it = coord.begin(); it != coord.end(); ++it ) {
+    Pvec_t& fitpoints = fFitData[ifit]->fFitCoordinates;
+    for( Pvec_t::iterator it = fitpoints.begin(); it != fitpoints.end(); 
+	 ++it ) {
       Point* p = *it;
       Double_t slope   = fFitData[ifit]->fSlope;
       Double_t x_track = fFitData[ifit]->fPos + p->z * slope;

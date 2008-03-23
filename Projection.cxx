@@ -44,8 +44,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
     fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
-    fPlaneCombos(0), fLayerCombos(0),
-    fHitMaxDist(1), fBinMaxDist(kMaxUInt), fConfLevel(1.0),
+    fPlaneCombos(0), fHitMaxDist(1), fBinMaxDist(kMaxUInt), fConfLevel(1.0),
     fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
 {
   // Constructor
@@ -72,14 +71,13 @@ Projection::~Projection()
   delete fPatternTree;
   delete fHitpattern;
   delete fPlaneCombos;
-  delete fLayerCombos;
 }
 
 //_____________________________________________________________________________
 void Projection::AddPlane( WirePlane* wp, WirePlane* partner )
 {
   // Add wire plane wp (and optional partner plane) to this projection. 
-  // Sets plane and layer numbers.
+  // Sets plane numbers.
 
   assert(wp);
 
@@ -90,13 +88,6 @@ void Projection::AddPlane( WirePlane* wp, WirePlane* partner )
     partner->SetPlaneNum( fPlanes.size() );
     fPlanes.push_back( partner );
   }
-
-  // Only add the primary plane to the vector of layers; partner planes are
-  // linked within the plane objects (get via wp->GetPartner())
-  wp->SetLayerNum( fLayers.size() );
-  fLayers.push_back( wp );
-  if( partner )
-    partner->SetLayerNum( wp->GetLayerNum() );
 }
 
 //_____________________________________________________________________________
@@ -126,17 +117,11 @@ Int_t Projection::Decode( const THaEvData& evdata )
   // Decode all planes belonging to this projection
 
   Int_t sum = 0;
-  for( vwsiz_t i = 0; i < fLayers.size(); ++i ) {
-    WirePlane* wp = fLayers[i];
+  for( vwsiz_t i = 0; i < GetNplanes(); ++i ) {
+    WirePlane* wp = fPlanes[i];
     Int_t nhits = wp->Decode( evdata );
     sum += nhits;
-    if( (wp = wp->GetPartner()) ) {
-      Int_t nhits2 = wp->Decode( evdata );
-      sum += nhits2;
-      if( nhits2 > nhits )
-	nhits = nhits2;
-    }
-    //TODO: nhits now holds the occupancy of this plane or plane pair,
+    //TODO: nhits now holds the occupancy of this plane,
     // use it for occupancy test
   }
   return sum;
@@ -152,32 +137,16 @@ Double_t Projection::GetPlaneZ( UInt_t i ) const
 }
 
 //_____________________________________________________________________________
-Double_t Projection::GetLayerZ( UInt_t i ) const
-{
-  // Return the effective z-position of the i-th wire plane layer.  In case
-  // of a partnered plane pair, the effective z is halfway between the two
-  // planes
-
-  assert( i<fLayers.size() );
-  WirePlane* wp = fLayers[i];
-  Double_t zpos = wp->GetZ();
-  if( wp->GetPartner() )
-    zpos = 0.5*( zpos + wp->GetPartner()->GetZ() );
-
-  return zpos;
-}
-
-//_____________________________________________________________________________
 void Projection::Reset()
 {
   // Reset parameters, clear list of planes, delete Hitpattern
   
   fIsInit = kFALSE;
   fPlanes.clear();
-  fLayers.clear();
   fMaxSlope = fWidth = 0.0;
   delete fHitpattern; fHitpattern = 0;
   delete fPatternTree; fPatternTree = 0;
+  delete fPlaneCombos; fPlaneCombos = 0;
   delete fRoadCorners; fRoadCorners = 0;
 }
 
@@ -192,6 +161,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 
   // Set up the event display support if corresponding bit is set in the MWDC
   if( fDetector->TestBit(MWDC::kEventDisplay) ) {
+    assert( fRoadCorners == 0 );
     fRoadCorners = new TClonesArray("TreeSearch::Road::Corners", 3);
     R__ASSERT(fRoadCorners);
     // Set local bit to indicate that initialization is done
@@ -206,20 +176,20 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
 {
   // Level-2 initialization - load pattern database and initialize hitpattern.
-  // Requires the wire planes to be fiully initialized.
+  // Requires the wire planes to be fully initialized.
 
   static const char* const here = "InitLevel2";
 
   vector<Double_t> zpos;
-  for( UInt_t i = 0; i < GetNlayers(); ++i )
-    zpos.push_back( GetLayerZ(i) );
+  for( UInt_t i = 0; i < GetNplanes(); ++i )
+    zpos.push_back( GetPlaneZ(i) );
   TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
 		  
   if( tp.Normalize() != 0 )
     return fStatus = kInitError;
 
   // Attempt to read the pattern database from file
-  delete fPatternTree;
+  assert( fPatternTree == 0 );
   //TODO: Make the file name
   const char* filename = "test.tree";
   fPatternTree = PatternTree::Read( filename, tp );
@@ -238,39 +208,23 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
   } 
 
   // Set up a hitpattern object with the parameters of this projection
-  delete fHitpattern;
+  assert( fHitpattern == 0 );
   fHitpattern = new Hitpattern( *fPatternTree );
   if( !fHitpattern || fHitpattern->IsError() )
     return fStatus = kInitError;
-  assert( GetNlayers() == fHitpattern->GetNplanes() );
+  assert( GetNplanes() == fHitpattern->GetNplanes() );
 
   // Determine maximum search distance (in bins) for combining patterns.
   // In principle, there is no limit if fHitMaxDist > 0 because
-  // the algorithm could just keep adding neightboring hits to clusters.
+  // the algorithm could just keep adding neighboring hits to clusters.
   // In practice, we set a cutoff of fHitMaxDist+1 wire spacings
   // (= typ 3 wires) that can be combined together
-  Double_t dx = 0;
-  WirePlane* wp = fLayers[0]; // The search is along the first layer
-  if( wp->GetPartner() ) {
-    // Maximum number of bins that fHitMaxDist+1 hits can cover in the
-    // midplane of a plane pair
-    WirePlane* wpl[2] = { wp, wp->GetPartner() };
-    Double_t dz = TMath::Abs( wpl[1]->GetZ() - wpl[0]->GetZ() );
-    for( Int_t i = 0; i < 2; ++i ) {
-      wp = wpl[i];
-      Double_t dx1 = fMaxSlope * dz;
-      dx1 += wp->GetMaxLRdist() + 2.0*wp->GetResolution();
-      if( fHitMaxDist )
-	dx1 += (fHitMaxDist+1)*wp->GetWireSpacing();
-      if( dx1 > dx )
-	dx = dx1;
-    }
-  } else {
-    // Max distance of bins that can belong to the same hit in a single plane
-    dx = wp->GetMaxLRdist() + 2.0*wp->GetResolution();
-    if( fHitMaxDist )
-      dx += (fHitMaxDist+1)*wp->GetWireSpacing();
-  }    
+  WirePlane* wp = fPlanes[0]; // The search is along the first plane
+  // Max distance of bins that can belong to the same hit in a single plane
+  Double_t dx = wp->GetMaxLRdist() + 2.0*wp->GetResolution();
+  if( fHitMaxDist )
+    dx += (fHitMaxDist+1)*wp->GetWireSpacing();
+
   fBinMaxDist = TMath::CeilNint( dx * fHitpattern->GetBinScale() );
 
   // Check range of fMinFitPlanes (minimum number of planes require for fit)
@@ -301,7 +255,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
   // missing hits. The value of the bit pattern of plane hits is used as an
   // index into this table; if the corresponding bit is set, the plane 
   // combination is allowed.
-  delete fPlaneCombos;
+  assert( fPlaneCombos == 0 );
   UInt_t np = 1U<<GetNplanes();
   fPlaneCombos = new TBits( np );
   fPlaneCombos->SetBitNumber( np-1 );  // Always allow full occupancy
@@ -328,22 +282,6 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
       if( k == GetNplanes() )
 	fPlaneCombos->SetBitNumber( bitval );
       ++c;
-    }
-  }
-
-  delete fLayerCombos;
-  UInt_t nl = 1U<<GetNlayers();
-  fLayerCombos = new TBits( nl );
-  // Build the layer patterns from the plane patterns
-  for( UInt_t planeval = (1U<<GetNplanes()); planeval; ) {
-    if( fPlaneCombos->TestBitNumber( --planeval ) ) {
-      UInt_t layerval = 0;
-      for( UInt_t i = 0; i < GetNplanes(); ++i ) {
-	if( planeval & (1U<<i) )
-	  layerval |= 1U << fPlanes[i]->GetLayerNum();
-      }
-      assert( layerval < nl );
-      fLayerCombos->SetBitNumber( layerval );
     }
   }
 
@@ -496,8 +434,17 @@ Int_t Projection::FillHitpattern()
   // and partner plane count as one).
 
   Int_t ntot = 0;
-  for( vwiter_t it = fLayers.begin(); it != fLayers.end(); ++it ) {
-    ntot += fHitpattern->ScanHits( *it, (*it)->GetPartner() );
+  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
+    WirePlane *plane = *it, *partner = plane->GetPartner();
+    // If a plane has a partner (usually with staggered wires), scan them
+    // together to resolve the L/R ambiguity of the hit positions, if possible
+    ntot += fHitpattern->ScanHits( plane, partner );
+    // If the partner plane was just scanned, don't scan it again
+    if( partner ) {
+      ++it;
+      assert( it != fPlanes.end() );
+      assert( *it == partner );
+    }
   }
 #ifdef TESTCODE
   n_hits = ntot;
@@ -533,7 +480,7 @@ Int_t Projection::Track()
   gettimeofday( &start2, 0 );
 #endif
 
-  ComparePattern compare( fHitpattern, fLayerCombos, &fPatternsFound );
+  ComparePattern compare( fHitpattern, fPlaneCombos, &fPatternsFound );
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
@@ -654,7 +601,7 @@ Int_t Projection::MakeRoads()
 //_____________________________________________________________________________
 Bool_t Projection::RemoveDuplicateRoads()
 {
-  // Check for indentical roads or roads that include each other
+  // Check for identical roads or roads that include each other
 
   // This runs in ~O(N^2), but if N>1, it is typically only 2-3.
   bool changed = false;
@@ -782,7 +729,6 @@ void Projection::Print( Option_t* opt ) const
        << GetName()
        << " type="  << GetType()
        << " npl="   << fPlanes.size()
-       << " nlay="  << fLayers.size()
        << " nlev="  << GetNlevels()
        << " zsize=" << GetZsize()
        << " maxsl=" << GetMaxSlope()
@@ -810,7 +756,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
 #endif
   // Compute the match pattern and see if it is allowed
   UInt_t matchvalue = fHitpattern->ContainsPattern(nd);
-  if( fLayerCombos->TestBitNumber(matchvalue)  ) {
+  if( fPlaneCombos->TestBitNumber(matchvalue)  ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 

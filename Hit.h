@@ -300,8 +300,6 @@ namespace TreeSearch {
   Int_t Hit::Compare( const Hit* rhs, Double_t maxdist ) const {
     // Determine if two hits are within maxdist of each other.
     // Returns -1 if this<rhs, 0 if overlap, +1 if this>rhs.
-    // Overlap is necessary but NOT sufficient for two hits to be a pair;
-    // additional comparisons of the L/R positions are necessary for that.
     if( fPosR+maxdist < rhs->fPosL )
       // this hit is "smaller than" (to the left of) rhs
       return -1;

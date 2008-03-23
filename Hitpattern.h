@@ -64,10 +64,10 @@ namespace TreeSearch {
     Bool_t   IsError()    const { return (fNplanes == 0); }
 
     void     SetPositionRange( Double_t start, Double_t end, UInt_t plane,
-			       Hit* hitA, Hit* hitB = 0 );
+			       Hit* hit );
     void     SetPosition( Double_t pos, Double_t res, UInt_t plane,
-			  Hit* hitA, Hit* hitB = 0 )
-    { SetPositionRange( pos-res, pos+res, plane, hitA, hitB ); }
+			  Hit* hit )
+    { SetPositionRange( pos-res, pos+res, plane, hit ); }
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
     //    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
     //    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
