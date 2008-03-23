@@ -541,27 +541,24 @@ Int_t Projection::MakeRoads()
   // Combine patterns with common sets of hits into Roads.
   //
   // This is the primary de-ghosting algorithm. It groups patterns with
-  // common wires (not common hit positions!) in all planes together.
+  // common wires in all planes.
 
-  NodeMap_t::iterator it1, it2, ref_it1;
-  for( it1 = ref_it1 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
+  NodeMap_t::iterator it1, it2, ref_it2;
+  for( it1 = ref_it2 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
        ++it1 ) {
     Node_t& nd1 = *it1;
     assert(nd1.second.used < 3);
     // New roads must contain at least one unused pattern
     if( nd1.second.used )
       continue;
-    Road* rd = new( (*fRoads)[GetNroads()] ) Road(this);
-    // Adding the first pattern must make a good match
-    if( !rd->Add(nd1) ) {
-#ifdef VERBOSE
-      cout << ">>>>>>>>> No match, skipped" << endl;
-#endif
-      assert(fRoads->GetLast() >= 0);
-      fRoads->RemoveAt( fRoads->GetLast() );
-      continue;
-    }
-    it2 = ref_it1;
+    // The seed pattern must make a good match - should always succeed
+    assert( HitSet::CheckMatch(nd1.second.hits, fPlaneCombos) ); 
+
+    // This pattern is good, so create a new road
+    Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
+
+    // Try adding other unused or partly used patterns to this road
+    it2 = ref_it2;
     // Search until end of list or too far right
     while( ++it2 != fPatternsFound.end() and
 	   (*it2).first[0] <= nd1.first[0] + fBinMaxDist ) {
@@ -571,11 +568,14 @@ Int_t Projection::MakeRoads()
 	// are no more patterns that could possibly have common hits.
 	if( nd2.second.used < 2 &&
 	    it1 != it2 ) // skip the seed in case we run over it
+	  //TODO: keep track of failed adds, 
+	  //  rescan if any until number of fails no longer changes
+	  // -> successive clustering
 	  rd->Add( nd2 );
       } else {
 	// Save last position too far left of it1 (seed of road).
 	// This + 1 is where we start the next search.
-	ref_it1 = it2;
+	ref_it2 = it2;
       }
     }
     // Update the "used" flags of the road's component patterns
