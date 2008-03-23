@@ -144,6 +144,7 @@ namespace TreeSearch {
     Double_t           fZL, fZU;    // z +/- eps of first/last plane 
 
     // Best fit results (copy of fFitData.begin() for global variable access)
+    // Caution: must be 6 Double_t in same order as in FitResult
     Double_t  fPos;      // Track origin
     Double_t  fSlope;    // Track slope
     Double_t  fChi2;     // Chi2 of fit

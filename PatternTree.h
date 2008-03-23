@@ -34,7 +34,7 @@ namespace TreeSearch {
     Bool_t    fNormalized;  // maxslope and zpos are normalized
     Double_t  fWidth;       // Physical detector width (needed in Hitpattern)
     Double_t  fMaxslope;    // Max slope (dx/dz) of tracks
-    vector<Double_t> fZpos; // z-positions of pattern planes (layers)
+    vector<Double_t> fZpos; // z-positions of pattern planes
   };
 
   class PatternTree {
