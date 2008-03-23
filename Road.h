@@ -30,6 +30,7 @@ namespace TreeSearch {
   class Road : public TObject {
 
   public:
+    //_________________________________________________________________________
     // Coordinates of hit positions, for track fitting
     struct Point {
       Point() : x(0), hit(0) {}
@@ -48,6 +49,7 @@ namespace TreeSearch {
 
     typedef std::vector<Road::Point*>  Pvec_t;
 
+    //_________________________________________________________________________
     // Fit results
     struct FitResult {
       Double_t fPos, fSlope, fChi2, fV[3];
@@ -89,6 +91,7 @@ namespace TreeSearch {
       };
     };
 
+    //_________________________________________________________________________
     // For global variable access/event display
     friend class Corners;
     class Corners : public TObject {
@@ -108,7 +111,9 @@ namespace TreeSearch {
       ClassDef(Corners,0)
     };
 
+    //_________________________________________________________________________
     explicit Road( const Projection* proj );
+    Road( Node_t& nd, const Projection* proj );
     Road() : fProjection(0), fBuild(0) {} // For internal ROOT use
     Road( const Road& );
     Road& operator=( const Road& );
@@ -149,17 +154,17 @@ namespace TreeSearch {
     Double_t  fSlope;    // Track slope
     Double_t  fChi2;     // Chi2 of fit
     Double_t  fV[3];     // Covariance matrix of param (V11, V12=V21, V22)
-    UInt_t    fDof;      // Degrees of freedom of fit (nhits-2)
 
+    UInt_t    fDof;      // Degrees of freedom of fit (nhits-2)
     Bool_t    fGood;     // Road successfully built and fit
 
-    std::list<Node_t*> fPatterns;   // Patterns in this road
-    Hset_t             fHits;       // All hits linked to the patterns
+    std::list<Node_t*>      fPatterns;  // Patterns in this road
+    Hset_t                  fHits;      // All hits linked to the patterns
     
-    std::vector<Pvec_t>     fPoints;  // Hit pos within road
-    std::vector<FitResult*> fFitData; // Good fit results, sorted by chi2
+    std::vector<Pvec_t>     fPoints;    // Hit pos within road
+    std::vector<FitResult*> fFitData;   // Good fit results, sorted by chi2
 
-    BuildInfo_t* fBuild; //! Working data for building
+    BuildInfo_t*            fBuild;     //! Working data for building
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();

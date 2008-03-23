@@ -36,8 +36,16 @@ struct BuildInfo_t {
   Hset_t            fClusterHits;  // Hits common between all patterns
   vector<UShort_t>  fCornerBin;    // Bin numbers defining the corners
                                    // 0=LL, 1=LR, 2=UR, 3=UL 
-  BuildInfo_t() : fCornerBin(4,0)
-  { fCornerBin[0] = fCornerBin[3] = kMaxUShort; }
+  BuildInfo_t() {
+    UShort_t corner_bins[4] = { kMaxUShort, 0, 0, kMaxUShort };
+    fCornerBin.assign( corner_bins, corner_bins+4 );
+  }
+  BuildInfo_t( const Node_t& nd ) : fClusterHits(nd.second.hits) 
+  {
+    UShort_t corner_bins[4] = { nd.first.Start(), nd.first.Start(),
+				nd.first.End(),   nd.first.End() };
+    fCornerBin.assign( corner_bins, corner_bins+4 );
+  }
 };
 
 // Number of points for polygon test
@@ -53,13 +61,38 @@ Road::Road( const Projection* proj )
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fBuild(0)
 {
-  // Constructor
+  // Construct empty road
 
   assert(fProjection);  // Invalid Projection* pointer
 
   memset( fCornerX, 0, kNcorner*sizeof(Double_t) );
+  fV[2] = fV[1] = fV[0] = kBig;
   fPoints.reserve( fProjection->GetNplanes() );
   fBuild = new BuildInfo_t;
+}
+
+//_____________________________________________________________________________
+Road::Road( Node_t& nd, const Projection* proj )
+  : TObject(), fProjection(proj), fZL(kBig), fZU(kBig),
+    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
+    fPatterns(1,&nd), fHits(nd.second.hits), fBuild(0)
+{
+  // Construct from pattern
+
+  assert(fProjection);  // Invalid Projection* pointer
+
+  memset( fCornerX, 0, kNcorner*sizeof(Double_t) );
+  fV[2] = fV[1] = fV[0] = kBig;
+  fPoints.reserve( fProjection->GetNplanes() );
+  fBuild = new BuildInfo_t(nd);
+
+#ifdef VERBOSE
+  cout << "Adding:" << endl;
+  nd.first.Print();
+  PrintHits(nd.second.hits);
+  cout << "New cluster:" << endl;
+  PrintHits( fBuild->fClusterHits );
+#endif
 }
 
 //_____________________________________________________________________________
@@ -177,6 +210,7 @@ static void PrintHits( const Hset_t& hits )
 }
 #endif
 //_____________________________________________________________________________
+inline
 Bool_t Road::CheckMatch( const Hset_t& hits ) const
 {
   // Return true if the hits from the given set either cover all planes
@@ -185,11 +219,7 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
 
   assert(fBuild);  // This function used only in build mode
 
-  UInt_t curpat = 0;
-  for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
-    curpat |= 1U << ((*it)->GetWirePlane()->GetPlaneNum());
-
-  return fProjection->GetPlaneCombos()->TestBitNumber(curpat);
+  return HitSet::CheckMatch( hits, fProjection->GetPlaneCombos() );
 }
 
 //_____________________________________________________________________________
