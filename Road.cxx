@@ -367,8 +367,10 @@ Bool_t Road::Adopt( const Road* other )
   // Verify that z-limits agree and x-ranges overlap
   const Double_t eps = 1e-6;
   if( TMath::Abs(fZL-other->fZL) > eps or TMath::Abs(fZU-other->fZU) > eps or
-      other->fCornerX[1] < fCornerX[0] or fCornerX[1] < other->fCornerX[0] or
-      other->fCornerX[2] < fCornerX[3] or fCornerX[2] < other->fCornerX[3] )
+      other->fCornerX[1] + eps < fCornerX[0] or 
+      fCornerX[1] + eps < other->fCornerX[0] or
+      other->fCornerX[2] + eps < fCornerX[3] or 
+      fCornerX[2] + eps < other->fCornerX[3] )
     return false;
   
   fCornerX[0] = TMath::Min( fCornerX[0], other->fCornerX[0] );
