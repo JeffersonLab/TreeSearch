@@ -8,6 +8,7 @@
 
 #include "Hit.h"
 #include "TSeqCollection.h"
+#include "TBits.h"
 #include "WirePlane.h"
 #include "Road.h"
 
@@ -273,6 +274,20 @@ HitPairIter& HitPairIter::Next()
   return *this;
 }
 
-} // end namespace TreeSearch
+//_____________________________________________________________________________
+Bool_t HitSet::CheckMatch( const Hset_t& hits, const TBits* bits )
+{
+  // Check if the plane occupancy pattern of the given hits is marked as 
+  // allowed in the given bitfield
+
+  UInt_t curpat = 0;
+  for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
+    curpat |= 1U << ((*it)->GetWirePlane()->GetPlaneNum());
+
+  return bits->TestBitNumber(curpat);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
+
+} // end namespace TreeSearch
+

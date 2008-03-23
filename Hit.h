@@ -16,6 +16,7 @@
 
 class TSeqCollection;
 class TIterator;
+class TBits;
 
 namespace TreeSearch {
 
@@ -268,6 +269,9 @@ namespace TreeSearch {
     UInt_t  used;  // 0=not in any road, 1=some hits used, 2=all hits used
     HitSet() : used(0) {}
     virtual ~HitSet() {}
+    Bool_t CheckMatch( const TBits* bits ) const;
+    static Bool_t CheckMatch( const Hset_t& hits, const TBits* bits );
+
     ClassDef(HitSet, 0)  // A set of hits associated with a pattern
   };
 
@@ -297,7 +301,8 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Int_t Hit::Compare( const Hit* rhs, Double_t maxdist ) const {
+  Int_t Hit::Compare( const Hit* rhs, Double_t maxdist ) const
+  {
     // Determine if two hits are within maxdist of each other.
     // Returns -1 if this<rhs, 0 if overlap, +1 if this>rhs.
     if( fPosR+maxdist < rhs->fPosL )
@@ -308,6 +313,16 @@ namespace TreeSearch {
       return +1;
     // The hits overlap within the maxdist tolerance
     return 0;
+  }
+
+  //___________________________________________________________________________
+  inline
+  Bool_t HitSet::CheckMatch( const TBits* bits ) const
+  {
+    // Check if the plane occupancy pattern of the hits in this hitset is
+    // marked as allowed in the given bitfield
+
+    return CheckMatch( hits, bits );
   }
 
 ///////////////////////////////////////////////////////////////////////////////
