@@ -282,7 +282,7 @@ Bool_t HitSet::CheckMatch( const Hset_t& hits, const TBits* bits )
 
   UInt_t curpat = 0;
   for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
-    curpat |= 1U << ((*it)->GetWirePlane()->GetPlaneNum());
+    curpat |= 1U << ((*it)->GetPlaneNum());
 
   return bits->TestBitNumber(curpat);
 }

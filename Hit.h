@@ -58,6 +58,7 @@ namespace TreeSearch {
     Double_t GetResolution() const { return fResolution; }
 
     WirePlane* GetWirePlane() const { return fWirePlane; }
+    UInt_t   GetPlaneNum()   const { return fWirePlane->GetPlaneNum(); }
 
     // Functors for ordering hits in sets
     struct WireNumLess : public std::binary_function< Hit*, Hit*, bool >
@@ -65,10 +66,8 @@ namespace TreeSearch {
       bool operator() ( const Hit* a, const Hit* b ) const
       { 
 	assert( a && b );
-	const WirePlane* A = a->GetWirePlane(), *B = b->GetWirePlane();
-	assert( A && B );
-	if( A->GetPlaneNum() < B->GetPlaneNum() ) return true;
-	if( A->GetPlaneNum() > B->GetPlaneNum() ) return false;
+	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
+	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
 	if( a->GetWireNum()  < b->GetWireNum()  ) return true;
 	if( a->GetWireNum()  > b->GetWireNum()  ) return false;
 	return ( a->GetDriftTime() < b->GetDriftTime() );
@@ -81,10 +80,8 @@ namespace TreeSearch {
       bool operator() ( const Hit* a, const Hit* b ) const
       { 
 	assert( a && b );
-	const WirePlane* A = a->GetWirePlane(), *B = b->GetWirePlane();
-	assert( A && B );
-	if( A->GetPlaneNum() < B->GetPlaneNum() ) return true;
-	if( A->GetPlaneNum() > B->GetPlaneNum() ) return false;
+	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
+	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
 	return ( a->GetWireNum() + fMaxDist < b->GetWireNum() );
       }
       Int_t GetMaxDist() const { return fMaxDist; }
