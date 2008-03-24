@@ -56,6 +56,19 @@ typedef Hset_t::iterator siter_t;
 #define ALL(c) (c).begin(), (c).end()
 
 //_____________________________________________________________________________
+#ifdef VERBOSE
+static void PrintHits( const Hset_t& hits )
+{
+  //  cout << hits.size() << " hits" << endl;
+
+  for( Hset_t::reverse_iterator it = hits.rbegin(); it != hits.rend(); ++it ) {
+    cout << " ";
+    (*it)->Print();
+  }
+  
+}
+#endif
+//_____________________________________________________________________________
 Road::Road( const Projection* proj ) 
   : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
@@ -87,11 +100,9 @@ Road::Road( Node_t& nd, const Projection* proj )
   fBuild = new BuildInfo_t(nd);
 
 #ifdef VERBOSE
-  cout << "Adding:" << endl;
+  cout << "New Road:" << endl;
   nd.first.Print();
-  PrintHits(nd.second.hits);
-  cout << "New cluster:" << endl;
-  PrintHits( fBuild->fClusterHits );
+  PrintHits(fHits);
 #endif
 }
 
@@ -197,19 +208,6 @@ void Road::CopyPointData( const Road& orig )
 }
   
 //_____________________________________________________________________________
-#ifdef VERBOSE
-static void PrintHits( const Hset_t& hits )
-{
-  //  cout << hits.size() << " hits" << endl;
-
-  for( Hset_t::reverse_iterator it = hits.rbegin(); it != hits.rend(); ++it ) {
-    cout << " ";
-    (*it)->Print();
-  }
-  
-}
-#endif
-//_____________________________________________________________________________
 inline
 Bool_t Road::CheckMatch( const Hset_t& hits ) const
 {
@@ -296,8 +294,8 @@ Bool_t Road::Add( Node_t& nd )
       if( intersection.size() < nd.second.hits.size() ) {
 	if( !CheckMatch(intersection) ) {
 	  // The new pattern would reduce the set of common hits in the road to
-	  // too loose a match, so we reject the new pattern and leave
-	  // the road as it is
+	  // too loose a match. Reject the new pattern and leave the road as 
+	  // it is.
 #ifdef VERBOSE
 	  cout << "no longer a good plane pattern" << endl;
 #endif
@@ -493,7 +491,7 @@ Bool_t Road::CollectCoordinates()
   for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
     Hit* hit = const_cast<Hit*>(*it);
     Double_t z = hit->GetZ();
-    UInt_t np = hit->GetWirePlane()->GetPlaneNum();
+    UInt_t np = hit->GetPlaneNum();
     // Prevent duplicate entries for hits with zero drift
     int i = (hit->GetDriftDist() == 0.0) ? 1 : 2;
     do {
@@ -524,7 +522,7 @@ Bool_t Road::CollectCoordinates()
     cout << " pl= " << i;
     assert( ipl == fPoints.rend() or !(*ipl).empty() );
     if( ipl == fPoints.rend() 
-	or i != (*ipl).front()->hit->GetWirePlane()->GetPlaneNum() )
+	or i != (*ipl).front()->hit->GetPlaneNum() )
       cout << " missing";
     else {
       Double_t z = (*ipl).front()->z;
