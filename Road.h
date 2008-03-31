@@ -8,6 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Hit.h"
+#include "Node.h"
 #include "TVector2.h"
 #include <set>
 #include <utility>
@@ -17,15 +18,12 @@
 #include <cassert>
 #include <cstring>
 
+class THaTrack;
+
 namespace TreeSearch {
 
   class Projection;
-  class NodeDescriptor;
-  class Hit;
-  class HitSet;
   class BuildInfo_t;    // Defined in implementation
-
-  typedef std::pair<const NodeDescriptor,HitSet> Node_t;
 
   class Road : public TObject {
 
@@ -48,6 +46,7 @@ namespace TreeSearch {
     };
 
     typedef std::vector<Road::Point*>  Pvec_t;
+    typedef std::list<const Node_t*>   NodeList_t;
 
     //_________________________________________________________________________
     // Fit results
@@ -113,14 +112,13 @@ namespace TreeSearch {
 
     //_________________________________________________________________________
     explicit Road( const Projection* proj );
-    Road( Node_t& nd, const Projection* proj );
-    Road() : fProjection(0), fBuild(0) {} // For internal ROOT use
+    Road( const Node_t& nd, const Projection* proj );
+    Road() : fProjection(0), fTrack(0), fBuild(0) {} // For internal ROOT use
     Road( const Road& );
     Road& operator=( const Road& );
     virtual ~Road();
 
-    Bool_t         Add( Node_t& nd );
-    Bool_t         Adopt( const Road* other );
+    Bool_t         Add( const Node_t& nd );
     virtual Int_t  Compare( const TObject* obj ) const;
     void           Finish();
     Bool_t         Fit();
@@ -133,43 +131,48 @@ namespace TreeSearch {
     Double_t       GetPosErrsq( Double_t z ) const;
     const Projection* GetProjection() const { return fProjection; }
     Double_t       GetSlope() const { return fSlope; }
-    Bool_t         Includes ( const Road* other ) const;
+    THaTrack*      GetTrack() const { return fTrack; }
+    Bool_t         Include ( const Road* other );
     TVector2       Intersect( const Road* other, Double_t z ) const;
     Bool_t         IsGood() const { return fGood; }
     virtual Bool_t IsSortable () const { return kTRUE; }
     Bool_t         IsVoid() const { return !fGood; }
     virtual void   Print( Option_t* opt="" ) const;
+    void           SetTrack( THaTrack* track ) { fTrack = track; }
     void           Void() { fGood = false; }
+
+#ifdef VERBOSE
+    const NodeList_t& GetPatterns() const { return fPatterns; }
+#endif
 
   protected:
 
     const Projection*  fProjection; //! Projection that this Road belongs to
 
     Double_t           fCornerX[5]; // x positions of corners
-    Double_t           fZL, fZU;    // z +/- eps of first/last plane 
+    Double_t           fZL, fZU;    // z -/+ eps of first/last plane 
 
     // Best fit results (copy of fFitData.begin() for global variable access)
     // Caution: must be 6 Double_t in same order as in FitResult
-    Double_t  fPos;      // Track origin
-    Double_t  fSlope;    // Track slope
-    Double_t  fChi2;     // Chi2 of fit
-    Double_t  fV[3];     // Covariance matrix of param (V11, V12=V21, V22)
+    Double_t     fPos;       // Track origin
+    Double_t     fSlope;     // Track slope
+    Double_t     fChi2;      // Chi2 of fit
+    Double_t     fV[3];      // Covariance matrix of param (V11, V12=V21, V22)
 
-    UInt_t    fDof;      // Degrees of freedom of fit (nhits-2)
-    Bool_t    fGood;     // Road successfully built and fit
+    UInt_t       fDof;       // Degrees of freedom of fit (nhits-2)
+    Bool_t       fGood;      // Road successfully built and fit
+    THaTrack*    fTrack;     // The lowest-chi2 3D track using this road
 
-    std::list<Node_t*>      fPatterns;  // Patterns in this road
-    Hset_t                  fHits;      // All hits linked to the patterns
+    NodeList_t   fPatterns;  // Patterns in this road
+    Hset_t       fHits;      // All hits linked to the patterns
     
-    std::vector<Pvec_t>     fPoints;    // Hit pos within road
-    std::vector<FitResult*> fFitData;   // Good fit results, sorted by chi2
+    std::vector<Pvec_t>      fPoints;    // Hit pos within road
+    std::vector<FitResult*>  fFitData;   // Good fit results, sorted by chi2
 
-    BuildInfo_t*            fBuild;     //! Working data for building
+    BuildInfo_t* fBuild;     //! Working data for building
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();
-    Double_t GetBinX( UInt_t bin ) const;
-
   private:
     void     CopyPointData( const Road& orig );
 

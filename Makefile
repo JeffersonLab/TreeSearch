@@ -2,7 +2,7 @@
 
 SRC  = MWDC.cxx WirePlane.cxx Hit.cxx TimeToDistConv.cxx Hitpattern.cxx \
 	Projection.cxx Pattern.cxx PatternTree.cxx PatternGenerator.cxx \
-	TreeWalk.cxx Road.cxx BigBite.cxx
+	TreeWalk.cxx Node.cxx Road.cxx BigBite.cxx
 
 EXTRAHDR = Helper.h Types.h
 
@@ -11,10 +11,13 @@ PACKAGE = TreeSearch
 LINKDEF = $(PACKAGE)_LinkDef.h
 
 #------------------------------------------------------------------------------
-# Compile debug version
+# Compile debug version (for gdb)
 export DEBUG = 1
-#export VERBOSE = 1
+# Compile extra code for printing verbose messages (enabled with fDebug)
+export VERBOSE = 1
+# Compile extra diagnostic code (extra computations and global variables)
 export TESTCODE = 1
+
 export I387MATH = 1
 export EXTRAWARN = 1
 

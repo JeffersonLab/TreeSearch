@@ -32,6 +32,8 @@ namespace TreeSearch {
   public:
     WirePlane( const char* name, const char* description = "", 
 	       THaDetectorBase* parent = 0 );
+    WirePlane() : fPartner(0), fProjection(0), fMWDC(0), fTTDConv(0),
+		  fHits(0), fFitCoords(0) {} // For ROOT RTTI
     virtual ~WirePlane();
 
     virtual void    Clear( Option_t* opt="" );
@@ -43,26 +45,26 @@ namespace TreeSearch {
 //     virtual Bool_t  IsSortable () const { return kTRUE; }
 
     FitCoord*       AddFitCoord( const FitCoord& coord );
-    EProjType       GetType() const { return fType; }
-    Double_t        GetZ() const { return fOrigin.Z(); }
-    Projection*     GetProjection() const { return fProjection; }
-    WirePlane*      GetPartner() const { return fPartner; }
+    EProjType       GetType()        const { return fType; }
+    Double_t        GetZ()           const { return fOrigin.Z(); }
+    Projection*     GetProjection()  const { return fProjection; }
+    WirePlane*      GetPartner()     const { return fPartner; }
     void            SetPartner( WirePlane* p );
-    MWDC*           GetMWDC() const { return fMWDC; }
-    Double_t        GetResolution() const { return fResolution; }
-    Double_t        GetMaxSlope() const; 
-    Double_t        GetWireStart() const { return fWireStart; }
+    MWDC*           GetMWDC()        const { return fMWDC; }
+    Double_t        GetResolution()  const { return fResolution; }
+    Double_t        GetMaxSlope()    const; 
+    Double_t        GetWireStart()   const { return fWireStart; }
     Double_t        GetWireSpacing() const { return fWireSpacing; }
-    virtual Double_t GetMaxLRdist() const { return GetWireSpacing(); }
+    virtual Double_t GetMaxLRdist()  const { return GetWireSpacing(); }
 
-    TimeToDistConv* GetTTDConv() const { return fTTDConv; }
+    TimeToDistConv* GetTTDConv()     const { return fTTDConv; }
 
-    TSeqCollection* GetHits()     const { return fHits; }
-    Int_t           GetNhits()    const { return fHits->GetLast()+1; }
-    TSeqCollection* GetCoords()   const { return fFitCoords; }
-    Int_t           GetNcoords()  const { return fFitCoords->GetLast()+1; }
-    UInt_t          GetPlaneNum() const { return fPlaneNum; }
-    Bool_t          IsRequired()  const { return TestBit(kIsRequired); }
+    TSeqCollection* GetHits()        const { return fHits; }
+    Int_t           GetNhits()       const { return fHits->GetLast()+1; }
+    TSeqCollection* GetCoords()      const { return fFitCoords; }
+    Int_t           GetNcoords()     const { return fFitCoords->GetLast()+1; }
+    UInt_t          GetPlaneNum()    const { return fPlaneNum; }
+    Bool_t          IsRequired()     const { return TestBit(kIsRequired); }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
     void            SetProjection( Projection* p ) { fProjection = p; }
@@ -104,6 +106,7 @@ namespace TreeSearch {
     Double_t    fResolution;   // Drift distance resolution (sigma) (m)
     Double_t    fMinTime;      // Minimum drift time for a hit (s)
     Double_t    fMaxTime;      // Maximum drift time for a hit (s)
+    UInt_t      fMaxHits;      // Maximum number of hits before flagging decode error
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
     vector<float>   fTDCOffset; // [fNelem] TDC offsets for each wire

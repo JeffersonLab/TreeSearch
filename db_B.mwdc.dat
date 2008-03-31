@@ -58,6 +58,8 @@ B.mwdc.u2.required = 1
 B.mwdc.v2.required = 1
 B.mwdc.x2.required = 1
 B.mwdc.chi2_conflevel = 1e-4
+#B.mwdc.maxhits = 20
+B.mwdc.maxpat  = 500
 
 #-----------------------------------------------------------
 #  TanH fit time-to-distance conversion. 

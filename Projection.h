@@ -8,14 +8,15 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaAnalysisObject.h"
-#include "TreeWalk.h"  // for NodeVisitor
+#include "TreeWalk.h"  // for NodeVisitor, Node_t
 #include "TMath.h"
 #include "TClonesArray.h"
 #include "TVector2.h"
 #include <vector>
-#include <map>
+#include <set>
 #include <cassert>
 #include <utility>
+#include <functional>
 
 class THaDetectorBase;
 class TBits;
@@ -26,7 +27,6 @@ namespace TreeSearch {
   class PatternTree;
   class WirePlane;
   class Road;
-  class HitSet;
 
   class Projection : public THaAnalysisObject {
   public:
@@ -35,6 +35,8 @@ namespace TreeSearch {
 
     Projection( Int_t type, const char* name, Double_t angle,
 		THaDetectorBase* parent );
+    Projection() : fDetector(0), fPatternTree(0), fPlaneCombos(0),
+		   fHitpattern(0), fRoads(0), fRoadCorners(0) {} // ROOT RTTI
     virtual ~Projection();
 
     void            AddPlane( WirePlane* wp, WirePlane* partner = 0 );
@@ -55,7 +57,6 @@ namespace TreeSearch {
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
     Double_t        GetConfLevel()    const { return fConfLevel; }
     Double_t        GetCosAngle()     const { return fAxis.X(); }
-    UInt_t          GetHitMaxDist()   const { return fHitMaxDist; }
     Hitpattern*     GetHitpattern()   const { return fHitpattern; }
     Double_t        GetMaxSlope()     const { return fMaxSlope; }
     UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
@@ -64,7 +65,6 @@ namespace TreeSearch {
     UInt_t          GetNpatterns()    const;
     UInt_t          GetNplanes()      const { return (UInt_t)fPlanes.size(); }
     UInt_t          GetNroads()       const;
-    UInt_t          GetBinMaxDist()   const { return fBinMaxDist; }
     TBits*          GetPlaneCombos()  const { return fPlaneCombos; }
     WirePlane*      GetPlane ( UInt_t plane ) const { return fPlanes[plane]; }
     Double_t        GetPlaneZ( UInt_t plane ) const;
@@ -88,8 +88,14 @@ namespace TreeSearch {
     };
 
   protected:
+    // Comparison functor for ordering found patterns
+    struct MostPlanes : public std::binary_function< Node_t, Node_t, bool >
+    {
+      bool operator() ( const Node_t& a, const Node_t& b ) const;
+    };
+    
     typedef std::vector<pdbl_t> vec_pdbl_t;
-    typedef std::map<const NodeDescriptor,HitSet> NodeMap_t;
+    typedef std::set<Node_t,MostPlanes> NodeSet_t;
 
     // Configuration
     Int_t            fType;          // Type of plane (u,v,x,y...)
@@ -108,9 +114,9 @@ namespace TreeSearch {
     TBits*           fPlaneCombos;   // Allowed plane occupancy patterns
 
     // Road construction control
-    UInt_t           fHitMaxDist;    // Max allowed distance between hits for
-                                     // clustering patterns into roads
-    UInt_t           fBinMaxDist;    // Search distance for MakeRoads
+    UInt_t           fMaxPat;        // Sanity cut on number of patterns
+    Int_t            fFrontMaxBinDist; // Max pattern dist in front plane
+    Int_t            fBackMaxBinDist;  // Max pattern dist in back plane
 
     // Fit statistics cut parameters
     Double_t         fConfLevel;     // Requested confidence level for chi2 cut
@@ -118,7 +124,7 @@ namespace TreeSearch {
 
     // Event-by-event results
     Hitpattern*      fHitpattern;    // Hitpattern of current event
-    NodeMap_t        fPatternsFound; // Patterns found by TreeSearch
+    NodeSet_t        fPatternsFound; // Patterns found by TreeSearch
     TClonesArray*    fRoads;         // Roads found by MakeRoads
     UInt_t           fNgoodRoads;    // Good roads in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
@@ -146,7 +152,7 @@ namespace TreeSearch {
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
-		      std::map<const NodeDescriptor,HitSet>* matches )
+		      NodeSet_t* matches )
 	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches)
 #ifdef TESTCODE
 	, fNtest(0)
@@ -159,16 +165,14 @@ namespace TreeSearch {
     private:
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
-      // Set of matching patterns
-      std::map<const NodeDescriptor,HitSet>* fMatches;
+      NodeSet_t*        fMatches;      // Set of matching patterns
 #ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
     };
 
   private:
-    // Prevent default construction, copying, assignment
-    Projection() {};
+    // Prevent default copying, assignment
     Projection( const Projection& orig );
     const Projection& operator=( const Projection& rhs );
 

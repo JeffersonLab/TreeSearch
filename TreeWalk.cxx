@@ -6,11 +6,11 @@
 
 #include "TreeWalk.h"
 #include "TError.h"
+#include <iomanip>
 
 using namespace std;
 
 ClassImp(TreeSearch::TreeWalk)
-ClassImp(TreeSearch::NodeDescriptor)
 
 namespace TreeSearch {
 
@@ -51,18 +51,6 @@ TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent,
   return ret;
 }
 
-
-//_____________________________________________________________________________
-void NodeDescriptor::Print() const
-{
-  // Print bit contents of the pattern of this NodeDescriptor
-
-  cout << "(" << (UInt_t)depth << "/" << (mirrored ? "-" : "+") << ") ";
-  for( UInt_t i=0; i<link->GetPattern()->GetNbits(); i++ ) {
-    cout << (*this)[i] << " ";
-  }
-  cout << endl;
-}
 
 //_____________________________________________________________________________
 void NodeVisitor::SetLinkPattern( Link* link, Pattern* pattern ) {

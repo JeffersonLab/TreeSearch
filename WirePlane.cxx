@@ -34,7 +34,8 @@ WirePlane::WirePlane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
     fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
     fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
-    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0), fHits(0), fFitCoords(0)
+    fMinTime(-kBig), fMaxTime(kBig), fMaxHits(kMaxUInt), fTTDConv(0),
+    fHits(0), fFitCoords(0)
 #ifdef TESTCODE
   , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
     fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
@@ -268,6 +269,10 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   CheckCrosstalk();
 #endif
 
+  // Negative return value indicates potential problem
+  if( nHits > fMaxHits )
+    return -nHits;
+
   return nHits;
 }
   
@@ -387,6 +392,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   // Default values for optional parameters
   fMinTime = -kBig;
   fMaxTime =  kBig;
+  fMaxHits =  kMaxUInt;
   Int_t required = 0;
   const DBRequest request[] = {
     { "detmap",        detmap,        kIntV },
@@ -402,6 +408,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     { "drift.min",     &fMinTime,     kDouble,  0, 1, -1 },
     { "drift.max",     &fMaxTime,     kDouble,  0, 1, -1 },
     { "required",      &required,     kInt,     0, 1 },
+    { "maxhits",       &fMaxHits,     kUInt,    0, 1, -1 },
     { 0 }
   };
 

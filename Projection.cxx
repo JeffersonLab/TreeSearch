@@ -44,7 +44,8 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
     fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
-    fPlaneCombos(0), fHitMaxDist(1), fBinMaxDist(kMaxUInt), fConfLevel(1.0),
+    fPlaneCombos(0), fMaxPat(kMaxUInt), fFrontMaxBinDist(kMaxUInt),
+    fBackMaxBinDist(kMaxUInt), fConfLevel(1.0),
     fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
 {
   // Constructor
@@ -117,13 +118,19 @@ Int_t Projection::Decode( const THaEvData& evdata )
   // Decode all planes belonging to this projection
 
   Int_t sum = 0;
+  bool err = false;
   for( vwsiz_t i = 0; i < GetNplanes(); ++i ) {
     WirePlane* wp = fPlanes[i];
     Int_t nhits = wp->Decode( evdata );
-    sum += nhits;
-    //TODO: nhits now holds the occupancy of this plane,
-    // use it for occupancy test
+    if( nhits < 0 ) {
+      err = true;
+      sum -= nhits;
+    } else
+      sum += nhits;
   }
+  if( err )
+    return -sum;
+
   return sum;
 }
 
@@ -214,18 +221,17 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
     return fStatus = kInitError;
   assert( GetNplanes() == fHitpattern->GetNplanes() );
 
-  // Determine maximum search distance (in bins) for combining patterns.
-  // In principle, there is no limit if fHitMaxDist > 0 because
-  // the algorithm could just keep adding neighboring hits to clusters.
-  // In practice, we set a cutoff of fHitMaxDist+1 wire spacings
-  // (= typ 3 wires) that can be combined together
-  WirePlane* wp = fPlanes[0]; // The search is along the first plane
-  // Max distance of bins that can belong to the same hit in a single plane
-  Double_t dx = wp->GetMaxLRdist() + 2.0*wp->GetResolution();
-  if( fHitMaxDist )
-    dx += (fHitMaxDist+1)*wp->GetWireSpacing();
-
-  fBinMaxDist = TMath::CeilNint( dx * fHitpattern->GetBinScale() );
+  // Determine maximum search distance (in bins) for combining patterns,
+  // separately for front and back planes since they can have different
+  // parameters.
+  // This is the max distance of bins that can belong to the same hit 
+  // plus an allowance for extra slope of a pattern if a front/back hit
+  // is missing
+  WirePlane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
+  Double_t dxf= front_plane->GetMaxLRdist() + 2.0*front_plane->GetResolution();
+  Double_t dxb= back_plane->GetMaxLRdist()  + 2.0*back_plane->GetResolution();
+  fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() ) + 2;
+  fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() ) + 2;
 
   // Check range of fMinFitPlanes (minimum number of planes require for fit)
   // and fMaxMiss (maximum number of missing planes allowed in a hitpattern).
@@ -309,20 +315,20 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   if( !file ) return kFileError;
 
   Double_t angle = kBig;
-  fHitMaxDist = 1;
   fMinFitPlanes = 3;
   fMaxMiss = 0;
+  fMaxPat  = kMaxUInt;
   fConfLevel = 1e-3;
   Int_t req1of2 = 1;
   const DBRequest request[] = {
     { "angle",           &angle,         kDouble, 0, 1 },
     { "maxslope",        &fMaxSlope,     kDouble, 0, 1, -1 },
     { "search_depth",    &fNlevels,      kUInt,   0, 0, -1 },
-    { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, -1 },
     { "min_fit_planes",  &fMinFitPlanes, kUInt,   0, 1, -1 },
     { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, -1 },
     { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, -1 },
     { "req1of2",         &req1of2,       kInt,    0, 1, -1 },
+    { "maxpat",          &fMaxPat,       kUInt,   0, 1, -1 },
     { 0 }
   };
 
@@ -437,7 +443,7 @@ Int_t Projection::FillHitpattern()
   for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
     WirePlane *plane = *it, *partner = plane->GetPartner();
     // If a plane has a partner (usually with staggered wires), scan them
-    // together to resolve the L/R ambiguity of the hit positions, if possible
+    // together to resolve some of the L/R ambiguity of the hit positions
     ntot += fHitpattern->ScanHits( plane, partner );
     // If the partner plane was just scanned, don't scan it again
     if( partner ) {
@@ -498,27 +504,54 @@ Int_t Projection::Track()
 
   if( fPatternsFound.empty() )
     return 0;
+  // Die if too many patterns - noisy event
+  if( (UInt_t)fPatternsFound.size() > fMaxPat )
+    // TODO: keep statistics
+    return -1;
 
   // Combine patterns with common sets of hits into Roads
   MakeRoads();
 
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    if( !fRoads->IsEmpty() ) {
+      Int_t nroads = GetNroads();
+      cout << nroads << " road";
+      if( nroads>1 ) cout << "s";
+      cout << endl;
+    }
+  }
+#endif
+#ifdef TESTCODE
+  n_roads = GetNroads();
+#endif
+
+  // This seems to cost much more than it gains
+//   // Check for indentical roads or roads that include each other.
+//   // Any roads that are eliminated are marked as void.
+//   if( GetNroads() > 1 ) {
+//     if( RemoveDuplicateRoads() )
+//       // Remove empty slots caused by removed duplicate roads
+//       fRoads->Compress();
+//   }
+
+// #ifdef VERBOSE
+//   if( fDebug > 0 ) {
+//     if( !fRoads->IsEmpty() ) {
+//       Int_t nroads = GetNroads();
+//       cout << nroads << " road";
+//       if( nroads>1 ) cout << "s";
+//       cout << " after filter" << endl;
+//     }
+//   }
+// #endif
 #ifdef TESTCODE
   gettimeofday(&stop, 0 );
   timersub( &stop, &start2, &diff );
   t_roads = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 
-  n_roads = GetNroads();
-
   gettimeofday( &start2, 0 );
 #endif
-
-  // Check for indentical roads or roads that include each other.
-  // Any roads that are eliminated are marked as void.
-  if( GetNroads() > 1 ) {
-    if( RemoveDuplicateRoads() )
-      // Remove empty slots caused by removed duplicate roads
-      fRoads->Compress();
-  }
 
   // Fit hit positions in the roads to straight lines
   FitRoads();
@@ -531,70 +564,132 @@ Int_t Projection::Track()
   t_track = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
 #endif
 
-  return 0;
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    if( !fRoads->IsEmpty() ) {
+      Int_t nroads = GetNgoodRoads();
+      cout << nroads << " road";
+      if( nroads>1 ) cout << "s";
+      cout << " successfully fit" << endl;
+    }
+    cout << "------------ end of projection  " << fName.Data() 
+	 << "------------" << endl;
+  }
+#endif
+  return GetNgoodRoads();
 }
 
+
+//_____________________________________________________________________________
+#ifdef VERBOSE
+static void PrintNode( const Node_t& node )
+{
+  const HitSet& hs = node.second;
+  cout << " npl/nhits= " << hs.nplanes << "/" << hs.hits.size()
+       << "  wnums= ";
+  UInt_t ipl = 0;
+  for( Hset_t::iterator ihit = hs.hits.begin(); ihit != hs.hits.end(); ) {
+    while( ipl < (*ihit)->GetPlaneNum() ) { cout << "--/"; ++ipl; }
+    bool seq = false;
+    do {
+      if( seq )  cout << " ";
+      cout << (*ihit)->GetWireNum();
+      seq = true;
+      ++ihit;
+    } while( ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
+    if( ipl != node.first.link->GetPattern()->GetNbits()-1 ) {
+      cout << "/";
+      if( ihit == hs.hits.end() )
+	cout << "--";
+    }
+    ++ipl;
+  }
+  cout << "  pat= ";
+  node.first.Print();
+}
+#endif
+
+//_____________________________________________________________________________
+inline
+bool Projection::MostPlanes::operator() ( const Node_t& a, 
+					  const Node_t& b ) const
+{
+  // Order patterns by decreasing number of active planes, then
+  // decreasing number of hits, then ascending bin numbers
+  if( a.second.nplanes > b.second.nplanes ) return true;
+  if( a.second.nplanes < b.second.nplanes ) return false;
+  if( a.second.hits.size() > b.second.hits.size() ) return true;
+  if( a.second.hits.size() < b.second.hits.size() ) return false;
+  return ( a.first < b.first );
+}
 
 //_____________________________________________________________________________
 Int_t Projection::MakeRoads()
 {
   // Combine patterns with common sets of hits into Roads.
   //
-  // This is the primary de-ghosting algorithm. It groups patterns with
-  // common wires in all planes.
+  // This is the primary de-ghosting algorithm. It finds clusters of patterns
+  // that share active wires (hits).
 
-  NodeMap_t::iterator it1, it2, ref_it2;
-  for( it1 = ref_it2 = fPatternsFound.begin(); it1 != fPatternsFound.end(); 
-       ++it1 ) {
-    Node_t& nd1 = *it1;
-    assert(nd1.second.used < 3);
-    // New roads must contain at least one unused pattern
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    cout << fPatternsFound.size() << " patterns found:" << endl;
+    for( NodeSet_t::iterator ipat = fPatternsFound.begin(); ipat !=
+	   fPatternsFound.end(); ++ipat )
+      PrintNode( *ipat );
+  }
+#endif
+
+  for( NodeSet_t::iterator itn = fPatternsFound.begin(); itn !=
+	 fPatternsFound.end(); ++itn ) {
+    const Node_t& nd1 = *itn;
+
+    // New roads must start with an unused pattern
     if( nd1.second.used )
       continue;
-    // The seed pattern must make a good match - should always succeed
-    assert( HitSet::CheckMatch(nd1.second.hits, fPlaneCombos) ); 
-
-    // This pattern is good, so create a new road
+      
+    // Start a new road with this pattern
     Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
 
-    // Try adding other unused or partly used patterns to this road
-    it2 = ref_it2;
-    // Search until end of list or too far right
-    while( ++it2 != fPatternsFound.end() and
-	   (*it2).first[0] <= nd1.first[0] + fBinMaxDist ) {
-      Node_t& nd2 = *it2;
-      if( nd1.first[0] <= nd2.first[0] + fBinMaxDist ) {
-	// Try adding unused or partly used pattern to the new road until there
-	// are no more patterns that could possibly have common hits.
-	if( nd2.second.used < 2 &&
-	    it1 != it2 ) // skip the seed in case we run over it
-	  //TODO: keep track of failed adds, 
-	  //  rescan if any until number of fails no longer changes
-	  // -> successive clustering
-	  rd->Add( nd2 );
-      } else {
-	// Save last position too far left of it1 (seed of road).
-	// This + 1 is where we start the next search.
-	ref_it2 = it2;
-      }
+    // Try to add the remaining cluster patterns to this road
+    NodeSet_t::iterator itn2 = itn;
+    while( ++itn2 != fPatternsFound.end() ) {
+      const Node_t& nd2 = *itn2;
+      if( nd2.second.used )
+	continue;
+      // Don't bother with patterns too far away (different cluster)
+      if( TMath::Abs((Int_t)nd2.first.Start()-(Int_t)nd1.first.Start()) >
+	  fFrontMaxBinDist or
+	  TMath::Abs((Int_t)nd2.first.End()-(Int_t)nd1.first.End()) > 
+	  fBackMaxBinDist )
+	continue;
+      rd->Add(nd2);
     }
     // Update the "used" flags of the road's component patterns
     rd->Finish();
+
+    // If event display enabled, export the road's corner coordinates
     if( TestBit(kEventDisplay) ) {
       assert( fRoads->GetLast() == fRoadCorners->GetLast()+1 );
       new( (*fRoadCorners)[fRoads->GetLast()] ) Road::Corners(rd);
     }
   }
+
 #ifdef VERBOSE
-  if( !fRoads->IsEmpty() ) {
-    Int_t nroads = GetNroads();
-    cout << nroads << " road";
-    if( nroads>1 ) cout << "s";
-    cout << endl;
+  if( fDebug > 0 ) {
+    cout << "Generated roads: " << endl;
+    for( UInt_t i = 0; i < GetNroads(); ++i ) {
+      const Road* rd = GetRoad(i);
+      const Road::NodeList_t& ndlst = rd->GetPatterns();
+      for( Road::NodeList_t::const_iterator ipat = ndlst.begin(); ipat !=
+	     ndlst.end(); ++ipat ) {
+	PrintNode( **ipat );
+      }
+      cout << "--------------------------------------------" << endl;
+    }
   }
-  cout << "------------ end of projection  " << fName.Data() 
-       << "------------" << endl;
 #endif
+
   return 0;
 }
 
@@ -603,41 +698,36 @@ Bool_t Projection::RemoveDuplicateRoads()
 {
   // Check for identical roads or roads that include each other
 
-  // This runs in ~O(N^2), but if N>1, it is typically only 2-3.
-  bool changed = false;
-  for( UInt_t i = 0; i < GetNroads(); ++i ) {
-    Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
-    if( !rd )
-      continue;
-    for( UInt_t j = i+1; j < GetNroads(); ++j ) {
-      Road* rd2 = static_cast<Road*>(fRoads->UncheckedAt(j));
-      if( !rd2 )
+  // This runs in ~O(N^2) time, but if N>1, it is typically only 2-5.
+  bool changed = false, restart = true;
+  while( restart ) {
+    restart = false;
+    for( UInt_t i = 0; i < GetNroads(); ++i ) {
+      Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
+      if( !rd )
 	continue;
-      if( rd->Includes(rd2) ) {
-	Bool_t ok = rd->Adopt(rd2);
-#ifndef NDEBUG
-	R__CHECK(ok);
-#endif
-	if( ok ) {
+      for( UInt_t j = i+1; j < GetNroads(); ++j ) {
+	Road* rd2 = static_cast<Road*>(fRoads->UncheckedAt(j));
+	if( !rd2 )
+	  continue;
+	if( rd->Include(rd2) ) {
 	  fRoads->RemoveAt(j);
-	  changed = true;
+	  changed = restart = true;
 #ifdef TESTCODE
 	  ++n_dupl;
 #endif
-	}
-      } else if( rd2->Includes(rd) ) {
-	Bool_t ok = rd2->Adopt(rd);
-#ifndef NDEBUG
-	R__CHECK(ok);
-#endif
-	if( ok ) {
+	} else if( rd2->Include(rd) ) {
 	  fRoads->RemoveAt(i);
-	  changed = true;
+	  changed = restart = true;
 #ifdef TESTCODE
 	  ++n_dupl;
 #endif
 	}
+	if( restart )
+	  break;
       }
+      if( restart )
+	break;
     }
   }
   return changed;
@@ -755,23 +845,21 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
   ++fNtest;
 #endif
   // Compute the match pattern and see if it is allowed
-  UInt_t matchvalue = fHitpattern->ContainsPattern(nd);
-  if( fPlaneCombos->TestBitNumber(matchvalue)  ) {
+  pair<UInt_t,UInt_t> match = fHitpattern->ContainsPattern(nd);
+  if( fPlaneCombos->TestBitNumber(match.first)  ) {
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 
     // Found a match at the bottom of the pattern tree.
     // Add the pattern descriptor to the set of matches,
-    // ordered by start bin number (NodeDescriptor::operator<)
-    pair<NodeMap_t::iterator,bool> ins =
-      fMatches->insert( make_pair(nd,HitSet()) );
-    assert(ins.second);  // duplicate matches should never happen
+    // ordered by Projection::MostPlanes, i.e. most number of active planes
+    // first, then most number of hits, then ascending by start bin number.
 
-    // Retrieve the node that was just inserted.
-    Node_t& node = *ins.first;
-
+    // Make new node to insert into the set. (We can't use a map since we
+    // want to sort using the HitSet data, too.
+    Node_t node = make_pair( nd, HitSet() );
     // Collect all hits associated with the pattern's bins and save them
-    // in the node's HitSet
+    // in the node's HitSet.
     assert( node.second.hits.empty() );
     for( UInt_t i = fHitpattern->GetNplanes(); i; ) {
       --i;
@@ -779,7 +867,14 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
       copy( hits.begin(), hits.end(), 
 	    inserter( node.second.hits, node.second.hits.begin() ));
     }
+    assert( HitSet::GetMatchValue(node.second.hits) == match.first );
+    node.second.plane_pattern = match.first;
+    node.second.nplanes = match.second;
 
+    // Insert the node. This copies the node by value.
+    pair<NodeSet_t::iterator,bool> ins = fMatches->insert( node );
+
+    assert(ins.second);  // duplicate matches should never happen
   }
   return kSkipChildNodes;
 }

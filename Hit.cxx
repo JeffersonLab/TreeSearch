@@ -8,7 +8,6 @@
 
 #include "Hit.h"
 #include "TSeqCollection.h"
-#include "TBits.h"
 #include "WirePlane.h"
 #include "Road.h"
 
@@ -275,16 +274,53 @@ HitPairIter& HitPairIter::Next()
 }
 
 //_____________________________________________________________________________
-Bool_t HitSet::CheckMatch( const Hset_t& hits, const TBits* bits )
+UInt_t HitSet::GetMatchValue( const Hset_t& hits )
 {
-  // Check if the plane occupancy pattern of the given hits is marked as 
-  // allowed in the given bitfield
+  // Return plane occupancy pattern of given hitset
 
   UInt_t curpat = 0;
   for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
-    curpat |= 1U << ((*it)->GetPlaneNum());
+    curpat |= 1U << (*it)->GetPlaneNum();
 
-  return bits->TestBitNumber(curpat);
+  return curpat;
+}
+
+//_____________________________________________________________________________
+Bool_t HitSet::IsSimilarTo( const HitSet& tryset ) const
+{
+  // Similar to STL includes() algorithm, but allows tryset to have additional
+  // hits in a given wire plane if there is at least one included hit in that
+  // plane.
+  //
+  // Example: the following matches, despite the extra hit in plane 1
+  //   this:  30/   32/40/50/51
+  //   try:   --/31 32/40/50/51
+  // 
+  // Standard includes() implies intersection == set2.
+  // This algorithm tests planepattern(intersection) == planepattern(set2)
+
+  assert( tryset.plane_pattern );
+
+  Hset_t::const_iterator ihits = hits.begin();
+  Hset_t::const_iterator ehits = hits.end();
+  Hset_t::const_iterator itry  = tryset.hits.begin();
+  Hset_t::const_iterator etry  = tryset.hits.end();
+  Hset_t::key_compare    comp  = hits.key_comp();
+
+  UInt_t intersection_pattern = 0;
+
+  while( ihits != ehits and itry != etry ) {
+    if( comp(*itry, *ihits) )
+      ++itry;
+    else if( comp(*ihits, *itry) )
+      ++ihits;
+    else {
+      intersection_pattern |= 1U << (*itry)->GetPlaneNum();
+      ++ihits;
+      ++itry;
+    }
+  }
+  return tryset.plane_pattern == intersection_pattern;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

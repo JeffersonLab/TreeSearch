@@ -36,7 +36,7 @@
 #pragma link C++ class std::pair<TObject*,TObject*>+;
 #pragma link C++ class std::vector<TreeSearch::WirePlane*>+;
 #pragma link C++ class std::vector<TreeSearch::Projection*>+;
-#pragma link C++ class std::pair<const TreeSearch::NodeDescriptor,
+#pragma link C++ class std::pair<TreeSearch::NodeDescriptor,
                                  TreeSearch::HitSet>+;
 
 #endif

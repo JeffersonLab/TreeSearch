@@ -14,6 +14,7 @@
 #include <cstring>
 #include <cassert>
 #include <vector>
+#include <utility>
 
 namespace TreeSearch {
 
@@ -45,7 +46,7 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    UInt_t   ContainsPattern( const NodeDescriptor& nd ) const;
+    std::pair<UInt_t,UInt_t> ContainsPattern( const NodeDescriptor& nd ) const;
 
     const std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, 
 						   UInt_t bin ) const {
@@ -157,39 +158,43 @@ namespace TreeSearch {
 //   }
 
   //___________________________________________________________________________
-  inline
-  UInt_t Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
+  inline std::pair<UInt_t,UInt_t> 
+  Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
   {
     // Check if the hitpattern contains the pattern specified by the
-    // NodeDescriptor. Returns the count of planes where the pattern's bit
-    // was found set in the hitpattern.
+    // NodeDescriptor. Returns the plane occupancy bitpattern and the 
+    // count of planes where the pattern's bit was found set in the hitpattern.
+    //
     // Used to compare with the patterns stored in the PatternTree class.
       
     assert( nd.depth < fNlevels );
     // The offset of the hitpattern bits at this depth
     UInt_t offs = 1U<<nd.depth;
-    UInt_t matchpattern = 0;
+    UInt_t matchval = 0, nmatch = 0;
     // The start bit number of the tree pattern we are comparing to
     UInt_t startpos = offs + nd.shift;
     Pattern* pat = nd.link->GetPattern();
-    assert(pat);
     // Pointer to the last element of the pattern's bit array + 1
     UShort_t* bitnum = pat->GetBits() + fNplanes;
     // Check if the pattern's bits are set in the hitpattern, plane by plane
     if( nd.mirrored ) {
       assert( startpos < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
-	if( fPattern[--i]->TestBitNumber(startpos - *--bitnum) )
-	  matchpattern |= (1U<<i);
+	if( fPattern[--i]->TestBitNumber(startpos - *--bitnum) ) {
+	  matchval |= (1U<<i);
+	  ++nmatch;
+	}
       }
     } else {
       assert( startpos + pat->GetWidth() < (offs<<1) );
       for( UInt_t i=fNplanes; i; ) {
-	if( fPattern[--i]->TestBitNumber(startpos + *--bitnum) )
-	  matchpattern |= (1U<<i);
+	if( fPattern[--i]->TestBitNumber(startpos + *--bitnum) ) {
+	  matchval |= (1U<<i);
+	  ++nmatch;
+	}
       }
     }
-    return matchpattern;
+    return std::make_pair(matchval,nmatch);
   }
 
 

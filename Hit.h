@@ -9,6 +9,7 @@
 
 #include "TimeToDistConv.h"
 #include "WirePlane.h"
+#include "TBits.h"
 #include <utility>
 #include <set>
 #include <cassert>
@@ -16,7 +17,6 @@
 
 class TSeqCollection;
 class TIterator;
-class TBits;
 
 namespace TreeSearch {
 
@@ -60,7 +60,7 @@ namespace TreeSearch {
     WirePlane* GetWirePlane() const { return fWirePlane; }
     UInt_t   GetPlaneNum()   const { return fWirePlane->GetPlaneNum(); }
 
-    // Functors for ordering hits in sets
+    // Functor for ordering hits in sets
     struct WireNumLess : public std::binary_function< Hit*, Hit*, bool >
     {
       bool operator() ( const Hit* a, const Hit* b ) const
@@ -74,20 +74,20 @@ namespace TreeSearch {
       }
     };
 
-    struct WireDistLess : public std::binary_function< Hit*, Hit*, bool >
-    {
-      WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) {}
-      bool operator() ( const Hit* a, const Hit* b ) const
-      { 
-	assert( a && b );
-	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
-	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
-	return ( a->GetWireNum() + fMaxDist < b->GetWireNum() );
-      }
-      Int_t GetMaxDist() const { return fMaxDist; }
-    private:
-      Int_t fMaxDist;      // Max allowed distance between hits in a cluster
-    };
+//     struct WireDistLess : public std::binary_function< Hit*, Hit*, bool >
+//     {
+//       WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) {}
+//       bool operator() ( const Hit* a, const Hit* b ) const
+//       { 
+// 	assert( a && b );
+// 	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
+// 	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
+// 	return ( a->GetWireNum() + fMaxDist < b->GetWireNum() );
+//       }
+//       Int_t GetMaxDist() const { return fMaxDist; }
+//     private:
+//       Int_t fMaxDist;      // Max allowed distance between hits in a cluster
+//     };
 
   protected:
     Int_t    fWireNum;     // Wire number
@@ -262,12 +262,17 @@ namespace TreeSearch {
 
   typedef std::set<Hit*,Hit::WireNumLess> Hset_t;
   struct HitSet {
-    Hset_t  hits;  // Hits associated with a pattern
-    UInt_t  used;  // 0=not in any road, 1=some hits used, 2=all hits used
-    HitSet() : used(0) {}
+    Hset_t  hits;          // Hits associated with a pattern
+    UInt_t  plane_pattern; // Bit pattern of plane numbers occupied by hits
+    UInt_t  nplanes;       // number of active planes
+    mutable UInt_t used;   // Pattern has been assigned to a road
+
+    HitSet() : plane_pattern(0), nplanes(0), used(0) {}
     virtual ~HitSet() {}
-    Bool_t CheckMatch( const TBits* bits ) const;
     static Bool_t CheckMatch( const Hset_t& hits, const TBits* bits );
+    Bool_t        CheckMatch( const TBits* bits ) const;
+    static UInt_t GetMatchValue( const Hset_t& hits );
+    Bool_t        IsSimilarTo( const HitSet& tryset ) const;
 
     ClassDef(HitSet, 0)  // A set of hits associated with a pattern
   };
@@ -314,12 +319,23 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
+  Bool_t HitSet::CheckMatch( const Hset_t& hits, const TBits* bits )
+  {
+    // Check if the plane occupancy pattern of the given hits is marked as 
+    // allowed in the given bitfield
+
+    return bits->TestBitNumber( GetMatchValue(hits) );
+  }
+
+  //___________________________________________________________________________
+  inline
   Bool_t HitSet::CheckMatch( const TBits* bits ) const
   {
     // Check if the plane occupancy pattern of the hits in this hitset is
     // marked as allowed in the given bitfield
 
-    return CheckMatch( hits, bits );
+    assert( plane_pattern || hits.empty() );
+    return bits->TestBitNumber(plane_pattern);
   }
 
 ///////////////////////////////////////////////////////////////////////////////

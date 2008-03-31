@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <numeric>
 #include <utility>
+#include <map>
 
 using namespace std;
 typedef string::size_type ssiz_t;
@@ -97,16 +98,25 @@ typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<WirePlane*>::iterator vwiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
+typedef set<Road*> Rset_t;
 
-#define ALL(c) (c).begin(), (c).end()
+struct MWDC::FitRes_t {
+  vector<Double_t> coef;
+  Double_t matchval;
+  Double_t chi2;
+  Int_t ndof;
+};
 
 // Global constant indicating invalid/uninitialized data
 const Double_t kBig = 1e38;
 
+#define ALL(c) (c).begin(), (c).end()
+
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
-    f3dMatchvalScalefact(1), f3dMatchCut(0)
+    f3dMatchvalScalefact(1), f3dMatchCut(0), fFailNhits(0), fFailNpat(0),
+    fNcombos(0), fN3dFits(0)
 { 
   // Constructor
 
@@ -171,6 +181,7 @@ void MWDC::Clear( Option_t* opt )
     if( fRefMap->GetSize() > 0 )
       fRefTime.assign( fRefMap->GetSize(), kBig );  // not strictly necessary
   }
+  fN3dFits = fNcombos = fFailNpat = fFailNhits = 0;
 }
 
 //_____________________________________________________________________________
@@ -210,27 +221,42 @@ Int_t MWDC::Decode( const THaEvData& evdata )
   // Decode the planes, then fill the hitpatterns in the projections
   //TODO: multithread
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    fProj[type]->Decode( evdata );
-
-  //TODO: check for excessive plane occupancy here and abort if too full
-  // (via "max occupancy" parameter or similar)
+    Int_t nhits = fProj[type]->Decode( evdata );
+    // Sanity cut on overfull wire planes. nhits < 0 indicates overflow
+    if( nhits < 0 ) {
+      fFailNhits = 1;
+      continue;
+    }
 
     fProj[type]->FillHitpattern();
-
   }
 
   return 0;
 }
 
 //_____________________________________________________________________________
+void MWDC::FitErrPrint( Int_t err ) const
+{
+  static const char* const here = "FitTrack";
+
+#ifdef TESTCODE
+  Error( Here(here), "Event %d: Failure fitting 3D track, err = %d. "
+	 "Should never happen. Call expert.", fEvNum, err );
+#else
+  Error( Here(here), "Failure fitting 3D track, err = %d. "
+	 "Should never happen. Call expert.", err );
+#endif
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
-		      Double_t& chi2, TMatrixDSym* coef_covar )
+		      Double_t& chi2, TMatrixDSym* coef_covar ) const
 {
   // Linear minimization routine to fit a physical straight line track through
   // the hits registered in the different projection planes.
   //
   // This is a much streamlined version of ROOT's TLinearFitter that solves
-  // the normal equation with weights, (At W A) a = (At W) y, using Cholesky
+  // the normal equations with weights, (At W A) a = (At W) y, using Cholesky
   // decomposition, TDecompChol. The model used is
   //   y_i = P_i * T_i
   //       = ( x + z_i * mx, y + z_i * my) * ( cos(a_i), sin(a_i) )
@@ -305,7 +331,7 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 
   // Calculate chi2 and update FitCoord data in the WirePlanes
 #ifdef VERBOSE
-  cout << "Points in 3D fit:" << endl;
+  if( fDebug > 2 ) cout << "Points in 3D fit:" << endl;
 #endif
   chi2 = 0;
   for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
@@ -323,8 +349,8 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
       Double_t diff = (x - p->x) / p->res();
       chi2 += diff*diff;
 #ifdef VERBOSE
-      cout << p->hit->GetWirePlane()->GetName() << " " 
-	   << "z = " << p->z << " x = " << p->x << endl;
+      if( fDebug > 2 ) cout << p->hit->GetWirePlane()->GetName() << " " 
+			    << "z = " << p->z << " x = " << p->x << endl;
 #endif
 #ifdef TESTCODE
       // TESTCODE adds 3D results to existing rank 0 hit coords in WirePlanes
@@ -351,13 +377,80 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   }
 
 #ifdef VERBOSE
-  cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
-       << "mx/my = " << coef[1] << " " << coef[3] << " "
-       << "ndof = " << npoints-4 << " chi2 = " << chi2
-       << endl;
+  if( fDebug > 1 ) 
+    cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
+	 << "mx/my = " << coef[1] << " " << coef[3] << " "
+	 << "ndof = " << npoints-4 << " chi2 = " << chi2
+	 << endl;
 #endif
   
   return npoints-4;
+}
+
+//_____________________________________________________________________________
+THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
+{
+  // Make new track with given parameters. Used by CoarseTrack.
+
+  THaTrack* newTrack = AddTrack( tracks,
+				 fit_par.coef[0], fit_par.coef[2],
+				 fit_par.coef[1], fit_par.coef[3] );
+  //TODO: make a TrackID?
+  assert( newTrack );
+  // The "detector" and "fp" TRANSPORT systems are the same for BigBite
+  newTrack->SetD( newTrack->GetX(), newTrack->GetY(),
+		  newTrack->GetTheta(), newTrack->GetPhi() );
+  newTrack->SetChi2( fit_par.chi2, fit_par.ndof );
+  return newTrack;
+}
+
+//_____________________________________________________________________________
+class CheckTypes : public unary_function<Road*,void>
+{
+public:
+  CheckTypes( UInt_t req ) : fReq(req), fActive(0) {}
+  void operator() ( const Road* rd )
+  { fActive |= 1U << rd->GetProjection()->GetType(); }
+  operator bool()       const { return (fActive & fReq) == fReq; }
+  bool     operator!()  const { return !((bool)*this); }
+  UInt_t   GetTypes()   const { return fActive; }
+private:
+  UInt_t fReq;
+  UInt_t fActive;
+};
+
+//_____________________________________________________________________________
+template< typename T, typename TestF > void
+OptimalN( const set<T>& choices, const multimap< double, set<T> >& weights,
+	  vector< set<T> >& picks, TestF testf )
+{
+  // This is the second-level de-ghosting algorithm, operating on fitted
+  // 3D tracks.  It selects the best set of tracks if multiple roads
+  // combinations are present in one or more projection.
+  // The key value of 'weights' is the chi2/dof of the fit corresponding to
+  // the tuple.
+
+  picks.clear();
+  set<T> choices_left(choices);
+
+  //TODO: try minimizing chi2 sum
+  //  double wsum = 0;
+  typename multimap<double,set<T> >::const_iterator it = weights.begin();
+  for( ; it != weights.end(); ++it ) {
+    const set<T>& tuple = (*it).second;
+    if( includes(ALL(choices_left), ALL(tuple)) ) {
+      picks.push_back( tuple );
+      //      wsum += (*it).first;
+      set<T> new_choices_left;
+      set_difference( ALL(choices_left), ALL(tuple),
+		      inserter(new_choices_left, new_choices_left.end()) );
+      if( !for_each(ALL(new_choices_left), testf) )
+	break;
+      choices_left.swap( new_choices_left );
+    }
+  }
+
+  return;
 }
 
 //_____________________________________________________________________________
@@ -366,21 +459,37 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   // Find tracks from the hitpatterns, using the coarse hit drift times
   // uncorrected for track slope, timing offset, fringe field effects etc.
 
-  static const char* const here = "CoarseTrack";
+  //  CONTINUE HERE:
+  //TODO:
+  // - improve 3D match:
+  //   * of all combos using a given road, keep only the combo with best fit
+  //     --> n_tracks = min(nrd_x,nrd_u,nrd_v)
+
+  //  static const char* const here = "CoarseTrack";
+
+  if( fFailNhits )
+    return -1;
 
   vector<Rvec_t>::size_type nproj = 0;
   vector<Rvec_t> roads;
   roads.reserve( kTypeEnd-kTypeBegin );
+  bool err = false;
+  UInt_t found_types = 0;
+  //TODO: multithread this loop
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* proj = fProj[type];
 
     // For each projection separately, do TreeSearch, build roads, and
     // fit tracks to uncorrected hit positions
-    proj->Track();
+    Int_t nrd = proj->Track();
 
-    if( proj->GetNgoodRoads() > 0 ) {
+    if( nrd < 0 )
+      err = true;
+
+    if( nrd > 0 ) {
       // Count number of projections with at least one road
       ++nproj;
+      found_types |= 1U << type;
       // Add pointers to the good roads to the appropriate vector
       roads.push_back( Rvec_t() );
       roads.back().reserve( proj->GetNgoodRoads() );
@@ -392,6 +501,11 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       }
     }
   }
+  // Abort on error (e.g. too many patterns)
+  if( err ) {
+    fFailNpat = 1;
+    return -1;
+  }
   assert( roads.size() == nproj );
 
   // Combine track projections to 3D tracks
@@ -400,15 +514,20 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   if( nproj >= 3 ) {
     Rvec_t selected;
     selected.reserve(nproj);
-    UInt_t n_combos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
+    //TODO: protect against overflow?
+    fNcombos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
+    //TODO: cut on excessive number of fits
     // Vector holding the results (vectors of roads with good matchval)
     vector< pair<Double_t,Rvec_t> > road_combos;
-    road_combos.reserve(n_combos);
+    road_combos.reserve(fNcombos);
+    // Set of the unique roads occurring in the road_combos elements
+    Rset_t unique_found;
 #ifdef VERBOSE
-    cout << "Matching " << nproj << " track projections in 3D (trying "
-	 << n_combos << " combinations):" << endl;
+    if( fDebug > 2 ) 
+      cout << "Matching " << nproj << " track projections in 3D (trying "
+	   << fNcombos << " combinations):" << endl;
 #endif
-    for( UInt_t i = 0; i < n_combos; ++i ) {
+    for( UInt_t i = 0; i < fNcombos; ++i ) {
       NthCombination( i, roads, selected );
       assert( selected.size() == nproj );
 
@@ -428,19 +547,21 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
  	TVector2 d2    = back.Proj(xax)  - xb;
 	// The scale factor converts this matchvalue to the one computed by
 	// the general algorithm below
-	//TODO; weigh with uncertainties
+	//TODO; weigh with uncertainties?
  	matchval = ( d1.Mod2() + d2.Mod2() ) * f3dMatchvalScalefact;
 #ifdef VERBOSE
-	cout << selected[0]->GetProjection()->GetName()
-	     << selected[1]->GetProjection()->GetName()
-	     << " front = "; front.Print();
-	cout << "front x  = "; xf.Print();
-	cout << "front dist = " << d1.Mod() << endl;
-	cout << selected[0]->GetProjection()->GetName()
-	     << selected[1]->GetProjection()->GetName()
-	     << " back = "; back.Print();
-	cout << "back x =  "; xb.Print();
-	cout << "back dist = " << d2.Mod() << endl;
+	if( fDebug > 2 ) {
+	  cout << selected[0]->GetProjection()->GetName()
+	       << selected[1]->GetProjection()->GetName()
+	       << " front = "; front.Print();
+	  cout << "front x  = "; xf.Print();
+	  cout << "front dist = " << d1.Mod() << endl;
+	  cout << selected[0]->GetProjection()->GetName()
+	       << selected[1]->GetProjection()->GetName()
+	       << " back = "; back.Print();
+	  cout << "back x =  "; xb.Print();
+	  cout << "back dist = " << d2.Mod() << endl;
+	}
 #endif
       } else {
 	// general algorithm:
@@ -454,20 +575,22 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	for( Rvec_t::iterator it1 = selected.begin();
 	     it1 != selected.end(); ++it1 ) {
 	  for( Rvec_t::iterator it2 = it1+1; it2 != selected.end(); ++it2 ) {
-	    //TODO: weigh with uncertainties of coordinates
+	    //TODO: weigh with uncertainties of coordinates?
 	    fxpts.push_back( (*it1)->Intersect(*it2, 0.0) );
 	    bxpts.push_back( (*it1)->Intersect(*it2, zback) );
 	    fctr += fxpts.back();
 	    bctr += bxpts.back();
 #ifdef VERBOSE
-	    cout << (*it1)->GetProjection()->GetName()
-		 << (*it2)->GetProjection()->GetName()
-		 << " front(" << fxpts.size() << ") = ";
-	    fxpts.back().Print();
-	    cout << (*it1)->GetProjection()->GetName()
-		 << (*it2)->GetProjection()->GetName()
-		 << " back (" << bxpts.size() << ") = ";
-	    bxpts.back().Print();
+	    if( fDebug > 2 ) {
+	      cout << (*it1)->GetProjection()->GetName()
+		   << (*it2)->GetProjection()->GetName()
+		   << " front(" << fxpts.size() << ") = ";
+	      fxpts.back().Print();
+	      cout << (*it1)->GetProjection()->GetName()
+		   << (*it2)->GetProjection()->GetName()
+		   << " back (" << bxpts.size() << ") = ";
+	      bxpts.back().Print();
+	    }
 #endif
 	  }
 	}
@@ -479,9 +602,11 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	  matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
 	}
 #ifdef VERBOSE
-	cout << "fctr = "; fctr.Print();
-	cout << "bctr = "; bctr.Print();
-	cout << "matchval = " << matchval;
+	if( fDebug > 2 ) {
+	  cout << "fctr = "; fctr.Print();
+	  cout << "bctr = "; bctr.Print();
+	  cout << "matchval = " << matchval;
+	}
 #endif
 	// We could just connect fctr and bctr here to get an approximate
 	// 3D track. But the linear minimization below is the right way
@@ -490,47 +615,75 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       } //if k3dFastMatch else
 
       if( matchval < f3dMatchCut ) {
+	// Save road combination with good matchvalue
 	road_combos.push_back( make_pair(matchval,selected) );
+	// Since not all of the roads in 'roads' may make a match,
+	// keep track of unique roads found for each projection type
+	unique_found.insert( ALL(selected) );
 #ifdef VERBOSE
-	cout << "ACCEPTED";
+	if( fDebug > 2 ) cout << "ACCEPTED";
 #endif
       }
 #ifdef VERBOSE
-      cout << endl;;
+      if( fDebug > 2 ) cout << endl;;
 #endif
-    } //for n_combos
+    } //for fNcombos
+
+    fN3dFits = road_combos.size();
 
     // Fit each set of matched roads using linear least squares, yielding 
     // the 3D track parameters, x, x'(=mx), y, y'(=my)
-    //FIXME: what about roads that are selected more than once? mark used?
-    vector<Double_t> fit_param( 4, kBig );
-    for( vector< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
-	 it != road_combos.end(); ++it ) {
-      Rvec_t& these_roads = (*it).second;
-      Double_t chi2 = 0;
-      Int_t ndof = FitTrack( these_roads, fit_param, chi2 );
-      if( ndof > 0 ) {
-	// Add this track
-	THaTrack* newTrack = AddTrack( tracks,
-				       fit_param[0], fit_param[2],
-				       fit_param[1], fit_param[3] );
-	//TODO: make a TrackID?
-	assert( newTrack );
-	// The "detector" and "fp" TRANSPORT systems are the same for BigBite
-	newTrack->SetD( newTrack->GetX(), newTrack->GetY(),
-			newTrack->GetTheta(), newTrack->GetPhi() );
-	newTrack->SetChi2( chi2, ndof );
-      } else {
-#ifdef TESTCODE
-	Error( Here(here), "Event %d: Failure fitting 3D track, err = %d. "
-	       "Should never happen. Call expert.", fEvNum, ndof );
-#else
-	Error( Here(here), "Failure fitting 3D track, err = %d. "
-	       "Should never happen. Call expert.", ndof );
-#endif
-      }
+    FitRes_t fit_par;
+    fit_par.coef.reserve(4);
+    if( fN3dFits == 1 ) {
+      // If there is only one combo (typical case), life is simple:
+      fit_par.matchval    = road_combos.front().first;
+      Rvec_t& these_roads = road_combos.front().second;
+      fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
+      if( fit_par.ndof > 0 )
+	NewTrack( tracks, fit_par );
+      else
+	FitErrPrint( fit_par.ndof );
     }
-  }
+    else if( fN3dFits > 0 ) {
+      // For multiple road combinations, find the set of tracks with the
+      // lowest chi2s that uses each road at most once
+      roads.clear();
+      typedef map<Rset_t, FitRes_t> FitResMap_t;
+      FitResMap_t fit_results;
+      multimap< double, Rset_t > fit_chi2;
+      // Fit all combinations and sort the results by ascending chi2
+      for( vector< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
+	   it != road_combos.end(); ++it ) {
+	fit_par.matchval    = (*it).first;
+	Rvec_t& these_roads = (*it).second;
+	fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
+	if( fit_par.ndof > 0 ) {
+	  Rset_t road_tuple( ALL(these_roads) );
+	  pair<FitResMap_t::iterator,bool> ins =
+	    fit_results.insert( make_pair(road_tuple, fit_par) );
+	  assert( ins.second );
+	  double rchi2 = fit_par.chi2/(double)fit_par.ndof;
+	  fit_chi2.insert( make_pair(rchi2, road_tuple) );
+	} else
+	  FitErrPrint( fit_par.ndof );
+      }
+
+      // Select "optimal" set of roads, minimizing sum of chi2s
+      vector<Rset_t> best_roads;
+      OptimalN( unique_found, fit_chi2, best_roads, CheckTypes(found_types) );
+
+      // Now each selected road tuple corresponds to a new track
+      for( vector<Rset_t>::iterator it = best_roads.begin(); it !=
+	     best_roads.end(); ++it ) {
+	// Retrieve the fit results for this tuple
+	FitResMap_t::iterator found = fit_results.find(*it);
+	assert( found != fit_results.end() );
+	NewTrack( tracks, (*found).second );
+      }
+    }//if(fN3dFits)
+  }// if(nproj>=3)
+
   // TODO: optional recovery code for missing projection
 
   // Quit here to let detectors CoarseProcess() the approximate tracks,
@@ -552,9 +705,15 @@ Int_t MWDC::FineTrack( TClonesArray& tracks )
   //TODO
 
 #ifdef VERBOSE
-  cout << "=========== end of event ==============" << endl;
+  if( fDebug > 0 ) {
+    cout << "=========== end of event ";
+#ifdef TESTCODE
+    cout << "# " << fEvNum << " ";
 #endif
-  return 0;//fNtracks;
+    cout << "==============" << endl;
+  }
+#endif
+  return 0;;
 }
 
 //_____________________________________________________________________________
@@ -569,16 +728,10 @@ Int_t MWDC::DefineVariables( EMode mode )
   // Register variables in global list
   
   RVarDef vars[] = {
-    //TODO: useful global variables
-#if 0
-    { "trackskipped", "Tracking skipped or truncated", "fTooBusy"       },
-    { "cproctime",    "Coarse Processing Time",        "fCoarseProcTime"},
-    { "fproctime",    "Fine Processing Time",          "fFineProcTime"  },
-    { "estngrp",      "Estimated Number of Groups",    "fEstNGroups"    },
-    { "estncall",     "Estimated Number of Calls",     "fEstNCalls"     },
-    { "ngrp",         "Number of Groups",              "fNGroups"       },
-    { "ncall",        "Number of recursive calls",     "fNCalls"        },
-#endif  
+    { "fail.nhits",   "Too many hits in wire plane(s)",  "fFailNhits" },
+    { "fail.npat",    "Too many treesearch patterns",    "fFailNpat" },
+    { "ncombos",      "Number of road combinations",     "fNcombos" },
+    { "nfits",        "Number of 3D track fits done",    "fN3dFits" },
     { 0 }
   };
   DefineVarsFromList( vars, mode );
@@ -738,7 +891,6 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   }
 
   // Determine the width of and add the wire planes to the projections
-  // TODO: this can be multithreaded, too - I think
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* theProj = fProj[type];
     Double_t width = 0.0;
@@ -958,9 +1110,9 @@ void MWDC::Print(const Option_t* opt) const
     fProj[type]->Print(opt);
   }
 
-  if( verbose > 1 ) {
-    //  fBench->Print();
-  }
+//   if( verbose > 1 ) {
+//     fBench->Print();
+//   }
 }
 
 
@@ -968,11 +1120,15 @@ void MWDC::Print(const Option_t* opt) const
 void MWDC::SetDebug( Int_t level )
 {
   // Set debug level of this detector, including all wire planes (subdetectors)
+  // and projections
 
   THaTrackingDetector::SetDebug( level );
 
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     fPlanes[iplane]->SetDebug( level );
+
+  for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
+    fProj[type]->SetDebug( level );
 }
 
 //_____________________________________________________________________________
