@@ -298,9 +298,6 @@ Bool_t Road::Add( const Node_t& nd )
     // NB: IsSimilarTo() is a looser match than std::includes(). The new
     // pattern may have extra hits
 
-    // Save a pointer to this pattern so we can update it later
-    fPatterns.push_back(&nd);
-
     // Expand the road width, but only for patterns of the same match level.
     // Patterns of lower match level can be artificially wide
     if( new_set.nplanes == fBuild->fCluster.nplanes )
@@ -312,12 +309,16 @@ Bool_t Road::Add( const Node_t& nd )
 #endif
   }
   else {
+    // The pattern does not fit into this cluster
 #ifdef VERBOSE
     if( fProjection->GetDebug() > 2 )
       cout << "Not a subset of this road" << endl;
 #endif
     return false;
   }
+
+  // Save a pointer to the added pattern so we can update it later
+  fPatterns.push_back(&nd);
 
   return true;
 }
@@ -349,7 +350,7 @@ void Road::Finish()
 
   // Convert the bin numbers of the left/right edges to physical coordinates
   vector< pair<Double_t,Double_t> > edgpos;
-  UInt_t npl = fProjection->GetNplanes(), np1 = npl-1;
+  UInt_t npl = fProjection->GetNplanes(), lastpl = npl-1;
   edgpos.reserve( npl );
   GetBinX binx( fProjection->GetHitpattern() ); // bin# -> position
   transform( ALL(fBuild->fLimits), back_inserter(edgpos), binx );
@@ -358,18 +359,18 @@ void Road::Finish()
   // front and back bins, shifted to the left/right to include fully the
   // left/rightmost bin. This may not be optimal, but it is fast, unambiguous,
   // and removes the bias towards the front/back bins.
-  Int_t lo = 0, hi = np1;
-  TVector2 LL( edgpos[lo].first,  fProjection->GetPlaneZ(lo) );
-  TVector2 UL( edgpos[hi].first,  fProjection->GetPlaneZ(hi) );
-  TVector2 LR( edgpos[lo].second, fProjection->GetPlaneZ(lo) );
-  TVector2 UR( edgpos[hi].second, fProjection->GetPlaneZ(hi) );
-  Double_t slope = (UL.X() - LL.X()) / (UL.Y() - LL.Y());
+  TVector2 LL( edgpos.front().first,  fProjection->GetPlaneZ(0) );
+  TVector2 LR( edgpos.front().second, fProjection->GetPlaneZ(0) );
+  TVector2 UL( edgpos.back().first,   fProjection->GetPlaneZ(lastpl) );
+  TVector2 UR( edgpos.back().second,  fProjection->GetPlaneZ(lastpl) );
+  Double_t slopeL = (UL.X() - LL.X()) / (UL.Y() - LL.Y());
+  Double_t slopeR = (UR.X() - LR.X()) / (UR.Y() - LR.Y());
   Double_t maxdL = 0, maxdR = 0;
-  for( UInt_t i = np1; i>1; ) { --i;
+  for( UInt_t i = lastpl; i>1; ) { --i;
     Double_t z = fProjection->GetPlaneZ(i);
     // Crossing points in test plane (i) of the L/R front/back connections
-    Double_t XL = LL.X() + slope * (z - LL.Y());
-    Double_t XR = LR.X() + slope * (z - LR.Y());
+    Double_t XL = UL.X() + slopeL * (z - UL.Y());
+    Double_t XR = UR.X() + slopeR * (z - UR.Y());
     // Memorize the bins that stick out the most on left/right. Reuse UL/UR
     Double_t lpt = edgpos[i].first, rpt = edgpos[i].second;
     Double_t dL = lpt - XL, dR = rpt - XR;
@@ -390,13 +391,13 @@ void Road::Finish()
   // on the planes are guaranteed to be included
   const Double_t eps = 1e-3;
   fZL = fProjection->GetPlaneZ(0) - eps;
-  fZU = fProjection->GetPlaneZ(np1) + eps;
+  fZU = fProjection->GetPlaneZ(lastpl) + eps;
   assert( fZL < fZU );
 
-  fCornerX[0] = UL.X() + slope * (fZL - UL.Y());
-  fCornerX[1] = UR.X() + slope * (fZL - UR.Y());
-  fCornerX[2] = UR.X() + slope * (fZU - UR.Y());
-  fCornerX[3] = UL.X() + slope * (fZU - UL.Y());
+  fCornerX[0] = UL.X() + slopeL * (fZL - UL.Y());
+  fCornerX[1] = UR.X() + slopeR * (fZL - UR.Y());
+  fCornerX[2] = UR.X() + slopeR * (fZU - UR.Y());
+  fCornerX[3] = UL.X() + slopeL * (fZU - UL.Y());
   fCornerX[4] = fCornerX[0];
 
   assert( fCornerX[0] < fCornerX[1] );
