@@ -641,29 +641,39 @@ Int_t Projection::MakeRoads()
 #endif
 
   for( NodeSet_t::iterator itn = fPatternsFound.begin(); itn !=
-	 fPatternsFound.end(); ++itn ) {
+	 fPatternsFound.end(); ) {
     const Node_t& nd1 = *itn;
 
     // New roads must start with an unused pattern
-    if( nd1.second.used )
-      continue;
-      
+//     if( nd1.second.used )
+//       continue;
+    assert( !nd1.second.used );
+
     // Start a new road with this pattern
     Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
 
     // Try to add the remaining cluster patterns to this road
     NodeSet_t::iterator itn2 = itn;
+    // Stop search unless there are any remaining unused patterns
+    itn = fPatternsFound.end();
     while( ++itn2 != fPatternsFound.end() ) {
       const Node_t& nd2 = *itn2;
       if( nd2.second.used )
 	continue;
       // Don't bother with patterns too far away (different cluster)
-      if( TMath::Abs((Int_t)nd2.first.Start()-(Int_t)nd1.first.Start()) >
-	  fFrontMaxBinDist or
-	  TMath::Abs((Int_t)nd2.first.End()-(Int_t)nd1.first.End()) > 
-	  fBackMaxBinDist )
+      if( TMath::Abs((Int_t)nd2.first.Start()-(Int_t)nd1.first.Start()) <=
+	  fFrontMaxBinDist and
+	  TMath::Abs((Int_t)nd2.first.End()-(Int_t)nd1.first.End()) <=
+	  fBackMaxBinDist  and
+	  // Test pattern and add it if applicable
+	  rd->Add(nd2) ) {
+	// Pattern successfully added
 	continue;
-      rd->Add(nd2);
+      }
+      // Either the pattern is out of range or it does not fit in the current
+      // cluster, so save current position as next unused pattern
+      if( itn == fPatternsFound.end() )
+	itn = itn2;
     }
     // Update the "used" flags of the road's component patterns
     rd->Finish();
