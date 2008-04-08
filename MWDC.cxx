@@ -199,6 +199,16 @@ Int_t MWDC::Decode( const THaEvData& evdata )
   fEvNum = evdata.GetEvNum();
 #endif
 
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    cout << "============== Event ";
+#ifdef TESTCODE
+    cout << "# " << fEvNum << " ";
+#endif
+    cout << "==============" << endl;
+  }
+#endif
+
   // Decode reference channels of the VME readout (if any)
   for( Int_t imod = 0; imod < fRefMap->GetSize(); ++imod ) {
     THaDetMap::Module* d = fRefMap->GetModule(imod);
@@ -231,7 +241,8 @@ Int_t MWDC::Decode( const THaEvData& evdata )
       continue;
     }
 
-    fProj[type]->FillHitpattern();
+    if( TestBit(kDoCoarse) )
+      fProj[type]->FillHitpattern();
   }
 
   return 0;
@@ -620,6 +631,9 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   if( fFailNhits )
     return -1;
 
+  if( !TestBit(kDoCoarse) )
+    return 0;
+
   vector<Rvec_t>::size_type nproj = 0;
   vector<Rvec_t> roads;
   roads.reserve( kTypeEnd-kTypeBegin );
@@ -746,17 +760,11 @@ Int_t MWDC::FineTrack( TClonesArray& tracks )
   // - Re-collect hits of roads and re-fit roads
   // - Re-combine track projections in 3D and re-fit 3D track
 
-  //TODO
+  if( !TestBit(kDoFine) )
+    return 0;
 
-#ifdef VERBOSE
-  if( fDebug > 0 ) {
-    cout << "=========== end of event ";
-#ifdef TESTCODE
-    cout << "# " << fEvNum << " ";
-#endif
-    cout << "==============" << endl;
-  }
-#endif
+  // TODO
+
   return 0;;
 }
 
@@ -1050,16 +1058,18 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   string planeconfig;
   Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
   f3dMatchCut = 1e-4;
-  Int_t event_display = false;
+  Int_t event_display = 0, disable_tracking = 0, disable_finetrack = 0;
   DBRequest request[] = {
-    { "planeconfig",  &planeconfig, kString },
-    { "cratemap",     cmap,         kIntM,    6 },
-    { "timecut",      &time_cut,    kInt,     0, 1 },
-    { "pairsonly",    &pairs_only,  kInt,     0, 1 },
-    { "MCdata",       &mc_data,     kInt,     0, 1 },
-    { "nopartner",    &nopartner,   kInt,     0, 1 },
-    { "3d_matchcut",  &f3dMatchCut, kDouble,  0, 1 },
-    { "event_display",&event_display, kInt,   0, 1 },
+    { "planeconfig",       &planeconfig,       kString },
+    { "cratemap",          cmap,               kIntM,   6 },
+    { "timecut",           &time_cut,          kInt,    0, 1 },
+    { "pairsonly",         &pairs_only,        kInt,    0, 1 },
+    { "MCdata",            &mc_data,           kInt,    0, 1 },
+    { "nopartner",         &nopartner,         kInt,    0, 1 },
+    { "3d_matchcut",       &f3dMatchCut,       kDouble, 0, 1 },
+    { "event_display",     &event_display,     kInt,    0, 1 },
+    { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
+    { "disable_finetrack", &disable_finetrack, kInt,    0, 1 },
     { 0 }
   };
 
@@ -1100,10 +1110,13 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   }
 
   // Set analysis control flags
-  SetBit( kDoTimeCut, time_cut );
-  SetBit( kPairsOnly, pairs_only );
-  SetBit( kMCdata,    mc_data );
-  SetBit( kNoPartner, nopartner );
+  SetBit( kDoTimeCut,     time_cut );
+  SetBit( kPairsOnly,     pairs_only );
+  SetBit( kMCdata,        mc_data );
+  SetBit( kNoPartner,     nopartner );
+  SetBit( kEventDisplay,  event_display );
+  SetBit( kDoCoarse,      !disable_tracking );
+  SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
 
   // Set up the wire planes
   for( ssiz_t i=0; i<planes.size(); ++i ) {
@@ -1128,8 +1141,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 
   if( fDebug > 0 )
     Info( Here(here), "Loaded %u planes", fPlanes.size() );
-
-  SetBit( kEventDisplay, (event_display != 0) );
 
   fIsInit = kTRUE;
   return kOK;

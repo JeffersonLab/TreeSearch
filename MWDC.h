@@ -67,7 +67,9 @@ namespace TreeSearch {
       kMCdata     = BIT(16), // Assume input is Monte Carlo data
       kNoPartner  = BIT(17), // Never partner wire planes
       k3dFastMatch= BIT(18), // Use fast 3D matching algorithm (auto detected)
-      kEventDisplay = BIT(19)  // Support event display
+      kEventDisplay = BIT(19), // Support event display
+      kDoCoarse   = BIT(20), // Do coarse tracking (if disabled, decode only)
+      kDoFine     = BIT(21)  // Do fine tracking (implies kDoCoarse)
     };
 
   protected:
