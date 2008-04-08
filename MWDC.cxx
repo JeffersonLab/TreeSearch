@@ -30,7 +30,6 @@
 #include <iostream>
 #include <algorithm>
 #include <numeric>
-#include <utility>
 #include <map>
 
 using namespace std;
@@ -98,7 +97,6 @@ typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<WirePlane*>::iterator vwiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
-typedef set<Road*> Rset_t;
 
 struct MWDC::FitRes_t {
   vector<Double_t> coef;
@@ -115,8 +113,10 @@ const Double_t kBig = 1e38;
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
-    f3dMatchvalScalefact(1), f3dMatchCut(0), fFailNhits(0), fFailNpat(0),
-    fNcombos(0), fN3dFits(0)
+    f3dMatchvalScalefact(1), f3dMatchCut(0), fFailNhits(0), fFailNpat(0)
+#ifdef TESTCODE
+  , fNcombos(0), fN3dFits(0)
+#endif
 { 
   // Constructor
 
@@ -181,7 +181,10 @@ void MWDC::Clear( Option_t* opt )
     if( fRefMap->GetSize() > 0 )
       fRefTime.assign( fRefMap->GetSize(), kBig );  // not strictly necessary
   }
-  fN3dFits = fNcombos = fFailNpat = fFailNhits = 0;
+  fFailNpat = fFailNhits = 0;
+#ifdef TESTCODE
+  fN3dFits = fNcombos = 0;
+#endif
 }
 
 //_____________________________________________________________________________
@@ -454,6 +457,159 @@ OptimalN( const set<T>& choices, const multimap< double, set<T> >& weights,
 }
 
 //_____________________________________________________________________________
+UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
+			 vector< pair<Double_t,Rvec_t> >& combos_found,
+			 Rset_t& unique_found )
+{
+  // Match roads from different projections that intersect in the front
+  // and back plane of the detector
+
+  // The number of projections that we work with (must be >= 3)
+  vector<Rvec_t>::size_type nproj = roads.size();
+
+  combos_found.clear();
+  unique_found.clear();
+
+  // Number of all possible combinations of the input roads
+  //TODO: protect against overflow?
+  UInt_t ncombos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
+  //TODO: cut on excessive number of fits?
+  //TODO: try not to overallocate memory as this most likely does
+  combos_found.reserve(ncombos);
+#ifdef VERBOSE
+  if( fDebug > 2 ) 
+    cout << "Matching " << nproj << " track projections in 3D (trying "
+	 << ncombos << " combinations):" << endl;
+#endif
+#ifdef TESTCODE
+  fNcombos = ncombos;
+#endif
+
+  // Vector holding a combination of roads to test. One road from each 
+  // projection 
+  Rvec_t selected;
+  selected.reserve(nproj);
+
+  Double_t zback = fPlanes.back()->GetZ();
+  vector<TVector2> fxpts, bxpts;
+  bool fast_3d = TestBit(k3dFastMatch);
+  if( fast_3d ) {
+    assert( nproj == 3 );
+  } else {
+    fxpts.reserve( nproj*(nproj-1)/2 );
+    bxpts.reserve( nproj*(nproj-1)/2 );
+  }
+  for( UInt_t i = 0; i < ncombos; ++i ) {
+    NthCombination( i, roads, selected );
+    assert( selected.size() == nproj );
+
+    Double_t matchval = 0.0;
+    if( fast_3d ) {
+      // special case n==3 and symmetric angles of planes 0 and 1:
+      //  - intersect first two proj in front and back
+      //  - calc perp distances to 3rd, add in quadrature -> matchval
+      TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
+      if( !fPlanes.front()->Contains(front) )
+	continue;
+      TVector2 back = selected[0]->Intersect( selected[1], zback );
+      if( !fPlanes.back()->Contains(back) )
+	continue;
+      const TVector2& xax = selected[2]->GetProjection()->GetAxis();
+      TVector2 xf = selected[2]->GetPos(0.0)   * xax;
+      TVector2 xb = selected[2]->GetPos(zback) * xax;
+      TVector2 d1 = front.Proj(xax) - xf;
+      TVector2 d2 = back.Proj(xax)  - xb;
+      // The scale factor converts this matchvalue to the one computed by
+      // the general algorithm below
+      //TODO; weigh with uncertainties?
+      matchval = ( d1.Mod2() + d2.Mod2() ) * f3dMatchvalScalefact;
+#ifdef VERBOSE
+      if( fDebug > 3 ) {
+	cout << selected[0]->GetProjection()->GetName()
+	     << selected[1]->GetProjection()->GetName()
+	     << " front = "; front.Print();
+	cout << "front x  = "; xf.Print();
+	cout << "front dist = " << d1.Mod() << endl;
+	cout << selected[0]->GetProjection()->GetName()
+	     << selected[1]->GetProjection()->GetName()
+	     << " back = "; back.Print();
+	cout << "back x =  "; xb.Print();
+	cout << "back dist = " << d2.Mod() << endl;
+      }
+#endif
+    } else {
+      // general algorithm:
+      //  - find all front and back intersections [ n(n-1)/2 each ] 
+      //  - compute weighted center of gravity of intersection points
+      //  - sum dist^2 of points to center of gravity -> matchval
+      fxpts.clear();
+      bxpts.clear();
+      TVector2 fctr, bctr;
+      for( Rvec_t::iterator it1 = selected.begin();
+	   it1 != selected.end(); ++it1 ) {
+	for( Rvec_t::iterator it2 = it1+1; it2 != selected.end(); ++it2 ) {
+	  //TODO: weigh with uncertainties of coordinates?
+	  fxpts.push_back( (*it1)->Intersect(*it2, 0.0) );
+	  bxpts.push_back( (*it1)->Intersect(*it2, zback) );
+	  fctr += fxpts.back();
+	  bctr += bxpts.back();
+#ifdef VERBOSE
+	  if( fDebug > 3 ) {
+	    cout << (*it1)->GetProjection()->GetName()
+		 << (*it2)->GetProjection()->GetName()
+		 << " front(" << fxpts.size() << ") = ";
+	    fxpts.back().Print();
+	    cout << (*it1)->GetProjection()->GetName()
+		 << (*it2)->GetProjection()->GetName()
+		 << " back (" << bxpts.size() << ") = ";
+	    bxpts.back().Print();
+	  }
+#endif
+	}
+      }
+      assert( fxpts.size() <= nproj*(nproj-1)/2 );
+      assert( bxpts.size() == fxpts.size() );
+      fctr /= static_cast<Double_t>( fxpts.size() );
+      if( !fPlanes.front()->Contains(fctr) )
+	continue;
+      bctr /= static_cast<Double_t>( fxpts.size() );
+      if( !fPlanes.back()->Contains(bctr) )
+	continue;
+      for( vector<TVector2>::size_type k = 0; k < fxpts.size(); ++k ) {
+	matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
+      }
+#ifdef VERBOSE
+      if( fDebug > 3 ) {
+	cout << "fctr = "; fctr.Print();
+	cout << "bctr = "; bctr.Print();
+	cout << "matchval = " << matchval;
+      }
+#endif
+      // We could just connect fctr and bctr here to get an approximate
+      // 3D track. But the linear minimization below is the right way
+      // to do this.
+
+    } //if k3dFastMatch else
+
+    if( matchval < f3dMatchCut ) {
+      // Save road combination with good matchvalue
+      combos_found.push_back( make_pair(matchval,selected) );
+      // Since not all of the roads in 'roads' may make a match,
+      // keep track of unique roads found for each projection type
+      unique_found.insert( ALL(selected) );
+#ifdef VERBOSE
+      if( fDebug > 3 ) cout << "ACCEPTED";
+#endif
+    }
+#ifdef VERBOSE
+    if( fDebug > 3 ) cout << endl;;
+#endif
+  } //for ncombos
+
+  return combos_found.size();
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   // Find tracks from the hitpatterns, using the coarse hit drift times
@@ -506,143 +662,19 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   // The standard method requires at least 3 projections. This helps reject
   // noise and, if there is more than one u or v road, correlates u and v
   if( nproj >= 3 ) {
-    Rvec_t selected;
-    selected.reserve(nproj);
-    //TODO: protect against overflow?
-    fNcombos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
-    //TODO: cut on excessive number of fits
     // Vector holding the results (vectors of roads with good matchval)
     vector< pair<Double_t,Rvec_t> > road_combos;
-    road_combos.reserve(fNcombos);
     // Set of the unique roads occurring in the road_combos elements
     Rset_t unique_found;
-#ifdef VERBOSE
-    if( fDebug > 2 ) 
-      cout << "Matching " << nproj << " track projections in 3D (trying "
-	   << fNcombos << " combinations):" << endl;
-#endif
-    Double_t zback = fPlanes.back()->GetZ();
-    vector<TVector2> fxpts, bxpts;
-    bool fast_3d = TestBit(k3dFastMatch);
-    if( fast_3d ) {
-      assert( nproj == 3 );
-    } else {
-      fxpts.reserve( nproj*(nproj-1)/2 );
-      bxpts.reserve( nproj*(nproj-1)/2 );
-    }
-    for( UInt_t i = 0; i < fNcombos; ++i ) {
-      NthCombination( i, roads, selected );
-      assert( selected.size() == nproj );
 
-      Double_t matchval = 0.0;
-      if( fast_3d ) {
-	// special case n==3 and symmetric angles of planes 0 and 1:
-	//  - intersect first two proj in front and back
-	//  - calc perp distances to 3rd, add in quadrature -> matchval
-	TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
-	if( !fPlanes.front()->Contains(front) )
-	  continue;
-	TVector2 back = selected[0]->Intersect( selected[1], zback );
-	if( !fPlanes.back()->Contains(back) )
-	  continue;
-	const TVector2& xax = selected[2]->GetProjection()->GetAxis();
-	TVector2 xf = selected[2]->GetPos(0.0)   * xax;
-	TVector2 xb = selected[2]->GetPos(zback) * xax;
- 	TVector2 d1 = front.Proj(xax) - xf;
- 	TVector2 d2 = back.Proj(xax)  - xb;
-	// The scale factor converts this matchvalue to the one computed by
-	// the general algorithm below
-	//TODO; weigh with uncertainties?
- 	matchval = ( d1.Mod2() + d2.Mod2() ) * f3dMatchvalScalefact;
-#ifdef VERBOSE
-	if( fDebug > 2 ) {
-	  cout << selected[0]->GetProjection()->GetName()
-	       << selected[1]->GetProjection()->GetName()
-	       << " front = "; front.Print();
-	  cout << "front x  = "; xf.Print();
-	  cout << "front dist = " << d1.Mod() << endl;
-	  cout << selected[0]->GetProjection()->GetName()
-	       << selected[1]->GetProjection()->GetName()
-	       << " back = "; back.Print();
-	  cout << "back x =  "; xb.Print();
-	  cout << "back dist = " << d2.Mod() << endl;
-	}
-#endif
-      } else {
-	// general algorithm:
-	//  - find all front and back intersections [ n(n-1)/2 each ] 
-	//  - compute weighted center of gravity of intersection points
-	//  - sum dist^2 of points to center of gravity -> matchval
-	fxpts.clear();
-	bxpts.clear();
-	TVector2 fctr, bctr;
-	for( Rvec_t::iterator it1 = selected.begin();
-	     it1 != selected.end(); ++it1 ) {
-	  for( Rvec_t::iterator it2 = it1+1; it2 != selected.end(); ++it2 ) {
-	    //TODO: weigh with uncertainties of coordinates?
-	    fxpts.push_back( (*it1)->Intersect(*it2, 0.0) );
-	    bxpts.push_back( (*it1)->Intersect(*it2, zback) );
-	    fctr += fxpts.back();
-	    bctr += bxpts.back();
-#ifdef VERBOSE
-	    if( fDebug > 2 ) {
-	      cout << (*it1)->GetProjection()->GetName()
-		   << (*it2)->GetProjection()->GetName()
-		   << " front(" << fxpts.size() << ") = ";
-	      fxpts.back().Print();
-	      cout << (*it1)->GetProjection()->GetName()
-		   << (*it2)->GetProjection()->GetName()
-		   << " back (" << bxpts.size() << ") = ";
-	      bxpts.back().Print();
-	    }
-#endif
-	  }
-	}
-	assert( fxpts.size() <= nproj*(nproj-1)/2 );
-	assert( bxpts.size() == fxpts.size() );
-	fctr /= static_cast<Double_t>( fxpts.size() );
-	bctr /= static_cast<Double_t>( fxpts.size() );
-	if( !fPlanes.front()->Contains(fctr) or
-	    !fPlanes.back()->Contains(bctr) )
-	  continue;
-	for( vector<TVector2>::size_type k = 0; k < fxpts.size(); ++k ) {
-	  matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
-	}
-#ifdef VERBOSE
-	if( fDebug > 2 ) {
-	  cout << "fctr = "; fctr.Print();
-	  cout << "bctr = "; bctr.Print();
-	  cout << "matchval = " << matchval;
-	}
-#endif
-	// We could just connect fctr and bctr here to get an approximate
-	// 3D track. But the linear minimization below is the right way
-	// to do this.
-
-      } //if k3dFastMatch else
-
-      if( matchval < f3dMatchCut ) {
-	// Save road combination with good matchvalue
-	road_combos.push_back( make_pair(matchval,selected) );
-	// Since not all of the roads in 'roads' may make a match,
-	// keep track of unique roads found for each projection type
-	unique_found.insert( ALL(selected) );
-#ifdef VERBOSE
-	if( fDebug > 2 ) cout << "ACCEPTED";
-#endif
-      }
-#ifdef VERBOSE
-      if( fDebug > 2 ) cout << endl;;
-#endif
-    } //for fNcombos
-
-    fN3dFits = road_combos.size();
+    // Find matching combinations of roads
+    UInt_t nfits = MatchRoads( roads, road_combos, unique_found );
 
     // Fit each set of matched roads using linear least squares, yielding 
     // the 3D track parameters, x, x'(=mx), y, y'(=my)
     FitRes_t fit_par;
     fit_par.coef.reserve(4);
-    if( fN3dFits == 1 ) {
+    if( nfits == 1 ) {
       // If there is only one combo (typical case), life is simple:
       fit_par.matchval    = road_combos.front().first;
       Rvec_t& these_roads = road_combos.front().second;
@@ -652,7 +684,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       else
 	FitErrPrint( fit_par.ndof );
     }
-    else if( fN3dFits > 0 ) {
+    else if( nfits > 0 ) {
       // For multiple road combinations, find the set of tracks with the
       // lowest chi2s that uses each road at most once
       roads.clear();
@@ -688,10 +720,15 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	assert( found != fit_results.end() );
 	NewTrack( tracks, (*found).second );
       }
-    }//if(fN3dFits)
-  }// if(nproj>=3)
+    } //if(nfits)
+#ifdef TESTCODE
+    fN3dFits = nfits;
+#endif
+  }
+  else if( nproj == 2 ) {
+    // TODO: optional recovery code for missing projection
 
-  // TODO: optional recovery code for missing projection
+  } //if(nproj>=3)
 
   // Quit here to let detectors CoarseProcess() the approximate tracks,
   // so that they can determine the corrections that we need when we
@@ -737,8 +774,10 @@ Int_t MWDC::DefineVariables( EMode mode )
   RVarDef vars[] = {
     { "fail.nhits",   "Too many hits in wire plane(s)",  "fFailNhits" },
     { "fail.npat",    "Too many treesearch patterns",    "fFailNpat" },
+#ifdef TESTCODE
     { "ncombos",      "Number of road combinations",     "fNcombos" },
     { "nfits",        "Number of 3D track fits done",    "fN3dFits" },
+#endif
     { 0 }
   };
   DefineVarsFromList( vars, mode );
