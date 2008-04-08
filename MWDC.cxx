@@ -459,12 +459,6 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   // Find tracks from the hitpatterns, using the coarse hit drift times
   // uncorrected for track slope, timing offset, fringe field effects etc.
 
-  //  CONTINUE HERE:
-  //TODO:
-  // - improve 3D match:
-  //   * of all combos using a given road, keep only the combo with best fit
-  //     --> n_tracks = min(nrd_x,nrd_u,nrd_v)
-
   //  static const char* const here = "CoarseTrack";
 
   if( fFailNhits )
@@ -527,24 +521,35 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       cout << "Matching " << nproj << " track projections in 3D (trying "
 	   << fNcombos << " combinations):" << endl;
 #endif
+    Double_t zback = fPlanes.back()->GetZ();
+    vector<TVector2> fxpts, bxpts;
+    bool fast_3d = TestBit(k3dFastMatch);
+    if( fast_3d ) {
+      assert( nproj == 3 );
+    } else {
+      fxpts.reserve( nproj*(nproj-1)/2 );
+      bxpts.reserve( nproj*(nproj-1)/2 );
+    }
     for( UInt_t i = 0; i < fNcombos; ++i ) {
       NthCombination( i, roads, selected );
       assert( selected.size() == nproj );
 
       Double_t matchval = 0.0;
-      Double_t zback = fPlanes.back()->GetZ();
-      if( TestBit(k3dFastMatch) ) {
-	assert( nproj == 3 );
+      if( fast_3d ) {
 	// special case n==3 and symmetric angles of planes 0 and 1:
 	//  - intersect first two proj in front and back
 	//  - calc perp distances to 3rd, add in quadrature -> matchval
-	const TVector2& xax = selected[2]->GetProjection()->GetAxis();
 	TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
-	TVector2 back  = selected[0]->Intersect( selected[1], zback );
-	TVector2 xf    = selected[2]->GetPos(0.0)   * xax;
-	TVector2 xb    = selected[2]->GetPos(zback) * xax;
- 	TVector2 d1    = front.Proj(xax) - xf;
- 	TVector2 d2    = back.Proj(xax)  - xb;
+	if( !fPlanes.front()->Contains(front) )
+	  continue;
+	TVector2 back = selected[0]->Intersect( selected[1], zback );
+	if( !fPlanes.back()->Contains(back) )
+	  continue;
+	const TVector2& xax = selected[2]->GetProjection()->GetAxis();
+	TVector2 xf = selected[2]->GetPos(0.0)   * xax;
+	TVector2 xb = selected[2]->GetPos(zback) * xax;
+ 	TVector2 d1 = front.Proj(xax) - xf;
+ 	TVector2 d2 = back.Proj(xax)  - xb;
 	// The scale factor converts this matchvalue to the one computed by
 	// the general algorithm below
 	//TODO; weigh with uncertainties?
@@ -568,9 +573,8 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	//  - find all front and back intersections [ n(n-1)/2 each ] 
 	//  - compute weighted center of gravity of intersection points
 	//  - sum dist^2 of points to center of gravity -> matchval
-	vector<TVector2> fxpts, bxpts;
-	fxpts.reserve( nproj*(nproj-1)/2 );
-	bxpts.reserve( nproj*(nproj-1)/2 );
+	fxpts.clear();
+	bxpts.clear();
 	TVector2 fctr, bctr;
 	for( Rvec_t::iterator it1 = selected.begin();
 	     it1 != selected.end(); ++it1 ) {
@@ -594,10 +598,13 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 #endif
 	  }
 	}
-	assert( fxpts.size() == nproj*(nproj-1)/2 );
+	assert( fxpts.size() <= nproj*(nproj-1)/2 );
 	assert( bxpts.size() == fxpts.size() );
 	fctr /= static_cast<Double_t>( fxpts.size() );
 	bctr /= static_cast<Double_t>( fxpts.size() );
+	if( !fPlanes.front()->Contains(fctr) or
+	    !fPlanes.back()->Contains(bctr) )
+	  continue;
 	for( vector<TVector2>::size_type k = 0; k < fxpts.size(); ++k ) {
 	  matchval += (fxpts[k]-fctr).Mod2() + (bxpts[k]-bctr).Mod2();
 	}

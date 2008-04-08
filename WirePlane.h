@@ -7,9 +7,11 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
+#include "Types.h"
 #include "THaSubDetector.h"
 #include "TClonesArray.h"
-#include "Types.h"
+#include "TVector2.h"
+#include "TMath.h"
 #include <vector>
 #include <string>
 #include <cassert>
@@ -17,6 +19,8 @@
 
 using std::vector;
 using std::string;
+
+class TVector2;
 
 namespace TreeSearch {
 
@@ -45,6 +49,7 @@ namespace TreeSearch {
 //     virtual Bool_t  IsSortable () const { return kTRUE; }
 
     FitCoord*       AddFitCoord( const FitCoord& coord );
+    Bool_t          Contains( const TVector2& point ) const;
     EProjType       GetType()        const { return fType; }
     Double_t        GetZ()           const { return fOrigin.Z(); }
     Projection*     GetProjection()  const { return fProjection; }
@@ -106,7 +111,7 @@ namespace TreeSearch {
     Double_t    fResolution;   // Drift distance resolution (sigma) (m)
     Double_t    fMinTime;      // Minimum drift time for a hit (s)
     Double_t    fMaxTime;      // Maximum drift time for a hit (s)
-    UInt_t      fMaxHits;      // Maximum number of hits before flagging decode error
+    UInt_t      fMaxHits;      // Maximum # hits before flagging decode error
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
     vector<float>   fTDCOffset; // [fNelem] TDC offsets for each wire
@@ -138,8 +143,24 @@ namespace TreeSearch {
 
     ClassDef(WirePlane,0)      // One MWDC wire plane
   };
-}
+
+  //___________________________________________________________________________
+  inline
+  Bool_t WirePlane::Contains( const TVector2& point ) const
+  {
+    // Check if the given point is within the active area of this wire plane.
+    // Coordinates are relative to the MWDC origin. Time-critical, called
+    // possibly O(10)-O(1000) per event
+
+    //TODO: allow for (small) rotation due to misalignment
+
+    return ( TMath::Abs( point.X()-fOrigin.X() ) < fSize[0] and
+	     TMath::Abs( point.Y()-fOrigin.Y() ) < fSize[1] );
+  }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+} // end namespace TreeSearch
+
 
 #endif

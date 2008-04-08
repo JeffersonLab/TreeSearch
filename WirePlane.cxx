@@ -10,14 +10,16 @@
 
 #include "WirePlane.h"
 #include "Hit.h"
-#include "THaDetMap.h"
-#include "THaEvData.h"
-#include "TClonesArray.h"
-#include "TMath.h"
-#include "TClass.h"
 #include "MWDC.h"
 #include "TimeToDistConv.h"
 #include "Projection.h"
+
+#include "THaDetMap.h"
+#include "THaEvData.h"
+#include "TClonesArray.h"
+
+#include "TClass.h"
+
 #include <iostream>
 #include <string>
 
@@ -374,9 +376,6 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   // Read database
 
   static const char* const here = "ReadDatabase";
-
-  // TODO: the refmap might be better in the MWDC class since, presumably,
-  // we only need to read those channels once
 
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
