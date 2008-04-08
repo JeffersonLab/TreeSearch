@@ -18,7 +18,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   template< typename VectorElem > void 
-  NthCombination( UInt_t n, std::vector<std::vector<VectorElem> >& vec,
+  NthCombination( UInt_t n, const std::vector<std::vector<VectorElem> >& vec,
 		  std::vector<VectorElem>& selected )
   {
     // Get the n-th permutation of the elements in vec and
