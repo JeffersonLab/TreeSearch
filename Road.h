@@ -173,6 +173,8 @@ namespace TreeSearch {
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();
+    Bool_t   IsInRange( const NodeDescriptor& nd ) const;
+
   private:
     void     CopyPointData( const Road& orig );
 

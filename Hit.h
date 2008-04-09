@@ -74,20 +74,26 @@ namespace TreeSearch {
       }
     };
 
-//     struct WireDistLess : public std::binary_function< Hit*, Hit*, bool >
-//     {
-//       WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) {}
-//       bool operator() ( const Hit* a, const Hit* b ) const
-//       { 
-// 	assert( a && b );
-// 	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
-// 	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
-// 	return ( a->GetWireNum() + fMaxDist < b->GetWireNum() );
-//       }
-//       Int_t GetMaxDist() const { return fMaxDist; }
-//     private:
-//       Int_t fMaxDist;      // Max allowed distance between hits in a cluster
-//     };
+    // Functor for comparing hits in HitSet::IsSimilarTo().
+    // Identical to WireNumLess if fMaxDist = 0. If fMaxDist > 0, all hits
+    // that are at most fMaxDist apart are equivalent.
+    struct WireDistLess : public std::binary_function< Hit*, Hit*, bool >
+    {
+      WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) { assert(maxdist>=0); }
+      bool operator() ( const Hit* a, const Hit* b ) const
+      { 
+	assert( a && b );
+	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
+	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
+	if( a->GetWireNum() + fMaxDist < b->GetWireNum()  ) return true;
+	if( fMaxDist > 0 ) return false;
+	if( a->GetWireNum()  > b->GetWireNum()  ) return false;
+	return ( a->GetDriftTime() < b->GetDriftTime() );
+      }
+      Int_t GetMaxDist() const { return fMaxDist; }
+    private:
+      Int_t fMaxDist;      // Max allowed distance between hits in a cluster
+    };
 
   protected:
     Int_t    fWireNum;     // Wire number
@@ -272,7 +278,7 @@ namespace TreeSearch {
     static Bool_t CheckMatch( const Hset_t& hits, const TBits* bits );
     Bool_t        CheckMatch( const TBits* bits ) const;
     static UInt_t GetMatchValue( const Hset_t& hits );
-    Bool_t        IsSimilarTo( const HitSet& tryset ) const;
+    Bool_t        IsSimilarTo( const HitSet& tryset, Int_t maxdist=0 ) const;
 
     ClassDef(HitSet, 0)  // A set of hits associated with a pattern
   };

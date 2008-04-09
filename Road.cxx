@@ -257,6 +257,44 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
 }
 
 //_____________________________________________________________________________
+static inline
+Bool_t OuterBitsSet( UInt_t p1, UInt_t p2, UInt_t nbits )
+{
+  // Test if p1 and p2 have the same first bits set and the same last bits set
+  if( p1 == 0 or p2 == 0 )
+    return false;
+  register UInt_t k = 1;
+  while( (p1 & k) == 0 and (p2 & k) == 0 )
+    k <<= 1;
+  if( !(p1 & k) or !(p2 & k) )
+    return false;
+  k = 1U << (nbits-1);
+  while( (p1 & k) == 0 and (p2 & k) == 0 )
+    k >>= 1;
+  return ( (p1 & k) and (p2 & k) );
+}
+
+//_____________________________________________________________________________
+inline
+Bool_t Road::IsInRange( const NodeDescriptor& nd ) const
+{
+  // Test if given pattern is within the allowed maximum distance from the
+  // current front and back bin ranges of the cluster
+
+  assert( fBuild );
+  assert( !fBuild->fLimits.empty() );
+
+  UInt_t fdist = fProjection->GetBinMaxDistF();
+  UInt_t bdist = fProjection->GetBinMaxDistB();
+  
+  return ( nd.Start() + fdist >= fBuild->fLimits.front().first and
+	   nd.Start()         <  fBuild->fLimits.front().second + fdist and
+	   nd.End()   + bdist >= fBuild->fLimits.back().first and
+	   nd.End()           <  fBuild->fLimits.back().second + bdist );
+}
+
+
+//_____________________________________________________________________________
 Bool_t Road::Add( const Node_t& nd )
 {
   // Check if the hits from the given NodeDescriptor pattern are common
@@ -279,6 +317,10 @@ Bool_t Road::Add( const Node_t& nd )
   }
 #endif
 
+  // If hitdist > 0, roads will collect patterns not only identical hits,
+  // but also nearby ones (at most hitdist wire numbers apart)
+  UInt_t hitdist = fProjection->GetHitMaxDist();
+
   if( fPatterns.empty() ) {
     // If this is the first pattern, initialize the cluster
     assert( CheckMatch(new_hits) );
@@ -293,20 +335,27 @@ Bool_t Road::Add( const Node_t& nd )
     }
 #endif
   } 
-  else if( fBuild->fCluster.IsSimilarTo(new_set) ) {
+  else if( IsInRange(nd.first) and 
+	   fBuild->fCluster.IsSimilarTo(new_set,hitdist) ) {
     // Accept this pattern if and only if it is a subset of the cluster
     // NB: IsSimilarTo() is a looser match than std::includes(). The new
     // pattern may have extra hits
 
+    // If hitdist > 0, grow the cluster with possible new hits found
+    if( hitdist > 0 ) {
+      fBuild->fCluster.hits.insert( ALL(new_hits) );
+      // Growing clusters are expanded even for lower match levels
+      // if they contain hits in the first and last active bins
+      if( OuterBitsSet( new_set.plane_pattern, 
+			fBuild->fCluster.plane_pattern,
+			fProjection->GetNplanes() ))
+	fBuild->ExpandWidth( nd.first );
+    }
     // Expand the road width, but only for patterns of the same match level.
     // Patterns of lower match level can be artificially wide
-    if( new_set.nplanes == fBuild->fCluster.nplanes )
+    else if( new_set.nplanes == fBuild->fCluster.nplanes )
       fBuild->ExpandWidth( nd.first );
 
-#ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 ) 
-      cout << "new npat = " << fPatterns.size() << endl;
-#endif
   }
   else {
     // The pattern does not fit into this cluster
@@ -320,6 +369,10 @@ Bool_t Road::Add( const Node_t& nd )
   // Save a pointer to the added pattern so we can update it later
   fPatterns.push_back(&nd);
 
+#ifdef VERBOSE
+    if( fProjection->GetDebug() > 2 ) 
+      cout << "new npat = " << fPatterns.size() << endl;
+#endif
   return true;
 }
 

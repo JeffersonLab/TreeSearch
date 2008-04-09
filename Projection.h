@@ -54,9 +54,12 @@ namespace TreeSearch {
 
     Double_t        GetAngle()        const;
     const TVector2& GetAxis()         const { return fAxis; }
+    UInt_t          GetBinMaxDistB()  const { return fBackMaxBinDist; }
+    UInt_t          GetBinMaxDistF()  const { return fFrontMaxBinDist; }
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
     Double_t        GetConfLevel()    const { return fConfLevel; }
     Double_t        GetCosAngle()     const { return fAxis.X(); }
+    UInt_t          GetHitMaxDist()   const { return fHitMaxDist; }
     Hitpattern*     GetHitpattern()   const { return fHitpattern; }
     Double_t        GetMaxSlope()     const { return fMaxSlope; }
     UInt_t          GetMinFitPlanes() const { return fMinFitPlanes; }
@@ -115,8 +118,10 @@ namespace TreeSearch {
 
     // Road construction control
     UInt_t           fMaxPat;        // Sanity cut on number of patterns
-    Int_t            fFrontMaxBinDist; // Max pattern dist in front plane
-    Int_t            fBackMaxBinDist;  // Max pattern dist in back plane
+    UInt_t           fFrontMaxBinDist; // Max pattern dist in front plane
+    UInt_t           fBackMaxBinDist;  // Max pattern dist in back plane
+    UInt_t           fHitMaxDist;    // Max allowed distance between hits for
+                                     // clustering patterns into roads
 
     // Fit statistics cut parameters
     Double_t         fConfLevel;     // Requested confidence level for chi2 cut

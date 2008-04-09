@@ -45,7 +45,7 @@ Projection::Projection( Int_t type, const char* name, Double_t angle,
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
     fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
     fPlaneCombos(0), fMaxPat(kMaxUInt), fFrontMaxBinDist(kMaxUInt),
-    fBackMaxBinDist(kMaxUInt), fConfLevel(1.0),
+    fBackMaxBinDist(kMaxUInt), fHitMaxDist(0), fConfLevel(1.0),
     fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
 {
   // Constructor
@@ -317,6 +317,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   if( !file ) return kFileError;
 
   Double_t angle = kBig;
+  fHitMaxDist = 0;
   fMinFitPlanes = 3;
   fMaxMiss = 0;
   fMaxPat  = kMaxUInt;
@@ -326,6 +327,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     { "angle",           &angle,         kDouble, 0, 1 },
     { "maxslope",        &fMaxSlope,     kDouble, 0, 1, -1 },
     { "search_depth",    &fNlevels,      kUInt,   0, 0, -1 },
+    { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, -1 },
     { "min_fit_planes",  &fMinFitPlanes, kUInt,   0, 1, -1 },
     { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, -1 },
     { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, -1 },
@@ -662,13 +664,8 @@ Int_t Projection::MakeRoads()
       const Node_t& nd2 = *itn2;
       if( nd2.second.used )
 	continue;
-      // Don't bother with patterns too far away (different cluster)
-      if( TMath::Abs((Int_t)nd2.first.Start()-(Int_t)nd1.first.Start()) <=
-	  fFrontMaxBinDist and
-	  TMath::Abs((Int_t)nd2.first.End()-(Int_t)nd1.first.End()) <=
-	  fBackMaxBinDist  and
-	  // Test pattern and add it if applicable
-	  rd->Add(nd2) ) {
+      // Test pattern and add it if applicable
+      if( rd->Add(nd2) ) {
 	// Pattern successfully added
 	continue;
       }

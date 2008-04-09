@@ -286,18 +286,29 @@ UInt_t HitSet::GetMatchValue( const Hset_t& hits )
 }
 
 //_____________________________________________________________________________
-Bool_t HitSet::IsSimilarTo( const HitSet& tryset ) const
+Bool_t HitSet::IsSimilarTo( const HitSet& tryset, Int_t maxdist ) const
 {
+  // If maxdist == 0:
   // Similar to STL includes() algorithm, but allows tryset to have additional
   // hits in a given wire plane if there is at least one included hit in that
   // plane.
   //
-  // Example: the following matches, despite the extra hit in plane 1
+  // Example: the following matches, despite the extra hit in "try":
   //   this:  30/   32/40/50/51
   //   try:   --/31 32/40/50/51
   // 
   // Standard includes() implies intersection == set2.
   // This algorithm tests planepattern(intersection) == planepattern(set2)
+  //
+  // If maxdist > 0:
+  // Same as above, but consider hits "equal" not only if they are identical
+  // but also if their wire numbers are at most maxdist apart.
+  //
+  // Exmaple: the following two patters are "similar" with maxdist = 1:
+  //   this:  30/32/40/50/51
+  //   try:   31/32/40/50/51
+  //
+  // This mode can be used to build "clusters" of patterns.
 
   assert( tryset.plane_pattern );
 
@@ -305,7 +316,8 @@ Bool_t HitSet::IsSimilarTo( const HitSet& tryset ) const
   Hset_t::const_iterator ehits = hits.end();
   Hset_t::const_iterator itry  = tryset.hits.begin();
   Hset_t::const_iterator etry  = tryset.hits.end();
-  Hset_t::key_compare    comp  = hits.key_comp();
+  //  Hset_t::key_compare    comp  = hits.key_comp();
+  Hit::WireDistLess comp(maxdist);
 
   UInt_t intersection_pattern = 0;
 
