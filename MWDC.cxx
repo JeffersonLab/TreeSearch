@@ -393,8 +393,8 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 #ifdef VERBOSE
   if( fDebug > 1 ) 
     cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
-	 << "mx/my = " << coef[1] << " " << coef[3] << " "
-	 << "ndof = " << npoints-4 << " chi2 = " << chi2
+	 << "mx/my = " << coef[1] << "/" << coef[3] << " "
+	 << "ndof = " << npoints-4 << " rchi2 = " << chi2/(double)(npoints-4)
 	 << endl;
 #endif
   
@@ -493,11 +493,6 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
   //TODO: cut on excessive number of fits?
   //TODO: try not to overallocate memory as this most likely does
   combos_found.reserve(ncombos);
-#ifdef VERBOSE
-  if( fDebug > 2 ) 
-    cout << "Matching " << nproj << " track projections in 3D (trying "
-	 << ncombos << " combinations):" << endl;
-#endif
 #ifdef TESTCODE
   fNcombos = ncombos;
 #endif
@@ -516,6 +511,20 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
     fxpts.reserve( nproj*(nproj-1)/2 );
     bxpts.reserve( nproj*(nproj-1)/2 );
   }
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    cout << "Matching ";
+    for( vector<Rvec_t>::size_type i = 0; i < nproj; ++i ) {
+      cout << roads[i].size();
+      if( i+1 < nproj ) cout << "x";
+    }
+    cout << " track projections in 3D (";
+    if( fast_3d ) cout << "fast";
+    else          cout << "generic";
+    cout << " algo, " << ncombos << " combinations):" << endl;
+  }
+#endif
+
   for( UInt_t i = 0; i < ncombos; ++i ) {
     NthCombination( i, roads, selected );
     assert( selected.size() == nproj );
@@ -623,6 +632,14 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 #endif
   } //for ncombos
 
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    cout << combos_found.size() << " match";
+    if( combos_found.size() != 1 )
+      cout << "es";
+    cout << " found" << endl;
+  }
+#endif
   return combos_found.size();
 }
 
@@ -743,6 +760,26 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     } //if(nfits)
 #ifdef TESTCODE
     fN3dFits = nfits;
+#endif
+#ifdef VERBOSE
+    if( fDebug > 0 ) {
+      Int_t ntr = tracks.GetLast()+1;
+      cout << ntr << " track";
+      if( ntr != 1 ) cout << "s";
+      if( nfits > 1 ) cout << " after chi2 optimization";
+      if( fDebug > 1 and ntr > 0 ) {
+	cout << ":" << endl;
+	for( Int_t i = 0; i < ntr; ++i ) {
+	  THaTrack* tr = (THaTrack*)tracks.UncheckedAt(i);
+	  cout << "3D track:  x/y = " << tr->GetX() << "/" << tr->GetY() 
+	       << " mx/my = " << tr->GetTheta() << "/" << tr->GetPhi()
+	       << " ndof = "  << tr->GetNDoF()
+	       << " rchi2 = " << tr->GetChi2()/(double)tr->GetNDoF()
+	       << endl;
+	}
+      } else
+	cout << endl;
+    }
 #endif
   }
   else if( nproj == 2 ) {
@@ -1146,6 +1183,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       return kInitError;
     }
     fPlanes.push_back( newplane );
+    newplane->SetDebug( fDebug );
   }
 
   if( fDebug > 0 )

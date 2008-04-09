@@ -136,7 +136,7 @@ Road::Road( const Node_t& nd, const Projection* proj )
   fBuild = new BuildInfo_t(nd);
 
 #ifdef VERBOSE
-  if( fProjection->GetDebug() > 2 ) {
+  if( fProjection->GetDebug() > 3 ) {
     cout << "New Road:" << endl;
     nd.first.Print();
     PrintHits(nd.second.hits);
@@ -310,7 +310,7 @@ Bool_t Road::Add( const Node_t& nd )
   const Hset_t& new_hits = nd.second.hits;
 
 #ifdef VERBOSE
-  if( fProjection->GetDebug() > 2 ) {
+  if( fProjection->GetDebug() > 3 ) {
     cout << "Adding:" << endl;
     nd.first.Print();
     PrintHits(new_hits);
@@ -329,7 +329,7 @@ Bool_t Road::Add( const Node_t& nd )
     fBuild->ExpandWidth( nd.first );
 
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 ) {
+    if( fProjection->GetDebug() > 3 ) {
       cout << "New cluster:" << endl;
       PrintHits( new_hits );
     }
@@ -360,7 +360,7 @@ Bool_t Road::Add( const Node_t& nd )
   else {
     // The pattern does not fit into this cluster
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 )
+    if( fProjection->GetDebug() > 3 )
       cout << "Not a subset of this road" << endl;
 #endif
     return false;
@@ -370,7 +370,7 @@ Bool_t Road::Add( const Node_t& nd )
   fPatterns.push_back(&nd);
 
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 ) 
+    if( fProjection->GetDebug() > 3 ) 
       cout << "new npat = " << fPatterns.size() << endl;
 #endif
   return true;
@@ -386,7 +386,7 @@ void Road::Finish()
 	 fPatterns.end(); ++it ) {
     (**it).second.used = 1;
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 ) { 
+    if( fProjection->GetDebug() > 3 ) { 
       cout << "used pat = ";
       (**it).first.Print(); 
     }
@@ -509,7 +509,7 @@ Bool_t Road::CollectCoordinates()
   DeleteContainerOfContainers( fPoints );
 
 #ifdef VERBOSE
-  if( fProjection->GetDebug() > 2 ) {
+  if( fProjection->GetDebug() > 3 ) {
     cout << "Collecting coordinates from: (" << fPatterns.size() 
 	 << " patterns)" << endl;
     PrintHits( fHits );
@@ -551,7 +551,7 @@ Bool_t Road::CollectCoordinates()
     and planepattern.CountBits() >= fProjection->GetMinFitPlanes();
   
 #ifdef VERBOSE
-  if( fProjection->GetDebug() > 2 ) {
+  if( fProjection->GetDebug() > 3 ) {
     cout << "Collected:" << endl;
     vector<Pvec_t>::reverse_iterator ipl = fPoints.rbegin();
     for( UInt_t i = fProjection->GetNplanes(); i--; ) {
@@ -642,7 +642,7 @@ Bool_t Road::Fit()
     }
 
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 ) 
+    if( fProjection->GetDebug() > 3 ) 
       cout << "Fit:"
 	   << " a1 = " << a1 << " (" << TMath::Sqrt(V[0]) << ")"
 	   << " a2 = " << a2
@@ -659,7 +659,7 @@ Bool_t Road::Fit()
     if( chi2 > chi2_interval.second )
       continue;
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 2 ) cout << "ACCEPTED" << endl;
+    if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;
 #endif
 
 #ifdef TESTCODE

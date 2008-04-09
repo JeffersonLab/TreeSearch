@@ -477,6 +477,7 @@ Int_t Projection::Track()
   //
   // Results in fRoads
 
+  Int_t ret = 0;
 
   // TreeSearch:
   // Match the hitpattern of the current event against the pattern template
@@ -494,6 +495,16 @@ Int_t Projection::Track()
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
+    UInt_t npat = fPatternsFound.size();
+    cout << npat << " pattern";
+    if( npat!=1 ) cout << "s";
+    if( npat > fMaxPat )
+      cout << " >>> exceeding limit of " << fMaxPat << ", terminating";
+    cout << endl;
+  }
+#endif
 #ifdef TESTCODE
   //FIXME: use high-res CPU time timer instead
   gettimeofday(&stop, 0 );
@@ -507,11 +518,13 @@ Int_t Projection::Track()
 #endif
 
   if( fPatternsFound.empty() )
-    return 0;
+    goto quit;
   // Die if too many patterns - noisy event
-  if( (UInt_t)fPatternsFound.size() > fMaxPat )
+  if( (UInt_t)fPatternsFound.size() > fMaxPat ) {
     // TODO: keep statistics
-    return -1;
+    ret = -1;
+    goto quit;
+  }
 
   // Combine patterns with common sets of hits into Roads
   MakeRoads();
@@ -576,11 +589,19 @@ Int_t Projection::Track()
       if( nroads>1 ) cout << "s";
       cout << " successfully fit" << endl;
     }
+  }
+#endif
+
+  ret = GetNgoodRoads();
+
+ quit:
+#ifdef VERBOSE
+  if( fDebug > 0 ) {
     cout << "------------ end of projection  " << fName.Data() 
 	 << "------------" << endl;
   }
 #endif
-  return GetNgoodRoads();
+  return ret;
 }
 
 
@@ -636,7 +657,7 @@ Int_t Projection::MakeRoads()
   // that share active wires (hits).
 
 #ifdef VERBOSE
-  if( fDebug > 0 ) {
+  if( fDebug > 2 ) {
     cout << fPatternsFound.size() << " patterns found:" << endl;
     for( NodeSet_t::iterator ipat = fPatternsFound.begin(); ipat !=
 	   fPatternsFound.end(); ++ipat )
@@ -685,7 +706,7 @@ Int_t Projection::MakeRoads()
   }
 
 #ifdef VERBOSE
-  if( fDebug > 0 ) {
+  if( fDebug > 2 ) {
     cout << "Generated roads: " << endl;
     for( UInt_t i = 0; i < GetNroads(); ++i ) {
       const Road* rd = GetRoad(i);
