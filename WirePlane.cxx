@@ -34,7 +34,7 @@ namespace TreeSearch {
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
-    fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), 
+    fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), fCoordOffset(0),
     fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
     fMinTime(-kBig), fMaxTime(kBig), fMaxHits(kMaxUInt), fTTDConv(0),
     fHits(0), fFitCoords(0)
@@ -225,7 +225,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	  if( mc_data ) {
 	    theHit = new( (*fHits)[nHits++] ) 
 	      MCHit( iw, 
-		     fWireStart + iw * fWireSpacing,
+		     GetWireStart() + iw * fWireSpacing,
 		     data,
 		     time,
 		     fResolution,
@@ -236,7 +236,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	  } else
 	    theHit = new( (*fHits)[nHits++] )
 	      Hit( iw, 
-		   fWireStart + iw * fWireSpacing,
+		   GetWireStart() + iw * fWireSpacing,
 		   data,
 		   time,
 		   fResolution,
@@ -380,6 +380,11 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
+  // Read fOrigin (detector position) and fSize. fOrigin is the chamber
+  // position relative to the MWDC reference frame - which in turn can be
+  // offset as a whole. Thus, with respect to some absolute frame
+  // (whatever it may be), each wire plane is positioned at 
+  // fOrigin(MWDC) + fOrigin(plane)
   Int_t err = ReadGeometry( file, date, kTRUE );
   if( err )
     return err;
@@ -543,6 +548,25 @@ void WirePlane::SetPartner( WirePlane* p )
   fPartner = p;
 
   return;
+}
+
+//_____________________________________________________________________________
+void WirePlane::SetProjection( Projection* proj )
+{
+  // Associate this plane with the given projection.
+  // Also updates fCoordOffset based on the orientation of the projection
+  // and this plane's fOrigin.
+
+  fProjection = proj;
+  if( proj ) {
+    assert( proj->IsInit() );
+    // Calculate the offset to be applied to the wire positions if the
+    // chamber has a position offset. This will translate the hit positions
+    // into the MWDC frame, which is the reference frame for tracking
+    TVector2 off( fOrigin.X(), fOrigin.Y() );
+    fCoordOffset = off * proj->GetAxis();
+  } else
+    fCoordOffset = 0;
 }
 
 //_____________________________________________________________________________

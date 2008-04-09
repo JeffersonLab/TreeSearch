@@ -956,12 +956,9 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	if( !thePlane->GetProjection() ) {
 	  WirePlane* partner = thePlane->GetPartner();
 	  assert( !partner || partner->GetProjection() == 0 );
-	  // AddPlane() sets the plane number in the WirePlane objects
+	  // AddPlane() sets the plane number, fProjection and fCoordOffset
+	  // in the WirePlane objects
 	  theProj->AddPlane( thePlane, partner );
-	  // Save pointer to the projection object with each plane and partner
-	  thePlane->SetProjection(theProj);
-	  if( partner ) 
-	    partner->SetProjection(theProj);
 	}
 	// Determine the "width" of this projection plane (=width along the
 	// projection coordinate).
@@ -973,14 +970,11 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	// The total width found here divided by the number of bins used in
 	// tree search is the resolution of the roads.
 	// Of course, this will become inefficient for grotesque geometries.
-	Double_t sina = theProj->GetSinAngle(), cosa = theProj->GetCosAngle();
-	TVector3 wp_off = thePlane->GetOrigin() - fOrigin;
-	Double_t off = wp_off.X()*sina - wp_off.Y()*cosa;
 	Double_t s = thePlane->GetWireStart();
 	Double_t d = thePlane->GetWireSpacing();
 	Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
-	Double_t lo = s - 0.5*d + off;
-	Double_t hi = s + (n-0.5)*d + off;
+	Double_t lo = s - 0.5*d;
+	Double_t hi = s + (n-0.5)*d;
 	Double_t w = TMath::Max( TMath::Abs(hi), TMath::Abs(lo) );
 	if( w > width )
 	  width = w;

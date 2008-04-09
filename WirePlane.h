@@ -58,7 +58,7 @@ namespace TreeSearch {
     MWDC*           GetMWDC()        const { return fMWDC; }
     Double_t        GetResolution()  const { return fResolution; }
     Double_t        GetMaxSlope()    const; 
-    Double_t        GetWireStart()   const { return fWireStart; }
+    Double_t        GetWireStart()   const { return fWireStart+fCoordOffset; }
     Double_t        GetWireSpacing() const { return fWireSpacing; }
     virtual Double_t GetMaxLRdist()  const { return GetWireSpacing(); }
 
@@ -72,7 +72,7 @@ namespace TreeSearch {
     Bool_t          IsRequired()     const { return TestBit(kIsRequired); }
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
-    void            SetProjection( Projection* p ) { fProjection = p; }
+    void            SetProjection( Projection* p );
 #ifdef TESTCODE
     void            CheckCrosstalk();
 #endif
@@ -102,6 +102,7 @@ namespace TreeSearch {
     EProjType   fType;         // Plane type (x,y,u,v)
     Double_t    fWireStart;    // Position of 1st wire (along wire coord) (m)
     Double_t    fWireSpacing;  // Wire spacing (assumed constant) (m)
+    Double_t    fCoordOffset;  // Wire coord offset wrt MWDC due to fOrigin
     WirePlane*  fPartner;      //! Partner plane (usually with staggered wires)
     Projection* fProjection;   //! The projection that we belong to
     MWDC*       fMWDC;         //! Our parent detector
