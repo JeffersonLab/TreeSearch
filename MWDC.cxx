@@ -404,16 +404,22 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 //_____________________________________________________________________________
 THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 {
-  // Make new track with given parameters. Used by CoarseTrack.
+  // Make new track with given parameters. Used by CoarseTrack to generate
+  // all MWDC tracks
 
-  THaTrack* newTrack = AddTrack( tracks,
-				 fit_par.coef[0], fit_par.coef[2],
-				 fit_par.coef[1], fit_par.coef[3] );
+  Double_t x  = fit_par.coef[0];
+  Double_t xp = fit_par.coef[1];
+  Double_t y  = fit_par.coef[2];
+  Double_t yp = fit_par.coef[3];
+  // Transform coordinates to spectrometer detector system at z=0
+  x += fOrigin.X() - xp * fOrigin.Z();
+  y += fOrigin.Y() - yp * fOrigin.Z();
+
+  THaTrack* newTrack = AddTrack( tracks, x, y, xp, yp );
   //TODO: make a TrackID?
   assert( newTrack );
   // The "detector" and "fp" TRANSPORT systems are the same for BigBite
-  newTrack->SetD( newTrack->GetX(), newTrack->GetY(),
-		  newTrack->GetTheta(), newTrack->GetPhi() );
+  newTrack->SetD( x, y, xp, yp );
   newTrack->SetChi2( fit_par.chi2, fit_par.ndof );
   return newTrack;
 }
@@ -1046,7 +1052,16 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  // Putting this container on the stack may cause a stack overflow!
+  // Read fOrigin (detector position) and fSize. fOrigin is the position of
+  // the MWDC detector relative to some superior coordinate system
+  // (typically the spectrometer detector stack reference frame). 
+  // fOrigin will be added to all tracks generated; if fOrigin.Z() is not
+  // zero, tracks will be projected into the z=0 plane.
+  Int_t err = ReadGeometry( file, date );
+  if( err )
+    return err;
+
+  // Putting this container on the stack may cause strange stack overflows!
   vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
   string planeconfig;
@@ -1068,7 +1083,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   };
 
   Int_t status = kInitError;
-  Int_t err = LoadDB( file, date, request, fPrefix );
+  err = LoadDB( file, date, request, fPrefix );
   fclose(file);
 
   if( !err ) {
