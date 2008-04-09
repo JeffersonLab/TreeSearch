@@ -84,10 +84,12 @@ void Projection::AddPlane( WirePlane* wp, WirePlane* partner )
 
   wp->SetPlaneNum( fPlanes.size() );
   fPlanes.push_back( wp );
+  wp->SetProjection( this );
   if( partner ) {
     assert( partner->GetZ() > wp->GetZ() ); // Planes must be ordered
     partner->SetPlaneNum( fPlanes.size() );
     fPlanes.push_back( partner );
+    partner->SetProjection( this );
   }
 }
 
@@ -870,12 +872,10 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     Node_t node = make_pair( nd, HitSet() );
     // Collect all hits associated with the pattern's bins and save them
     // in the node's HitSet.
-    assert( node.second.hits.empty() );
-    for( UInt_t i = fHitpattern->GetNplanes(); i; ) {
-      --i;
+    for( UInt_t i = 0; i < fHitpattern->GetNplanes(); ++i ) {
       const vector<Hit*>& hits = fHitpattern->GetHits( i, node.first[i] );
       copy( hits.begin(), hits.end(), 
-	    inserter( node.second.hits, node.second.hits.begin() ));
+	    inserter( node.second.hits, node.second.hits.end() ));
     }
     assert( HitSet::GetMatchValue(node.second.hits) == match.first );
     node.second.plane_pattern = match.first;
