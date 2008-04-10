@@ -475,7 +475,7 @@ OptimalN( const set<T>& choices, const multimap< double, set<T> >& weights,
 
 //_____________________________________________________________________________
 UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
-			 vector< pair<Double_t,Rvec_t> >& combos_found,
+			 list< pair<Double_t,Rvec_t> >& combos_found,
 			 Rset_t& unique_found )
 {
   // Match roads from different projections that intersect in the front
@@ -483,6 +483,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 
   // The number of projections that we work with (must be >= 3)
   vector<Rvec_t>::size_type nproj = roads.size();
+  assert( nproj >= 2 );
 
   combos_found.clear();
   unique_found.clear();
@@ -490,12 +491,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
   // Number of all possible combinations of the input roads
   //TODO: protect against overflow?
   UInt_t ncombos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
-  //TODO: cut on excessive number of fits?
-  //TODO: try not to overallocate memory as this most likely does
-  combos_found.reserve(ncombos);
-#ifdef TESTCODE
-  fNcombos = ncombos;
-#endif
+  UInt_t nfound = 0;
 
   // Vector holding a combination of roads to test. One road from each 
   // projection 
@@ -523,6 +519,9 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
     else          cout << "generic";
     cout << " algo, " << ncombos << " combinations):" << endl;
   }
+#endif
+#ifdef TESTCODE
+  fNcombos = ncombos;
 #endif
 
   for( UInt_t i = 0; i < ncombos; ++i ) {
@@ -620,6 +619,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
     if( matchval < f3dMatchCut ) {
       // Save road combination with good matchvalue
       combos_found.push_back( make_pair(matchval,selected) );
+      ++nfound;
       // Since not all of the roads in 'roads' may make a match,
       // keep track of unique roads found for each projection type
       unique_found.insert( ALL(selected) );
@@ -634,13 +634,13 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 
 #ifdef VERBOSE
   if( fDebug > 0 ) {
-    cout << combos_found.size() << " match";
-    if( combos_found.size() != 1 )
+    cout << nfound << " match";
+    if( nfound != 1 )
       cout << "es";
     cout << " found" << endl;
   }
 #endif
-  return combos_found.size();
+  return nfound;
 }
 
 //_____________________________________________________________________________
@@ -700,7 +700,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   // noise and, if there is more than one u or v road, correlates u and v
   if( nproj >= 3 ) {
     // Vector holding the results (vectors of roads with good matchval)
-    vector< pair<Double_t,Rvec_t> > road_combos;
+    list< pair<Double_t,Rvec_t> > road_combos;
     // Set of the unique roads occurring in the road_combos elements
     Rset_t unique_found;
 
@@ -729,7 +729,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       FitResMap_t fit_results;
       multimap< double, Rset_t > fit_chi2;
       // Fit all combinations and sort the results by ascending chi2
-      for( vector< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
+      for( list< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
 	   it != road_combos.end(); ++it ) {
 	fit_par.matchval    = (*it).first;
 	Rvec_t& these_roads = (*it).second;

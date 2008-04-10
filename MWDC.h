@@ -14,6 +14,7 @@
 #include <vector>
 #include <utility>
 #include <set>
+#include <list>
 
 class THaTrack;
 class THaBenchmark;
@@ -100,7 +101,7 @@ namespace TreeSearch {
     Int_t     FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 			Double_t& chi2, TMatrixDSym* coef_covar = 0 ) const;
     UInt_t    MatchRoads( const vector<Rvec_t>& roads,
-			  vector< std::pair<Double_t,Rvec_t> >& combos_found,
+			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 			  Rset_t& unique_found );
 			  
     THaTrack* NewTrack( TClonesArray& tracks, const FitRes_t& fit_par );
