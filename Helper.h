@@ -62,11 +62,17 @@ namespace TreeSearch {
     typedef std::vector<int> vint_t;
   public:
     UniqueCombo( int N, int k ) : fN(N), fGood(true)
-    { assert( 0<k && k<=N ); for( int i=0; i<k; ++i ) fCurrent.push_back(i); }
+    { assert( 0<=k && k<=N ); for( int i=0; i<k; ++i ) fCurrent.push_back(i); }
     // Default copy and assignment are fine
 
     UniqueCombo& operator++()
-    { fGood = recursive_plus( fCurrent.size()-1 ); return *this; }
+    {
+      if( fCurrent.empty() )
+	fGood = false;
+      else
+	fGood = recursive_plus( fCurrent.size()-1 );
+      return *this;
+    }
     const UniqueCombo operator++(int)
     { UniqueCombo clone(*this); ++*this; return clone; }
     const vint_t& operator()() const { return fCurrent; }
