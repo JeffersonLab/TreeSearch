@@ -241,7 +241,8 @@ namespace TreeSearch {
     Double_t  Get3DTrkSlope() const { return f3DTrkSlope; }
     Double_t  Get3DTrkDist()  const { return f3DTrkPos-fHit->GetWirePos(); }
     Double_t  Get3DTrkResid() const { return f3DTrkPos-fPos; }
-
+    Int_t     GetWireNum()    const { return fHit->GetWireNum(); }
+    
 #ifdef TESTCODE
     UInt_t    GetRank()       const { return fFitRank; }
     void      Set3DTrkInfo( Double_t pos, Double_t slope )

@@ -299,11 +299,13 @@ Int_t WirePlane::DefineVariables( EMode mode )
     { "ncoords",     "Num fit coords",     "GetNcoords()" },
     { "coord.rank",  "Fit rank of coord",
                                 "fFitCoords.TreeSearch::FitCoord.fFitRank" },
+    { "coord.wire", "Wire number of fitted hit",
+                            "fFitCoords.TreeSearch::FitCoord.GetWireNum()" },
     { "coord.time", "Drift time of hit (s)",
                           "fFitCoords.TreeSearch::FitCoord.GetDriftTime()" },
     { "coord.dist", "Drift distance of hit (m)",
                           "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
-    { "coord.pos",   "Position used in projection fit (m)",
+    { "coord.pos",   "Position used in fit (wirepos +/- dist) (m)",
                                     "fFitCoords.TreeSearch::FitCoord.fPos" },
     { "coord.trkpos","Track pos from projection fit (m)",
                                "fFitCoords.TreeSearch::FitCoord.fTrackPos" },
@@ -360,15 +362,8 @@ THaAnalysisObject::EStatus WirePlane::Init( const TDatime& date )
   if( status ) 
     return fStatus = status;
 
-  //FIXME:
-//   THaDetectorBase *parent = GetDetector();
-//   if( parent )
-//     fOrigin += parent->GetOrigin();
-
   return fStatus = kOK;
 }
-
-
 
 //_____________________________________________________________________________
 Int_t WirePlane::ReadDatabase( const TDatime& date )
@@ -380,7 +375,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  // Read fOrigin (detector position) and fSize. fOrigin is the chamber
+  // Read fOrigin (plane position) and fSize. fOrigin is the chamber
   // position relative to the MWDC reference frame - which in turn can be
   // offset as a whole. Thus, with respect to some absolute frame
   // (whatever it may be), each wire plane is positioned at 
