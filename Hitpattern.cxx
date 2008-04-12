@@ -1,3 +1,5 @@
+//*-- Author :    Ole Hansen, Jefferson Lab   13-Aug-2007
+
 ///////////////////////////////////////////////////////////////////////////////
 //                                                                           //
 // TreeSearch::Hitpattern                                                    //
@@ -267,33 +269,34 @@ Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
     Hit* hitB = static_cast<Hit*>((*it).second);
     assert( hitA || hitB );
     if( hitA && hitB ) {
-      // A pair of hits registered in partner planes, so we know that at
-      // least one combination of hit positions is within maxdist of each
-      // other. Determine which combinations these are and set their bins.
-      UInt_t set = 0, bitA, bitB;
+      // A pair of hits registered in partner planes. One or more combinations
+      // of hit positions may be within maxdist of each other.
+      // Determine which combinations these are and set their bins.
+      int set = 0, bitA, bitB;
       Double_t posA, posB;
-      // Prevent duplicate entries for zero-drift hits
-      if( hitA->GetDriftDist() == 0 ) set |= 8;
-      if( hitB->GetDriftDist() == 0 ) set |= 2;
-      bool found = false;
-      for( int i=4; i--; ) {
+      for( int i = 4; i; ) { --i;
 	if( i&2 ) { posA = hitA->GetPosL(); bitA = 8; }
 	else      { posA = hitA->GetPosR(); bitA = 4; }
 	if( i&1 ) { posB = hitB->GetPosL(); bitB = 2; }
 	else      { posB = hitB->GetPosR(); bitB = 1; }
 	if( TMath::Abs( posA-posB ) <= maxdist ) {
-	  found = true;
 	  if( (bitA & set) == 0 ) {
 	    SetPosition( posA+fOffset, hitA->GetResolution(), planeA, hitA );
-	    set |= bitA;
+	    // Prevent duplicate entries for zero-drift hits
+	    if( hitA->GetDriftDist() == 0 )
+	      set |= 12;
+	    else
+	      set |= bitA;
 	  }
 	  if( (bitB & set) == 0 ) {
 	    SetPosition( posB+fOffset, hitB->GetResolution(), planeB, hitB );
-	    set |= bitB;
+	    if( hitB->GetDriftDist() == 0 )
+	      set |= 3;
+	    else
+	      set |= bitB;
 	  }
 	}
       }
-      assert(found); // If !found here, HitPairIter is faulty
     }
     else if( do_single_hits ) {
       // Unpaired hit in only one plane
