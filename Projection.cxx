@@ -235,6 +235,32 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
   fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() ) + 2;
   fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() ) + 2;
 
+  // Special handling of calibration mode: Allow missing hits in calibration
+  // planes, and require hits in all other planes 
+  UInt_t ncalib = 0;
+  for( UInt_t k = 0; k < GetNplanes(); ++k ) {
+    if( fPlanes[k]->IsCalibrating() )
+      ++ncalib;
+  }
+  if( ncalib > 0 ) {
+    Info( Here(here), "Calibrating %d planes in projection %s.",
+	  ncalib, GetName() );
+    fMaxMiss = ncalib;
+    for( UInt_t k = 0; k < GetNplanes(); ++k ) {
+      if( fPlanes[k]->IsCalibrating() ) {
+	if( fRequire1of2 and fPlanes[k]->GetPartner() and
+	    fPlanes[k]->GetPartner()->IsCalibrating() ) {
+	  Error( Here(here), "Cannot require 1 of 2 partner planes and "
+		 "calibrate both partners (%s and %s) simultaneously. "
+		 "Fix database.", fPlanes[k]->GetName(),
+		 fPlanes[k]->GetPartner()->GetName() );
+	  return kInitError;
+	}
+      } else
+	  fPlanes[k]->SetRequired();
+    }
+  }
+
   // Check range of fMinFitPlanes (minimum number of planes require for fit)
   // and fMaxMiss (maximum number of missing planes allowed in a hitpattern).
   // This is here instead of in ReadDatabase because we need GetNplanes()
@@ -253,10 +279,16 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
   // fMinFitPlanes left
   UInt_t maxmiss = GetNplanes()-fMinFitPlanes;
   if( fMaxMiss > maxmiss ) {
-    Warning( Here(here), "Allowed number of missing planes = %u reduced to %u "
-	     "to satisfy min_fit_planes = %u.  Fix database.", 
-	     fMaxMiss, maxmiss, fMinFitPlanes );
-    fMaxMiss = maxmiss;
+    if( ncalib == 0 ) {
+      Warning( Here(here), "Allowed number of missing planes = %u reduced "
+	       "to %u to satisfy min_fit_planes = %u.  Fix database.", 
+	       fMaxMiss, maxmiss, fMinFitPlanes );
+      fMaxMiss = maxmiss;
+    } else {
+      Error( Here(here), "Too many planes in calibration mode, found %d, "
+	     "max allowed = %d. Fix database.", ncalib, maxmiss );
+      return kInitError;
+    }
   }
 
   // Set up the lookup bitpattern indicating which planes are allowed to have 
@@ -292,7 +324,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
       ++c;
     }
   }
-
+  
   // Determine Chi2 confidence interval limits for the selected CL and the
   // possible degrees of freedom (minfit-2...nplanes-2) of the projection fit
   fChisqLimits.clear();

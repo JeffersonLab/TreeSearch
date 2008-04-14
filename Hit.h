@@ -211,44 +211,31 @@ namespace TreeSearch {
   public:
     FitCoord( Hit* hit, Road* road, Double_t pos,
 	      Double_t trkpos2d, Double_t trkslope2d,
-	      Double_t trkpos, Double_t trkslope
-#ifdef TESTCODE
-	      , UInt_t ifit
-#endif
-	      ) 
+	      Double_t trkpos, Double_t trkslope )
       : fHit(hit), fRoad(road), fPos(pos), fTrackPos(trkpos2d), 
-	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope)
-#ifdef TESTCODE
-      , fFitRank(ifit)
-#else
-      , fFitRank(0)
-#endif
-    { assert(fHit&&fRoad); }
-    FitCoord() :fHit(0), fRoad(0) {} // For ROOT RTTI
+	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope),
+	fFitRank(0) {}
+    FitCoord() : fHit(0), fRoad(0) {} // For ROOT RTTI
     virtual ~FitCoord() {}
 
     Double_t  GetChi2()       const;
     Hit*      GetHit()        const { return fHit; }
     Road*     GetRoad()       const { return fRoad; }
     Double_t  GetPos()        const { return fPos; }
-    Double_t  GetDriftTime()  const { return fHit->GetDriftTime(); }
-    Double_t  GetDriftDist()  const { return fHit->GetDriftDist(); }
+    Double_t  GetDriftTime()  const { return fHit ? fHit->GetDriftTime():kBig;}
+    Double_t  GetDriftDist()  const { return fHit ? fHit->GetDriftDist():kBig;}
     Double_t  GetTrackPos()   const { return fTrackPos; }
     Double_t  GetTrackSlope() const { return fTrackSlope; }
-    Double_t  GetTrackDist()  const { return fTrackPos-fHit->GetWirePos(); }
-    Double_t  GetResidual()   const { return fTrackPos-fPos; }
+    Double_t  GetTrackDist()  const 
+    { return fHit ? fTrackPos-fHit->GetWirePos() : kBig; }
+    Double_t  GetResidual()   const { return fHit ? fTrackPos-fPos : kBig; }
     Double_t  Get3DTrkPos()   const { return f3DTrkPos; }
     Double_t  Get3DTrkSlope() const { return f3DTrkSlope; }
-    Double_t  Get3DTrkDist()  const { return f3DTrkPos-fHit->GetWirePos(); }
-    Double_t  Get3DTrkResid() const { return f3DTrkPos-fPos; }
-    Int_t     GetWireNum()    const { return fHit->GetWireNum(); }
+    Double_t  Get3DTrkDist()  const 
+    { return fHit ? f3DTrkPos-fHit->GetWirePos() : kBig; }
+    Double_t  Get3DTrkResid() const { return fHit ? f3DTrkPos-fPos : kBig; }
+    Int_t     GetWireNum()    const { return fHit ? fHit->GetWireNum() : -1; }
     
-#ifdef TESTCODE
-    UInt_t    GetRank()       const { return fFitRank; }
-    void      Set3DTrkInfo( Double_t pos, Double_t slope )
-    { f3DTrkPos = pos; f3DTrkSlope = slope; }
-#endif
-
   private:
     Hit*      fHit;      // Decoded raw hit data
     Road*     fRoad;     // Road that created this fit

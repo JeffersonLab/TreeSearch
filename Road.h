@@ -39,9 +39,6 @@ namespace TreeSearch {
       Double_t x;    // Selected x coordinates
       Double_t z;    // z coordinate
       Hit*     hit;  // Associated hit (stored in WirePlane)
-#ifdef TESTCODE
-      std::vector<FitCoord*> coord; // Associated FitCoord(s) (in WirePlane)
-#endif
       ClassDef(Point,0)
     };
 
@@ -122,10 +119,10 @@ namespace TreeSearch {
     virtual Int_t  Compare( const TObject* obj ) const;
     void           Finish();
     Bool_t         Fit();
-    Double_t       GetChi2( UInt_t ifit=0 ) const;
-    FitResult*     GetFitResult( UInt_t ifit=0 ) const;
+    Double_t       GetChi2() const { return fChi2; }
+    FitResult*     GetFitResult() const;
     UInt_t         GetNfits() const { return (UInt_t)fFitData.size(); }
-    const Pvec_t&  GetPoints( UInt_t ifit=0 ) const;
+    const Pvec_t&  GetPoints() const;
     Double_t       GetPos() const { return fPos; }
     Double_t       GetPos( Double_t z ) const { return fPos + z*fSlope; }
     Double_t       GetPosErrsq( Double_t z ) const;
@@ -200,29 +197,20 @@ namespace TreeSearch {
 
   //---------------------------------------------------------------------------
   inline
-  Double_t Road::GetChi2( UInt_t ifit ) const
+  const TreeSearch::Road::Pvec_t& Road::GetPoints() const
   {
-    // Return unnormalized chi2 of the i-th fit
-    assert( ifit < GetNfits() );
-    return fFitData[ifit]->fChi2;
+    // Return points used by the best fit
+    assert( !fFitData.empty() );
+    return fFitData.front()->GetPoints();
   }
 
   //---------------------------------------------------------------------------
   inline
-  const TreeSearch::Road::Pvec_t& Road::GetPoints( UInt_t ifit ) const
+  Road::FitResult* Road::GetFitResult() const
   {
-    // Return points used by i-th fit
-    assert( ifit < GetNfits() );
-    return fFitData[ifit]->GetPoints();
-  }
-
-  //---------------------------------------------------------------------------
-  inline
-  Road::FitResult* Road::GetFitResult( UInt_t ifit ) const
-  {
-    // Return fit results of i-th fit
-    assert( ifit < GetNfits() );
-    return fFitData[ifit];
+    // Return results of the best fit
+    assert( !fFitData.empty() );
+    return fFitData.front();
   }
 
   //---------------------------------------------------------------------------

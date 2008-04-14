@@ -525,6 +525,9 @@ Bool_t Road::CollectCoordinates()
   UInt_t last_np = kMaxUInt;
   for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
     Hit* hit = const_cast<Hit*>(*it);
+    // Skip all hits from planes in calibration mode - these are not fitted
+    if( hit->GetWirePlane()->IsCalibrating() )
+      continue;
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetPlaneNum();
     // Prevent duplicate entries for hits with zero drift
@@ -558,8 +561,12 @@ Bool_t Road::CollectCoordinates()
       cout << " pl= " << i;
       assert( ipl == fPoints.rend() or !(*ipl).empty() );
       if( ipl == fPoints.rend() 
-	  or i != (*ipl).front()->hit->GetPlaneNum() )
-	cout << " missing";
+	  or i != (*ipl).front()->hit->GetPlaneNum() ) {
+	if( (*ipl).front()->hit->GetWirePlane()->IsCalibrating() )
+	  cout << " calibrating";
+	else
+	  cout << " missing";
+      }
       else {
 	Double_t z = (*ipl).front()->z;
 	cout << " z=" << z << "\t x=";
@@ -608,6 +615,7 @@ Bool_t Road::Fit()
   // Loop over all combinations of hits in the planes
   vector<Pvec_t>::size_type npts = fPoints.size();
   Pvec_t selected;
+  selected.reserve( npts );
   fDof = npts-2;
   Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
   Double_t* w = new Double_t[npts];
@@ -662,11 +670,6 @@ Bool_t Road::Fit()
     if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;
 #endif
 
-#ifdef TESTCODE
-    // TESTCODE saves all fits with acceptable Chi2
-    fFitData.push_back( new FitResult(a1,a2,chi2,V) );
-    fFitData.back()->fFitCoordinates.swap( selected );
-#else
     // Production code saves only the best fit
     if( fFitData.empty() || chi2 < fFitData.back()->fChi2 ) {
       if( fFitData.empty() )
@@ -676,7 +679,6 @@ Bool_t Road::Fit()
       // Save points used for this fit
       fFitData.back()->fFitCoordinates.swap( selected );
     }
-#endif
   }
   delete [] w;
 
@@ -684,27 +686,6 @@ Bool_t Road::Fit()
     //TODO: keep statistics
     return false;
   }
-
-#ifdef TESTCODE
-  // Sort fit results by ascending chi2
-  sort( ALL(fFitData), FitResult::Chi2IsLess() );
-
-  // Save with the WirePlanes the hit coordinates used in all the good
-  // projection (2D) fits 
-  for( vector<FitResult*>::size_type ifit = 0; ifit < fFitData.size();
-       ++ifit ) {
-    Pvec_t& fitpoints = fFitData[ifit]->fFitCoordinates;
-    for( Pvec_t::iterator it = fitpoints.begin(); it != fitpoints.end(); 
-	 ++it ) {
-      Point* p = *it;
-      Double_t slope   = fFitData[ifit]->fSlope;
-      Double_t x_track = fFitData[ifit]->fPos + p->z * slope;
-      FitCoord* fc = p->hit->GetWirePlane()->AddFitCoord
-	( FitCoord( p->hit, this, p->x, x_track, slope, kBig, kBig, ifit ));
-      p->coord.push_back(fc);
-    }
-  }
-#endif
 
   // Copy best fit results to member variables
   memcpy( &fPos, &(fFitData.front()->fPos), 6*sizeof(Double_t) );

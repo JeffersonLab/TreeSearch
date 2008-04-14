@@ -54,8 +54,8 @@ public:
   }
   virtual Bool_t IsEqual( const TObject* obj ) const {
     const CSpair* m;
-    if( !obj || !(m = dynamic_cast<const CSpair*>(obj)) ) return kFALSE;
-    return ( fCrate == m->fCrate && fSlot == m->fSlot );
+    if( !obj or !(m = dynamic_cast<const CSpair*>(obj)) ) return kFALSE;
+    return ( fCrate == m->fCrate and fSlot == m->fSlot );
   }
   UShort_t  fCrate;
   UShort_t  fSlot;
@@ -102,7 +102,9 @@ struct MWDC::FitRes_t {
   vector<Double_t> coef;
   Double_t matchval;
   Double_t chi2;
-  Int_t ndof;
+  Int_t    ndof;
+  Rvec_t*  roads;
+  FitRes_t() : roads(0) {}
 };
 
 // Global constant indicating invalid/uninitialized data
@@ -134,7 +136,7 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
 				       p_angle[type]*TMath::DegToRad(),
 				       this 
 				       );
-    if( !proj || proj->IsZombie() ) {
+    if( !proj or proj->IsZombie() ) {
       // Urgh. Something very bad is going on
       Error( Here("MWDC"), "Error creating projection %s. Call expert.", 
 	     p_name[type] );
@@ -171,7 +173,7 @@ void MWDC::Clear( Option_t* opt )
   THaTrackingDetector::Clear(opt);
   
   // Clear the planes and projections, but only if we're not called from Init()
-  if( !opt || *opt != 'I' ) {
+  if( !opt or *opt != 'I' ) {
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
       fPlanes[iplane]->Clear(opt);
 
@@ -240,12 +242,114 @@ Int_t MWDC::Decode( const THaEvData& evdata )
       fFailNhits = 1;
       continue;
     }
-
+    // No need to fill the hitpattern if no tracking requested
     if( TestBit(kDoCoarse) )
       fProj[type]->FillHitpattern();
   }
 
   return 0;
+}
+
+//_____________________________________________________________________________
+class AddFitCoord
+{
+public:
+  AddFitCoord() {}
+  void operator() ( Road* rd, Road::Point* p, const vector<Double_t>& coef )
+  {
+    const Projection* proj = rd->GetProjection();
+    Double_t slope2d  = rd->GetSlope();
+    Double_t trkpos2d = rd->GetPos() + p->z * slope2d;
+    Double_t cosa     = proj->GetCosAngle();
+    Double_t sina     = proj->GetSinAngle();
+    Double_t slope    = coef[1]*cosa + coef[3]*sina;
+    Double_t pos      = coef[0]*cosa + coef[2]*sina + slope * p->z;
+    p->hit->GetWirePlane()->AddFitCoord
+      ( FitCoord( p->hit, rd, p->x, trkpos2d, slope2d, pos, slope ));
+  }
+};
+
+//_____________________________________________________________________________
+#ifdef VERBOSE
+class PrintFitPoint
+{
+public:
+  PrintFitPoint() {}
+  void operator() ( Road*, Road::Point* p, const vector<Double_t>& )
+  {
+    cout << p->hit->GetWirePlane()->GetName() << " " 
+	 << "z = " << p->z << " x = " << p->x << endl;
+  }
+};
+#endif
+
+//_____________________________________________________________________________
+class FillFitMatrix
+{
+public:
+  FillFitMatrix( TMatrixDSym& AtA, TVectorD& Aty ) 
+    : fAtA(AtA), fAty(Aty), fNpoints(0) {}
+  // TODO: resize & clear matrix to 4x4 if necessary
+  void operator() ( Road* rd, Road::Point* p, const vector<Double_t>& )
+  {
+    const Projection* proj = rd->GetProjection();
+    Double_t cosa = proj->GetCosAngle();
+    Double_t sina = proj->GetSinAngle();
+    ++fNpoints;
+    Double_t Ai[4] = { cosa, cosa * p->z, sina, sina * p->z };
+    Double_t s2 = 1.0/(p->res()*p->res());
+    for( int j = 0; j<4; ++j ) {
+      for( int k = j; k<4; ++k ) {
+	fAtA(j,k) += Ai[j] * s2 * Ai[k];
+      }
+      fAty(j) += Ai[j] * s2 * p->x;
+    }
+  }
+  Int_t GetNpoints() const { return fNpoints; }
+private:
+  TMatrixDSym& fAtA;
+  TVectorD&    fAty;
+  Int_t        fNpoints;
+};
+
+//_____________________________________________________________________________
+class CalcChisquare
+{
+public:
+  CalcChisquare() : fChi2(0) {}
+  void operator() ( Road* rd, Road::Point* p, const vector<Double_t>& coef )
+  {
+    const Projection* proj = rd->GetProjection();
+    Double_t cosa  = proj->GetCosAngle();
+    Double_t sina  = proj->GetSinAngle();
+    Double_t slope = coef[1]*cosa + coef[3]*sina;
+    Double_t pos   = coef[0]*cosa + coef[2]*sina + slope*p->z;
+    Double_t diff  = (pos - p->x) / p->res();
+    fChi2 += diff*diff;
+  }
+  void     Clear() { fChi2 = 0; }
+  Double_t GetResult() const { return fChi2; }
+private:
+  Double_t fChi2;
+};
+
+//_____________________________________________________________________________
+template< typename Action >
+Action MWDC::ForAllTrackPoints( const Rvec_t& roads, 
+				const vector<Double_t>& coef, Action action )
+{
+  // Apply action to all points from roads and the track given by coef
+
+  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
+    Road* rd = *it;
+    const Road::Pvec_t& points = rd->GetPoints();
+    for( Road::Pvec_t::const_iterator it2 = points.begin();
+	 it2 != points.end(); ++it2 ) {
+      Road::Point* p = *it2;
+      action( rd, p, coef );
+    }
+  }
+  return action;
 }
 
 //_____________________________________________________________________________
@@ -301,34 +405,16 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   // Fill the (At W A) matrix and (At W y) vector with the measured points
   TMatrixDSym AtA(4);
   TVectorD Aty(4);
-  Int_t npoints = 0;
-  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
-    const Projection* proj = (*it)->GetProjection();
-    Double_t cosa = proj->GetCosAngle();
-    Double_t sina = proj->GetSinAngle();
+  FillFitMatrix f = ForAllTrackPoints(roads, coef, FillFitMatrix(AtA, Aty));
 
-    // Fit the 3D track using the points from the best fit in each Road
-    const Road::Pvec_t& points = (*it)->GetPoints();
-    for( Road::Pvec_t::const_iterator it2 = points.begin();
-	 it2 != points.end(); ++it2 ) {
-      const Road::Point* p = (*it2);
-      ++npoints;
-      Double_t Ai[4] = { cosa, cosa * p->z, sina, sina * p->z };
-      Double_t s2 = 1.0/(p->res()*p->res());
-      for( int j = 0; j<4; ++j ) {
-	for( int k = j; k<4; ++k ) {
-	  AtA(j,k) += Ai[j] * s2 * Ai[k];
-	}
-	Aty(j) += Ai[j] * s2 * p->x;
-      }
-    }
-  }
+  Int_t npoints = f.GetNpoints();
+  assert( npoints > 4 );
+  if( npoints <=4 ) return -1; // Meaningful fit not possible
+
+  // FillFitMatrix only fills the upper triangle for efficiency
   for( int j = 0; j<4; ++j )
     for( int k = j+1; k<4; ++k )
       AtA(k,j) = AtA(j,k);
-
-  assert( npoints > 4 );
-  if( npoints <=4 ) return -1; // Meaningful fit not possible
 
   // Invert the characteristic matrix and solve the normal equations.
   // As in ROOT's TLinearFitter, we use a Cholesky decomposition
@@ -343,43 +429,15 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   assert( Aty.GetNrows() == 4 );
   coef.assign( Aty.GetMatrixArray(), Aty.GetMatrixArray()+Aty.GetNrows() );
 
-  // Calculate chi2 and update FitCoord data in the WirePlanes
 #ifdef VERBOSE
-  if( fDebug > 2 ) cout << "Points in 3D fit:" << endl;
-#endif
-  chi2 = 0;
-  for( Rvec_t::const_iterator it = roads.begin(); it != roads.end(); ++it ) {
-    Road* rd = *it;
-    const Projection* proj = rd->GetProjection();
-    Double_t cosa = proj->GetCosAngle();
-    Double_t sina = proj->GetSinAngle();
-    
-    const Road::Pvec_t& points = rd->GetPoints();
-    for( Road::Pvec_t::const_iterator it2 = points.begin();
-	 it2 != points.end(); ++it2 ) {
-      const Road::Point* p = *it2;
-      Double_t slope = coef[1]*cosa + coef[3]*sina;
-      Double_t x = coef[0]*cosa + coef[2]*sina + slope*p->z;
-      Double_t diff = (x - p->x) / p->res();
-      chi2 += diff*diff;
-#ifdef VERBOSE
-      if( fDebug > 2 ) cout << p->hit->GetWirePlane()->GetName() << " " 
-			    << "z = " << p->z << " x = " << p->x << endl;
-#endif
-#ifdef TESTCODE
-      // TESTCODE adds 3D results to existing rank 0 hit coords in WirePlanes
-      assert( !p->coord.empty() && p->coord.front()->GetRank() == 0 );
-      p->coord.front()->Set3DTrkInfo( x, slope );
-#else
-      // Production code creates the hit coordinates in the WirePlanes
-      // using only the points from the 3D track fit(s)
-      Double_t slope2d  = rd->GetSlope();
-      Double_t trkpos2d = rd->GetPos() + p->z * slope2d;
-      p->hit->GetWirePlane()->AddFitCoord
-	( FitCoord( p->hit, rd, p->x, trkpos2d, slope2d, x, slope ));
-#endif
-    }
+  if( fDebug > 2 ) {
+    cout << "Points in 3D fit:" << endl;
+    ForAllTrackPoints( roads, coef, PrintFitPoint() );
   }
+#endif
+
+  // Calculate chi2
+  chi2 = ForAllTrackPoints(roads, coef, CalcChisquare()).GetResult();
 
   // Calculate covariance matrix of the parameters, if requested
   if( coef_covar ) {
@@ -402,6 +460,60 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 }
 
 //_____________________________________________________________________________
+void MWDC::FindNearestHits( const THaTrack* track, const Rvec_t& roads ) const
+{
+  // For each calibration plane, find the hit nearest to the given track
+  // and register it in the plane's fit coordinates array.
+  // Used only in calibration mode. Normally, only hits used in track
+  // fitting are registered.
+
+  assert( !roads.empty() );
+
+  for( vector<WirePlane*>::const_iterator it = fCalibPlanes.begin(); it !=
+	 fCalibPlanes.end(); ++it ) {
+    WirePlane* wp  = *it;
+    Double_t z     = wp->GetZ();
+    Double_t cosa  = wp->GetProjection()->GetCosAngle();
+    Double_t sina  = wp->GetProjection()->GetSinAngle();
+    Double_t slope = track->GetTheta()*cosa + track->GetPhi()*sina;
+    Double_t x     = track->GetX()*cosa + track->GetY()*sina + slope*z;
+    Double_t dmin  = kBig;
+    Double_t pmin  = kBig;
+    Hit* hmin = 0;
+    // TODO: use lower_bound() or similar to get to the hit more quickly
+    TIter next( wp->GetHits() );
+    while( Hit* hit = static_cast<Hit*>( next() )) {
+      for( int i = 0; i < 2; ++i ) {
+	Double_t pos = (i==0) ? hit->GetPosL() : hit->GetPosR();
+	Double_t d   = TMath::Abs(pos-x);
+	if( d < dmin ) {
+	  dmin = d;
+	  hmin = hit;
+	  pmin = pos;
+	}
+      }
+    }
+      // The road vector does not necessarily contain all projections, so
+      // search for the road of the type of this wire plane if necessary,
+      // taking advantage of the fact that the road vector is sorted by type
+    Road* rd = 0;
+    Int_t k = TMath::Min( roads.size(), (Rvec_t::size_type)wp->GetType() );
+    do {
+      if( roads[k]->GetProjection()->GetType() > wp->GetType() )
+	--k;
+      else {
+	if( roads[k]->GetProjection() == wp->GetProjection() )
+	  rd = roads[k];
+	break;
+      }
+    } while( k>=0 );
+    Double_t slope2d = rd ? rd->GetSlope() : kBig;
+    Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
+    wp->AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
+  }
+}
+
+//_____________________________________________________________________________
 THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 {
   // Make new track with given parameters. Used by CoarseTrack to generate
@@ -421,6 +533,11 @@ THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   // The "detector" and "fp" TRANSPORT systems are the same for BigBite
   newTrack->SetD( x, y, xp, yp );
   newTrack->SetChi2( fit_par.chi2, fit_par.ndof );
+
+  ForAllTrackPoints( *fit_par.roads, fit_par.coef, AddFitCoord() );
+  if( !fCalibPlanes.empty() )
+    FindNearestHits( newTrack, *fit_par.roads );
+    
   return newTrack;
 }
 
@@ -715,6 +832,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       // If there is only one combo (typical case), life is simple:
       fit_par.matchval    = road_combos.front().first;
       Rvec_t& these_roads = road_combos.front().second;
+      fit_par.roads       = &these_roads;
       fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
       if( fit_par.ndof > 0 )
 	NewTrack( tracks, fit_par );
@@ -733,6 +851,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	   it != road_combos.end(); ++it ) {
 	fit_par.matchval    = (*it).first;
 	Rvec_t& these_roads = (*it).second;
+	fit_par.roads       = &these_roads;
 	fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
 	if( fit_par.ndof > 0 ) {
 	  Rset_t road_tuple( ALL(these_roads) );
@@ -814,10 +933,9 @@ Int_t MWDC::FineTrack( TClonesArray& tracks )
 //_____________________________________________________________________________
 Int_t MWDC::DefineVariables( EMode mode )
 {
-  // Initialize global variables and lookup table for decoder
+  // Initialize global variables
 
-
-  if( mode == kDefine && fIsSetup ) return kOK;
+  if( mode == kDefine and fIsSetup ) return kOK;
   fIsSetup = ( mode == kDefine );
 
   // Register variables in global list
@@ -964,7 +1082,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   }
   Double_t du = u_angle - 90.0*qu;
   Double_t dv = v_angle - 90.0*qv;
-  if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 ||
+  if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 or
       TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
     Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
 	   "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
@@ -998,7 +1116,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	// Add planes not yet used to the corresponding projection
 	if( !thePlane->GetProjection() ) {
 	  WirePlane* partner = thePlane->GetPartner();
-	  assert( !partner || partner->GetProjection() == 0 );
+	  assert( !partner or partner->GetProjection() == 0 );
 	  // AddPlane() sets the plane number, fProjection and fCoordOffset
 	  // in the WirePlane objects
 	  theProj->AddPlane( thePlane, partner );
@@ -1030,12 +1148,12 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	     "Need >= 3, have %u. Fix database.", theProj->GetName(), n );
       return fStatus = kInitError;
     }
-    // Set width of this projection plane
+    // Set width of this projection
     width *= 2.0;
     if( width > 0.01 )
       theProj->SetWidth( width );
     else {
-      Error( Here(here), "Error calculating width of projection plane \"%s\". "
+      Error( Here(here), "Error calculating width of projection \"%s\". "
 	     "Wire spacing too small? Fix database.", theProj->GetName() );
       return fStatus = kInitError;
     }
@@ -1048,9 +1166,12 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
       if( theProj->GetMaxSlope() < 0.01 ) {  // Consider unset
 	theProj->SetMaxSlope( maxslope );
       } else if( theProj->GetMaxSlope() > maxslope ) {
-// 	Warning( Here(here), "For plane type \"%s\", maxslope from database = "
-// 		 "%lf exceeds geometric maximum = %lf. Using smaller value.",
-// 		 theProj->GetName(), theProj->GetMaxSlope(), maxslope );
+	if( fDebug > 0 ) {
+	  Warning( Here(here), "For projection \"%s\", maxslope from "
+		   "database = %lf exceeds geometric maximum = %lf. "
+		   "Using smaller value.",
+		   theProj->GetName(), theProj->GetMaxSlope(), maxslope );
+	}
 	theProj->SetMaxSlope( maxslope );
       }
     } else {
@@ -1085,6 +1206,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   }
   // Delete existing configuration (in case we are re-initializing)
   fPlanes.clear();
+  fCalibPlanes.clear();
 
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
@@ -1101,7 +1223,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   // Putting this container on the stack may cause strange stack overflows!
   vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
-  string planeconfig;
+  string planeconfig, calibconfig;
   Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
   f3dMatchCut = 1e-4;
   Int_t event_display = 0, disable_tracking = 0, disable_finetrack = 0;
@@ -1116,6 +1238,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     { "event_display",     &event_display,     kInt,    0, 1 },
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
     { "disable_finetrack", &disable_finetrack, kInt,    0, 1 },
+    { "calibrate",         &calibconfig,       kString, 0, 1 },
     { 0 }
   };
 
@@ -1149,12 +1272,6 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   if( status != kOK )
     return status;
 
-  vector<string> planes = vsplit(planeconfig);
-  if( planes.empty() ) {
-    Error( Here(here), "No planes defined. Set \"planeconfig\" in database." );
-    return kInitError;
-  }
-
   // Set analysis control flags
   SetBit( kDoTimeCut,     time_cut );
   SetBit( kPairsOnly,     pairs_only );
@@ -1164,26 +1281,55 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
 
+  vector<string> planes = vsplit(planeconfig);
+  if( planes.empty() ) {
+    Error( Here(here), "No planes defined. Set \"planeconfig\" in database." );
+    return kInitError;
+  }
+  vector<string> calibplanes = vsplit(calibconfig);
+
   // Set up the wire planes
   for( ssiz_t i=0; i<planes.size(); ++i ) {
-    TString name(planes[i].c_str());
-    if( name.IsNull() )
-      continue;
+    assert( !planes[i].empty() );
+    const char* name = planes[i].c_str();
     vwiter_t it = find_if( ALL(fPlanes), WirePlane::NameEquals( name ) );
     if( it != fPlanes.end() ) {
-      Error( Here(here), "Duplicate plane name: %s. Fix database.", 
-	     name.Data() );
+      Error( Here(here), "Duplicate plane name: %s. Fix database.", name );
       return kInitError;
     }
     WirePlane* newplane = new WirePlane( name, name, this );
-    if( !newplane || newplane->IsZombie() ) {
+    if( !newplane or newplane->IsZombie() ) {
       // Urgh. Something is very bad
-      Error( Here(here), "Error creating wire plane %s. Call expert.", 
-	     name.Data() );
+      Error( Here(here), "Error creating wire plane %s. Call expert.", name );
       return kInitError;
     }
     fPlanes.push_back( newplane );
     newplane->SetDebug( fDebug );
+
+    // Set calibration mode if requested for any planes
+    if( !calibplanes.empty() ) {
+      vector<string>::iterator its =
+	find_if( ALL(calibplanes), bind2nd(equal_to<string>(), planes[i]) );
+      if( its != calibplanes.end() ) {
+	Info( Here(here), "Plane %s in calibration mode", name );
+	newplane->EnableCalibration();
+	fCalibPlanes.push_back( newplane );
+	calibplanes.erase( its );
+      }
+    }
+  }
+
+  // Warn if any requested calibration plane(s) do not exist
+  if( !calibplanes.empty() ) {
+    string s("plane");
+    if( calibplanes.size() > 1 )
+      s.append("s");
+    for( vector<string>::size_type i = 0; i < calibplanes.size(); ++i ) {
+      s.append(" ");
+      s.append(calibplanes[i]);
+    }
+    Warning( Here(here), "Requested calibration for undefined %s. "
+	     "Typo in database?", s.c_str() );
   }
 
   if( fDebug > 0 )
@@ -1209,7 +1355,7 @@ void MWDC::Print(const Option_t* opt) const
     fPlanes[iplane]->Print(opt);
 
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-    if( type == kTypeBegin || verbose > 0 )
+    if( type == kTypeBegin or verbose > 0 )
       cout << endl;
     fProj[type]->Print(opt);
   }
@@ -1261,7 +1407,7 @@ EProjType MWDC::NameToType( const char* name )
   // Return the index corresponding to the given plane name.
   // The comparison is not case-sensitive.
 
-  if( name && *name ) {
+  if( name and *name ) {
     TString s(name);
     s.ToLower();
     for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {

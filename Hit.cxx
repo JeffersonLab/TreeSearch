@@ -76,14 +76,8 @@ Double_t FitCoord::GetChi2() const
 {
   // Return chi2 of the fit that used this coordinate
 
-  return fRoad ? fRoad->GetChi2( fFitRank ) : kBig;
+  return fRoad ? fRoad->GetChi2() : kBig;
 }
-
-//_____________________________________________________________________________
-
-}
-
-namespace TreeSearch {
 
 //_____________________________________________________________________________
 HitPairIter::HitPairIter( const TSeqCollection* collA,

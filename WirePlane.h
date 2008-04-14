@@ -50,6 +50,7 @@ namespace TreeSearch {
 
     FitCoord*       AddFitCoord( const FitCoord& coord );
     Bool_t          Contains( const TVector2& point ) const;
+    void            EnableCalibration( Bool_t enable = true );
     EProjType       GetType()        const { return fType; }
     Double_t        GetZ()           const { return fOrigin.Z(); }
     Projection*     GetProjection()  const { return fProjection; }
@@ -69,10 +70,12 @@ namespace TreeSearch {
     TSeqCollection* GetCoords()      const { return fFitCoords; }
     Int_t           GetNcoords()     const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum()    const { return fPlaneNum; }
-    Bool_t          IsRequired()     const { return TestBit(kIsRequired); }
+    Bool_t          IsCalibrating()  const { return TestBit(kCalibrating); }
+    Bool_t          IsRequired()     const;
 
     void            SetPlaneNum( UInt_t n ) { fPlaneNum = n; }
     void            SetProjection( Projection* p );
+    void            SetRequired( Bool_t enable = true );
 #ifdef TESTCODE
     void            CheckCrosstalk();
 #endif
@@ -139,7 +142,8 @@ namespace TreeSearch {
 
     // Bits for WirePlanes
     enum {
-      kIsRequired   = BIT(14)  // Tracks must have a hit in this plane
+      kIsRequired  = BIT(14), // Tracks must have a hit in this plane
+      kCalibrating = BIT(15)  // Plane in calibration mode (implies !required)
     };
 
     ClassDef(WirePlane,0)      // One MWDC wire plane
@@ -159,6 +163,31 @@ namespace TreeSearch {
 	     TMath::Abs( point.Y()-fOrigin.Y() ) < fSize[1] );
   }
 
+  //___________________________________________________________________________
+  inline
+  void WirePlane::EnableCalibration( Bool_t enable )
+  {
+    // Enable/disable calibration mode flag
+
+    SetBit( kCalibrating, enable );
+  }
+  
+  //___________________________________________________________________________
+  inline
+  Bool_t WirePlane::IsRequired() const
+  { 
+    return ( not IsCalibrating() and TestBit(kIsRequired) );
+  }
+
+  //___________________________________________________________________________
+  inline
+  void WirePlane::SetRequired( Bool_t enable )
+  {
+    // Enable/disable calibration mode flag
+
+    SetBit( kIsRequired, enable );
+  }
+  
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch

@@ -77,8 +77,9 @@ namespace TreeSearch {
     typedef std::vector<Road*> Rvec_t;
     typedef std::set<Road*>    Rset_t;
 
-    vector<WirePlane*>   fPlanes;    // Wire planes
-    vector<Projection*>  fProj;      // Plane projections
+    vector<WirePlane*>   fPlanes;      // Wire planes
+    vector<Projection*>  fProj;        // Plane projections
+    vector<WirePlane*>   fCalibPlanes; // Planes in calibration mode
 
     THaDetMap*     fRefMap;    // Map of reference channels for VME readout
     vector<float>  fRefTime;   // [fRefMap->GetSize()] ref channel data
@@ -97,9 +98,14 @@ namespace TreeSearch {
     UInt_t         fN3dFits;   // Number of track fits done (=good road combos)
     Int_t          fEvNum;     // Current event number
 #endif
+    void      FindNearestHits( const THaTrack* track,
+			       const Rvec_t& roads ) const;
     void      FitErrPrint( Int_t err ) const;
     Int_t     FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 			Double_t& chi2, TMatrixDSym* coef_covar = 0 ) const;
+    template< typename Action > static
+    Action    ForAllTrackPoints( const Rvec_t& roads, 
+				 const vector<Double_t>& coef, Action action );
     UInt_t    MatchRoads( const vector<Rvec_t>& roads,
 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 			  Rset_t& unique_found );
