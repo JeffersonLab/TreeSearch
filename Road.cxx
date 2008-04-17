@@ -91,19 +91,6 @@ public:
 };
 
 //_____________________________________________________________________________
-#ifdef VERBOSE
-static void PrintHits( const Hset_t& hits )
-{
-  //  cout << hits.size() << " hits" << endl;
-
-  for( Hset_t::reverse_iterator it = hits.rbegin(); it != hits.rend(); ++it ) {
-    cout << " ";
-    (*it)->Print();
-  }
-  
-}
-#endif
-//_____________________________________________________________________________
 Road::Road( const Projection* proj ) 
   : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),

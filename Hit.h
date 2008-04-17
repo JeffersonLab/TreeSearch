@@ -14,6 +14,7 @@
 #include <set>
 #include <cassert>
 #include <functional>
+#include <iostream>
 
 class TSeqCollection;
 class TIterator;
@@ -58,7 +59,7 @@ namespace TreeSearch {
     Double_t GetResolution() const { return fResolution; }
 
     WirePlane* GetWirePlane() const { return fWirePlane; }
-    UInt_t   GetPlaneNum()   const { return fWirePlane->GetPlaneNum(); }
+    UInt_t   GetPlaneNum()    const { return fWirePlane->GetPlaneNum(); }
 
     // Functor for ordering hits in sets
     struct WireNumLess : public std::binary_function< Hit*, Hit*, bool >
@@ -66,6 +67,8 @@ namespace TreeSearch {
       bool operator() ( const Hit* a, const Hit* b ) const
       { 
 	assert( a && b );
+	if( a->GetWirePlane()->GetType() != b->GetWirePlane()->GetType() )
+	  return (a->GetWirePlane()->GetType() < b->GetWirePlane()->GetType());
 	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
 	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
 	if( a->GetWireNum()  < b->GetWireNum()  ) return true;
@@ -83,6 +86,8 @@ namespace TreeSearch {
       bool operator() ( const Hit* a, const Hit* b ) const
       { 
 	assert( a && b );
+	if( a->GetWirePlane()->GetType() != b->GetWirePlane()->GetType() )
+	  return (a->GetWirePlane()->GetType() < b->GetWirePlane()->GetType());
 	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
 	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
 	if( a->GetWireNum() + fMaxDist < b->GetWireNum()  ) return true;
@@ -331,6 +336,20 @@ namespace TreeSearch {
     assert( plane_pattern || hits.empty() );
     return bits->TestBitNumber(plane_pattern);
   }
+
+  //___________________________________________________________________________
+#ifdef VERBOSE
+  inline
+  void PrintHits( const Hset_t& hits )
+  {
+    //  cout << hits.size() << " hits" << endl;
+    for( Hset_t::reverse_iterator it = hits.rbegin(); it != hits.rend();
+	 ++it ) {
+      std::cout << " ";
+      (*it)->Print();
+    }
+  }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

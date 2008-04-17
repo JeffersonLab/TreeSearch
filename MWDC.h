@@ -28,6 +28,9 @@ namespace TreeSearch {
   class Projection;
   class Road;
 
+  typedef std::vector<Road*> Rvec_t;
+  typedef std::set<Road*>    Rset_t;
+
   extern const Double_t kBig;
 
   class MWDC : public THaTrackingDetector {
@@ -74,12 +77,11 @@ namespace TreeSearch {
     };
 
   protected:
-    typedef std::vector<Road*> Rvec_t;
-    typedef std::set<Road*>    Rset_t;
+    typedef std::vector<WirePlane*> Wpvec_t;
 
-    vector<WirePlane*>   fPlanes;      // Wire planes
-    vector<Projection*>  fProj;        // Plane projections
-    vector<WirePlane*>   fCalibPlanes; // Planes in calibration mode
+    Wpvec_t        fPlanes;      // Wire planes
+    vector<Projection*> fProj;   // Plane projections
+    Wpvec_t        fCalibPlanes; // Planes in calibration mode
 
     THaDetMap*     fRefMap;    // Map of reference channels for VME readout
     vector<float>  fRefTime;   // [fRefMap->GetSize()] ref channel data
@@ -98,7 +100,7 @@ namespace TreeSearch {
     UInt_t         fN3dFits;   // Number of track fits done (=good road combos)
     Int_t          fEvNum;     // Current event number
 #endif
-    void      FindNearestHits( const THaTrack* track,
+    void      FindNearestHits( WirePlane* wp, const THaTrack* track,
 			       const Rvec_t& roads ) const;
     void      FitErrPrint( Int_t err ) const;
     Int_t     FitTrack( const Rvec_t& roads, vector<Double_t>& coef,

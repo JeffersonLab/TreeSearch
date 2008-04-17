@@ -94,8 +94,8 @@ public:
 namespace TreeSearch {
 
 typedef vector<WirePlane*>::size_type vwsiz_t;
+typedef vector<WirePlane*>::iterator  vwiter_t;
 typedef vector<Projection*>::size_type vpsiz_t;
-typedef vector<WirePlane*>::iterator vwiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
 
 struct MWDC::FitRes_t {
@@ -460,57 +460,53 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 }
 
 //_____________________________________________________________________________
-void MWDC::FindNearestHits( const THaTrack* track, const Rvec_t& roads ) const
+void MWDC::FindNearestHits( WirePlane* wp, const THaTrack* track, 
+			    const Rvec_t& roads ) const
 {
-  // For each calibration plane, find the hit nearest to the given track
+  // For the given wire plane, find the hit nearest to the given track
   // and register it in the plane's fit coordinates array.
-  // Used only in calibration mode. Normally, only hits used in track
-  // fitting are registered.
+  // The given roads are the ones generating the given track.
 
   assert( !roads.empty() );
 
-  for( vector<WirePlane*>::const_iterator it = fCalibPlanes.begin(); it !=
-	 fCalibPlanes.end(); ++it ) {
-    WirePlane* wp  = *it;
-    Double_t z     = wp->GetZ();
-    Double_t cosa  = wp->GetProjection()->GetCosAngle();
-    Double_t sina  = wp->GetProjection()->GetSinAngle();
-    Double_t slope = track->GetTheta()*cosa + track->GetPhi()*sina;
-    Double_t x     = track->GetX()*cosa + track->GetY()*sina + slope*z;
-    Double_t dmin  = kBig;
-    Double_t pmin  = kBig;
-    Hit* hmin = 0;
-    // TODO: use lower_bound() or similar to get to the hit more quickly
-    TIter next( wp->GetHits() );
-    while( Hit* hit = static_cast<Hit*>( next() )) {
-      for( int i = 0; i < 2; ++i ) {
-	Double_t pos = (i==0) ? hit->GetPosL() : hit->GetPosR();
-	Double_t d   = TMath::Abs(pos-x);
-	if( d < dmin ) {
-	  dmin = d;
-	  hmin = hit;
-	  pmin = pos;
-	}
+  Double_t z     = wp->GetZ();
+  Double_t cosa  = wp->GetProjection()->GetCosAngle();
+  Double_t sina  = wp->GetProjection()->GetSinAngle();
+  Double_t slope = track->GetTheta()*cosa + track->GetPhi()*sina;
+  Double_t x     = track->GetX()*cosa + track->GetY()*sina + slope*z;
+  Double_t dmin  = kBig;
+  Double_t pmin  = kBig;
+  Hit* hmin = 0;
+  // TODO: use lower_bound() or similar to get to the hit more quickly
+  TIter next( wp->GetHits() );
+  while( Hit* hit = static_cast<Hit*>( next() )) {
+    for( int i = 0; i < 2; ++i ) {
+      Double_t pos = (i==0) ? hit->GetPosL() : hit->GetPosR();
+      Double_t d   = TMath::Abs(pos-x);
+      if( d < dmin ) {
+	dmin = d;
+	hmin = hit;
+	pmin = pos;
       }
     }
-      // The road vector does not necessarily contain all projections, so
-      // search for the road of the type of this wire plane if necessary,
-      // taking advantage of the fact that the road vector is sorted by type
-    Road* rd = 0;
-    Int_t k = TMath::Min( roads.size(), (Rvec_t::size_type)wp->GetType() );
-    do {
-      if( roads[k]->GetProjection()->GetType() > wp->GetType() )
-	--k;
-      else {
-	if( roads[k]->GetProjection() == wp->GetProjection() )
-	  rd = roads[k];
-	break;
-      }
-    } while( k>=0 );
-    Double_t slope2d = rd ? rd->GetSlope() : kBig;
-    Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
-    wp->AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
   }
+  // The road vector does not necessarily contain all projections, so
+  // search for the road of the type of this wire plane if necessary,
+  // taking advantage of the fact that the road vector is sorted by type
+  Road* rd = 0;
+  Int_t k = TMath::Min( roads.size(), (Rvec_t::size_type)wp->GetType() );
+  do {
+    if( roads[k]->GetProjection()->GetType() > wp->GetType() )
+      --k;
+    else {
+      if( roads[k]->GetProjection() == wp->GetProjection() )
+	rd = roads[k];
+      break;
+    }
+  } while( k>=0 );
+  Double_t slope2d = rd ? rd->GetSlope() : kBig;
+  Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
+  wp->AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
 }
 
 //_____________________________________________________________________________
@@ -532,9 +528,11 @@ THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   newTrack->SetChi2( fit_par.chi2, fit_par.ndof );
 
   ForAllTrackPoints( *fit_par.roads, fit_par.coef, AddFitCoord() );
-  if( !fCalibPlanes.empty() )
-    FindNearestHits( newTrack, *fit_par.roads );
-    
+  for( Wpvec_t::const_iterator it = fCalibPlanes.begin(); it !=
+	 fCalibPlanes.end(); ++it ) {
+    FindNearestHits( (*it), newTrack, *fit_par.roads );
+  }
+
   return newTrack;
 }
 
@@ -558,9 +556,40 @@ private:
 };
 
 //_____________________________________________________________________________
-template< typename T, typename TestF > void
-OptimalN( const set<T>& choices, const multimap< double, set<T> >& weights,
-	  vector< set<T> >& picks, TestF testf )
+class AnySharedHits : public unary_function<Road*,bool>
+{
+public:
+  AnySharedHits() {}
+  bool operator() ( const Road* rd )
+  {
+    const Hset_t& test_hits = rd->GetHits();
+//     cout << "--- testing: " << endl;
+//     PrintHits(test_hits);
+    for( Hset_t::const_iterator it = test_hits.begin(); it != test_hits.end();
+	 ++it ) {
+      if( fHits.find(*it) != fHits.end() )
+	return true;
+    }
+    return false;
+  }
+  const AnySharedHits& use( const Rset_t& tuple )
+  {
+    fHits.clear();
+    for( Rset_t::const_iterator it = tuple.begin(); it != tuple.end(); ++it ) {
+      const Road* rd = *it;
+      fHits.insert( ALL(rd->GetHits()) );
+    }
+//     PrintHits(fHits);
+    return *this;
+  }
+private:
+  Hset_t fHits;
+};
+
+//_____________________________________________________________________________
+template< typename Container, typename TestF, typename QuitF > void
+OptimalN( const Container& choices, const multimap<double,Container>& weights,
+	  vector<Container>& picks, TestF testf, QuitF quitf )
 {
   // This is the second-level de-ghosting algorithm, operating on fitted
   // 3D tracks.  It selects the best set of tracks if multiple roads
@@ -568,23 +597,29 @@ OptimalN( const set<T>& choices, const multimap< double, set<T> >& weights,
   // The key value of 'weights' is the chi2/dof of the fit corresponding to
   // the tuple.
 
+  //TODO: how efficient? O(N^2)? (N iterations on include)
+
   picks.clear();
-  set<T> choices_left(choices);
+  Container choices_left(choices);
 
   //TODO: try minimizing chi2 sum
   //  double wsum = 0;
-  typename multimap<double,set<T> >::const_iterator it = weights.begin();
+  typename multimap<double,Container>::const_iterator it = weights.begin();
   for( ; it != weights.end(); ++it ) {
-    const set<T>& tuple = (*it).second;
+    const Container& tuple = (*it).second;
     if( includes(ALL(choices_left), ALL(tuple)) ) {
       picks.push_back( tuple );
       //      wsum += (*it).first;
-      set<T> new_choices_left;
+      Container choices_less_tuple;
       set_difference( ALL(choices_left), ALL(tuple),
-		      inserter(new_choices_left, new_choices_left.end()) );
+		      inserter(choices_less_tuple, choices_less_tuple.end()) );
+      Container new_choices_left;
+      remove_copy_if( ALL(choices_less_tuple),
+		      inserter(new_choices_left, new_choices_left.end()),
+		      testf.use(tuple) );
       // Quit if the test function, applied to each remaining element, is no
       // longer true
-      if( !for_each(ALL(new_choices_left), testf) )
+      if( !for_each(ALL(new_choices_left), quitf) )
 	break;
       choices_left.swap( new_choices_left );
     }
@@ -869,7 +904,8 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 
       // Select "optimal" set of roads, minimizing sum of chi2s
       vector<Rset_t> best_roads;
-      OptimalN( unique_found, fit_chi2, best_roads, CheckTypes(found_types) );
+      OptimalN( unique_found, fit_chi2, best_roads, 
+		AnySharedHits(), CheckTypes(found_types) );
 
       // Now each selected road tuple corresponds to a new track
       for( vector<Rset_t>::iterator it = best_roads.begin(); it !=
