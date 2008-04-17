@@ -426,11 +426,11 @@ Int_t Projection::DefineVariables( EMode mode )
     { "t_roads", "Time in MakeRoads (us)", "t_roads" },
     { "t_fit", "Time for fitting Roads (us)", "t_fit" },
     { "t_track", "Total time in Track (us)", "t_track" },
+    { "rd.nfits", "Number of acceptable fits in road",
+                                         "fRoads.TreeSearch::Road.fNfits" },
 #endif
     { "nroads","Number of roads (good or bad)",        "GetNroads()"      },
     { "ngood", "Number of good roads",                 "fNgoodRoads"      },
-    { "rd.nfits", "Number of acceptable fits in road",
-                                     "fRoads.TreeSearch::Road.GetNfits()" },
     { "rd.pos",   "Origin of best track (m)",
                                            "fRoads.TreeSearch::Road.fPos" },
     { "rd.slope", "Slope (dx/dz) of best track",

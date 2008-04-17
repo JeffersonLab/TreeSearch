@@ -28,7 +28,6 @@
 #pragma link C++ class TreeSearch::TreeParam_t+;
 #pragma link C++ class TreeSearch::Road+;
 #pragma link C++ class TreeSearch::FitCoord+;
-#pragma link C++ class TreeSearch::Road::FitResult+;
 #pragma link C++ class TreeSearch::Road::Corners+;
 #pragma link C++ class TreeSearch::Road::Point+;
 #pragma link C++ class TreeSearch::BigBite+;

@@ -108,6 +108,9 @@ Road::Road( const Projection* proj )
   : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fTrack(0), fBuild(0)
+#ifdef TESTCODE
+  , fNfits(0)
+#endif
 {
   // Construct empty road
 
@@ -121,9 +124,12 @@ Road::Road( const Projection* proj )
 
 //_____________________________________________________________________________
 Road::Road( const Node_t& nd, const Projection* proj )
-  : TObject(), fProjection(proj), fZL(kBig), fZU(kBig),
+  : TObject(), fPatterns(1,&nd), fProjection(proj), fZL(kBig), fZU(kBig),
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
-    fTrack(0), fPatterns(1,&nd), fBuild(0)
+    fTrack(0), fBuild(0)
+#ifdef TESTCODE
+  , fNfits(0)
+#endif
 {
   // Construct from pattern
 
@@ -147,6 +153,9 @@ Road::Road( const Node_t& nd, const Projection* proj )
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) : 
   TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits)
+#ifdef TESTCODE
+  , fNfits(orig.fNfits)
+#endif
 {
   // Copy constructor
 
@@ -171,7 +180,7 @@ Road& Road::operator=( const Road& rhs )
     size_t nbytes = (char*)&fTrack - (char*)&fProjection + sizeof(fTrack);
     memcpy( &fProjection, &rhs.fProjection, nbytes );
 
-    DeleteContainer( fFitData );
+    fFitCoord.clear();
     DeleteContainerOfContainers( fPoints );
     CopyPointData( rhs );
 
@@ -189,7 +198,6 @@ Road::~Road()
 {
   // Destructor
 
-  DeleteContainer( fFitData );
   DeleteContainerOfContainers( fPoints );
   delete fBuild;
 
@@ -198,11 +206,11 @@ Road::~Road()
 //_____________________________________________________________________________
 void Road::CopyPointData( const Road& orig )
 {
-  // Copy fPoints and fFitData. Used by copy c'tor and assignment operator.
+  // Copy fPoints and fFitCoord. Used by copy c'tor and assignment operator.
   // Creates actual copies of Points because they are managed by the Roads.
 
   if( orig.fPoints.empty() )
-    assert( orig.fFitData.empty() ); // Can't have fit data but no points :-/
+    assert( orig.fFitCoord.empty() ); // Can't have fit coord but no points :-/
   else {
     typedef map<Point*,Point*> Pmap_t;
     Pmap_t xref;
@@ -215,7 +223,7 @@ void Road::CopyPointData( const Road& orig )
 	Point* old_point = *it;
 	Point* new_point = new Point( *old_point );
 	fPoints[i].push_back( new_point );
-	// It gets a bit tricky here: To be able to copy the fFitData, which
+	// It gets a bit tricky here: To be able to copy the fFitCoord, which
 	// contain pointers to some of the Points in fPoints, we need to keep 
 	// track of which old point was copied to which new point.
 	pair<Pmap_t::iterator,bool> 
@@ -224,23 +232,15 @@ void Road::CopyPointData( const Road& orig )
       }
     }
 
-    // Copy fit results
-    fFitData.reserve( orig.fFitData.size() );
-    for( vector<FitResult*>::const_iterator it = orig.fFitData.begin();
-	 it != orig.fFitData.end(); ++it ) {
-      // The FitResult copy c'tor does not copy the fFitCoordinates array
-      fFitData.push_back( new FitResult( **it ));
-      // The copied FitResult must reference the copied Points
-      const Pvec_t& old_points = (*it)->GetPoints();
-      Pvec_t&       new_points = fFitData.back()->fFitCoordinates;
-      new_points.reserve( old_points.size() );
-      for( Pvec_t::const_iterator it2 = old_points.begin(); it2 !=
-	     old_points.end(); ++it2 ) {
-	Point* old_point = *it2;
-	Pmap_t::iterator found = xref.find( old_point );
-	assert( found != xref.end() );
-	new_points.push_back( (*found).second );
-      }
+    // Copy fit coordinates (hits used in best fit)
+    fFitCoord.reserve( orig.fFitCoord.size() );
+    // The copied FitCoord must reference the corresponding copied Points
+    for( Pvec_t::const_iterator it = orig.fFitCoord.begin(); it !=
+	   orig.fFitCoord.end(); ++it ) {
+      Point* old_point = *it;
+      Pmap_t::iterator found = xref.find( old_point );
+      assert( found != xref.end() );
+      fFitCoord.push_back( (*found).second );
     }
   }
 }
@@ -593,11 +593,23 @@ Bool_t Road::Fit()
   // Collect hit positions within the Road limits and, if enough points
   // found, fit them to a straight line. If several points found in one
   // or more planes, fit all possible combinations of them.
-  // Fit results with acceptable chi2 (Projection::fChisqLimits) are
-  // sorted into fFitData, lowest chi2 first.
+  // Results of the best fit with acceptable chi2 (Projection::fChisqLimits)
+  // are stored in the member variables
 
-  assert( fGood );
-  DeleteContainer( fFitData );
+  if( !fGood )
+    return false;
+
+  if( fFitCoord.empty() )
+    assert( fChi2 == kBig );
+  else {
+    fFitCoord.clear();
+    fV[2]= fV[1] = fV[0] = fChi2 = fSlope = fPos = kBig;
+    fDof = kMaxUInt;
+  }
+  fGood = false;
+#ifdef TESTCODE
+  fNfits = 0;
+#endif
 
   // Collect coordinates of hits that are within the width of the road
   if( !CollectCoordinates() )
@@ -618,7 +630,7 @@ Bool_t Road::Fit()
   selected.reserve( npts );
   fDof = npts-2;
   Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
-  Double_t* w = new Double_t[npts];
+  vector<Double_t> w(npts);
   for( UInt_t i = 0; i < n_combinations; ++i ) {
     NthCombination( i, fPoints, selected );
     assert( selected.size() == npts );
@@ -666,31 +678,27 @@ Bool_t Road::Fit()
       continue;
     if( chi2 > chi2_interval.second )
       continue;
-#ifdef VERBOSE
-    if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;
+#ifdef TESTCODE
+    ++fNfits;
 #endif
 
-    // Production code saves only the best fit
-    if( fFitData.empty() || chi2 < fFitData.back()->fChi2 ) {
-      if( fFitData.empty() )
-	fFitData.push_back( new FitResult(a1,a2,chi2,V) );
-      else 
-	fFitData.back()->Set(a1,a2,chi2,V);
+    // Save the best fit results
+    if( chi2 < fChi2 ) {
+      fPos   = a1;
+      fSlope = a2;
+      fChi2  = chi2;
+      memcpy( fV, V, 3*sizeof(Double_t) );
       // Save points used for this fit
-      fFitData.back()->fFitCoordinates.swap( selected );
+      fFitCoord.swap( selected );
+      fGood = true;
+#ifdef VERBOSE
+      if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;
+#endif
     }
-  }
-  delete [] w;
 
-  if( fFitData.empty() ) {
-    //TODO: keep statistics
-    return false;
-  }
+  }// for n_combinations
 
-  // Copy best fit results to member variables
-  memcpy( &fPos, &(fFitData.front()->fPos), 6*sizeof(Double_t) );
-
-  return true;
+  return fGood;
 }
 
 //_____________________________________________________________________________
