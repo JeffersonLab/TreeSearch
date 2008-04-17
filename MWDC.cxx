@@ -523,9 +523,6 @@ THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   Double_t xp = fit_par.coef[1];
   Double_t y  = fit_par.coef[2];
   Double_t yp = fit_par.coef[3];
-  // Transform coordinates to spectrometer detector system at z=0
-  x += fOrigin.X() - xp * fOrigin.Z();
-  y += fOrigin.Y() - yp * fOrigin.Z();
 
   THaTrack* newTrack = AddTrack( tracks, x, y, xp, yp );
   //TODO: make a TrackID?
@@ -544,6 +541,10 @@ THaTrack* MWDC::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 //_____________________________________________________________________________
 class CheckTypes : public unary_function<Road*,void>
 {
+  // Function object for testing the projection occupancy of roads.
+  // Applied to a road, it saves the road's plane type (u,v,x..).
+  // Testing the object returns true if all types specified in the 'req'
+  // argument to the constructor have been seen in all the roads tested.
 public:
   CheckTypes( UInt_t req ) : fReq(req), fActive(0) {}
   void operator() ( const Road* rd )
@@ -581,6 +582,8 @@ OptimalN( const set<T>& choices, const multimap< double, set<T> >& weights,
       set<T> new_choices_left;
       set_difference( ALL(choices_left), ALL(tuple),
 		      inserter(new_choices_left, new_choices_left.end()) );
+      // Quit if the test function, applied to each remaining element, is no
+      // longer true
       if( !for_each(ALL(new_choices_left), testf) )
 	break;
       choices_left.swap( new_choices_left );
