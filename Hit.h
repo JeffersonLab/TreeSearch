@@ -289,14 +289,14 @@ namespace TreeSearch {
     // wire number and, for each wire, will be in the order in which they hit
     // the wire
 
-    // For dissimilar objects, compare addresses for lack of anything better
-//     if( !obj || IsA() != obj->IsA() )
-//       return (this<obj) ? -1 : (this==obj) ? 0 : 1;
+    const Hit* rhs = dynamic_cast<const Hit*>(obj);
+    assert( rhs );
+    assert( fWirePlane == rhs->fWirePlane );
 
-    if( fPos  < static_cast<const Hit*>(obj)->fPos )  return -1;
-    if( fPos  > static_cast<const Hit*>(obj)->fPos )  return  1;
-    if( fTime < static_cast<const Hit*>(obj)->fTime ) return -1;
-    if( fTime > static_cast<const Hit*>(obj)->fTime ) return  1;
+    if( fPos  < rhs->fPos )  return -1;
+    if( fPos  > rhs->fPos )  return  1;
+    if( fTime < rhs->fTime ) return -1;
+    if( fTime > rhs->fTime ) return  1;
     return 0;
   }
 
