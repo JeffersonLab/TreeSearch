@@ -288,14 +288,16 @@ class FillFitMatrix
 {
 public:
   FillFitMatrix( TMatrixDSym& AtA, TVectorD& Aty ) 
-    : fAtA(AtA), fAty(Aty), fNpoints(0) {}
-  // TODO: resize & clear matrix to 4x4 if necessary
+    : fAtA(AtA), fAty(Aty), fNpoints(0) 
+  {
+    assert( fAtA.GetNrows() == 4 && fAty.GetNrows() == 4 );
+  }
+
   void operator() ( Road* rd, Road::Point* p, const vector<Double_t>& )
   {
     const Projection* proj = rd->GetProjection();
     Double_t cosa = proj->GetCosAngle();
     Double_t sina = proj->GetSinAngle();
-    ++fNpoints;
     Double_t Ai[4] = { cosa, cosa * p->z, sina, sina * p->z };
     Double_t s2 = 1.0/(p->res()*p->res());
     for( int j = 0; j<4; ++j ) {
@@ -304,6 +306,7 @@ public:
       }
       fAty(j) += Ai[j] * s2 * p->x;
     }
+    ++fNpoints;
   }
   Int_t GetNpoints() const { return fNpoints; }
 private:
@@ -466,9 +469,13 @@ void MWDC::FindNearestHits( WirePlane* wp, const THaTrack* track,
   // For the given wire plane, find the hit nearest to the given track
   // and register it in the plane's fit coordinates array.
   // The given roads are the ones generating the given track.
+  // This routine is used for efficiency and alignment studies and testing.
 
   assert( !roads.empty() );
 
+  // Search for the hit with wire position closest to the track crossing
+  // position in this plane. The hits are sorted by wire position, so
+  // the search can be made fast.
   Double_t z     = wp->GetZ();
   Double_t cosa  = wp->GetProjection()->GetCosAngle();
   Double_t sina  = wp->GetProjection()->GetSinAngle();
@@ -477,22 +484,89 @@ void MWDC::FindNearestHits( WirePlane* wp, const THaTrack* track,
   Double_t dmin  = kBig;
   Double_t pmin  = kBig;
   Hit* hmin = 0;
-  // TODO: use lower_bound() or similar to get to the hit more quickly
-  TIter next( wp->GetHits() );
-  while( Hit* hit = static_cast<Hit*>( next() )) {
-    for( int i = 0; i < 2; ++i ) {
-      Double_t pos = (i==0) ? hit->GetPosL() : hit->GetPosR();
-      Double_t d   = TMath::Abs(pos-x);
-      if( d < dmin ) {
+  // Binary search the hits array for the track crossing position x, similar
+  // to std::lower_bound(). This finds the first hit with wire position >= x.
+  const TSeqCollection* hits = wp->GetHits();
+  Int_t first = 0, last = hits->GetSize();
+  // GetSize() is incorrect for TObjArrays and TClonesArrays
+  const TObjArray* arr = dynamic_cast<const TObjArray*>(hits);
+  if( arr )
+    last = arr->GetLast()+1;
+  Int_t len = last - first;
+  Int_t half, middle;
+  while( len > 0 ) {
+    half = len >> 1;
+    middle = first + half;
+    if( static_cast<Hit*>(hits->At(middle))->GetWirePos() < x ) {
+      first = middle + 1;
+      len -= half + 1;
+    } else
+      len = half;
+  }
+  // Decide whether the wire >= x or the first one < x are closest.
+  // If the track crosses between two adjacent wires, keep both.
+  if( last > 0 ) {
+    assert( first <= last );
+    Hit *hnext = 0, *hprev = 0;
+    if( first < last ) {
+      hnext = static_cast<Hit*>(hits->At(first));
+      assert( hnext->GetWirePos() >= x );
+    }
+    if( first > 0 ) {
+      hprev = static_cast<Hit*>(hits->At(first-1));
+      assert( hprev->GetWirePos() < x );
+      if( hnext ) {
+	assert( hprev->GetWireNum() < hnext->GetWireNum() );
+	if( hprev->GetWireNum() + 1 < hnext->GetWireNum() ) {
+	  if( x - hprev->GetWirePos() < hnext->GetWirePos() - x )
+	    hnext = 0;
+	  else
+	    hprev = 0;
+	}
+      }
+    }
+    // Of the closest wire(s) found, find the closest drift distance.
+    // If there are multiple hits one a wire, test all hits - without
+    // making assumptions about the order of drift distances
+    if( hnext ) {
+      hmin = hnext;
+      pmin = hnext->GetPosL();
+      dmin = TMath::Abs(pmin-x);
+      Int_t i = first;
+      Hit* h;
+      while( ++i < last and (h = static_cast<Hit*>(hits->At(i)))->GetWireNum()
+	     == hnext->GetWireNum() ) {
+	Double_t d = TMath::Abs(h->GetPosL()-x);
+	if( d < dmin ) {
+	  dmin = d;
+	  hmin = h;
+	  pmin = h->GetPosL();
+	}
+      }
+    }
+    if( hprev ) {
+      Double_t d = TMath::Abs(hprev->GetPosR()-x);
+      if( !hmin or d < dmin ) {
 	dmin = d;
-	hmin = hit;
-	pmin = pos;
+	hmin = hprev;
+	pmin = hprev->GetPosR();
+      }
+      Int_t i = first-1;
+      Hit* h;
+      while( --i >= 0 and (h = static_cast<Hit*>(hits->At(i)))->GetWireNum()
+	     == hprev->GetWireNum() ) {
+	d = TMath::Abs(h->GetPosR()-x);
+	if( d < dmin ) {
+	  dmin = d;
+	  hmin = h;
+	  pmin = h->GetPosR();
+	}
       }
     }
   }
   // The road vector does not necessarily contain all projections, so
-  // search for the road of the type of this wire plane if necessary,
-  // taking advantage of the fact that the road vector is sorted by type
+  // search for the road of the type of this wire plane, taking advantage
+  // of the fact that the road vector is sorted by type
   Road* rd = 0;
   Int_t k = TMath::Min( roads.size(), (Rvec_t::size_type)wp->GetType() );
   do {
@@ -506,6 +580,8 @@ void MWDC::FindNearestHits( WirePlane* wp, const THaTrack* track,
   } while( k>=0 );
   Double_t slope2d = rd ? rd->GetSlope() : kBig;
   Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
+
+  // Finally, record the hit info in the wire plane
   wp->AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
 }
 
