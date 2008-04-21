@@ -155,6 +155,8 @@ void Hitpattern::AddHit( UInt_t plane, UInt_t bin, Hit* hit ) {
   assert(hit);
   UInt_t idx = MakeIdx( plane, bin );
   fHits[idx].push_back( hit );
+  // Even though this may record the same idx multiple times, it performs
+  // better than anything more fancy (like e.g. a set)
   fHitList.push_back( idx );
 #ifdef TESTCODE
   if( fMaxhitBin < (UInt_t)fHits[idx].size() )
@@ -171,8 +173,9 @@ void Hitpattern::Clear( Option_t* )
     fPattern[--i]->FastClear();
 
   // For speed, clear only arrays that are actually filled
-  for( vector<UInt_t>::size_type i = fHitList.size(); i; ) {
-    UInt_t idx = fHitList[--i];
+  for( vector<UInt_t>::iterator it = fHitList.begin(); it != fHitList.end();
+       ++it ) {
+    UInt_t idx = *it;
     assert( idx < fHits.size());
     fHits[idx].clear();
   }

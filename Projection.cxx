@@ -416,7 +416,7 @@ Int_t Projection::DefineVariables( EMode mode )
     { "n_hits", "Number of hits used for filling hitpattern", "n_hits" },
     { "n_bins", "Number of bins set in hitpattern", "n_bins" },
     { "n_binhits", "Number of references from bins to hits","n_binhits" },
-    { "maxhits_per_bin", "Max number of hits per bin", "maxhits_bin" },
+    { "n_maxhits_bin", "Max number of hits per bin", "maxhits_bin" },
     { "n_test", "Number of pattern comparisons", "n_test"  },
     { "n_pat", "Number of patterns found",   "n_pat"    },
     { "n_roads", "Number of roads before filter",   "n_roads"    },
@@ -491,7 +491,7 @@ Int_t Projection::FillHitpattern()
 #ifdef TESTCODE
   n_hits = ntot;
   n_bins = fHitpattern->GetBinsSet();
-  n_binhits = fHitpattern->GetHitListSize();
+  n_binhits = fHitpattern->GetNhits();
   maxhits_bin = fHitpattern->GetMaxhitBin();
 #endif
   return ntot;

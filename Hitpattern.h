@@ -14,6 +14,7 @@
 #include <cstring>
 #include <cassert>
 #include <vector>
+#include <set>
 #include <utility>
 
 namespace TreeSearch {
@@ -48,13 +49,12 @@ namespace TreeSearch {
 
     std::pair<UInt_t,UInt_t> ContainsPattern( const NodeDescriptor& nd ) const;
 
-    const std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane, 
+    const std::vector<TreeSearch::Hit*>&  GetHits( UInt_t plane,
 						   UInt_t bin ) const {
       // Get array of hits that set the given bin in the given plane
       return fHits[ MakeIdx(plane,bin) ];
     }
     UInt_t   GetNbins()   const { return 1U<<(fNlevels-1); }
-    UInt_t   GetNhits()   const { return (UInt_t)fHitList.size(); }
     UInt_t   GetNlevels() const { return fNlevels; }
     UInt_t   GetNplanes() const { return fNplanes; }
     Double_t GetOffset()  const { return fOffset; }
@@ -79,15 +79,15 @@ namespace TreeSearch {
     void     SetOffset( Double_t off ) { fOffset = off; }
 
 #ifdef TESTCODE
-    // Total number of bins set at the highest resolution
+    // Number of bins set at the highest resolution
     UInt_t   GetBinsSet() const;
-    // Number of references from bins to hits
-    UInt_t   GetHitListSize() const { return (UInt_t)fHitList.size(); }
+    // Number of hits recorded
+    UInt_t   GetNhits()   const { return (UInt_t)fHitList.size(); }
     // Maximum number of hits recorded per bin
     UInt_t   GetMaxhitBin() const { return fMaxhitBin; }
 #endif
 
-//FIXME: add Draw() (=event display)
+//TODO: add Draw() (=event display)
 
   protected:
 
@@ -98,20 +98,18 @@ namespace TreeSearch {
     Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
     Bits**   fPattern;  // [fNplanes] pattern at all fNlevels resolutions
 
-    // For each plane and each bin at max level, provide an array
-    // of pointers to the hits that set this bin. This must be an array,
-    // not a tree or list, for lookup efficiency during track processing.
-    // Since each plane has the same number of levels, we can simplify
-    // this to a 2D array, which performs better than a 3D array would.
-    // [fNplanes<<(fNlevels-1)][number of hits in bin]
-    std::vector<std::vector<Hit*> > fHits;
-    // Linear list of plane/bin number index of all hits
+    // Storage for saving pointers to the hits that set each active bin at
+    // max level in each plane. Since each plane has the same number of
+    // levels, each plane/bin combination can be represented with a 
+    // single index (see MakeIdx below).
+    std::vector< std::vector<Hit*> > fHits;
+    // The plane/bin indices set in fHits. Used for fast clearing
     std::vector<UInt_t> fHitList;
     
     UInt_t MakeIdx( UInt_t plane, UInt_t bin ) const {
       // Return index into fHits corresponding to the given plane and bin
       assert( plane<fNplanes && bin<GetNbins() );
-      UInt_t idx = plane*GetNbins() + bin;
+      UInt_t idx = (plane<<(fNlevels-1)) + bin;
       assert( idx < fHits.size());
       return idx;
     }
