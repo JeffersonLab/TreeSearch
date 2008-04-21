@@ -36,6 +36,18 @@ namespace TreeSearch {
 
 }
 
+// Other common types used by TreeSearch
+
+#include <utility>
+#include <vector>
+
+namespace TreeSearch {
+
+  typedef std::pair<double,double>    pdbl_t;
+  typedef std::vector<pdbl_t>         vec_pdbl_t;
+
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif

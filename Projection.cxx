@@ -39,13 +39,13 @@ typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<WirePlane*>::iterator  vwiter_t;
 
 //_____________________________________________________________________________
-Projection::Projection( Int_t type, const char* name, Double_t angle,
+Projection::Projection( EProjType type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
     fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
     fPlaneCombos(0), fMaxPat(kMaxUInt), fFrontMaxBinDist(kMaxUInt),
-    fBackMaxBinDist(kMaxUInt), fHitMaxDist(0), fConfLevel(1.0),
+    fBackMaxBinDist(kMaxUInt), fHitMaxDist(0), fConfLevel(1e-3),
     fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
 {
   // Constructor

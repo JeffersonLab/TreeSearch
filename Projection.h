@@ -9,13 +9,13 @@
 
 #include "THaAnalysisObject.h"
 #include "TreeWalk.h"  // for NodeVisitor, Node_t
+#include "Types.h"
 #include "TMath.h"
 #include "TClonesArray.h"
 #include "TVector2.h"
 #include <vector>
 #include <set>
 #include <cassert>
-#include <utility>
 #include <functional>
 
 class THaDetectorBase;
@@ -31,9 +31,7 @@ namespace TreeSearch {
   class Projection : public THaAnalysisObject {
   public:
 
-    typedef std::pair<Double_t,Double_t> pdbl_t;
-
-    Projection( Int_t type, const char* name, Double_t angle,
+    Projection( EProjType type, const char* name, Double_t angle,
 		THaDetectorBase* parent );
     Projection() : fDetector(0), fPatternTree(0), fPlaneCombos(0),
 		   fHitpattern(0), fRoads(0), fRoadCorners(0) {} // ROOT RTTI
@@ -73,7 +71,7 @@ namespace TreeSearch {
     Double_t        GetPlaneZ( UInt_t plane ) const;
     Road*           GetRoad  ( UInt_t i )     const;
     Double_t        GetSinAngle()     const { return fAxis.Y(); }
-    Int_t           GetType()         const { return fType; }
+    EProjType       GetType()         const { return fType; }
     Double_t        GetWidth()        const { return fWidth; }
     Double_t        GetZsize()        const;
 
@@ -97,11 +95,10 @@ namespace TreeSearch {
       bool operator() ( const Node_t& a, const Node_t& b ) const;
     };
     
-    typedef std::vector<pdbl_t> vec_pdbl_t;
     typedef std::set<Node_t,MostPlanes> NodeSet_t;
 
     // Configuration
-    Int_t            fType;          // Type of plane (u,v,x,y...)
+    EProjType        fType;          // Type of plane (u,v,x,y...)
     std::vector<WirePlane*> fPlanes; // Wire planes in this projection
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
@@ -194,7 +191,7 @@ namespace TreeSearch {
   }
 
   //___________________________________________________________________________
-  inline const Projection::pdbl_t& Projection::GetChisqLimits( UInt_t i ) const
+  inline const pdbl_t& Projection::GetChisqLimits( UInt_t i ) const
   { 
     assert( i < fChisqLimits.size() );
     return fChisqLimits[i];

@@ -616,7 +616,7 @@ Bool_t Road::Fit()
   Pvec_t selected;
   selected.reserve( npts );
   fDof = npts-2;
-  Projection::pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
+  pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
   vector<Double_t> w(npts);
   for( UInt_t i = 0; i < n_combinations; ++i ) {
     NthCombination( i, fPoints, selected );
