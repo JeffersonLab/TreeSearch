@@ -98,15 +98,6 @@ typedef vector<WirePlane*>::iterator  vwiter_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
 
-struct MWDC::FitRes_t {
-  vector<Double_t> coef;
-  Double_t matchval;
-  Double_t chi2;
-  Int_t    ndof;
-  Rvec_t*  roads;
-  FitRes_t() : roads(0) {}
-};
-
 // Global constant indicating invalid/uninitialized data
 const Double_t kBig = 1e38;
 
@@ -115,9 +106,10 @@ const Double_t kBig = 1e38;
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
-    f3dMatchvalScalefact(1), f3dMatchCut(0), fFailNhits(0), fFailNpat(0)
+    f3dMatchvalScalefact(1), f3dMatchCut(0), fMinNdof(1),
+    fFailNhits(0), fFailNpat(0)
 #ifdef TESTCODE
-  , fNcombos(0), fN3dFits(0)
+  , fNcombos(0), fN3dFits(0), fEvNum(0)
 #endif
 { 
   // Constructor
@@ -624,7 +616,7 @@ public:
   void operator() ( const Road* rd )
   { fActive |= 1U << rd->GetProjection()->GetType(); }
   operator bool()       const { return (fActive & fReq) == fReq; }
-  bool     operator!()  const { return !((bool)*this); }
+  bool     operator!()  const { return (fActive & fReq) != fReq; }
   UInt_t   GetTypes()   const { return fActive; }
 private:
   UInt_t fReq;
@@ -663,15 +655,55 @@ private:
 };
 
 //_____________________________________________________________________________
-template< typename Container, typename TestF, typename QuitF > void
-OptimalN( const Container& choices, const multimap<double,Container>& weights,
+class MWDC::TrackFitWeight
+{
+  // Object for sorting fits. The smaller a track's TrackFitWeight, the
+  // "better" a track is considered to be.
+public:
+  TrackFitWeight( const MWDC::FitRes_t& fit_par ) :
+    fNdof(fit_par.ndof), fChi2(fit_par.chi2) { assert(fNdof); }
+
+  bool operator<( const TrackFitWeight& rhs ) const
+  {
+    // The "best" tracks have the largest number of hits and the smallest chi2
+    //TODO: devalue tracks with very large chi2?
+    if( fNdof > rhs.fNdof ) return true;
+    if( fNdof < rhs.fNdof ) return false;
+    return ( fChi2 < rhs.fChi2 );
+  }
+  operator double() const { return fChi2/(double)fNdof; }
+private:
+  UInt_t   fNdof;
+  Double_t fChi2;
+};
+
+//_____________________________________________________________________________
+template< typename Container, typename Weight, typename TestF,
+	  typename QuitF > Double_t
+OptimalN( const Container& choices, const multimap<Weight,Container>& weights,
 	  vector<Container>& picks, TestF testf, QuitF quitf )
 {
   // This is the second-level de-ghosting algorithm, operating on fitted
   // 3D tracks.  It selects the best set of tracks if multiple roads
   // combinations are present in one or more projection.
-  // The key value of 'weights' is the chi2/dof of the fit corresponding to
-  // the tuple.
+  //
+  // Requirements:
+  //  "Container": STL container supporting begin(), insert() etc.,
+  //               contains "Elements".
+  //  "Weight":    sorting functor, supporting operator< and operator double()
+  //  "TestF":     Functor for eliminating additional leftover elements,
+  //               must support:
+  //                  operator() (const Element&): test this element,
+  //                                         eliminate if true
+  //                  use(const Container&): test against elements in this 
+  //                                         container
+  //               (use() is in lieu of a constructor because the object
+  //                is constructed by the caller (possibly with parameters)).
+  //  "QuitF":     Functor for terminating search early. Applied to all 
+  //               leftover elements. Must support
+  //                  operator() (const Element&)
+  //                  operator bool(): End search if false after running on
+  //                                   all elements
 
   //TODO: how efficient? O(N^2)? (N iterations on include)
 
@@ -679,29 +711,35 @@ OptimalN( const Container& choices, const multimap<double,Container>& weights,
   Container choices_left(choices);
 
   //TODO: try minimizing chi2 sum
-  //  double wsum = 0;
-  typename multimap<double,Container>::const_iterator it = weights.begin();
+  double wsum = 0;
+  typename multimap<Weight,Container>::const_iterator it = weights.begin();
   for( ; it != weights.end(); ++it ) {
     const Container& tuple = (*it).second;
     if( includes(ALL(choices_left), ALL(tuple)) ) {
+      // Pick next set of still-available elements in order of ascending weight
       picks.push_back( tuple );
-      //      wsum += (*it).first;
+      // Sum of weights of chosen sets, converted to double
+      wsum += (*it).first;
+      // Remove chosen elements from the remaining choices
       Container choices_less_tuple;
       set_difference( ALL(choices_left), ALL(tuple),
 		      inserter(choices_less_tuple, choices_less_tuple.end()) );
+      // Test each remaining element against the choses set of elements
+      // and remove it if it compares true (remove elements with common traits)
       Container new_choices_left;
       remove_copy_if( ALL(choices_less_tuple),
 		      inserter(new_choices_left, new_choices_left.end()),
 		      testf.use(tuple) );
-      // Quit if the test function, applied to each remaining element, is no
-      // longer true
+      // Quit if the quit function, applied to each element still remaining
+      // now, is no longer true
       if( !for_each(ALL(new_choices_left), quitf) )
 	break;
+      // Update the set of remaining elements
       choices_left.swap( new_choices_left );
     }
   }
 
-  return;
+  return wsum;
 }
 
 //_____________________________________________________________________________
@@ -875,6 +913,24 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 }
 
 //_____________________________________________________________________________
+inline
+Bool_t MWDC::PassTrackCuts( const FitRes_t& fit_par ) const
+{
+  // Test results of 3D track fit (in fit_par) against hard cuts from
+  // database
+
+  if( fit_par.ndof < fMinNdof )
+    return false;
+
+  pdbl_t chi2_interval = GetChisqLimits(fit_par.ndof);
+  if( fit_par.chi2 < chi2_interval.first or
+      fit_par.chi2 > chi2_interval.second )
+    return false;
+
+  return true;
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   // Find tracks from the hitpatterns, using the coarse hit drift times
@@ -898,7 +954,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     Projection* proj = fProj[type];
 
     // For each projection separately, do TreeSearch, build roads, and
-    // fit tracks to uncorrected hit positions
+    // fit 2D tracks to uncorrected hit positions
     Int_t nrd = proj->Track();
 
     if( nrd < 0 )
@@ -948,8 +1004,10 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       Rvec_t& these_roads = road_combos.front().second;
       fit_par.roads       = &these_roads;
       fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
-      if( fit_par.ndof > 0 )
-	NewTrack( tracks, fit_par );
+      if( fit_par.ndof > 0 ) {
+	if( PassTrackCuts(fit_par) )
+	  NewTrack( tracks, fit_par );
+      }
       else
 	FitErrPrint( fit_par.ndof );
     }
@@ -959,7 +1017,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       roads.clear();
       typedef map<Rset_t, FitRes_t> FitResMap_t;
       FitResMap_t fit_results;
-      multimap< double, Rset_t > fit_chi2;
+      multimap< TrackFitWeight, Rset_t > fit_chi2;
       // Fit all combinations and sort the results by ascending chi2
       for( list< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
 	   it != road_combos.end(); ++it ) {
@@ -968,16 +1026,32 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 	fit_par.roads       = &these_roads;
 	fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
 	if( fit_par.ndof > 0 ) {
-	  Rset_t road_tuple( ALL(these_roads) );
-	  pair<FitResMap_t::iterator,bool> ins =
-	    fit_results.insert( make_pair(road_tuple, fit_par) );
-	  assert( ins.second );
-	  double rchi2 = fit_par.chi2/(double)fit_par.ndof;
-	  fit_chi2.insert( make_pair(rchi2, road_tuple) );
+	  if( PassTrackCuts(fit_par) ) {
+	    Rset_t road_tuple( ALL(these_roads) );
+	    pair<FitResMap_t::iterator,bool> ins =
+	      fit_results.insert( make_pair(road_tuple, fit_par) );
+	    assert( ins.second );
+	    fit_chi2.insert( make_pair( TrackFitWeight(fit_par), road_tuple) );
+	  }
 	} else
 	  FitErrPrint( fit_par.ndof );
       }
 
+#ifdef VERBOSE
+      if( fDebug > 2 ) {
+	cout << "Track candidates:" << endl;
+	for( multimap<TrackFitWeight,Rset_t>::iterator it = fit_chi2.begin();
+	     it != fit_chi2.end(); ++it ) {
+	  FitResMap_t::iterator found = fit_results.find((*it).second);
+	  FitRes_t& r = (*found).second;
+	  cout 	 << "ndof = " << r.ndof
+		 << " rchi2 = " << r.chi2/(double)r.ndof
+		 << " x/y = " << r.coef[0] << "/" << r.coef[2]
+		 << " mx/my = " << r.coef[1] << "/" << r.coef[3]
+		 << endl;
+	}
+      }
+#endif
       // Select "optimal" set of roads, minimizing sum of chi2s
       vector<Rset_t> best_roads;
       OptimalN( unique_found, fit_chi2, best_roads, 
@@ -1342,6 +1416,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
   f3dMatchCut = 1e-4;
   Int_t event_display = 0, disable_tracking = 0, disable_finetrack = 0;
+  Int_t maxmiss = -1;
+  Double_t conf_level = 1e-9;
   DBRequest request[] = {
     { "planeconfig",       &planeconfig,       kString },
     { "cratemap",          cmap,               kIntM,   6 },
@@ -1354,6 +1430,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
     { "disable_finetrack", &disable_finetrack, kInt,    0, 1 },
     { "calibrate",         &calibconfig,       kString, 0, 1 },
+    { "3d_maxmiss",        &maxmiss,           kInt,    0, 1 },
+    { "3d_chi2_conflevel", &conf_level,        kDouble, 0, 1 },
     { 0 }
   };
 
@@ -1447,9 +1525,31 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 	     "Typo in database?", s.c_str() );
   }
 
+  UInt_t nplanes = fPlanes.size();
   if( fDebug > 0 )
-    Info( Here(here), "Loaded %u planes", fPlanes.size() );
+    Info( Here(here), "Loaded %u planes", nplanes );
 
+  // Convert maximum number of missing hits to ndof of fits
+  if( maxmiss >= 0 )
+    fMinNdof = nplanes - 4 - maxmiss;
+  else
+    fMinNdof = 1;
+
+  // Determine Chi2 confidence interval limits for the selected CL and the
+  // possible degrees of freedom of the 3D track fit
+  if( conf_level < 0.0 or conf_level > 1.0 ) {
+    Error( Here(here), "Illegal fit confidence level = %lf. "
+	   "Must be 0-1. Fix database.", conf_level );
+    return kInitError;
+  }
+  fChisqLimits.clear();
+  fChisqLimits.resize( nplanes-3, make_pair<Double_t,Double_t>(0,0) );
+  for( vec_pdbl_t::size_type dof = fMinNdof; dof < fChisqLimits.size();
+       ++dof ) {
+    fChisqLimits[dof].first  = TMath::ChisquareQuantile( conf_level, dof );
+    fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-conf_level, dof );
+  }
+  
   fIsInit = kTRUE;
   return kOK;
 }

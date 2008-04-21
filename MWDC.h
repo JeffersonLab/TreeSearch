@@ -15,6 +15,7 @@
 #include <utility>
 #include <set>
 #include <list>
+#include <cassert>
 
 class THaTrack;
 class THaBenchmark;
@@ -34,9 +35,6 @@ namespace TreeSearch {
   extern const Double_t kBig;
 
   class MWDC : public THaTrackingDetector {
-    friend class WirePlane;
-    class FitRes_t;
-
   public:
     MWDC( const char* name, const char* description = "", 
 	  THaApparatus* app = 0 );
@@ -54,6 +52,7 @@ namespace TreeSearch {
     void            EnableBenchmarks( Bool_t b = kTRUE );
 
     void            EnableEventDisplay( Bool_t enable = true );
+    const pdbl_t&   GetChisqLimits( UInt_t i ) const;
     Double_t        GetRefTime( UInt_t i ) const 
     { return (i<(UInt_t)fRefMap->GetSize()) ? fRefTime[i] : kBig; }
 
@@ -77,20 +76,36 @@ namespace TreeSearch {
     };
 
   protected:
-    typedef std::vector<WirePlane*> Wpvec_t;
+    friend class WirePlane;
+    class TrackFitWeight;
+    struct FitRes_t {
+      vector<Double_t> coef;
+      Double_t matchval;
+      Double_t chi2;
+      Int_t    ndof;
+      Rvec_t*  roads;
+      FitRes_t() : roads(0) {}
+    };
+
+    typedef std::vector<WirePlane*>  Wpvec_t;
+    typedef std::vector<Projection*> Prvec_t;
 
     Wpvec_t        fPlanes;      // Wire planes
-    vector<Projection*> fProj;   // Plane projections
+    Prvec_t        fProj;        // Plane projections
     Wpvec_t        fCalibPlanes; // Planes in calibration mode
 
-    THaDetMap*     fRefMap;    // Map of reference channels for VME readout
-    vector<float>  fRefTime;   // [fRefMap->GetSize()] ref channel data
+    THaDetMap*     fRefMap;      // Map of reference channels for VME readout
+    vector<float>  fRefTime;     // [fRefMap->GetSize()] ref channel data
 
-    THashTable*    fCrateMap;  // Map of MWDC DAQ modules
+    THashTable*    fCrateMap;    // Map of MWDC DAQ modules
 
     // Paremeters for 3D projection matching
     Double_t       f3dMatchvalScalefact; // Correction for fast 3D matchval
     Double_t       f3dMatchCut;          // Maximum allowed 3D match error
+
+    // Track fit cut parameters
+    Int_t          fMinNdof;     // Minimum number of points in fit - 4
+    vec_pdbl_t     fChisqLimits; // lo/hi onfidence interval limits on Chi2
 
     // Event data
     Int_t          fFailNhits; // Too many hits in wire plane(s)
@@ -113,6 +128,7 @@ namespace TreeSearch {
 			  Rset_t& unique_found );
 			  
     THaTrack* NewTrack( TClonesArray& tracks, const FitRes_t& fit_par );
+    Bool_t    PassTrackCuts( const FitRes_t& fit_par ) const;
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
@@ -124,6 +140,13 @@ namespace TreeSearch {
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
+
+  //___________________________________________________________________________
+  inline const pdbl_t& MWDC::GetChisqLimits( UInt_t i ) const
+  { 
+    assert( i < fChisqLimits.size() );
+    return fChisqLimits[i];
+  }
 
 }
 
