@@ -770,9 +770,20 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 
   Double_t zback = fPlanes.back()->GetZ();
   vector<TVector2> fxpts, bxpts;
+  Double_t su = 0, sv = 0, cu = 0, cv = 0, inv_denom = 0;
+  TVector2 xax;
   bool fast_3d = TestBit(k3dFastMatch);
   if( fast_3d ) {
-    assert( nproj == 3 );
+    assert( nproj == 3 && fProj.size() == 3 );
+    Prvec_t::iterator ip = fProj.begin();
+    su = (*ip)->GetSinAngle();
+    cu = (*ip)->GetCosAngle();
+    ++ip;
+    sv = (*ip)->GetSinAngle();
+    cv = (*ip)->GetCosAngle();
+    inv_denom = 1.0/(sv*cu-su*cv);
+    ++ip;
+    xax = (*ip)->GetAxis();
   } else {
     fxpts.reserve( nproj*(nproj-1)/2 );
     bxpts.reserve( nproj*(nproj-1)/2 );
@@ -803,13 +814,18 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
       // special case n==3 and symmetric angles of planes 0 and 1:
       //  - intersect first two proj in front and back
       //  - calc perp distances to 3rd, add in quadrature -> matchval
-      TVector2 front = selected[0]->Intersect( selected[1], 0.0 );
+      Double_t z0 = selected[0]->GetPos();
+      Double_t z1 = selected[1]->GetPos();
+      TVector2 front( (z0 * sv - z1 * su) * inv_denom,
+		      (z1 * cu - z0 * cv) * inv_denom );
       if( !fPlanes.front()->Contains(front) )
 	continue;
-      TVector2 back = selected[0]->Intersect( selected[1], zback );
+      z0 = selected[0]->GetPos(zback);
+      z1 = selected[1]->GetPos(zback);
+      TVector2 back( (z0 * sv - z1 * su) * inv_denom,
+		     (z1 * cu - z0 * cv) * inv_denom );
       if( !fPlanes.back()->Contains(back) )
 	continue;
-      const TVector2& xax = selected[2]->GetProjection()->GetAxis();
       TVector2 xf = selected[2]->GetPos(0.0)   * xax;
       TVector2 xb = selected[2]->GetPos(zback) * xax;
       TVector2 d1 = front.Proj(xax) - xf;
