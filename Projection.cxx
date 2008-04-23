@@ -24,10 +24,10 @@
 #include "TError.h"
 
 #include <iostream>
-#include <sys/time.h>  // for timing
 #include <algorithm>
 #include <utility>
 #ifdef TESTCODE
+#include "TStopwatch.h"
 #include <cstring>
 #endif
 
@@ -518,9 +518,7 @@ Int_t Projection::Track()
   fPatternsFound.clear();
 
 #ifdef TESTCODE
-  struct timeval start, start2, stop, diff;
-  gettimeofday( &start, 0 );
-  gettimeofday( &start2, 0 );
+  TStopwatch timer, timer_tot;
 #endif
 
   ComparePattern compare( fHitpattern, fPlaneCombos, &fPatternsFound );
@@ -538,15 +536,12 @@ Int_t Projection::Track()
   }
 #endif
 #ifdef TESTCODE
-  //FIXME: use high-res CPU time timer instead
-  gettimeofday(&stop, 0 );
-  timersub( &stop, &start2, &diff );
-  t_treesearch = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+  t_treesearch = 1e6*timer.RealTime();
 
   n_test = compare.GetNtest();
   n_pat  = fPatternsFound.size();
 
-  gettimeofday( &start2, 0 );
+  timer.Start();
 #endif
 
   if( fPatternsFound.empty() )
@@ -595,22 +590,16 @@ Int_t Projection::Track()
 //   }
 // #endif
 #ifdef TESTCODE
-  gettimeofday(&stop, 0 );
-  timersub( &stop, &start2, &diff );
-  t_roads = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
-
-  gettimeofday( &start2, 0 );
+  t_roads = 1e6*timer.RealTime();
+  timer.Start();
 #endif
 
   // Fit hit positions in the roads to straight lines
   FitRoads();
 
 #ifdef TESTCODE
-  gettimeofday(&stop, 0 );
-  timersub( &stop, &start2, &diff );
-  t_fit = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
-  timersub( &stop, &start, &diff );
-  t_track = 1e6*(Double_t)diff.tv_sec + (Double_t)diff.tv_usec;
+  t_fit   = 1e6*timer.RealTime();
+  t_track = 1e6*timer_tot.RealTime();
 #endif
 
 #ifdef VERBOSE

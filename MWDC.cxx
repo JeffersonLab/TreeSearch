@@ -32,6 +32,10 @@
 #include <numeric>
 #include <map>
 
+#ifdef TESTCODE
+#include "TStopwatch.h"
+#endif
+
 using namespace std;
 typedef string::size_type ssiz_t;
 
@@ -137,8 +141,6 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
     }
     fProj[type] = proj;
   }
-
-  //  fBench = new THaBenchmark;
 }
 
 //_____________________________________________________________________________
@@ -148,8 +150,6 @@ MWDC::~MWDC()
   if (fIsSetup)
     RemoveVariables();
   
-  //  delete fBench;
-
   for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
     delete fPlanes[iplane];
   for( vpsiz_t type = 0; type < fProj.size(); ++type )
@@ -177,7 +177,8 @@ void MWDC::Clear( Option_t* opt )
   }
   fFailNpat = fFailNhits = 0;
 #ifdef TESTCODE
-  fN3dFits = fNcombos = 0;
+  size_t nbytes = (char*)&t_coarse - (char*)&fNcombos + sizeof(t_coarse);
+  memset( &fNcombos, 0, nbytes );
 #endif
 }
 
@@ -944,6 +945,9 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
   if( !TestBit(kDoCoarse) )
     return 0;
 
+#ifdef TESTCODE
+  TStopwatch timer, timer_tot;
+#endif
   vector<Rvec_t>::size_type nproj = 0;
   vector<Rvec_t> roads;
   roads.reserve( kTypeEnd-kTypeBegin );
@@ -975,6 +979,10 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       }
     }
   }
+#ifdef TESTCODE
+  t_track = 1e6*timer.RealTime();
+  timer.Start();
+#endif
   // Abort on error (e.g. too many patterns)
   if( err ) {
     fFailNpat = 1;
@@ -994,6 +1002,10 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     // Find matching combinations of roads
     UInt_t nfits = MatchRoads( roads, road_combos, unique_found );
 
+#ifdef TESTCODE
+    t_3dmatch = 1e6*timer.RealTime();
+    timer.Start();
+#endif
     // Fit each set of matched roads using linear least squares, yielding 
     // the 3D track parameters, x, x'(=mx), y, y'(=my)
     FitRes_t fit_par;
@@ -1068,6 +1080,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     } //if(nfits)
 #ifdef TESTCODE
     fN3dFits = nfits;
+    t_3dfit = 1e6*timer.RealTime();
 #endif
 #ifdef VERBOSE
     if( fDebug > 0 ) {
@@ -1095,6 +1108,9 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 
   } //if(nproj>=3)
 
+#ifdef TESTCODE
+    t_coarse = 1e6*timer_tot.RealTime();
+#endif
   // Quit here to let detectors CoarseProcess() the approximate tracks,
   // so that they can determine the corrections that we need when we
   // continue in FineTrack
@@ -1130,11 +1146,15 @@ Int_t MWDC::DefineVariables( EMode mode )
   // Register variables in global list
   
   RVarDef vars[] = {
-    { "fail.nhits",   "Too many hits in wire plane(s)",  "fFailNhits" },
-    { "fail.npat",    "Too many treesearch patterns",    "fFailNpat" },
+    { "fail.nhits", "Too many hits in wire plane(s)",  "fFailNhits" },
+    { "fail.npat",  "Too many treesearch patterns",    "fFailNpat" },
 #ifdef TESTCODE
-    { "ncombos",      "Number of road combinations",     "fNcombos" },
-    { "nfits",        "Number of 3D track fits done",    "fN3dFits" },
+    { "ncombos",    "Number of road combinations",     "fNcombos" },
+    { "nfits",      "Number of 3D track fits done",    "fN3dFits" },
+    { "t_track",    "Time in 1st stage tracking (us)", "t_track" },
+    { "t_3dmatch",  "Time in MatchRoads (us)",         "t_3dmatch" },
+    { "t_3dfit",    "Time fitting/selecting 3D tracks (us)", "t_3dfit" },
+    { "t_coarse",   "Total time in CoarseTrack (us)",  "t_coarse" },
 #endif
     { 0 }
   };
@@ -1575,9 +1595,6 @@ void MWDC::Print(const Option_t* opt) const
     fProj[type]->Print(opt);
   }
 
-//   if( verbose > 1 ) {
-//     fBench->Print();
-//   }
 }
 
 
@@ -1595,12 +1612,6 @@ void MWDC::SetDebug( Int_t level )
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type )
     fProj[type]->SetDebug( level );
 }
-
-//_____________________________________________________________________________
-// void MWDC::EnableBenchmarks( Bool_t b )
-// {
-//   fDoBench = b;
-// }
 
 //_____________________________________________________________________________
 void MWDC::EnableEventDisplay( Bool_t b )
@@ -1676,43 +1687,9 @@ UInt_t MWDC::GetDAQnchan( THaDetMap::Module* mod ) const
   return found ? found->fNchan : 0;
 }
 
-//_____________________________________________________________________________
-// Int_t MWDC::End(THaRunBase* run)
-// {
-//     //    fBench->Print();
-//   return THaTrackingDetector::End(run);
-
-// }
-
-
-
-//_____________________________________________________________________________
-#if 0
-// TEST
-  {
-    // Print all defined detector map items
-    string prefix = "B.mwdc.";
-    THaDetMap* map = new THaDetMap;
-    vector<Int_t>* vi = new vector<Int_t>;
-    UInt_t flags = THaDetMap::kDoNotClear|THaDetMap::kFillRefChan;
-    for( ssiz_t i=0; i<planes.size(); ++i ) {
-      string key = prefix + planes[i];
-      key += ".detmap";
-      if( LoadDBarray(file,date,key.c_str(),*vi) == 0 ) {
-	map->Fill(*vi,flags);
-      }
-      vi->clear();
-    }
-    map->Sort();
-    map->Print();
-    delete map;
-    delete vi;
-  }
-#endif	  
-
+///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch
 
 ClassImp(TreeSearch::MWDC)
 
-///////////////////////////////////////////////////////////////////////////////

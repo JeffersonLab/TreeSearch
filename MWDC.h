@@ -114,6 +114,7 @@ namespace TreeSearch {
     UInt_t         fNcombos;   // Number of road combinations tried
     UInt_t         fN3dFits;   // Number of track fits done (=good road combos)
     Int_t          fEvNum;     // Current event number
+    Double_t       t_track, t_3dmatch, t_3dfit, t_coarse; // times in us
 #endif
     void      FindNearestHits( WirePlane* wp, const THaTrack* track,
 			       const Rvec_t& roads ) const;
