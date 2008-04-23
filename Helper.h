@@ -25,12 +25,16 @@ namespace TreeSearch {
     // put result in selected. selected[k] is one of the
     // vec[k].size() elements in the k-th plane.
 
+    using std::vector;
+
     assert( !vec.empty() );
 
     UInt_t vsiz = vec.size(), k;
     selected.resize( vsiz );
-    for( UInt_t j = vsiz; j--; ) {
-      typename std::vector<VectorElem>::size_type npt = vec[j].size();
+    typename vector< vector<VectorElem> >::const_iterator iv = vec.begin();
+    typename vector<VectorElem>::iterator is = selected.begin();
+    while( iv != vec.end() ) {
+      typename std::vector<VectorElem>::size_type npt = (*iv).size();
       assert(npt);
       if( npt == 1 )
 	k = 0;
@@ -39,7 +43,9 @@ namespace TreeSearch {
 	n /= npt;
       }
       // Copy the selected element
-      selected[j] = vec[j][k];
+      (*is) = (*iv)[k];
+      ++iv;
+      ++is;
     }
   }
 
