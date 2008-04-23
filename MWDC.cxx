@@ -773,6 +773,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
   Double_t su = 0, sv = 0, cu = 0, cv = 0, inv_denom = 0;
   TVector2 xax;
   bool fast_3d = TestBit(k3dFastMatch);
+  Double_t match_cut = f3dMatchCut;
   if( fast_3d ) {
     assert( nproj == 3 && fProj.size() == 3 );
     Prvec_t::iterator ip = fProj.begin();
@@ -782,8 +783,13 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
     sv = (*ip)->GetSinAngle();
     cv = (*ip)->GetCosAngle();
     inv_denom = 1.0/(sv*cu-su*cv);
+    // Only the scaled coefficients are needed (cf. Road::Intersect)
+    su *= inv_denom; cu *= inv_denom; sv *= inv_denom; cv *= inv_denom;
     ++ip;
     xax = (*ip)->GetAxis();
+    // The scale factor converts the fast_3d matchvalue to the one computed
+    // by the general algorithm
+    match_cut *= f3dMatchvalScalefact;
   } else {
     fxpts.reserve( nproj*(nproj-1)/2 );
     bxpts.reserve( nproj*(nproj-1)/2 );
@@ -805,7 +811,8 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
   fNcombos = ncombos;
 #endif
 
-  for( UInt_t i = 0; i < ncombos; ++i ) {
+  // Time-critical loop, may easily run O(1e4) times per event
+   for( UInt_t i = 0; i < ncombos; ++i ) {
     NthCombination( i, roads, selected );
     assert( selected.size() == nproj );
 
@@ -816,36 +823,30 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
       //  - calc perp distances to 3rd, add in quadrature -> matchval
       Double_t z0 = selected[0]->GetPos();
       Double_t z1 = selected[1]->GetPos();
-      TVector2 front( (z0 * sv - z1 * su) * inv_denom,
-		      (z1 * cu - z0 * cv) * inv_denom );
+      TVector2 front( (z0 * sv - z1 * su), (z1 * cu - z0 * cv) );
       if( !fPlanes.front()->Contains(front) )
 	continue;
       z0 = selected[0]->GetPos(zback);
       z1 = selected[1]->GetPos(zback);
-      TVector2 back( (z0 * sv - z1 * su) * inv_denom,
-		     (z1 * cu - z0 * cv) * inv_denom );
+      TVector2 back( (z0 * sv - z1 * su), (z1 * cu - z0 * cv) );
       if( !fPlanes.back()->Contains(back) )
 	continue;
-      TVector2 xf = selected[2]->GetPos(0.0)   * xax;
-      TVector2 xb = selected[2]->GetPos(zback) * xax;
-      TVector2 d1 = front.Proj(xax) - xf;
-      TVector2 d2 = back.Proj(xax)  - xb;
-      // The scale factor converts this matchvalue to the one computed by
-      // the general algorithm below
+      Double_t d1 = selected[2]->GetPos()      - front * xax;
+      Double_t d2 = selected[2]->GetPos(zback) - back  * xax;
       //TODO; weigh with uncertainties?
-      matchval = ( d1.Mod2() + d2.Mod2() ) * f3dMatchvalScalefact;
+      matchval = d1*d1 + d2*d2;
 #ifdef VERBOSE
       if( fDebug > 3 ) {
 	cout << selected[0]->GetProjection()->GetName()
 	     << selected[1]->GetProjection()->GetName()
 	     << " front = "; front.Print();
-	cout << "front x  = "; xf.Print();
-	cout << "front dist = " << d1.Mod() << endl;
+	cout << "front x  = "; (selected[2]->GetPos()*xax).Print();
+	cout << "front dist = " << d1 << endl;
 	cout << selected[0]->GetProjection()->GetName()
 	     << selected[1]->GetProjection()->GetName()
 	     << " back = "; back.Print();
-	cout << "back x =  "; xb.Print();
-	cout << "back dist = " << d2.Mod() << endl;
+	cout << "back x =  "; (selected[2]->GetPos(zback)*xax).Print();
+	cout << "back dist = " << d2 << endl;
       }
 #endif
     } else {
@@ -902,7 +903,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 
     } //if k3dFastMatch else
 
-    if( matchval < f3dMatchCut ) {
+    if( matchval < match_cut ) {
       // Save road combination with good matchvalue
       combos_found.push_back( make_pair(matchval,selected) );
       ++nfound;
@@ -1326,7 +1327,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	<  0.5*TMath::DegToRad() ) {
       SetBit(k3dFastMatch);
       Double_t tan = TMath::Tan( 0.5*TMath::Pi()-uang );
-      f3dMatchvalScalefact = 2.0*(1.0/3.0 + tan*tan );
+      f3dMatchvalScalefact = 0.5 / (1.0/3.0 + tan*tan );
     }
   }
 
