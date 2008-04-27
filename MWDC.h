@@ -28,6 +28,7 @@ namespace TreeSearch {
   class WirePlane;
   class Projection;
   class Road;
+  class ThreadCtrl;  // Defined in implementation
 
   typedef std::vector<Road*> Rvec_t;
   typedef std::set<Road*>    Rset_t;
@@ -42,7 +43,6 @@ namespace TreeSearch {
 
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
-    //    virtual Int_t   End(THaRunBase* run);
     virtual EStatus Init( const TDatime& date );
     virtual Int_t   CoarseTrack( TClonesArray& tracks );
     virtual Int_t   FineTrack( TClonesArray& tracks );
@@ -99,6 +99,10 @@ namespace TreeSearch {
 
     THashTable*    fCrateMap;    // Map of MWDC DAQ modules
 
+    // Multithread support
+    Int_t          fMaxThreads;  // Maximum simultaneously active threads
+    ThreadCtrl*    fThreads;     //! Thread controller
+
     // Paremeters for 3D projection matching
     Double_t       f3dMatchvalScalefact; // Correction for fast 3D matchval
     Double_t       f3dMatchCut;          // Maximum allowed 3D match error
@@ -116,6 +120,7 @@ namespace TreeSearch {
     Int_t          fEvNum;     // Current event number
     Double_t       t_track, t_3dmatch, t_3dfit, t_coarse; // times in us
 #endif
+
     void      FindNearestHits( WirePlane* wp, const THaTrack* track,
 			       const Rvec_t& roads ) const;
     void      FitErrPrint( Int_t err ) const;

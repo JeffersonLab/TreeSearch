@@ -26,11 +26,16 @@
 #include "THashTable.h"
 #include "TVector2.h"
 #include "TDecompChol.h"
+#include "TSystem.h"
+#include "TThread.h"
+#include "TCondition.h"
+#include "TMutex.h"
 
 #include <iostream>
 #include <algorithm>
 #include <numeric>
 #include <map>
+#include <string>
 
 #ifdef TESTCODE
 #include "TStopwatch.h"
@@ -107,9 +112,100 @@ const Double_t kBig = 1e38;
 
 #define ALL(c) (c).begin(), (c).end()
 
+static void DoTrack( void* ptr );
+
+//_____________________________________________________________________________
+// Support classes for data-processing threads
+
+struct TrackThread {
+  Projection*  proj;    // Projection to be processed
+  Int_t*       status;  // Return status (shared)
+  Int_t*       running; // Bitfield indicating threads to wait for (shared)
+  TMutex*      start_m; // Mutex for start condition
+  TMutex*      done_m;  // Mutex for done condition
+  TCondition*  start;   // Start condition of tracking threads
+  TCondition*  done;    // Condition indicating all tracking threads done
+  TThread*     thread;  // The actual thread running with these arguments
+  TrackThread()
+    : proj(0), status(0), running(0), start(0), done(0), thread(0) {}
+  ~TrackThread() { 
+    if( thread ) {
+      TThread::Delete(thread);
+      delete thread;
+    }
+  }
+};
+  
+//_____________________________________________________________________________
+class ThreadCtrl {
+  //TODO: better encapsulation
+  friend THaAnalysisObject::EStatus MWDC::Init(const TDatime&);
+  friend Int_t MWDC::CoarseTrack(TClonesArray&);
+public:
+  ThreadCtrl() : fTrackStatus(0), fTrackToDo(0),
+		 fTrackStartM(new TMutex), fTrackDoneM(new TMutex),
+		 fTrackStart(new TCondition(fTrackStartM)),
+		 fTrackDone(new TCondition(fTrackDoneM)) {}
+  ~ThreadCtrl() {
+    // Terminate tracking threads
+    if( !fTrack.empty() ) {
+      fTrackStartM->Lock();
+      fTrackToDo = 0;
+      for( vector<TrackThread>::iterator it = fTrack.begin(); it !=
+	     fTrack.end(); ++it ) {
+	TThread* th = (*it).thread;
+	if( th and th->GetState() == TThread::kRunningState )
+	  SETBIT(fTrackToDo, (*it).proj->GetType());
+      }
+      // negative sign is termination flag
+      SETBIT(fTrackToDo, 31);
+      fTrackStart->Broadcast();
+      fTrackStartM->UnLock();
+      fTrackDoneM->Lock();
+      while( true ) {
+	Int_t ret = fTrackDone->Wait();
+	if( ret == 0 and fTrackToDo == BIT(31) )
+	  break;
+      }
+      fTrackDoneM->UnLock();
+    }
+    // At this point, all threads should have released their condition
+    // waits and mutexes, so clean up is safe
+    delete fTrackDone;
+    delete fTrackStart;
+    delete fTrackDoneM;
+    delete fTrackStartM;
+  }
+  TThread* AddTrackThread( Projection* proj ) {
+    assert( proj );
+    fTrack.push_back( TrackThread() );
+    TrackThread* t = &fTrack.back();
+    t->proj    = proj;
+    t->status  = &fTrackStatus;
+    t->running = &fTrackToDo;
+    t->start_m = fTrackStartM;
+    t->done_m  = fTrackDoneM;
+    t->start   = fTrackStart;
+    t->done    = fTrackDone;
+    string tn;
+    tn = "trk_"; tn.append( proj->GetName() );
+    t->thread  = new TThread( tn.c_str(), DoTrack, (void*)t );
+    return t->thread;
+  }
+private:
+  vector<TrackThread>  fTrack;        // Tracking thread descriptors
+  Int_t                fTrackStatus;  // Common status variable
+  Int_t                fTrackToDo;    // Bitfield of projections to wait for
+  TMutex*              fTrackStartM;  // Mutex for start condition
+  TMutex*              fTrackDoneM;   // Mutex for done condition
+  TCondition*          fTrackStart;   // Start condition
+  TCondition*          fTrackDone;    // Finish condition
+};
+
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
+    fMaxThreads(1), fThreads(0),
     f3dMatchvalScalefact(1), f3dMatchCut(0), fMinNdof(1),
     fFailNhits(0), fFailNpat(0)
 #ifdef TESTCODE
@@ -150,11 +246,12 @@ MWDC::~MWDC()
   if (fIsSetup)
     RemoveVariables();
   
-  for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
-    delete fPlanes[iplane];
-  for( vpsiz_t type = 0; type < fProj.size(); ++type )
-    delete fProj[type];
+  delete fThreads;
+  if( fMaxThreads > 1 )
+    gSystem->Unload("libThread");
 
+  DeleteContainer( fPlanes );
+  DeleteContainer( fProj );
   delete fRefMap;
 }
 
@@ -725,8 +822,8 @@ OptimalN( const Container& choices, const multimap<Weight,Container>& weights,
       Container choices_less_tuple;
       set_difference( ALL(choices_left), ALL(tuple),
 		      inserter(choices_less_tuple, choices_less_tuple.end()) );
-      // Test each remaining element against the choses set of elements
-      // and remove it if it compares true (remove elements with common traits)
+      // Test each remaining element against the chosen set of elements
+      // and remove it if it compares true (=remove elems with common traits)
       Container new_choices_left;
       remove_copy_if( ALL(choices_less_tuple),
 		      inserter(new_choices_left, new_choices_left.end()),
@@ -775,6 +872,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
   bool fast_3d = TestBit(k3dFastMatch);
   Double_t match_cut = f3dMatchCut;
   if( fast_3d ) {
+    // Pre-compute coefficients for coordinate transformations
     assert( nproj == 3 && fProj.size() == 3 );
     Prvec_t::iterator ip = fProj.begin();
     su = (*ip)->GetSinAngle();
@@ -811,7 +909,7 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
   fNcombos = ncombos;
 #endif
 
-  // Time-critical loop, may easily run O(1e4) times per event
+  // Time-critical loop, may run O(1e5) times per event with noisy input
    for( UInt_t i = 0; i < ncombos; ++i ) {
     NthCombination( i, roads, selected );
     assert( selected.size() == nproj );
@@ -949,6 +1047,51 @@ Bool_t MWDC::PassTrackCuts( const FitRes_t& fit_par ) const
 }
 
 //_____________________________________________________________________________
+static void DoTrack( void* ptr )
+{
+  TrackThread* arg = reinterpret_cast<TrackThread*>(ptr);
+
+  //  TThread::SetCancelOn();
+  bool terminate = false;
+  arg->start_m->Lock();
+  while( !terminate ) {
+
+    // Wait for start condition
+    while( true ) {
+      Int_t ret = arg->start->Wait();
+      if( ret == 0 and TESTBIT(*arg->running, arg->proj->GetType()) )
+	break;
+    }
+    terminate = TESTBIT(*arg->running, 31);
+    arg->start_m->UnLock();
+
+    Int_t nrd = 0;
+    if( !terminate )
+      // Process this event
+      nrd = arg->proj->Track();
+
+    // Set error flag, if necessary, and decrement run counter
+    arg->done_m->Lock();
+    if( nrd < 0 ) {
+      *arg->status = 1;
+    }
+    // Clear the bit for this projection in the status bitfield
+    assert( TESTBIT(*arg->running, arg->proj->GetType()) );
+    CLRBIT( *arg->running, arg->proj->GetType() );
+    // If all bits are zero, all threads have finished processing
+    if( (*arg->running & ~BIT(31)) == 0 )
+      arg->done->Signal();
+
+    if( !terminate )
+      // Ensure that we enter Wait() before the main thread can send the
+      // next Broadcast()
+      arg->start_m->Lock();  
+
+    arg->done_m->UnLock();
+  }
+}
+
+//_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   // Find tracks from the hitpatterns, using the coarse hit drift times
@@ -965,29 +1108,68 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 #ifdef TESTCODE
   TStopwatch timer, timer_tot;
 #endif
+
+  Int_t err = 0;
+
+  bool do_thread = (fMaxThreads > 1);
+  if( do_thread ) {
+    // Wake the tracking threads
+    fThreads->fTrackDoneM->Lock();
+    fThreads->fTrackStatus = 0;
+    Int_t all_todo = BIT(kTypeEnd)-1 & ~(BIT(kTypeBegin)-1);
+    Int_t max_todo = BIT(fMaxThreads)-1;
+    Int_t start = kTypeBegin;
+    while( start < kTypeEnd ) {
+      Int_t now_todo = (max_todo << start) & all_todo;
+      fThreads->fTrackStartM->Lock();
+      fThreads->fTrackToDo = now_todo;
+      fThreads->fTrackStart->Broadcast();
+      fThreads->fTrackStartM->UnLock();
+      // Wait for end of processing
+      while( true ) {
+	Int_t ret = fThreads->fTrackDone->Wait();
+	if( ret == 0 and fThreads->fTrackToDo == 0 )
+	  break;
+      }
+      start += fMaxThreads;
+    }
+    // Retrieve status
+    err = fThreads->fTrackStatus;
+    fThreads->fTrackDoneM->UnLock();
+  } else {
+    // Single-threaded execution: Track() each projection in turn
+    for( Prvec_t::iterator it = fProj.begin(); it != fProj.end(); ++it ) {
+      Int_t ret = (*it)->Track();
+      if( ret < 0 )
+	err = 1;
+    }
+  }
+
+  // Abort on error (e.g. too many patterns)
+  if( err != 0 ) {
+    fFailNpat = 1;
+    return -1;
+  }
+  // Copy pointers to roads from each projection into local 2D vector
+  // (projections, roads).
+  // NB: subsequent code assumes that the first index runs in order
+  // of ascending projection type, so this can't easily be done in the 
+  // tracking threads.
   vector<Rvec_t>::size_type nproj = 0;
   vector<Rvec_t> roads;
   roads.reserve( kTypeEnd-kTypeBegin );
-  bool err = false;
   UInt_t found_types = 0;
-  //TODO: multithread this loop
   for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
     Projection* proj = fProj[type];
 
-    // For each projection separately, do TreeSearch, build roads, and
-    // fit 2D tracks to uncorrected hit positions
-    Int_t nrd = proj->Track();
-
-    if( nrd < 0 )
-      err = true;
-
+    Int_t nrd = proj->GetNgoodRoads();
     if( nrd > 0 ) {
       // Count number of projections with at least one road
       ++nproj;
       found_types |= 1U << type;
       // Add pointers to the good roads to the appropriate vector
       roads.push_back( Rvec_t() );
-      roads.back().reserve( proj->GetNgoodRoads() );
+      roads.back().reserve(nrd);
       for( UInt_t i = 0; i < proj->GetNroads(); ++i ) {
 	Road* rd = proj->GetRoad(i);
 	assert(rd);
@@ -996,16 +1178,11 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
       }
     }
   }
+  assert( roads.size() == nproj );
 #ifdef TESTCODE
   t_track = 1e6*timer.RealTime();
   timer.Start();
 #endif
-  // Abort on error (e.g. too many patterns)
-  if( err ) {
-    fFailNpat = 1;
-    return -1;
-  }
-  assert( roads.size() == nproj );
 
   // Combine track projections to 3D tracks
   // The standard method requires at least 3 projections. This helps reject
@@ -1416,6 +1593,20 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 
   }
 
+  // If threading requested, load thread library and start up threads
+  if( fMaxThreads > 1 ) {
+    gSystem->Load("libThread");
+    delete fThreads;
+    fThreads = new ThreadCtrl;
+    fThreads->fTrack.reserve( fProj.size() );
+    fThreads->fTrackStartM->Lock();
+    for( vpsiz_t k = 0; k < fProj.size(); ++k ) {
+      TThread* t = fThreads->AddTrackThread( fProj[k] );
+      t->Run();
+    }
+    fThreads->fTrackStartM->UnLock();
+  }
+
   return fStatus = kOK;
 }
 
@@ -1453,7 +1644,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   Int_t time_cut = 1, pairs_only = 0, mc_data = 0, nopartner = 0;
   f3dMatchCut = 1e-4;
   Int_t event_display = 0, disable_tracking = 0, disable_finetrack = 0;
-  Int_t maxmiss = -1;
+  Int_t maxmiss = -1, maxthreads = -1;
   Double_t conf_level = 1e-9;
   DBRequest request[] = {
     { "planeconfig",       &planeconfig,       kString },
@@ -1469,6 +1660,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
     { "calibrate",         &calibconfig,       kString, 0, 1 },
     { "3d_maxmiss",        &maxmiss,           kInt,    0, 1 },
     { "3d_chi2_conflevel", &conf_level,        kDouble, 0, 1 },
+    { "maxthreads",        &maxthreads,        kInt,    0, 1 },
     { 0 }
   };
 
@@ -1585,6 +1777,24 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
        ++dof ) {
     fChisqLimits[dof].first  = TMath::ChisquareQuantile( conf_level, dof );
     fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-conf_level, dof );
+  }
+
+  // If maxthreads set, use it
+  if( maxthreads > 0 ) {
+    fMaxThreads = TMath::Max(maxthreads,1);
+    if( fMaxThreads > 20 ) { // Sanity limit
+      fMaxThreads = 20;
+      Warning( Here(here), "Excessive value of maxthreads = %d, "
+	       "limited to %u", maxthreads, fMaxThreads );
+    }
+  } else {
+    // If maxthreads not given, automatically use the number of cpus reported
+    SysInfo_t sysifo;
+    gSystem->GetSysInfo( &sysifo );
+    if( sysifo.fCpus > 0 )
+      fMaxThreads = sysifo.fCpus;
+    else
+      fMaxThreads = 1;
   }
   
   fIsInit = kTRUE;
