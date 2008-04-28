@@ -658,7 +658,7 @@ void MWDC::FindNearestHits( WirePlane* wp, const THaTrack* track,
   // search for the road of the type of this wire plane, taking advantage
   // of the fact that the road vector is sorted by type
   Road* rd = 0;
-  Int_t k = TMath::Min( roads.size(), (Rvec_t::size_type)wp->GetType() );
+  Int_t k = min( roads.size(), (Rvec_t::size_type)wp->GetType() );
   do {
     if( roads[k]->GetProjection()->GetType() > wp->GetType() )
       --k;
@@ -1539,7 +1539,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
 	Double_t lo = s - 0.5*d;
 	Double_t hi = s + (n-0.5)*d;
-	Double_t w = TMath::Max( TMath::Abs(hi), TMath::Abs(lo) );
+	Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
 	if( w > width )
 	  width = w;
       }
@@ -1781,7 +1781,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 
   // If maxthreads set, use it
   if( maxthreads > 0 ) {
-    fMaxThreads = TMath::Max(maxthreads,1);
+    fMaxThreads = max(maxthreads,1);
     if( fMaxThreads > 20 ) { // Sanity limit
       fMaxThreads = 20;
       Warning( Here(here), "Excessive value of maxthreads = %d, "

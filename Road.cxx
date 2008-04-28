@@ -64,8 +64,8 @@ struct BuildInfo_t {
     if( fLimits.empty() )
       fLimits.assign( npl, make_pair(kMaxUShort, 0) );
     for( UInt_t i = npl; i; ) { --i;
-      fLimits[i] = make_pair(TMath::Min(fLimits[i].first,  nd[i]),
-			     TMath::Max(fLimits[i].second, UShort_t(nd[i]+1)));
+      fLimits[i] = make_pair(min(fLimits[i].first,  nd[i]),
+			     max(fLimits[i].second, UShort_t(nd[i]+1)));
     }
   }
 };
@@ -464,10 +464,10 @@ Bool_t Road::Include( const Road* other )
 
   if( includes(ALL(fHits), ALL(other->fHits), fHits.key_comp()) ) {
     // Widen the road bundaries
-    fCornerX[0] = TMath::Min( fCornerX[0], other->fCornerX[0] );
-    fCornerX[1] = TMath::Max( fCornerX[1], other->fCornerX[1] );
-    fCornerX[2] = TMath::Max( fCornerX[2], other->fCornerX[2] );
-    fCornerX[3] = TMath::Min( fCornerX[3], other->fCornerX[3] );
+    fCornerX[0] = min( fCornerX[0], other->fCornerX[0] );
+    fCornerX[1] = max( fCornerX[1], other->fCornerX[1] );
+    fCornerX[2] = max( fCornerX[2], other->fCornerX[2] );
+    fCornerX[3] = min( fCornerX[3], other->fCornerX[3] );
     fCornerX[4] = fCornerX[0];
     return true;
   }
