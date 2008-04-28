@@ -913,8 +913,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // in the node's HitSet.
     for( UInt_t i = 0; i < fHitpattern->GetNplanes(); ++i ) {
       const vector<Hit*>& hits = fHitpattern->GetHits( i, node.first[i] );
-      copy( hits.begin(), hits.end(), 
-	    inserter( node.second.hits, node.second.hits.end() ));
+      node.second.hits.insert( hits.begin(), hits.end() );
     }
     assert( HitSet::GetMatchValue(node.second.hits) == match.first );
     node.second.plane_pattern = match.first;
