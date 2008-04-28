@@ -160,8 +160,8 @@ public:
       // negative sign is termination flag
       SETBIT(fTrackToDo, 31);
       fTrackStart->Broadcast();
-      fTrackStartM->UnLock();
       fTrackDoneM->Lock();
+      fTrackStartM->UnLock();
       while( true ) {
 	Int_t ret = fTrackDone->Wait();
 	if( ret == 0 and fTrackToDo == BIT(31) )
