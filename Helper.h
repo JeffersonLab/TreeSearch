@@ -13,11 +13,12 @@
 #include <vector>
 #include <cassert>
 #include <functional>
+#include <algorithm>
 
 namespace TreeSearch {
 
   //___________________________________________________________________________
-  template< typename VectorElem > void 
+  template< typename VectorElem > inline void 
   NthCombination( UInt_t n, const std::vector<std::vector<VectorElem> >& vec,
 		  std::vector<VectorElem>& selected )
   {
@@ -109,25 +110,27 @@ namespace TreeSearch {
   };
 
   //___________________________________________________________________________
+  struct DeleteObject {
+    template< typename T >
+    void operator() ( const T* ptr ) const { delete ptr; }
+  };
+
+  //___________________________________________________________________________
   template< typename Container >
-  void DeleteContainer( Container& c )
+  inline void DeleteContainer( Container& c )
   {
     // Delete all elements of given container of pointers
-    for( typename Container::iterator it = c.begin(); it != c.end(); ++it ) {
-      delete *it;
-    }
+    for_each( c.begin(), c.end(), DeleteObject() );
     c.clear();
   }
 
   //___________________________________________________________________________
   template< typename ContainerOfContainers >
-  void DeleteContainerOfContainers( ContainerOfContainers& cc )
+  inline void DeleteContainerOfContainers( ContainerOfContainers& cc )
   {
     // Delete all elements of given container of containers of pointers
-    for( typename ContainerOfContainers::iterator it = cc.begin();
-	 it != cc.end(); ++it ) {
-      DeleteContainer( *it );
-    }
+    for_each( cc.begin(), cc.end(), 
+	      DeleteContainer<typename ContainerOfContainers::value_type> );
     cc.clear();
   }
   
