@@ -49,7 +49,6 @@ namespace TreeSearch {
     virtual Int_t   DefineVariables( EMode mode = kDefine );
     virtual void    Print(const Option_t* opt) const;
     virtual void    SetDebug( Int_t level );
-    void            EnableBenchmarks( Bool_t b = kTRUE );
 
     void            EnableEventDisplay( Bool_t enable = true );
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
@@ -121,6 +120,9 @@ namespace TreeSearch {
     Double_t       t_track, t_3dmatch, t_3dfit, t_coarse; // times in us
 #endif
 
+    void      Add3dMatch( const Rvec_t& selected, Double_t matchval,
+			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+			  Rset_t& unique_found ) const;
     void      FindNearestHits( WirePlane* wp, const THaTrack* track,
 			       const Rvec_t& roads ) const;
     void      FitErrPrint( Int_t err ) const;

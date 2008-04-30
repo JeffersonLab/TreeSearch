@@ -49,6 +49,7 @@ namespace TreeSearch {
 //     virtual Bool_t  IsSortable () const { return kTRUE; }
 
     FitCoord*       AddFitCoord( const FitCoord& coord );
+    Bool_t          Contains( Double_t x, Double_t y ) const;
     Bool_t          Contains( const TVector2& point ) const;
     void            EnableCalibration( Bool_t enable = true );
     EProjType       GetType()        const { return fType; }
@@ -151,16 +152,25 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Bool_t WirePlane::Contains( const TVector2& point ) const
+  Bool_t WirePlane::Contains( Double_t x, Double_t y ) const
   {
     // Check if the given point is within the active area of this wire plane.
-    // Coordinates are relative to the MWDC origin. Time-critical, called
-    // possibly O(10)-O(1000) per event
+    // Coordinates are relative to the MWDC origin. Time-critical, may be
+    // be called O(1e5) per event
 
-    //TODO: allow for (small) rotation due to misalignment
+    //TODO: allow for (small) rotation due to misalignment?
 
-    return ( TMath::Abs( point.X()-fOrigin.X() ) < fSize[0] and
-	     TMath::Abs( point.Y()-fOrigin.Y() ) < fSize[1] );
+    return ( TMath::Abs( x-fOrigin.X() ) < fSize[0] and
+	     TMath::Abs( y-fOrigin.Y() ) < fSize[1] );
+  }
+
+  //___________________________________________________________________________
+  inline
+  Bool_t WirePlane::Contains( const TVector2& point ) const
+  {
+    // Same as Contains(x,y), but using a TVector2 as input
+
+    return Contains( point.X(), point.Y() );
   }
 
   //___________________________________________________________________________
