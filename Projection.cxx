@@ -653,6 +653,13 @@ static void PrintNode( const Node_t& node )
   cout << "  pat= ";
   node.first.Print();
 }
+
+inline
+static void PrintNodeP( const Node_t* node )
+{
+  PrintNode( *node );
+}
+
 #endif
 
 //_____________________________________________________________________________
@@ -680,9 +687,7 @@ Int_t Projection::MakeRoads()
 #ifdef VERBOSE
   if( fDebug > 2 ) {
     cout << fPatternsFound.size() << " patterns found:" << endl;
-    for( NodeSet_t::iterator ipat = fPatternsFound.begin(); ipat !=
-	   fPatternsFound.end(); ++ipat )
-      PrintNode( *ipat );
+    for_each( fPatternsFound.begin(), fPatternsFound.end(), PrintNode );
   }
 #endif
 
@@ -732,10 +737,7 @@ Int_t Projection::MakeRoads()
     for( UInt_t i = 0; i < GetNroads(); ++i ) {
       const Road* rd = GetRoad(i);
       const Road::NodeList_t& ndlst = rd->GetPatterns();
-      for( Road::NodeList_t::const_iterator ipat = ndlst.begin(); ipat !=
-	     ndlst.end(); ++ipat ) {
-	PrintNode( **ipat );
-      }
+      for_each( ndlst.begin(), ndlst.end(), PrintNodeP );
       cout << "--------------------------------------------" << endl;
     }
   }
@@ -907,7 +909,7 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // first, then most number of hits, then ascending by start bin number.
 
     // Make new node to insert into the set. (We can't use a map since we
-    // want to sort using the HitSet data, too.
+    // want to sort using the HitSet data, too.)
     Node_t node = make_pair( nd, HitSet() );
     // Collect all hits associated with the pattern's bins and save them
     // in the node's HitSet.
