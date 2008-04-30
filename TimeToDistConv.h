@@ -32,8 +32,14 @@ namespace TreeSearch {
   protected:
 
     TimeToDistConv( UInt_t npar = 0 ) : fNparam(npar) {}
-    TimeToDistConv( const TimeToDistConv& );
-    TimeToDistConv& operator=( const TimeToDistConv& );
+    TimeToDistConv( const TimeToDistConv& rhs ) : fNparam(rhs.fNparam) {}
+    TimeToDistConv& operator=( const TimeToDistConv& rhs )
+    {
+      if( this != &rhs ) {
+	fNparam = rhs.fNparam;
+      }
+      return *this;
+    }
 
     UInt_t  fNparam;    // Number of parameters
 
