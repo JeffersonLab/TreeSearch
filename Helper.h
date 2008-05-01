@@ -22,9 +22,12 @@ namespace TreeSearch {
   NthCombination( UInt_t n, const std::vector<std::vector<VectorElem> >& vec,
 		  std::vector<VectorElem>& selected )
   {
-    // Get the n-th permutation of the elements in vec and
-    // put result in selected. selected[k] is one of the
+    // Get the n-th combination of the elements in "vec" and
+    // put result in "selected". selected[k] is one of the
     // vec[k].size() elements in the k-th plane.
+    //
+    // This function is equivalent to vec.size() nested/recursive loops
+    // over the elements of each of the vectors in vec.
 
     using std::vector;
 
