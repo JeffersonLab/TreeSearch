@@ -863,7 +863,7 @@ void MWDC::Add3dMatch( const Rvec_t& selected, Double_t matchval,
 }
 
 //_____________________________________________________________________________
-UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
+UInt_t MWDC::MatchRoads( vector<Rvec_t>& roads,
 			 list< pair<Double_t,Rvec_t> >& combos_found,
 			 Rset_t& unique_found )
 {
@@ -930,15 +930,19 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
     ++ip;
     Double_t xax_x = ((*ip)->GetAxis()).X();
     Double_t xax_y = ((*ip)->GetAxis()).Y();
-    //    match_cut *= f3dMatchvalScalefact;
 
     // The selected roads from each of the three projections
     Road* tuple[3];
-    // Number of roads in each projection
-    UInt_t nrd[3] = { roads[0].size(), roads[1].size(), roads[2].size() };
-    // Indices of currently selected tuple
-    UInt_t ird[3];
+    // Number of roads in u/v projections
+    UInt_t nrd[2] = { roads[0].size(), roads[1].size() };
+    // Indices of currently selected u/v pair
+    UInt_t ird[2];
     WirePlane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
+
+    // For fast access to the relevant position range, sort the 3rd projection
+    // by ascending front position
+    sort( ALL(roads[2]), Road::PosIsLess() );
+    Road::PosIsNear pos_near( TMath::Sqrt(f3dMatchCut) );
 
     Double_t matchval = 0.0;
     // Time-critical loop, may run O(1e5) times per event with noisy input
@@ -964,9 +968,12 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 	  if( back_plane->Contains(xb,yb) ) {
 	    Double_t pf = xf*xax_x + yf*xax_y; // front x from u/v
 	    Double_t pb = xb*xax_x + yb*xax_y; // back x from u/v
-	    ird[2] = 0;
-	    while( ird[2] != nrd[2] ) {
-	      tuple[2] = roads[2][ird[2]];
+	    // Find range of roads in 3rd projection near this front x
+	    pair<Rvec_t::iterator,Rvec_t::iterator> range = 
+	      equal_range( ALL(roads[2]), pf, pos_near );
+	    // Test the candidate x-roads for complete matches
+	    for( Rvec_t::iterator it=range.first; it != range.second; ++it ) {
+	      tuple[2] = *it;
 	      Double_t d1 = tuple[2]->GetPos()      - pf;
 	      Double_t d2 = tuple[2]->GetPos(zback) - pb;
 	      //TODO; weigh with uncertainties?
@@ -998,7 +1005,6 @@ UInt_t MWDC::MatchRoads( const vector<Rvec_t>& roads,
 		selected.assign( tuple, tuple+3 );
 		Add3dMatch( selected, matchval, combos_found, unique_found );
 	      }
-	      ++ird[2];
 	    }
 	  }
 	}

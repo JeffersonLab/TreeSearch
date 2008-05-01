@@ -101,6 +101,25 @@ namespace TreeSearch {
     const NodeList_t& GetPatterns() const { return fPatterns; }
 #endif
 
+    struct PosIsLess
+      : public std::binary_function< Road*, Road*, bool >
+    {
+      bool operator() ( const Road* a, const Road* b ) const
+      { return ( a->GetPos() < b->GetPos() ); }
+    };
+
+    class PosIsNear {
+    public:
+      PosIsNear( Double_t tolerance ) : fTol(tolerance) {}
+      bool operator() ( const Road* rd, Double_t pos ) const
+      { return ( rd->GetPos() + fTol < pos ); }
+      bool operator() ( Double_t pos, const Road* rd ) const
+      { return ( pos + fTol < rd->GetPos() ); }
+    private:
+      Double_t fTol;
+    };
+
+
   protected:
 
     NodeList_t     fPatterns;   // Patterns in this road

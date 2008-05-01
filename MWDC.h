@@ -131,7 +131,7 @@ namespace TreeSearch {
     template< typename Action > static
     Action    ForAllTrackPoints( const Rvec_t& roads, 
 				 const vector<Double_t>& coef, Action action );
-    UInt_t    MatchRoads( const vector<Rvec_t>& roads,
+    UInt_t    MatchRoads( vector<Rvec_t>& roads,
 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 			  Rset_t& unique_found );
 			  
