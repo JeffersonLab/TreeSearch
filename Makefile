@@ -13,6 +13,7 @@ LINKDEF = $(PACKAGE)_LinkDef.h
 #------------------------------------------------------------------------------
 # Compile debug version (for gdb)
 export DEBUG = 1
+#export PROFILE = 1
 # Compile extra code for printing verbose messages (enabled with fDebug)
 export VERBOSE = 1
 # Compile extra diagnostic code (extra computations and global variables)
@@ -77,7 +78,7 @@ ifeq ($(ARCH),linux)
 # Linux with gcc (RedHat)
 CXX           = g++
 ifdef DEBUG
-  CXXFLAGS    = -g -O0 
+  CXXFLAGS    = -g -O0
   LDFLAGS     = -g -O0
   DEFINES     =
 else
@@ -123,8 +124,8 @@ GLIBS        += $(ROOTGLIBS) $(SYSLIBS)
 MAKEDEPEND    = gcc
 
 ifdef PROFILE
-CXXFLAGS     += -pg
-LDFLAGS      += -pg
+CXXFLAGS     += -g -pg
+LDFLAGS      += -g -pg
 endif
 
 ifndef PKG
@@ -142,6 +143,11 @@ DEP           = $(SRC:.cxx=.d)
 OBJS          = $(OBJ) $(USERDICT).o
 
 all:		$(USERLIB)
+
+$(PACKAGE)a:	$(OBJS)
+		$(LD) $(LDFLAGS) $(ANALYZER)/src/main.o $(OBJS) $(ANALYZER)/libPodd.a $(ROOTSYS)/lib/libRoot.a $(ROOTSYS)/lib/libpcre.a $(ROOTSYS)/lib/libfreetype.a -lz $(shell root-config --auxlibs) -o $@
+
+static:		$(PACKAGE)a
 
 $(USERLIB):	$(OBJS)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $(OBJS)
@@ -176,7 +182,7 @@ srcdist:
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)
 
-.PHONY: all clean realclean srcdist
+.PHONY: all clean realclean srcdist static
 
 .SUFFIXES:
 .SUFFIXES: .c .cc .cpp .cxx .C .o .d
