@@ -263,24 +263,28 @@ Bool_t OuterBitsSet( UInt_t p1, UInt_t p2, UInt_t nbits )
 
 //_____________________________________________________________________________
 inline
-Bool_t Road::IsInRange( const NodeDescriptor& nd ) const
+Bool_t Road::IsInBackRange( const NodeDescriptor& nd ) const
 {
-  // Test if given pattern is within the allowed maximum distance from the
-  // current front and back bin ranges of the cluster
+  assert( fBuild && !fBuild->fLimits.empty() );
 
-  assert( fBuild );
-  assert( !fBuild->fLimits.empty() );
-
-  UInt_t fdist = fProjection->GetBinMaxDistF();
   UInt_t bdist = fProjection->GetBinMaxDistB();
-  
-  return ( nd.Start() + fdist >= fBuild->fLimits.front().first and
-	   nd.Start()         <  fBuild->fLimits.front().second + fdist and
-	   nd.End()   + bdist >= fBuild->fLimits.back().first and
-	   nd.End()           <  fBuild->fLimits.back().second + bdist );
+
+  return ( nd.End() + bdist >= fBuild->fLimits.back().first and
+	   nd.End()         <  fBuild->fLimits.back().second + bdist );
 }
 
+//_____________________________________________________________________________
+//inline
+Bool_t Road::IsInFrontRange( const NodeDescriptor& nd ) const
+{
+  assert( fBuild && !fBuild->fLimits.empty() );
 
+  UInt_t fdist = fProjection->GetBinMaxDistF();
+  
+  return ( nd.Start() + fdist >= fBuild->fLimits.front().first and
+	   nd.Start()         <  fBuild->fLimits.front().second + fdist );
+}
+  
 //_____________________________________________________________________________
 Bool_t Road::Add( const Node_t& nd )
 {
@@ -292,6 +296,7 @@ Bool_t Road::Add( const Node_t& nd )
   // Adding can only be done so long as the road is not yet finished
 
   assert(fBuild);  // Add() after Finish() not allowed
+  assert( fPatterns.empty() || IsInFrontRange(nd.first) );
 
   const HitSet& new_set  = nd.second;
   const Hset_t& new_hits = nd.second.hits;
@@ -322,7 +327,7 @@ Bool_t Road::Add( const Node_t& nd )
     }
 #endif
   } 
-  else if( IsInRange(nd.first) and 
+  else if( IsInBackRange(nd.first) and 
 	   fBuild->fCluster.IsSimilarTo(new_set,hitdist) ) {
     // Accept this pattern if and only if it is a subset of the cluster
     // NB: IsSimilarTo() is a looser match than std::includes(). The new
@@ -342,7 +347,6 @@ Bool_t Road::Add( const Node_t& nd )
     // Patterns of lower match level can be artificially wide
     else if( new_set.nplanes == fBuild->fCluster.nplanes )
       fBuild->ExpandWidth( nd.first );
-
   }
   else {
     // The pattern does not fit into this cluster
@@ -549,7 +553,7 @@ Bool_t Road::CollectCoordinates()
       assert( ipl == fPoints.rend() or !(*ipl).empty() );
       if( ipl == fPoints.rend() 
 	  or i != (*ipl).front()->hit->GetPlaneNum() ) {
-	if( (*ipl).front()->hit->GetWirePlane()->IsCalibrating() )
+	if( fProjection->GetPlane(i)->IsCalibrating() )
 	  cout << " calibrating";
 	else
 	  cout << " missing";

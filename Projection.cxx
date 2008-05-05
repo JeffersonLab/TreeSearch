@@ -677,11 +677,22 @@ bool Projection::MostPlanes::operator() ( const Node_t& a,
 }
 
 //_____________________________________________________________________________
+struct BinIsLess : public std::binary_function< Node_t*, Node_t*, bool >
+{
+  bool operator() ( const Node_t* a, const Node_t* b ) const
+  {
+    // Comparison functor for sorting patterns by start bin position in
+    // MakeRoads().
+    return ( a->first.Start() < b->first.Start() );
+  }
+};
+
+//_____________________________________________________________________________
 Int_t Projection::MakeRoads()
 {
   // Combine patterns with common sets of hits into Roads.
   //
-  // This is the primary de-ghosting algorithm. It finds clusters of patterns
+  // This is the primary de-cloning algorithm. It finds clusters of patterns
   // that share active wires (hits).
 
 #ifdef VERBOSE
@@ -691,35 +702,84 @@ Int_t Projection::MakeRoads()
   }
 #endif
 
-  for( NodeSet_t::iterator itn = fPatternsFound.begin(); itn !=
-	 fPatternsFound.end(); ) {
-    const Node_t& nd1 = *itn;
+  // Copy of fPatternFound, but sorted by bin number only. For efficiency,
+  // the copy contains pointers to the nodes, not the nodes themselves.
+  typedef multiset<const Node_t*,BinIsLess> BinOrdNodes_t;
+  BinOrdNodes_t nodelookup;
+  for( NodeSet_t::iterator it = fPatternsFound.begin(); it !=
+	 fPatternsFound.end(); ++it ) {
+    nodelookup.insert( nodelookup.end(), &(*it) );
+  }
+
+#ifdef VERBOSE
+  if( fDebug > 2 ) {
+    cout << "--------------------------------------------" << endl;
+    cout << nodelookup.size() << " patterns sorted by bin:" << endl;
+    for_each( nodelookup.begin(), nodelookup.end(), PrintNodeP );
+  }
+#endif
+
+  // Build roads starting with patterns that have the most active planes.
+  // These tend to yield the best track candidates.
+  for( NodeSet_t::iterator it = fPatternsFound.begin(); it !=
+	 fPatternsFound.end(); ++it ) {
+    const Node_t& nd1 = *it;
 
     // New roads must start with an unused pattern
-//     if( nd1.second.used )
-//       continue;
-    assert( !nd1.second.used );
+    if( nd1.second.used )
+      continue;
 
     // Start a new road with this pattern
     Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
 
-    // Try to add the remaining cluster patterns to this road
-    NodeSet_t::iterator itn2 = itn;
-    // Stop search unless there are any remaining unused patterns
-    itn = fPatternsFound.end();
-    while( ++itn2 != fPatternsFound.end() ) {
-      const Node_t& nd2 = *itn2;
-      if( nd2.second.used )
-	continue;
-      // Test pattern and add it if applicable
-      if( rd->Add(nd2) ) {
-	// Pattern successfully added
-	continue;
+    // Try to add similar patterns to this road (cf. HitSet::IsSimilarTo)
+    // Since only patterns with front bin numbers near the start pattern
+    // are candidates, search along the start bin index built above.
+    BinOrdNodes_t::iterator jt = nodelookup.find( &nd1 );
+    assert( jt != nodelookup.end() );
+
+    // Test patterns in direction of decreasing front bin number index, 
+    // beginning with the road start pattern, until they are too far away.
+
+// Under g++ 4.1.2, this fails for reasons I don't understand
+// (the call to erase() sometimes modifies ++jr, i.e. seems to affect
+// iterators referring to elements other than the deleted one):
+//
+//     BinOrdNodes_t::reverse_iterator jr(jt);
+//     while( jr != nodelookup.rend() and rd->IsInFrontRange((*jr)->first) ) {
+//       if( rd->Add(**jr) )
+// 	nodelookup.erase( (++jr).base() );
+//       else
+// 	++jr;
+//     }
+//
+// Workaround:
+    if( jt != nodelookup.begin() ) {
+      BinOrdNodes_t::iterator jr(jt);
+      --jr;
+      while( rd->IsInFrontRange((*jr)->first) ) {
+	if( rd->Add(**jr) ) {
+	  // Pattern successfully added
+	  // Erase used patterns from the lookup index
+	  if( jr == nodelookup.begin() ) {
+	    nodelookup.erase( jr );
+	    break;
+	  } else {
+	    nodelookup.erase( jr-- );
+	  }
+	} else if( jr != nodelookup.begin() ) {
+	  --jr;
+	} else
+	  break;
       }
-      // Either the pattern is out of range or it does not fit in the current
-      // cluster, so save current position as next unused pattern
-      if( itn == fPatternsFound.end() )
-	itn = itn2;
+    }
+    nodelookup.erase( jt++ );
+    // Repeat in the forward direction along the index
+    while( jt != nodelookup.end() and rd->IsInFrontRange((*jt)->first) ) {
+      if( rd->Add(**jt) )
+	nodelookup.erase( jt++ );
+      else
+	++jt;
     }
     // Update the "used" flags of the road's component patterns
     rd->Finish();
@@ -730,6 +790,7 @@ Int_t Projection::MakeRoads()
       new( (*fRoadCorners)[fRoads->GetLast()] ) Road::Corners(rd);
     }
   }
+  assert( nodelookup.empty() );
 
 #ifdef VERBOSE
   if( fDebug > 2 ) {

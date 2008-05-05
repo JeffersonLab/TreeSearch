@@ -48,6 +48,9 @@ namespace TreeSearch {
       return ( shift == rhs.shift && mirrored == rhs.mirrored &&
 	       *(link->GetPattern()) == *(rhs.link->GetPattern()) );
     }
+    bool operator!=( const NodeDescriptor& rhs ) const {
+      return !operator==(rhs);
+    }
     UShort_t Start() const { return shift; }
     UShort_t End()   const { return (*this)[link->GetPattern()->GetNbits()-1];}
     void     Print() const;
