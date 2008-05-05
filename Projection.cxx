@@ -683,7 +683,7 @@ struct BinIsLess : public std::binary_function< Node_t*, Node_t*, bool >
   {
     // Comparison functor for sorting patterns by start bin position in
     // MakeRoads().
-    return ( a->first.Start() < b->first.Start() );
+    return ( a->first < b->first );
   }
 };
 
@@ -737,6 +737,7 @@ Int_t Projection::MakeRoads()
     // are candidates, search along the start bin index built above.
     BinOrdNodes_t::iterator jt = nodelookup.find( &nd1 );
     assert( jt != nodelookup.end() );
+    assert( (*jt)->first == nd1.first );
 
     // Test patterns in direction of decreasing front bin number index, 
     // beginning with the road start pattern, until they are too far away.
