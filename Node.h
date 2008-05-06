@@ -26,23 +26,46 @@ namespace TreeSearch {
 		    UChar_t dep )
       : link(ln), parent(p), shift(shft), mirrored(mir), depth(dep)
     { assert(ln && ln->GetPattern()); }
-    virtual ~NodeDescriptor() {}
+    NodeDescriptor() {}
+    ~NodeDescriptor() {}
+
+    UShort_t Start() const { return shift; }
+    UShort_t End()   const { return (*this)[link->GetPattern()->GetNbits()-1];}
+    void     Print() const;
 
     // operator[] returns actual bit value in the i-th plane
     UShort_t  operator[](UInt_t i) const {
-      //    UInt_t   GetBit( UInt_t i ) const {
       if( i == 0 ) return shift;
       Pattern& pat = *(link->GetPattern());
       if( mirrored ) return shift - pat[i];
       else           return shift + pat[i];
     }
-    // Comparison operators for inserting into ordered STL containers.
+    // Comparison operators
     bool operator<( const NodeDescriptor& rhs ) const {
-      for( UInt_t i = 0; i < link->GetPattern()->GetNbits(); ++i ) {
+      if( shift < rhs.shift ) return true;
+      if( shift > rhs.shift ) return false;
+      UInt_t nb = link->GetPattern()->GetNbits();
+      for( UInt_t i = 1; i < nb; ++i ) {
 	if( (*this)[i] < rhs[i] )  return true;
 	if( (*this)[i] > rhs[i] )  return false;
       }
       return false; // Patterns are equal
+    }
+    bool operator<=( const NodeDescriptor& rhs ) const {
+      if( shift < rhs.shift ) return true;
+      if( shift > rhs.shift ) return false;
+      UInt_t nb = link->GetPattern()->GetNbits();
+      for( UInt_t i = 1; i < nb; ++i ) {
+	if( (*this)[i] < rhs[i] )  return true;
+	if( (*this)[i] > rhs[i] )  return false;
+      }
+      return true; // Patterns are equal
+    }
+    bool operator>( const NodeDescriptor& rhs ) const {
+      return !operator<=(rhs);
+    }
+    bool operator>=( const NodeDescriptor& rhs ) const {
+      return !operator<(rhs);
     }
     bool operator==( const NodeDescriptor& rhs ) const {
       return ( shift == rhs.shift && mirrored == rhs.mirrored &&
@@ -51,12 +74,6 @@ namespace TreeSearch {
     bool operator!=( const NodeDescriptor& rhs ) const {
       return !operator==(rhs);
     }
-    UShort_t Start() const { return shift; }
-    UShort_t End()   const { return (*this)[link->GetPattern()->GetNbits()-1];}
-    void     Print() const;
-  private:
-    NodeDescriptor() {}; // For linking ROOT dictionary
-    ClassDef(NodeDescriptor, 0)  // Full description of a pattern
   };    
 
   class HitSet;

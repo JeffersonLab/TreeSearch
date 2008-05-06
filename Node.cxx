@@ -9,8 +9,6 @@
 
 using namespace std;
 
-ClassImp(TreeSearch::NodeDescriptor)
-
 namespace TreeSearch {
 
 //_____________________________________________________________________________
