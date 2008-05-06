@@ -76,6 +76,7 @@ namespace TreeSearch {
     virtual ~Road();
 
     Bool_t         Add( const Node_t& nd );
+    void           ClearGrow() { fGrown = false; }
     virtual Int_t  Compare( const TObject* obj ) const;
     void           Finish();
     Bool_t         Fit();
@@ -88,6 +89,7 @@ namespace TreeSearch {
     const Projection* GetProjection() const { return fProjection; }
     Double_t       GetSlope()   const { return fSlope; }
     THaTrack*      GetTrack()   const { return fTrack; }
+    Bool_t         HasGrown()   const { return fGrown; }
     Bool_t         Include( const Road* other );
     TVector2       Intersect( const Road* other, Double_t z ) const;
     Bool_t         IsGood()     const { return fGood; }
@@ -95,6 +97,7 @@ namespace TreeSearch {
     virtual Bool_t IsSortable() const { return kTRUE; }
     Bool_t         IsVoid()     const { return !fGood; }
     virtual void   Print( Option_t* opt="" ) const;
+    void           SetGrow() { fGrown = true; }
     void           SetTrack( THaTrack* track ) { fTrack = track; }
     void           Void() { fGood = false; }
 
@@ -145,6 +148,7 @@ namespace TreeSearch {
     THaTrack*      fTrack;      // The lowest-chi2 3D track using this road
 
     BuildInfo_t*   fBuild;      //! Working data for building
+    Bool_t         fGrown;      //! Add() added hits in front or back plane
 
 #ifdef TESTCODE
     UInt_t         fNfits;      // Statistics: num fits with acceptable chi2

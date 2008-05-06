@@ -40,14 +40,56 @@ static const size_t kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
 
 //_____________________________________________________________________________
+static inline
+UInt_t GetOuterBits( UInt_t p )
+{
+  // Return the first and last set bits that are set in p
+  static const char LogTable256[] = {
+    0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
+  };
+  UInt_t ret = 0;
+  if( p != 0 ) {
+    register UInt_t t, tt;
+    if( (tt = p >> 16) )
+      ret = 1U << ((t = tt >> 8) ? 24 + LogTable256[t] : 16 + LogTable256[tt]);
+    else 
+      ret = 1U << ((t = p >> 8) ? 8 + LogTable256[t] : LogTable256[p]);
+
+    t = 1;
+    while( (p & t) == 0 )
+      t <<= 1;
+    ret |= t;
+  }
+  return ret;
+}
+
+//_____________________________________________________________________________
 // Private class for building a cluster of patterns
 struct BuildInfo_t {
   HitSet            fCluster;      // Copy of start HitSet of the cluster
   vector< pair<UShort_t,UShort_t> > 
                     fLimits; // [nplanes] Min/max bin numbers in each plane
+  UInt_t            fOuterBits;
 
-  BuildInfo_t() {}
-  BuildInfo_t( const Node_t& node ) : fCluster(node.second) 
+  BuildInfo_t() : fOuterBits(0) {}
+  BuildInfo_t( const Node_t& node )
+    : fCluster(node.second), 
+      fOuterBits(GetOuterBits(node.second.plane_pattern))
   {
     // Construct from given start pattern/hitset
     const NodeDescriptor& nd = node.first;
@@ -64,8 +106,12 @@ struct BuildInfo_t {
     if( fLimits.empty() )
       fLimits.assign( npl, make_pair(kMaxUShort, 0) );
     for( UInt_t i = npl; i; ) { --i;
-      fLimits[i] = make_pair(min(fLimits[i].first,  nd[i]),
-			     max(fLimits[i].second, UShort_t(nd[i]+1)));
+      pair<UShort_t,UShort_t>& lim = fLimits[i];
+      UInt_t bin = nd[i];
+      if( bin < lim.first )
+	lim.first = bin;
+      if( bin+1 > lim.second )
+	lim.second = bin+1;
     }
   }
 };
@@ -94,7 +140,7 @@ public:
 Road::Road( const Projection* proj ) 
   : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
-    fTrack(0), fBuild(0)
+    fTrack(0), fBuild(0), fGrown(false)
 #ifdef TESTCODE
   , fNfits(0)
 #endif
@@ -113,7 +159,7 @@ Road::Road( const Projection* proj )
 Road::Road( const Node_t& nd, const Projection* proj )
   : TObject(), fPatterns(1,&nd), fProjection(proj), fZL(kBig), fZU(kBig),
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
-    fTrack(0), fBuild(0)
+    fTrack(0), fBuild(0), fGrown(true)
 #ifdef TESTCODE
   , fNfits(0)
 #endif
@@ -139,7 +185,8 @@ Road::Road( const Node_t& nd, const Projection* proj )
 
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) : 
-  TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits)
+  TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits),
+  fGrown(orig.fGrown)
 #ifdef TESTCODE
   , fNfits(orig.fNfits)
 #endif
@@ -164,6 +211,10 @@ Road& Road::operator=( const Road& rhs )
 
   if( this != &rhs ) {
     TObject::operator=(rhs);
+
+    fPatterns = rhs.fPatterns;
+    fHits     = rhs.fHits;
+
     size_t nbytes = (char*)&fTrack - (char*)&fProjection + sizeof(fTrack);
     memcpy( &fProjection, &rhs.fProjection, nbytes );
 
@@ -176,6 +227,11 @@ Road& Road::operator=( const Road& rhs )
       fBuild = new BuildInfo_t( *rhs.fBuild );
     else
       fBuild = 0;
+
+    fGrown = rhs.fGrown;
+#ifdef TESTCODE
+    fNfits = rhs.fNfits;
+#endif
   }
   return *this;
 }
@@ -244,24 +300,6 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
 }
 
 //_____________________________________________________________________________
-static inline
-Bool_t OuterBitsSet( UInt_t p1, UInt_t p2, UInt_t nbits )
-{
-  // Test if p1 and p2 have the same first bits set and the same last bits set
-  if( p1 == 0 or p2 == 0 )
-    return false;
-  register UInt_t k = 1;
-  while( (p1 & k) == 0 and (p2 & k) == 0 )
-    k <<= 1;
-  if( !(p1 & k) or !(p2 & k) )
-    return false;
-  k = 1U << (nbits-1);
-  while( (p1 & k) == 0 and (p2 & k) == 0 )
-    k >>= 1;
-  return ( (p1 & k) and (p2 & k) );
-}
-
-//_____________________________________________________________________________
 inline
 Bool_t Road::IsInBackRange( const NodeDescriptor& nd ) const
 {
@@ -319,7 +357,8 @@ Bool_t Road::Add( const Node_t& nd )
     assert( new_set.nplanes > 0 && new_set.plane_pattern > 0 );
     fBuild->fCluster = new_set;
     fBuild->ExpandWidth( nd.first );
-
+    fBuild->fOuterBits = GetOuterBits( fBuild->fCluster.plane_pattern );
+    fGrown = true;
 #ifdef VERBOSE
     if( fProjection->GetDebug() > 3 ) {
       cout << "New cluster:" << endl;
@@ -335,18 +374,22 @@ Bool_t Road::Add( const Node_t& nd )
 
     // If hitdist > 0, grow the cluster with possible new hits found
     if( hitdist > 0 ) {
-      fBuild->fCluster.hits.insert( ALL(new_hits) );
+      UInt_t outer_bits = fBuild->fOuterBits;
+      for( siter_t it = new_hits.begin(); it != new_hits.end(); ++it ) {
+	pair< siter_t, bool > ins = fBuild->fCluster.hits.insert(*it);
+	if( ins.second and TESTBIT(outer_bits,(*it)->GetPlaneNum()) )
+	  fGrown = true;
+      }
       // Growing clusters are expanded even for lower match levels
       // if they contain hits in the first and last active bins
-      if( OuterBitsSet( new_set.plane_pattern, 
-			fBuild->fCluster.plane_pattern,
-			fProjection->GetNplanes() ))
+      if( (outer_bits & new_set.plane_pattern) == outer_bits )
 	fBuild->ExpandWidth( nd.first );
     }
     // Expand the road width, but only for patterns of the same match level.
     // Patterns of lower match level can be artificially wide
-    else if( new_set.nplanes == fBuild->fCluster.nplanes )
+    else if( new_set.nplanes == fBuild->fCluster.nplanes ) {
       fBuild->ExpandWidth( nd.first );
+    }
   }
   else {
     // The pattern does not fit into this cluster
@@ -361,9 +404,10 @@ Bool_t Road::Add( const Node_t& nd )
   fPatterns.push_back(&nd);
 
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 3 ) 
-      cout << "new npat = " << fPatterns.size() << endl;
+  if( fProjection->GetDebug() > 3 ) 
+    cout << "new npat = " << fPatterns.size() << endl;
 #endif
+
   return true;
 }
 
@@ -449,6 +493,7 @@ void Road::Finish()
 
   // All done. Put the tools away
   delete fBuild; fBuild = 0;
+  fGrown = false;
 
   return;
 }
