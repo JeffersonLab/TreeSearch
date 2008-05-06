@@ -38,6 +38,8 @@ namespace TreeSearch {
 typedef vector<WirePlane*>::size_type vwsiz_t;
 typedef vector<WirePlane*>::iterator  vwiter_t;
 
+#define ALL(c) (c).begin(), (c).end()
+
 //_____________________________________________________________________________
 Projection::Projection( EProjType type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
@@ -102,7 +104,7 @@ void Projection::Clear( Option_t* )
     fHitpattern->Clear();
 
   fRoads->Delete();
-  fPatternsFound.clear();
+  DeleteContainer( fPatternsFound );
   fNgoodRoads = 0;
 
   if( TestBit(kEventDisplay) )
@@ -335,6 +337,8 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
     fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
   }
   
+  fPatternsFound.reserve( 200 );
+
   return fStatus = kOK;
 }
 
@@ -515,7 +519,7 @@ Int_t Projection::Track()
   // Match the hitpattern of the current event against the pattern template
   // database. Results in fPatternsFound.
 
-  fPatternsFound.clear();
+  assert( fPatternsFound.empty() );
 
 #ifdef TESTCODE
   TStopwatch timer, timer_tot;
@@ -663,26 +667,27 @@ static void PrintNodeP( const Node_t* node )
 #endif
 
 //_____________________________________________________________________________
-inline
-bool Projection::MostPlanes::operator() ( const Node_t& a, 
-					  const Node_t& b ) const
-{
-  // Order patterns by decreasing number of active planes, then
-  // decreasing number of hits, then ascending bin numbers
-  if( a.second.nplanes > b.second.nplanes ) return true;
-  if( a.second.nplanes < b.second.nplanes ) return false;
-  if( a.second.hits.size() > b.second.hits.size() ) return true;
-  if( a.second.hits.size() < b.second.hits.size() ) return false;
-  return ( a.first < b.first );
-}
+// Comparison functors used for sorting patterns in MakeRoads()
 
-//_____________________________________________________________________________
-struct BinIsLess : public std::binary_function< Node_t*, Node_t*, bool >
+struct MostPlanes : public binary_function< Node_t*, Node_t*, bool >
 {
   bool operator() ( const Node_t* a, const Node_t* b ) const
   {
-    // Comparison functor for sorting patterns by start bin position in
-    // MakeRoads().
+    // Order patterns by decreasing number of active planes, then
+    // decreasing number of hits, then ascending bin numbers
+    if( a->second.nplanes > b->second.nplanes ) return true;
+    if( a->second.nplanes < b->second.nplanes ) return false;
+    if( a->second.hits.size() > b->second.hits.size() ) return true;
+    if( a->second.hits.size() < b->second.hits.size() ) return false;
+    return ( a->first < b->first );
+  }
+};
+
+struct BinIsLess : public binary_function< Node_t*, Node_t*, bool >
+{
+  bool operator() ( const Node_t* a, const Node_t* b ) const
+  {
+    // Order by bin number only
     return ( a->first < b->first );
   }
 };
@@ -695,41 +700,42 @@ Int_t Projection::MakeRoads()
   // This is the primary de-cloning algorithm. It finds clusters of patterns
   // that share active wires (hits).
 
+  // Sort patterns according to MostPlanes (see above)
+  sort( ALL(fPatternsFound), MostPlanes() );
+
+  // Copy patterns to secondary key sorted by bin number only. This key 
+  // greatly improves lookup speed of potential similar patterns
+  typedef set<const Node_t*,BinIsLess> BinOrdNodes_t;
+  BinOrdNodes_t nodelookup;
+
+  // Inserting one-by-one with hint is faster than range insert without hint
+  // since fPatternsFound is already sorted in a similar order, so the hint
+  // is often good
+  copy( ALL(fPatternsFound), inserter( nodelookup, nodelookup.end() ));
+
+  assert( fPatternsFound.size() == nodelookup.size() );
+
 #ifdef VERBOSE
   if( fDebug > 2 ) {
     cout << fPatternsFound.size() << " patterns found:" << endl;
-    for_each( fPatternsFound.begin(), fPatternsFound.end(), PrintNode );
-  }
-#endif
+    for_each( ALL(fPatternsFound), PrintNodeP );
 
-  // Copy of fPatternFound, but sorted by bin number only. For efficiency,
-  // the copy contains pointers to the nodes, not the nodes themselves.
-  typedef multiset<const Node_t*,BinIsLess> BinOrdNodes_t;
-  BinOrdNodes_t nodelookup;
-  for( NodeSet_t::iterator it = fPatternsFound.begin(); it !=
-	 fPatternsFound.end(); ++it ) {
-    nodelookup.insert( nodelookup.end(), &(*it) );
-  }
-
-#ifdef VERBOSE
-  if( fDebug > 2 ) {
     cout << "--------------------------------------------" << endl;
     cout << nodelookup.size() << " patterns sorted by bin:" << endl;
-    for_each( nodelookup.begin(), nodelookup.end(), PrintNodeP );
+    for_each( ALL(nodelookup), PrintNodeP );
   }
 #endif
 
   // Build roads starting with patterns that have the most active planes.
   // These tend to yield the best track candidates.
-  for( NodeSet_t::iterator it = fPatternsFound.begin(); it !=
+  for( NodeVec_t::iterator it = fPatternsFound.begin(); it !=
 	 fPatternsFound.end(); ++it ) {
-    const Node_t& nd1 = *it;
+    const Node_t& nd1 = **it;
 
-    // New roads must start with an unused pattern
     if( nd1.second.used )
       continue;
 
-    // Start a new road with this pattern
+    // Start a new road with next unused pattern
     Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
 
     // Try to add similar patterns to this road (cf. HitSet::IsSimilarTo)
@@ -742,46 +748,60 @@ Int_t Projection::MakeRoads()
     // Test patterns in direction of decreasing front bin number index, 
     // beginning with the road start pattern, until they are too far away.
 
-// Under g++ 4.1.2, this fails for reasons I don't understand
-// (the call to erase() sometimes modifies ++jr, i.e. seems to affect
-// iterators referring to elements other than the deleted one):
-//
-//     BinOrdNodes_t::reverse_iterator jr(jt);
-//     while( jr != nodelookup.rend() and rd->IsInFrontRange((*jr)->first) ) {
-//       if( rd->Add(**jr) )
-// 	nodelookup.erase( (++jr).base() );
-//       else
-// 	++jr;
+    // Under g++ 4.1.2, this fails for reasons I don't understand. It seems
+    // like reverse iterators can be unexpectedly invalidated by erase()
+//     while( rd->HasGrown() ) {
+//       rd->ClearGrow();
+//       BinOrdNodes_t::reverse_iterator jr(jt); // sets jr = jt-1
+//       while( jr != nodelookup.rend() and rd->IsInFrontRange((*jr)->first) ){
+// 	if( rd->Add(**jr) )
+// 	  nodelookup.erase( (++jr).base() );
+// 	else
+// 	  ++jr;
+//       }
 //     }
 //
 // Workaround:
-    if( jt != nodelookup.begin() ) {
+
+    // need to rescan if fHitMaxDist > 0 because IsInFrontRange may catch
+    // more patterns after patterns with new hits have been added
+    while( rd->HasGrown() ) { 
+      rd->ClearGrow();
       BinOrdNodes_t::iterator jr(jt);
-      --jr;
-      while( rd->IsInFrontRange((*jr)->first) ) {
-	if( rd->Add(**jr) ) {
-	  // Pattern successfully added
-	  // Erase used patterns from the lookup index
-	  if( jr == nodelookup.begin() ) {
-	    nodelookup.erase( jr );
+      if( jt != nodelookup.begin() ) {
+	--jr;
+	while( rd->IsInFrontRange((*jr)->first) ) {
+	  if( rd->Add(**jr) ) {
+	    // Pattern successfully added
+	    // Erase used patterns from the lookup index
+	    if( jr == nodelookup.begin() ) {
+	      nodelookup.erase( jr );
+	      break;
+	    } else {
+	      nodelookup.erase( jr-- );
+	    }
+	  } else if( jr != nodelookup.begin() ) {
+	    --jr;
+	  } else
 	    break;
-	  } else {
-	    nodelookup.erase( jr-- );
-	  }
-	} else if( jr != nodelookup.begin() ) {
-	  --jr;
-	} else
-	  break;
+	}
       }
     }
-    nodelookup.erase( jt++ );
     // Repeat in the forward direction along the index
-    while( jt != nodelookup.end() and rd->IsInFrontRange((*jt)->first) ) {
-      if( rd->Add(**jt) )
-	nodelookup.erase( jt++ );
-      else
-	++jt;
+    rd->SetGrow();
+    while( rd->HasGrown() ) {
+      rd->ClearGrow();
+      BinOrdNodes_t::iterator jf(jt);
+      ++jf;
+      while( jf != nodelookup.end() and rd->IsInFrontRange((*jf)->first) ) {
+	if( rd->Add(**jf) )
+	  nodelookup.erase( jf++ );
+	else
+	  ++jf;
+      }
     }
+    nodelookup.erase( jt );
+
     // Update the "used" flags of the road's component patterns
     rd->Finish();
 
@@ -799,7 +819,7 @@ Int_t Projection::MakeRoads()
     for( UInt_t i = 0; i < GetNroads(); ++i ) {
       const Road* rd = GetRoad(i);
       const Road::NodeList_t& ndlst = rd->GetPatterns();
-      for_each( ndlst.begin(), ndlst.end(), PrintNodeP );
+      for_each( ALL(ndlst), PrintNodeP );
       cout << "--------------------------------------------" << endl;
     }
   }
@@ -965,28 +985,23 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     if( nd.depth < fHitpattern->GetNlevels()-1 )
       return kRecurse;
 
-    // Found a match at the bottom of the pattern tree.
-    // Add the pattern descriptor to the set of matches,
-    // ordered by Projection::MostPlanes, i.e. most number of active planes
-    // first, then most number of hits, then ascending by start bin number.
+    // Found a match at the bottom of the pattern tree
+    Node_t* node = new Node_t;
+    node->first = nd;
 
-    // Make new node to insert into the set. (We can't use a map since we
-    // want to sort using the HitSet data, too.)
-    Node_t node = make_pair( nd, HitSet() );
     // Collect all hits associated with the pattern's bins and save them
     // in the node's HitSet.
     for( UInt_t i = 0; i < fHitpattern->GetNplanes(); ++i ) {
-      const vector<Hit*>& hits = fHitpattern->GetHits( i, node.first[i] );
-      node.second.hits.insert( hits.begin(), hits.end() );
+      const vector<Hit*>& hits = fHitpattern->GetHits( i, nd[i] );
+      node->second.hits.insert( ALL(hits) );
     }
-    assert( HitSet::GetMatchValue(node.second.hits) == match.first );
-    node.second.plane_pattern = match.first;
-    node.second.nplanes = match.second;
+    assert( HitSet::GetMatchValue(node->second.hits) == match.first );
+    node->second.plane_pattern = match.first;
+    node->second.nplanes = match.second;
 
-    // Insert the node. This copies the node by value.
-    pair<NodeSet_t::iterator,bool> ins = fMatches->insert( node );
-
-    assert(ins.second);  // duplicate matches should never happen
+    // Add the pointer to the new node to the vector of results
+    //TODO: stop if max num of patterns reached
+    fMatches->push_back( node );
   }
   return kSkipChildNodes;
 }

@@ -17,6 +17,7 @@
 #include <set>
 #include <cassert>
 #include <functional>
+#include <list>
 
 class THaDetectorBase;
 class TBits;
@@ -89,13 +90,7 @@ namespace TreeSearch {
     };
 
   protected:
-    // Comparison functor for ordering found patterns
-    struct MostPlanes : public std::binary_function< Node_t, Node_t, bool >
-    {
-      bool operator() ( const Node_t& a, const Node_t& b ) const;
-    };
-    
-    typedef std::set<Node_t,MostPlanes> NodeSet_t;
+    typedef std::vector<Node_t*> NodeVec_t;
 
     // Configuration
     EProjType        fType;          // Type of plane (u,v,x,y...)
@@ -126,7 +121,7 @@ namespace TreeSearch {
 
     // Event-by-event results
     Hitpattern*      fHitpattern;    // Hitpattern of current event
-    NodeSet_t        fPatternsFound; // Patterns found by TreeSearch
+    NodeVec_t        fPatternsFound; // Patterns found by TreeSearch
     TClonesArray*    fRoads;         // Roads found by MakeRoads
     UInt_t           fNgoodRoads;    // Good roads in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
@@ -154,7 +149,7 @@ namespace TreeSearch {
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
-		      NodeSet_t* matches )
+		      NodeVec_t* matches )
 	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches)
 #ifdef TESTCODE
 	, fNtest(0)
@@ -167,7 +162,7 @@ namespace TreeSearch {
     private:
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
-      NodeSet_t*        fMatches;      // Set of matching patterns
+      NodeVec_t*        fMatches;      // Set of matching patterns
 #ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
