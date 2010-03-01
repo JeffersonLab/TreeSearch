@@ -748,25 +748,11 @@ Int_t Projection::MakeRoads()
     // Test patterns in direction of decreasing front bin number index, 
     // beginning with the road start pattern, until they are too far away.
 
-    // Under g++ 4.1.2, this fails for reasons I don't understand. It seems
-    // like reverse iterators can be unexpectedly invalidated by erase()
-//     while( rd->HasGrown() ) {
-//       rd->ClearGrow();
-//       BinOrdNodes_t::reverse_iterator jr(jt); // sets jr = jt-1
-//       while( jr != nodelookup.rend() and rd->IsInFrontRange((*jr)->first) ){
-// 	if( rd->Add(**jr) )
-// 	  nodelookup.erase( (++jr).base() );
-// 	else
-// 	  ++jr;
-//       }
-//     }
-//
-// Workaround:
-
     // need to rescan if fHitMaxDist > 0 because IsInFrontRange may catch
     // more patterns after patterns with new hits have been added
     while( rd->HasGrown() ) { 
       rd->ClearGrow();
+      // The following runs much slower with a reverse_iterator
       BinOrdNodes_t::iterator jr(jt);
       if( jt != nodelookup.begin() ) {
 	--jr;
