@@ -15,6 +15,8 @@ B.mwdc.planeconfig = u1 u1p x1 x1p v1 v1p \
 B.mwdc.search_depth = 10
 B.mwdc.maxslope = 2.5
 
+B.mwdc.maxthreads = 1
+
 # Wire angles. Specify the angle of the _normal_ to the wires, pointing
 # along the direction of increasing wire number. Positive angles mean 
 # rotation from x towards y (so the y-axis is at +90deg).
@@ -24,6 +26,10 @@ B.mwdc.x.angle = 0.0
 
 # Enable support for event display
 B.mwdc.event_display = 1
+
+# 3D track cuts
+B.mwdc.3d_chi2_conflevel = 1e-8
+B.mwdc.3d_maxmiss = 2
 
 # "Crate map" for the MWDC. Specifies DAQ module configuration.
 # Allows mixing of Fastbus/VME and modules with different resolutions.
@@ -54,11 +60,12 @@ B.mwdc.timecut = 1
 B.mwdc.pairsonly = 0
 B.mwdc.maxmiss = 1
 B.mwdc.req1of2 = 1
+B.mwdc.nopartner = 0
 B.mwdc.u2.required = 1
 B.mwdc.v2.required = 1
 B.mwdc.x2.required = 1
 B.mwdc.chi2_conflevel = 1e-4
-#B.mwdc.maxhits = 20
+# B.mwdc.maxhits = 20
 B.mwdc.maxpat  = 500
 
 #-----------------------------------------------------------
