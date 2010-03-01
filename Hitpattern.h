@@ -14,7 +14,6 @@
 #include <cstring>
 #include <cassert>
 #include <vector>
-#include <set>
 #include <utility>
 
 namespace TreeSearch {
@@ -70,8 +69,8 @@ namespace TreeSearch {
 			  Hit* hit )
     { SetPositionRange( pos-res, pos+res, plane, hit ); }
     Int_t    ScanHits( WirePlane* A, WirePlane* B );
-    //    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
-    //    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
+    //Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
+    //Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
 
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
@@ -152,7 +151,7 @@ namespace TreeSearch {
 //     if( bin < 0 || bin >= GetNbins() )
 //       return kFALSE;
 //     return 
-//       fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
+//   fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
 //   }
 
   //___________________________________________________________________________
