@@ -394,7 +394,7 @@ bool PatternGenerator::SlopeTest( const Pattern& pat, UInt_t depth ) const
 //_____________________________________________________________________________
 bool PatternGenerator::LineTest( const Pattern& pat ) const
 {
-  // Check if the gievn bit pattern is consistent with a straight line.
+  // Check if the given bit pattern is consistent with a straight line.
   // The intersection plane positions are given by fZ[]. Assumes fZ[0]=0.
   // The other z values must increase strictly monotonically, fZ{i] > fZ[i-1].
   // In the parent class, the z-values are normalized so that 
@@ -543,15 +543,15 @@ void PatternGenerator::MakeChildNodes( HashNode* pnode, UInt_t depth )
   Link* ln = parent->GetChild();
   while( ln ) {
     Pattern* pat = ln->GetPattern();
-    // This Find() is necessary because we don't want to store the state 
-    // parameter fMinDepth with the pattern itself - if we did so, we'd
-    // get bigger patterns but minimally faster code here
+    // This Find() is necessary because we need the pattern's fMinDepth, which
+    // is stored with its HashNode, not the pattern itself, for efficiency.
     HashNode* node = Find( *pat );
     assert(node);
     // We only need to go deeper if either this pattern does not have children
     // yet OR (important!) children were previously generated from a deeper
-    // location in the tree and so this pattern's subtree needs to be extended
-    // deeper down now.
+    // location in the tree. In the second case, this pattern's subtree needs
+    // to be extended deeper down since the distance from here to the bottom of
+    // the tree is larger now.
     if( !pat->fChild or node->fMinDepth > depth )
       MakeChildNodes( node, depth+1 );
     ln = ln->Next();

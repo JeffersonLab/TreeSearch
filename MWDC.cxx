@@ -505,6 +505,7 @@ Int_t MWDC::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   if( npoints <=4 ) return -1; // Meaningful fit not possible
 
   // FillFitMatrix only fills the upper triangle for efficiency
+  //TODO: make a function of FillFitMatrix?
   for( int j = 0; j<4; ++j )
     for( int k = j+1; k<4; ++k )
       AtA(k,j) = AtA(j,k);
@@ -1667,6 +1668,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   // If threading requested, load thread library and start up threads
   if( fMaxThreads > 1 ) {
     gSystem->Load("libThread");
+    //FIXME: check for successful load, warn and degrade if not
     delete fThreads;
     fThreads = new ThreadCtrl;
     fThreads->fTrack.reserve( fProj.size() );
