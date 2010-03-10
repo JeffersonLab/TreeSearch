@@ -245,7 +245,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
       ++ncalib;
   }
   if( ncalib > 0 ) {
-    Info( Here(here), "Calibrating %d planes in projection %s.",
+    Info( Here(here), "Calibrating %d planes in %s-projection.",
 	  ncalib, GetName() );
     fMaxMiss = ncalib;
     for( UInt_t k = 0; k < GetNplanes(); ++k ) {
@@ -259,36 +259,36 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
 	  return kInitError;
 	}
       } else
-	  fPlanes[k]->SetRequired();
+	fPlanes[k]->SetRequired();
     }
   }
 
   // Check range of fMinFitPlanes (minimum number of planes require for fit)
   // and fMaxMiss (maximum number of missing planes allowed in a hitpattern).
-  // This is here instead of in ReadDatabase because we need GetNplanes()
-  if( fMinFitPlanes < 3 || fMinFitPlanes > GetNplanes() ) {
-    Error( Here(here), "Illegal number of required planes for fitting = %u. "
-	   "Must be >= 3 and <= %u. "
-	   "Fix database.", fMinFitPlanes, GetNplanes() );
+  // This is done here instead of in ReadDatabase because we need GetNplanes().
+  if( fMinFitPlanes < 3 or fMinFitPlanes > GetNplanes() ) {
+    Error( Here(here), "Illegal number of required planes for projection "
+	   "track fitting = %u. Must be >= 3 and <= %u. Fix database.",
+	   fMinFitPlanes, GetNplanes() );
     return kInitError;
   }
-  if( fMaxMiss > GetNplanes()-1 ) {
+  if( fMaxMiss > GetNplanes()-2 ) {
     Error( Here(here), "Illegal number of allowed missing planes = %u. "
-	   "Must be <= %u. Fix database.", fMaxMiss, GetNplanes()-1 );
+	   "Must be <= %u. Fix database.", fMaxMiss, GetNplanes()-2 );
     return kInitError;
   }
   // There cannot be so many planes missing that we don't have at least
   // fMinFitPlanes left
-  UInt_t maxmiss = GetNplanes()-fMinFitPlanes;
-  if( fMaxMiss > maxmiss ) {
+  UInt_t allowed_maxmiss = GetNplanes()-fMinFitPlanes;
+  if( fMaxMiss > allowed_maxmiss ) {
     if( ncalib == 0 ) {
       Warning( Here(here), "Allowed number of missing planes = %u reduced "
 	       "to %u to satisfy min_fit_planes = %u.  Fix database.", 
-	       fMaxMiss, maxmiss, fMinFitPlanes );
-      fMaxMiss = maxmiss;
+	       fMaxMiss, allowed_maxmiss, fMinFitPlanes );
+      fMaxMiss = allowed_maxmiss;
     } else {
       Error( Here(here), "Too many planes in calibration mode, found %d, "
-	     "max allowed = %d. Fix database.", ncalib, maxmiss );
+	     "max allowed = %d. Fix database.", ncalib, allowed_maxmiss );
       return kInitError;
     }
   }
@@ -622,7 +622,7 @@ Int_t Projection::Track()
  quit:
 #ifdef VERBOSE
   if( fDebug > 0 ) {
-    cout << "------------ end of projection  " << fName.Data() 
+    cout << "------------ end of projection  " << GetName()
 	 << "------------" << endl;
   }
 #endif
@@ -892,7 +892,7 @@ void Projection::MakePrefix()
     basename.Chop();  // delete trailing dot
   } else
     Warning( Here("MakePrefix"), "No parent detector defined. "
-	     "Using \"%s\".", fName.Data() );
+	     "Using \"%s\".", GetName() );
 
   THaAnalysisObject::MakePrefix( basename.Data() );
 }
