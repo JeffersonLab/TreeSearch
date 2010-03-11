@@ -330,7 +330,7 @@ UInt_t PatternGenerator::Hash( const Pattern& pat ) const
   // 2^(fNlevels-1 + fNplanes-2) - 1. With the hash computed here, collisions 
   // never occur for patterns that pass LineTest(). 
 
-  UInt_t hash = pat[fNplanes-1] * (1U << fNplanes-2);
+  UInt_t hash = pat[fNplanes-1] * (1U << (fNplanes-2));
   const Double_t x = pat[fNplanes-1];
   const Double_t z = fZ[fNplanes-1];
 

@@ -109,7 +109,7 @@ void swapped_binary_write( ostream& os, const T& data, size_t n = 1,
 #ifdef R__BYTESWAP
   size_t k = size-1;
   for( size_t i = start; i < n * size; ++i )
-    os.put( bytes[(i&~k)+(k-i&k)] );
+    os.put( bytes[(i&~k)+((k-i)&k)] );
 #else
   os.write( bytes+start, n*size-start );
 #endif

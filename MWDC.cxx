@@ -54,7 +54,7 @@ class CSpair : public TObject {
 public:
   CSpair( UShort_t crate, UShort_t slot ) : fCrate(crate), fSlot(slot) {}
   virtual ULong_t Hash() const {
-    UInt_t cs = static_cast<UInt_t>(fCrate)<<16 + static_cast<UInt_t>(fSlot);
+    UInt_t cs = (static_cast<UInt_t>(fCrate)<<16) + static_cast<UInt_t>(fSlot);
 #if ROOT_VERSION_CODE >= ROOT_VERSION(5,16,0)
     return TString::Hash( &cs, sizeof(cs) );
 #else
@@ -306,7 +306,7 @@ Int_t MWDC::Decode( const THaEvData& evdata )
     THaDetMap::Module* d = fRefMap->GetModule(imod);
     // By construction, this map has one channel per module
     Int_t chan = d->lo;
-    Int_t nhits = evdata.GetNumHits( d->crate, d->slot, chan );
+    UInt_t nhits = evdata.GetNumHits( d->crate, d->slot, chan );
     if( nhits > 0 ) {
       Int_t data = evdata.GetData( d->crate, d->slot, chan, nhits-1 );
       if( nhits > 1 ) {
@@ -1184,7 +1184,7 @@ Int_t MWDC::CoarseTrack( TClonesArray& tracks )
     // Wake the tracking threads
     fThreads->fTrackDoneM->Lock();
     fThreads->fTrackStatus = 0;
-    Int_t all_todo = BIT(kTypeEnd)-1 & ~(BIT(kTypeBegin)-1);
+    Int_t all_todo = (BIT(kTypeEnd)-1) & ~(BIT(kTypeBegin)-1);
     Int_t max_todo = BIT(fMaxThreads)-1;
     Int_t start = kTypeBegin;
     while( start < kTypeEnd ) {
@@ -1545,7 +1545,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   Double_t v_angle = fProj[kVPlane]->GetAngle()*TMath::RadToDeg();
   Int_t qu = TMath::FloorNint( u_angle/90.0 );
   Int_t qv = TMath::FloorNint( v_angle/90.0 );
-  if( qu&1 == qv&1 ) {
+  if( (qu&1) == (qv&1) ) {
     Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and vangle "
 	   "(%6.2lf) are in equivalent quadrants. Fix database.",
 	   u_angle, v_angle );

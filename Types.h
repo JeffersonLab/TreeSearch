@@ -31,7 +31,7 @@ namespace TreeSearch {
     }
   }
   inline
-  const EProjType operator++( EProjType& e, int )
+  EProjType operator++( EProjType& e, int )
   { EProjType r(e); ++e; return r; }
 
 }
