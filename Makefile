@@ -46,6 +46,7 @@ endif
 ROOTCFLAGS   := $(shell root-config --cflags)
 ROOTLIBS     := $(shell root-config --libs)
 ROOTGLIBS    := $(shell root-config --glibs)
+ROOTBIN      := $(shell root-config --bindir)
 
 INCLUDES      = $(ROOTCFLAGS) $(addprefix -I, $(INCDIRS) ) -I$(shell pwd)
 
@@ -144,11 +145,6 @@ OBJS          = $(OBJ) $(USERDICT).o
 
 all:		$(USERLIB)
 
-$(PACKAGE)a:	$(OBJS)
-		$(LD) $(LDFLAGS) $(ANALYZER)/src/main.o $(OBJS) $(ANALYZER)/libPodd.a $(ROOTSYS)/lib/libRoot.a $(ROOTSYS)/lib/libpcre.a $(ROOTSYS)/lib/libfreetype.a -lz $(shell root-config --auxlibs) -o $@
-
-static:		$(PACKAGE)a
-
 $(USERLIB):	$(OBJS)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $(OBJS)
 		@echo "$@ done"
@@ -160,7 +156,7 @@ endif
 
 $(USERDICT).cxx: $(HDR) $(LINKDEF)
 	@echo "Generating dictionary $(USERDICT)..."
-	$(ROOTSYS)/bin/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
+	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
 install:	all
 		$(error Please define install yourself)
@@ -182,7 +178,7 @@ srcdist:
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)
 
-.PHONY: all clean realclean srcdist static
+.PHONY: all clean realclean srcdist
 
 .SUFFIXES:
 .SUFFIXES: .c .cc .cpp .cxx .C .o .d
