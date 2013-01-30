@@ -1,0 +1,23 @@
+# Compiled stuff
+*.[od]
+lib*.so*
+
+# Generated files
+*Dict.h
+*Dict.cxx
+
+# Internal documentation
+TODO
+ChangeLog
+
+# Editor lint
+.#*
+*~
+
+# Work directory clutter, test files, replay output etc.
+/db*.dat
+*.root
+*.odef
+*.cdef
+*.png
+*.patch
