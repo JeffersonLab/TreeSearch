@@ -32,9 +32,7 @@ namespace TreeSearch {
 	 WirePlane* wp ) :
       fWireNum(wnum), fRawTDC(tdc), fTime(time), fPos(pos), fPosL(pos), 
       fPosR(pos), fResolution(res), fWirePlane(wp)
-#ifdef TESTCODE
       , fCl(0), fMulti(0), fTdiff(0.0)
-#endif
     { assert(fWirePlane); }
     // Default copy and assignment are fine
     //    Hit( const Hit& );
@@ -111,10 +109,11 @@ namespace TreeSearch {
 
     WirePlane* fWirePlane; //! Pointer to parent wire plane
 
-#ifdef TESTCODE
+    // Only needed for TESTCODE, but kept for binary compatibility
     Int_t    fCl;          // Neighboring wire also fired
     Int_t    fMulti;       // Additional hits present on same wire
     Double_t fTdiff;       // Time difference to previous multihit
+#ifdef TESTCODE
     friend void WirePlane::CheckCrosstalk();
 #endif
 

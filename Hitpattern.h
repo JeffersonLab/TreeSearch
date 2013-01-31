@@ -115,9 +115,8 @@ namespace TreeSearch {
 
     void AddHit( UInt_t plane, UInt_t bin, Hit* hit );
 
-#ifdef TESTCODE
+    // Only needed for TESTCODE
     UInt_t  fMaxhitBin;  // Maximum depth of hit array per bin
-#endif
 
   private:
     void Init( Double_t width );

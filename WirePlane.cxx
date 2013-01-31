@@ -38,10 +38,8 @@ WirePlane::WirePlane( const char* name, const char* description,
     fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
     fMinTime(-kBig), fMaxTime(kBig), fMaxHits(kMaxUInt), fTTDConv(0),
     fHits(0), fFitCoords(0)
-#ifdef TESTCODE
   , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
     fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
-#endif
 {
   // Constructor
 

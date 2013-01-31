@@ -126,7 +126,7 @@ namespace TreeSearch {
     TClonesArray*   fHits;      // Hit data
     TClonesArray*   fFitCoords; // Hit coordinates used by good fits in roads
 
-#ifdef TESTCODE
+    // Only needed for TESTCODE, but kept for binary compatibility
     UInt_t          fNmiss;     // Statistics: Decoder channel misses
     UInt_t          fNrej;      // Statistics: Rejected hits
     Int_t           fWasSorted; // Statistics: hits were sorted (0/1)
@@ -136,7 +136,6 @@ namespace TreeSearch {
     UInt_t          fNcl;       // Statistics: number of hit "clusters"
     UInt_t          fNdbl;      // Statistics: num wires with neighboring hits
     UInt_t          fClsiz;     // Statistics: max cluster size
-#endif
 
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );

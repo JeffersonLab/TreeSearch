@@ -150,9 +150,8 @@ namespace TreeSearch {
     BuildInfo_t*   fBuild;      //! Working data for building
     Bool_t         fGrown;      //! Add() added hits in front or back plane
 
-#ifdef TESTCODE
+    // Only needed for TESTCODE
     UInt_t         fNfits;      // Statistics: num fits with acceptable chi2
-#endif
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();

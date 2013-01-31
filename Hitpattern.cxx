@@ -30,9 +30,7 @@ namespace TreeSearch {
 Hitpattern::Hitpattern( const PatternTree& pt )
   : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0), 
     fOffset(0.5*pt.GetWidth()), fPattern(0)
-#ifdef TESTCODE
   , fMaxhitBin(0)
-#endif
 {
   // Construct Hitpattern using paramaters of pattern tree
 
@@ -42,9 +40,7 @@ Hitpattern::Hitpattern( const PatternTree& pt )
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
   : fNlevels(nlevels), fNplanes(0), fScale(0), fOffset(0.5*width), fPattern(0)
-#ifdef TESTCODE
   , fMaxhitBin(0)
-#endif
 {
   // Constructor
 
@@ -91,9 +87,7 @@ try
   : fNlevels(orig.fNlevels), fNplanes(orig.fNplanes),
     fScale(orig.fScale), fBinWidth(orig.fBinWidth), fOffset(orig.fOffset),
     fPattern(0), fHits(orig.fHits), fHitList(orig.fHitList)
-#ifdef TESTCODE
   , fMaxhitBin(orig.fMaxhitBin)
-#endif
 {
   // Copy ctor
 

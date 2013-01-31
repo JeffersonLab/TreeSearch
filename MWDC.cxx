@@ -208,9 +208,9 @@ MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
     fMaxThreads(1), fThreads(0),
     f3dMatchvalScalefact(1), f3dMatchCut(0), fMinNdof(1),
     fFailNhits(0), fFailNpat(0)
-#ifdef TESTCODE
-  , fNcombos(0), fN3dFits(0), fEvNum(0)
-#endif
+  , fNcombos(0), fN3dFits(0), fEvNum(0),
+    t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
+    
 { 
   // Constructor
 

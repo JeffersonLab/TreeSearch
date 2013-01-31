@@ -113,12 +113,12 @@ namespace TreeSearch {
     // Event data
     Int_t          fFailNhits; // Too many hits in wire plane(s)
     Int_t          fFailNpat;  // Too many treesearch patterns found
-#ifdef TESTCODE
+
+    // Only needed for TESTCODE, but kept for binary compatibility
     UInt_t         fNcombos;   // Number of road combinations tried
     UInt_t         fN3dFits;   // Number of track fits done (=good road combos)
     Int_t          fEvNum;     // Current event number
     Double_t       t_track, t_3dmatch, t_3dfit, t_coarse; // times in us
-#endif
 
     void      Add3dMatch( const Rvec_t& selected, Double_t matchval,
 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,

@@ -126,12 +126,10 @@ namespace TreeSearch {
     UInt_t           fNgoodRoads;    // Good roads in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
 
-#ifdef TESTCODE
-    // Statistics
+    // Statistics (only needed for TESTCODE, but kept for binary compatibility)
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
     UInt_t n_test, n_pat, n_roads, n_dupl, n_badfits;
     Double_t t_treesearch, t_roads, t_fit, t_track;
-#endif
 
     Bool_t  FitRoads();
     Bool_t  RemoveDuplicateRoads();
@@ -151,9 +149,7 @@ namespace TreeSearch {
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
 		      NodeVec_t* matches )
 	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches)
-#ifdef TESTCODE
 	, fNtest(0)
-#endif
       { assert(fHitpattern && fPlaneCombos && fMatches); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
 #ifdef TESTCODE
@@ -163,9 +159,8 @@ namespace TreeSearch {
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
       NodeVec_t*        fMatches;      // Set of matching patterns
-#ifdef TESTCODE
+      // Only needed for TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
-#endif
     };
 
   private:

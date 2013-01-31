@@ -141,9 +141,7 @@ Road::Road( const Projection* proj )
   : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fTrack(0), fBuild(0), fGrown(false)
-#ifdef TESTCODE
   , fNfits(0)
-#endif
 {
   // Construct empty road
 
@@ -160,9 +158,7 @@ Road::Road( const Node_t& nd, const Projection* proj )
   : TObject(), fPatterns(1,&nd), fProjection(proj), fZL(kBig), fZU(kBig),
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fTrack(0), fBuild(0), fGrown(true)
-#ifdef TESTCODE
   , fNfits(0)
-#endif
 {
   // Construct from pattern
 
@@ -187,9 +183,7 @@ Road::Road( const Node_t& nd, const Projection* proj )
 Road::Road( const Road& orig ) : 
   TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits),
   fGrown(orig.fGrown)
-#ifdef TESTCODE
   , fNfits(orig.fNfits)
-#endif
 {
   // Copy constructor
 
