@@ -27,7 +27,7 @@ class THashTable;
 using std::vector;
 
 namespace TreeSearch {
-  class ReadoutPlane;
+  class Plane;
   class Projection;
   class Road;
   class ThreadCtrl;  // Defined in implementation
@@ -63,6 +63,8 @@ namespace TreeSearch {
     vector<TreeSearch::Plane*>& GetListOfPlanes() { return fPlanes; }
     vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
 #endif
+
+    EProjType       NameToType( const char* name );
 
     // Analysis control flags. Set via database.
     enum {
@@ -135,6 +137,7 @@ namespace TreeSearch {
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
+    Double_t  LoadDAQresolution( THaDetMap::Module* m ) const;
     UInt_t    GetDAQnchan( THaDetMap::Module* m ) const;
 
     // Podd interface

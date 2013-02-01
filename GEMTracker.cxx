@@ -12,7 +12,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "GEMTracker.h"
-#include "ReadoutPlane.h"
+#include "GEMPlane.h"
 #include "Projection.h"
 #include "Hit.h"
 #include "Road.h"

@@ -2116,6 +2116,27 @@ void Tracker::EnableEventDisplay( Bool_t b )
 }
 
 //_____________________________________________________________________________
+EProjType MWDC::NameToType( const char* name )
+{
+  // Return the index corresponding to the given plane name.
+  // The comparison is not case-sensitive.
+
+  if( name and *name ) {
+    TString s(name);
+    s.ToLower();
+    for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+      if( !fProj[type] )
+	continue;
+      TString ps( fProj[type]->GetName() );
+      ps.ToLower();
+      if( s == ps )
+	return type;
+    }
+  }
+  return kUndefinedType;
+}
+
+//_____________________________________________________________________________
 inline
 static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot, 
 				 const THashTable* table )
@@ -2133,6 +2154,16 @@ UInt_t Tracker::LoadDAQmodel( THaDetMap::Module* mod ) const
   UInt_t num = found ? found->fModel : 0;
   mod->SetModel( num );
   return num;
+}
+
+//_____________________________________________________________________________
+Double_t MWDC::LoadDAQresolution( THaDetMap::Module* mod ) const
+{
+  // Update detector map module 'mod' with the resolution from the cratemap
+  DAQmodule* found = FindDAQmodule( mod->crate, mod->slot, fCrateMap );
+  Double_t res = found ? found->fResolution : 0.0;
+  mod->SetResolution( res );
+  return res;
 }
 
 //_____________________________________________________________________________
