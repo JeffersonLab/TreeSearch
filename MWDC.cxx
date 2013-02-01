@@ -915,6 +915,16 @@ Plane* MWDC::MakePlane( const char* name, const char* description,
   return new WirePlane( name, description, parent );
 }
 
+//_____________________________________________________________________________
+UInt_t MWDC::GetCrateMapDBcols() const
+{
+  // Return number of columns for the detector crate map in the database.
+  // 6 columns means that a 6-th column is present, indicating the resolution 
+  // of the module, typically a TDC
+
+  return 6;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch

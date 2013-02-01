@@ -46,6 +46,7 @@ namespace TreeSearch {
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
+    virtual UInt_t GetCrateMapDBcols() const;
 
     ClassDef(GEMTracker,0)   // Tree search track reconstruction for GEM trackers
   };

@@ -79,26 +79,29 @@ public:
 };
 class DAQmodule : public CSpair {
 public:
-  DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan )
-    : CSpair(crate, slot), fModel(model), fNchan(nchan) {}
+  DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan,
+	     Double_t res = 0 )
+    : CSpair(crate, slot), fModel(model), fNchan(nchan), fResolution(res) {}
   virtual ~DAQmodule() {}
   virtual void Copy( TObject& obj ) const {
     TObject::Copy(obj);
     DAQmodule* m = dynamic_cast<DAQmodule*>(&obj);
     if( !m ) return;
     m->fCrate = fCrate; m->fSlot = fSlot; m->fModel = fModel;
-    m->fNchan = fNchan;
+    m->fNchan = fNchan; m->fResolution = fResolution;
   }
   virtual void Print( Option_t* ) const {
     cout << "DAQmodule: "
 	 << " crate = " << fCrate
 	 << " slot = "  << fSlot
 	 << " model = " << fModel
-	 << " nchan = "   << fNchan
+	 << " nchan = " << fNchan
+	 << " res = "   << fResolution
 	 << endl;
   }
   UInt_t    fModel;
   UInt_t    fNchan;
+  Double_t  fResolution;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1902,9 +1905,10 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   Int_t maxmiss = -1, maxthreads = -1;
   Double_t conf_level = 1e-9;
   ResetBit( k3dFastMatch ); // Set in Init()
+  assert( GetCrateMapDBcols() >= 5 );
   DBRequest request[] = {
     { "planeconfig",       &planeconfig,       kString },
-    { "cratemap",          cmap,               kIntM,   5 }, //===> TODO: MWDC has 6 fields
+    { "cratemap",          cmap,               kIntM,   GetCrateMapDBcols() },
     { "3d_matchcut",       &f3dMatchCut,       kDouble, 0, 1 },
     { "event_display",     &event_display,     kInt,    0, 1 },
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
@@ -1927,9 +1931,13 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       // Build the list of crate map elements
       for( vviter_t it = cmap->begin(); it != cmap->end(); ++it ) {
 	vector<int>& row = *it;
+	assert( row.size() == GetCrateMapDBcols() ); // failure indicates bug in LoadDB
 	for( Int_t slot = row[1]; slot <= row[2]; ++slot ) {
-	  DAQmodule* m =
-	    new DAQmodule( row[0], slot, row[3], row[4] );
+	  DAQmodule* m = 0;
+	  if( GetCrateMapDBcols() < 6 )
+	    m = new DAQmodule( row[0], slot, row[3], row[4] );
+	  else
+	    m = new DAQmodule( row[0], slot, row[3], row[4], row[5] );
 	  DAQmodule* found = static_cast<DAQmodule*>(fCrateMap->FindObject(m));
 	  if( found ) { 
 	    m->Copy(*found);  // Later entries override earlier ones

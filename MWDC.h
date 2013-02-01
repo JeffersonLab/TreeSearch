@@ -49,6 +49,7 @@ namespace TreeSearch {
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
+    virtual UInt_t GetCrateMapDBcols() const;
 
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };

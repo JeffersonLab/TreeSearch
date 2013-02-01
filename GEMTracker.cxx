@@ -1052,12 +1052,22 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-Plane* MWDC::MakePlane( const char* name, const char* description, 
-			THaDetectorBase* parent ) const
+Plane* GEMTracker::MakePlane( const char* name, const char* description, 
+			      THaDetectorBase* parent ) const
 {
   // Create an object of the plane class used by this implementation
 
   return new GEMPlane( name, description, parent );
+}
+
+//_____________________________________________________________________________
+UInt_t GEMTracker::GetCrateMapDBcols() const
+{
+  // Return number of columns for the detector crate map in the database.
+  // 5 columns means that the no resolution value is needed to analyze the
+  // data, as is typical for ADCs
+
+  return 5;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

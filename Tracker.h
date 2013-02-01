@@ -146,6 +146,7 @@ namespace TreeSearch {
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const = 0;
+    virtual UInt_t GetCrateMapDBcols() const = 0;
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };
