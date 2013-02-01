@@ -30,11 +30,13 @@
 #include "THashTable.h"
 #include "TVector2.h"
 #include "TDecompChol.h"
+#include "TMatrixDSym.h"
 #include "TSystem.h"
 #include "TThread.h"
 #include "TCondition.h"
 #include "TMutex.h"
 #include "TBits.h"
+#include "TClass.h"
 
 #include <iostream>
 #include <algorithm>

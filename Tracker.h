@@ -12,7 +12,6 @@
 #include "THaTrackingDetector.h"
 #include "THaDetMap.h"
 #include "Types.h"
-#include "TMatrixDSym.h"
 #include <vector>
 #include <utility>
 #include <set>
@@ -23,6 +22,8 @@ class THaTrack;
 class THaBenchmark;
 class TClonesArray;
 class THashTable;
+class TMatrixDSym;
+class TClass;
 
 using std::vector;
 
@@ -41,7 +42,7 @@ namespace TreeSearch {
   public:
     Tracker( const char* name, const char* description = "", 
 	     THaApparatus* app = 0 );
-    virtual ~GEM();
+    virtual ~Tracker();
 
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
@@ -52,17 +53,11 @@ namespace TreeSearch {
     virtual void    Print(const Option_t* opt) const;
     virtual void    SetDebug( Int_t level );
 
-    void            EnableEventDisplay( Bool_t enable = true );
-    const pdbl_t&   GetChisqLimits( UInt_t i ) const;
-
     virtual Int_t   Begin( THaRunBase* r=0 );
     virtual Int_t   End( THaRunBase* r=0 );
 
-#ifdef TESTCODE
-    Int_t           GetEvNum() const { return fEvNum; }
-    vector<TreeSearch::Plane*>& GetListOfPlanes() { return fPlanes; }
-    vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
-#endif
+    void            EnableEventDisplay( Bool_t enable = true );
+    const pdbl_t&   GetChisqLimits( UInt_t i ) const;
 
     EProjType       NameToType( const char* name );
 
@@ -73,6 +68,12 @@ namespace TreeSearch {
       kDoCoarse   = BIT(20), // Do coarse tracking (if disabled, decode only)
       kDoFine     = BIT(21)  // Do fine tracking (implies kDoCoarse)
     };
+
+#ifdef TESTCODE
+    Int_t           GetEvNum() const { return fEvNum; }
+    vector<TreeSearch::Plane*>& GetListOfPlanes() { return fPlanes; }
+    vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
+#endif
 
   protected:
     friend class Plane;
@@ -142,6 +143,8 @@ namespace TreeSearch {
 
     // Podd interface
     virtual Int_t   ReadDatabase( const TDatime& date );
+
+    virtual TClass* GetPlaneClass() const = 0;
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };

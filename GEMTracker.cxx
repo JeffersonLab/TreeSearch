@@ -49,8 +49,8 @@ typedef string::size_type ssiz_t;
 
 namespace TreeSearch {
 
-typedef vector<ReadoutPlane*>::size_type vrsiz_t;
-typedef vector<ReadoutPlane*>::iterator  vriter_t;
+typedef vector<Plane*>::size_type vrsiz_t;
+typedef vector<Plane*>::iterator  vriter_t;
 typedef vector<Projection*>::size_type vpsiz_t;
 typedef vector<Projection*>::iterator  vpiter_t;
 typedef vector<vector<Int_t> >::iterator vviter_t;
@@ -72,7 +72,7 @@ GEMTracker::~GEMTracker()
 }
 
 //_____________________________________________________________________________
-void GEMTracker::FindNearestHits( ReadoutPlane* rp, const THaTrack* track, 
+void GEMTracker::FindNearestHits( Plane* rp, const THaTrack* track, 
 			   const Rvec_t& roads ) const
 {
   // For the given readout plane, find the hit nearest to the given track
@@ -296,7 +296,7 @@ UInt_t GEMTracker::MatchRoads( vector<Rvec_t>& roads,
 	     itxp != xpoints.end(); ++itxp ) {
 	  const Road::Point* xp = *itxp;
 	  assert( xp and xp->hit );
-	  const ReadoutPlane* xplane = xp->hit->GetReadoutPlane();
+	  const Plane* xplane = xp->hit->GetPlane();
 	  assert( xplane );
 	  UInt_t xnum = xplane->GetPlaneNum();
 	  assert( xnum < xplanes.size() );
@@ -313,7 +313,7 @@ UInt_t GEMTracker::MatchRoads( vector<Rvec_t>& roads,
 	  if( ityp == ypoints.end() ) break;
 	  const Road::Point* yp = *ityp;
 	  assert( yp and yp->hit );
-	  const ReadoutPlane* yplane = yp->hit->GetReadoutPlane();
+	  const Plane* yplane = yp->hit->GetPlane();
 	  assert( yplane );
 	  assert( yplane->GetPartner() == xplane );
 
@@ -400,7 +400,7 @@ UInt_t GEMTracker::MatchRoads( vector<Rvec_t>& roads,
     UInt_t nrd[2] = { roads[0].size(), roads[1].size() };
     // Indices of currently selected u/v pair
     UInt_t ird[2];
-    ReadoutPlane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
+    Plane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
 
     // For fast access to the relevant position range, sort the 3rd projection
     // by ascending front position
@@ -568,7 +568,7 @@ THaAnalysisObject::EStatus GEMTracker::Init( const TDatime& date )
 
   static const char* const here = "Init";
 
-  // The "cratemap" is only needed during Init of GEM and ReadoutPlane
+  // The "cratemap" is only needed during Init of GEM and Plane
   assert( fCrateMap == 0 );
   fCrateMap = new THashTable(100);
   fCrateMap->SetOwner();
@@ -589,21 +589,21 @@ THaAnalysisObject::EStatus GEMTracker::Init( const TDatime& date )
     return fStatus = status;
 
   // Sort planes by increasing z-position
-  sort( ALL(fPlanes), ReadoutPlane::ZIsLess() );
+  sort( ALL(fPlanes), Plane::ZIsLess() );
 
   // Associate planes and partners
   bool all_partnered = true;
   for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    ReadoutPlane* thePlane = fPlanes[iplane];
+    Plane* thePlane = fPlanes[iplane];
     TString other( thePlane->GetPartnerName() );
     if( other.IsNull() ) {
       thePlane->SetPartner( 0 );
       all_partnered = false;
       continue;
     }
-    vriter_t it = find_if( ALL(fPlanes), ReadoutPlane::NameEquals(other) );
+    vriter_t it = find_if( ALL(fPlanes), Plane::NameEquals(other) );
     if( it != fPlanes.end() ) {
-      ReadoutPlane* partner = *it;
+      Plane* partner = *it;
       // Sanity checks
       if( thePlane == partner ) {
 	Error( Here(here), "Plane %s: cannot partner a plane with itself. "
@@ -654,7 +654,7 @@ THaAnalysisObject::EStatus GEMTracker::Init( const TDatime& date )
   // Set up the projections based on which plane types are defined
   assert( fProj.empty() );
   for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    ReadoutPlane* thePlane = fPlanes[iplane];
+    Plane* thePlane = fPlanes[iplane];
     assert( !thePlane->GetProjection() );
     EProjType type = thePlane->GetType();
     vpiter_t it = find_if( ALL(fProj), Projection::TypeEquals(type) );
@@ -764,7 +764,7 @@ THaAnalysisObject::EStatus GEMTracker::Init( const TDatime& date )
     Double_t width = 0.0;
     //TODO: can this be part of Projection::Init?
     for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-      ReadoutPlane* thePlane = fPlanes[iplane];
+      Plane* thePlane = fPlanes[iplane];
       //FIXME: loop over the projection's planes only -> do in Projection::Init
       if( thePlane->GetType() == type ) {
 	// Determine the "width" of this projection plane (=width along the
@@ -953,13 +953,13 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
   for( ssiz_t i=0; i<planes.size(); ++i ) {
     assert( !planes[i].empty() );
     const char* name = planes[i].c_str();
-    vriter_t it = find_if( ALL(fPlanes), ReadoutPlane::NameEquals( name ) );
+    vriter_t it = find_if( ALL(fPlanes), Plane::NameEquals( name ) );
     if( it != fPlanes.end() ) {
       Error( Here(here), "Duplicate plane name: %s. Fix database.", name );
       return kInitError;
     }
-    ReadoutPlane* newplane = 0;
-    try { newplane = new ReadoutPlane( name, name, this ); }
+    Plane* newplane = 0;
+    try { newplane = new Plane( name, name, this ); }
     catch( bad_alloc ) { newplane = 0; }
     if( !newplane or newplane->IsZombie() ) {
       // Urgh. Something is very bad
@@ -1049,6 +1049,14 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
   
   fIsInit = kTRUE;
   return kOK;
+}
+
+//_____________________________________________________________________________
+TClass* MWDC::GetPlaneClass() const
+{
+  // Return ROOT class of the Planes used by this implementation
+
+  return GEMPlane::Class();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

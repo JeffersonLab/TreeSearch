@@ -47,6 +47,8 @@ namespace TreeSearch {
     // Podd interface
     virtual Int_t   ReadDatabase( const TDatime& date );
 
+    virtual TClass* GetPlaneClass() const;
+
     ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
   };
 

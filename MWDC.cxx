@@ -906,6 +906,14 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
   return kOK;
 }
 
+//_____________________________________________________________________________
+TClass* MWDC::GetPlaneClass() const
+{
+  // Return ROOT class of the Planes used by this implementation
+
+  return WirePlane::Class();
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch

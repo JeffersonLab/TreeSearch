@@ -44,6 +44,8 @@ namespace TreeSearch {
     // Podd interface
     virtual Int_t   ReadDatabase( const TDatime& date );
 
+    virtual TClass* GetPlaneClass() const;
+
     ClassDef(GEMTracker,0)   // Tree search track reconstruction for GEM trackers
   };
 
