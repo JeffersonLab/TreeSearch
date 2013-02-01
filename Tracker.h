@@ -97,7 +97,7 @@ namespace TreeSearch {
     Int_t          fMaxThreads;  // Maximum simultaneously active threads
     ThreadCtrl*    fThreads;     //! Thread controller
 
-    // Paremeters for 3D projection matching
+    // Parameters for 3D projection matching
     Double_t       f3dMatchvalScalefact; // Correction for fast 3D matchval
     Double_t       f3dMatchCut;          // Maximum allowed 3D match error
 

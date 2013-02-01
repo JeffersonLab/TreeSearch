@@ -1604,65 +1604,67 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   // Sort planes by increasing z-position
   sort( ALL(fPlanes), Plane::ZIsLess() );
 
-  // Associate planes and partners
-  bool all_partnered = true;
-  for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-    Plane* thePlane = fPlanes[iplane];
-    TString other( thePlane->GetPartnerName() );
-    if( other.IsNull() ) {
-      thePlane->SetPartner( 0 );
-      all_partnered = false;
-      continue;
-    }
-    vriter_t it = find_if( ALL(fPlanes), Plane::NameEquals(other) );
-    if( it != fPlanes.end() ) {
-      Plane* partner = *it;
-      // Sanity checks
-      if( thePlane == partner ) {
-	Error( Here(here), "Plane %s: cannot partner a plane with itself. "
-	       "Fix database.", other.Data() );
-	return fStatus = kInitError;
-      }
-      // Partner planes must be of different types (multi-dimensional readout)
-      if( thePlane->GetType() == partner->GetType() ) {
-	Error( Here(here), "Partner planes %s and %s have the same type!"
-	       " Fix database.", thePlane->GetName(), partner->GetName() );
-	return fStatus = kInitError;
-      }
-      // 2D readouts must have essentially the same z-position
-      if( TMath::Abs( thePlane->GetZ() - partner->GetZ() ) > 1e-3 ) {
-	Error( Here(here), "Partner planes %s and %s must have the same "
-	       "z-position within 1 mm. Fix database.", 
-	       thePlane->GetName(), partner->GetName() );
-	return fStatus = kInitError;
-      }
-      // Check for consistency
-      TString ppname( partner->GetPartnerName() );
-      if( ppname.IsNull() or ppname != thePlane->GetName() ) {
-	Error( Here(here), "Inconsistent plane partnering. Partner(%s) "
-	       "= %s, but partner(%s) = %s. Fix database.",
-	       thePlane->GetName(), other.Data(), 
-	       partner->GetName(), ppname.IsNull() ? "(none)":ppname.Data() );
-	return fStatus = kInitError;
-      }
-      // Nothing to do if partner already set (prevents duplicate printouts)
-      if( thePlane->GetPartner() == partner ) {
-	assert( partner->GetPartner() == thePlane );
-	continue;
-      }
-      // Mutually associate thePlane and partner
-      if( fDebug > 0 )
-	Info( Here(here), "Partnering plane %s with %s",
-	      thePlane->GetName(), partner->GetName() );
+  //===> TODO: split MWDC and GEM versions
 
-      partner->SetPartner( thePlane );
+  // // Associate planes and partners
+  // bool all_partnered = true;
+  // for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+  //   Plane* thePlane = fPlanes[iplane];
+  //   TString other( thePlane->GetPartnerName() );
+  //   if( other.IsNull() ) {
+  //     thePlane->SetPartner( 0 );
+  //     all_partnered = false;
+  //     continue;
+  //   }
+  //   vriter_t it = find_if( ALL(fPlanes), Plane::NameEquals(other) );
+  //   if( it != fPlanes.end() ) {
+  //     Plane* partner = *it;
+  //     // Sanity checks
+  //     if( thePlane == partner ) {
+  // 	Error( Here(here), "Plane %s: cannot partner a plane with itself. "
+  // 	       "Fix database.", other.Data() );
+  // 	return fStatus = kInitError;
+  //     }
+  //     // Partner planes must be of different types (multi-dimensional readout)
+  //     if( thePlane->GetType() == partner->GetType() ) {
+  // 	Error( Here(here), "Partner planes %s and %s have the same type!"
+  // 	       " Fix database.", thePlane->GetName(), partner->GetName() );
+  // 	return fStatus = kInitError;
+  //     }
+  //     // 2D readouts must have essentially the same z-position
+  //     if( TMath::Abs( thePlane->GetZ() - partner->GetZ() ) > 1e-3 ) {
+  // 	Error( Here(here), "Partner planes %s and %s must have the same "
+  // 	       "z-position within 1 mm. Fix database.", 
+  // 	       thePlane->GetName(), partner->GetName() );
+  // 	return fStatus = kInitError;
+  //     }
+  //     // Check for consistency
+  //     TString ppname( partner->GetPartnerName() );
+  //     if( ppname.IsNull() or ppname != thePlane->GetName() ) {
+  // 	Error( Here(here), "Inconsistent plane partnering. Partner(%s) "
+  // 	       "= %s, but partner(%s) = %s. Fix database.",
+  // 	       thePlane->GetName(), other.Data(), 
+  // 	       partner->GetName(), ppname.IsNull() ? "(none)":ppname.Data() );
+  // 	return fStatus = kInitError;
+  //     }
+  //     // Nothing to do if partner already set (prevents duplicate printouts)
+  //     if( thePlane->GetPartner() == partner ) {
+  // 	assert( partner->GetPartner() == thePlane );
+  // 	continue;
+  //     }
+  //     // Mutually associate thePlane and partner
+  //     if( fDebug > 0 )
+  // 	Info( Here(here), "Partnering plane %s with %s",
+  // 	      thePlane->GetName(), partner->GetName() );
 
-    } else {
-      Error( Here(here), "Partner plane %s of %s is not defined!"
-	     " Fix database.", other.Data(), thePlane->GetName() );
-      return fStatus = kInitError;
-    }
-  }
+  //     partner->SetPartner( thePlane );
+
+  //   } else {
+  //     Error( Here(here), "Partner plane %s of %s is not defined!"
+  // 	     " Fix database.", other.Data(), thePlane->GetName() );
+  //     return fStatus = kInitError;
+  //   }
+  // }
 
   // Set up the projections based on which plane types are defined
   assert( fProj.empty() );
@@ -1676,18 +1678,18 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       proj = *it;
     } else {
       try {
-	proj = new Projection( type,
-			       kProjParam[type].name, 
-			       kProjParam[type].angle*TMath::DegToRad(),
-			       this 
-			       );
+  	proj = new Projection( type,
+  			       kProjParam[type].name, 
+  			       kProjParam[type].angle*TMath::DegToRad(),
+  			       this 
+  			       );
       }
       catch( bad_alloc ) { proj = 0; }
       if( !proj or proj->IsZombie() ) {
-	// Urgh. Something very bad is going on
-	Error( Here(here), "Error creating projection %s. Call expert.", 
-	       kProjParam[type].name );
-	return fStatus = kInitError;
+  	// Urgh. Something very bad is going on
+  	Error( Here(here), "Error creating projection %s. Call expert.", 
+  	       kProjParam[type].name );
+  	return fStatus = kInitError;
       }
       fProj.push_back( proj );
     }
@@ -1697,20 +1699,20 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   // Sort projections by ascending EProjType
   sort( ALL(fProj), Projection::ByType() );
 
-  // If exactly two projections are defined, switch on the 3D amplitude
-  // correlation matching mode
-  if( fProj.size() == 2 ) {
-    SetBit( k3dCorrAmpl );
-    if( fDebug > 0 )
-      Info( Here(here), "2 projections defined: Enabling amplitude "
-	    "correlation matching.");
+  // // If exactly two projections are defined, switch on the 3D amplitude
+  // // correlation matching mode
+  // if( fProj.size() == 2 ) {
+  //   SetBit( k3dCorrAmpl );
+  //   if( fDebug > 0 )
+  //     Info( Here(here), "2 projections defined: Enabling amplitude "
+  // 	    "correlation matching.");
 
-    if( not all_partnered ) {
-      Error( Here(here), "Amplitude correlation mode enabled, but one or "
-	     "more readout planes are 1D (=no partner). Fix database." );
-      return fStatus = kInitError;
-    }
-  }
+  //   if( not all_partnered ) {
+  //     Error( Here(here), "Amplitude correlation mode enabled, but one or "
+  // 	     "more readout planes are 1D (=no partner). Fix database." );
+  //     return fStatus = kInitError;
+  //   }
+  // }
 
   // Initialize the projections. This will read the database and set
   // the projections' angle and maxslope, which we need in the following
@@ -1720,55 +1722,55 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       return fStatus = status;
   }
 
-  // Sanity checks of U and V angles which the projections just read via Init
-  vpiter_t iu = find_if( ALL(fProj), Projection::TypeEquals(kUPlane) );
-  vpiter_t iv = find_if( ALL(fProj), Projection::TypeEquals(kVPlane) );
-  if( iu != fProj.end() and iv != fProj.end() ) {
-    // Both u and v planes are defined
-    //TODO: isn't this an unnecessary limitation?
-    //TODO: instead, check if any projections have (nearly) identical angles
-    Double_t u_angle = (*iu)->GetAngle()*TMath::RadToDeg();
-    Double_t v_angle = (*iv)->GetAngle()*TMath::RadToDeg();
-    Int_t qu = TMath::FloorNint( u_angle/90.0 );
-    Int_t qv = TMath::FloorNint( v_angle/90.0 );
-    if( (qu&1) == (qv&1) ) {
-      Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and vangle "
-	     "(%6.2lf) are in equivalent quadrants. Fix database.",
-	     u_angle, v_angle );
-      return fStatus = kInitError;
-    }
-    //TODO: put this check into Projection::Init?
-    //FIXME: this does not require both u and v
-    Double_t du = u_angle - 90.0*qu;
-    Double_t dv = v_angle - 90.0*qv;
-    if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 or
-	TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
-      Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
-	     "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
-      return fStatus = kInitError;
-    }
+  // // Sanity checks of U and V angles which the projections just read via Init
+  // vpiter_t iu = find_if( ALL(fProj), Projection::TypeEquals(kUPlane) );
+  // vpiter_t iv = find_if( ALL(fProj), Projection::TypeEquals(kVPlane) );
+  // if( iu != fProj.end() and iv != fProj.end() ) {
+  //   // Both u and v planes are defined
+  //   //TODO: isn't this an unnecessary limitation?
+  //   //TODO: instead, check if any projections have (nearly) identical angles
+  //   Double_t u_angle = (*iu)->GetAngle()*TMath::RadToDeg();
+  //   Double_t v_angle = (*iv)->GetAngle()*TMath::RadToDeg();
+  //   Int_t qu = TMath::FloorNint( u_angle/90.0 );
+  //   Int_t qv = TMath::FloorNint( v_angle/90.0 );
+  //   if( (qu&1) == (qv&1) ) {
+  //     Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and vangle "
+  // 	     "(%6.2lf) are in equivalent quadrants. Fix database.",
+  // 	     u_angle, v_angle );
+  //     return fStatus = kInitError;
+  //   }
+  //   //TODO: put this check into Projection::Init?
+  //   //FIXME: this does not require both u and v
+  //   Double_t du = u_angle - 90.0*qu;
+  //   Double_t dv = v_angle - 90.0*qv;
+  //   if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 or
+  // 	TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
+  //     Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
+  // 	     "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
+  //     return fStatus = kInitError;
+  //   }
 
-    // Check if we can use the simplified 3D matching algorithm
-    //FIXME: fast_3d should work for x,y,u(45) and similar, too
-    //TODO: generalize to 4 projections with symmetry
-    if( fProj.size() == 3 ) {
-      assert( !TestBit(k3dCorrAmpl) );
-      // This assumes that u and v are the first two defined projections
-      assert( kUPlane < kVPlane && kVPlane < 2 );
-      // The abs(angle) of the two rotated planes must be (nearly) the same
-      Double_t uang = TMath::Abs( TVector2::Phi_mpi_pi( (*iu)->GetAngle() ));
-      if( (TMath::Abs( TVector2::Phi_mpi_pi( (*iv)->GetAngle() ))-uang )
-	  <  0.5*TMath::DegToRad() ) {
-	SetBit(k3dFastMatch);
-	Double_t tan = TMath::Tan( 0.5*TMath::Pi()-uang );
-	// The scale factor converts the fast_3d matchvalue to the one computed
-	// by the general algorithm
-	f3dMatchvalScalefact = 2.0 * (1.0/3.0 + tan*tan );
-	// Avoid scaling for every event
-	f3dMatchCut /= f3dMatchvalScalefact;
-      }
-    }
-  }
+  //   // Check if we can use the simplified 3D matching algorithm
+  //   //FIXME: fast_3d should work for x,y,u(45) and similar, too
+  //   //TODO: generalize to 4 projections with symmetry
+  //   if( fProj.size() == 3 ) {
+  //     assert( !TestBit(k3dCorrAmpl) );
+  //     // This assumes that u and v are the first two defined projections
+  //     assert( kUPlane < kVPlane && kVPlane < 2 );
+  //     // The abs(angle) of the two rotated planes must be (nearly) the same
+  //     Double_t uang = TMath::Abs( TVector2::Phi_mpi_pi( (*iu)->GetAngle() ));
+  //     if( (TMath::Abs( TVector2::Phi_mpi_pi( (*iv)->GetAngle() ))-uang )
+  // 	  <  0.5*TMath::DegToRad() ) {
+  // 	SetBit(k3dFastMatch);
+  // 	Double_t tan = TMath::Tan( 0.5*TMath::Pi()-uang );
+  // 	// The scale factor converts the fast_3d matchvalue to the one computed
+  // 	// by the general algorithm
+  // 	f3dMatchvalScalefact = 2.0 * (1.0/3.0 + tan*tan );
+  // 	// Avoid scaling for every event
+  // 	f3dMatchCut /= f3dMatchvalScalefact;
+  //     }
+  //   }
+  // }
 
   // Determine width and maxslope of the projections
   for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
@@ -1780,24 +1782,24 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       Plane* thePlane = fPlanes[iplane];
       //FIXME: loop over the projection's planes only -> do in Projection::Init
       if( thePlane->GetType() == type ) {
-	// Determine the "width" of this projection plane (=width along the
-	// projection coordinate).
-	// The idea is that all possible hit positions in all planes of a 
-	// given projection must fall within the range [-W/2,W/2]. It is normal
-	// that some planes cover less than this width (e.g. because they are 
-	// smaller or offset) - it is meant to be the enclosing range for all
-	// planes. In this way, the tree search can use one fixed bin width.
-	// The total width found here divided by the number of bins used in
-	// tree search is the resolution of the roads.
-	// Of course, this will become inefficient for grotesque geometries.
-	Double_t s = thePlane->GetStripStart();
-	Double_t d = thePlane->GetStripPitch();
-	Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
-	Double_t lo = s - 0.5*d;
-	Double_t hi = s + (n-0.5)*d;
-	Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
-	if( w > width )
-	  width = w;
+  	// Determine the "width" of this projection plane (=width along the
+  	// projection coordinate).
+  	// The idea is that all possible hit positions in all planes of a 
+  	// given projection must fall within the range [-W/2,W/2]. It is normal
+  	// that some planes cover less than this width (e.g. because they are 
+  	// smaller or offset) - it is meant to be the enclosing range for all
+  	// planes. In this way, the tree search can use one fixed bin width.
+  	// The total width found here divided by the number of bins used in
+  	// tree search is the resolution of the roads.
+  	// Of course, this will become inefficient for grotesque geometries.
+  	Double_t s = thePlane->GetStart();
+  	Double_t d = thePlane->GetPitch();
+  	Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
+  	Double_t lo = s - 0.5*d;
+  	Double_t hi = s + (n-0.5)*d;
+  	Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
+  	if( w > width )
+  	  width = w;
       }
     }
 
@@ -1808,7 +1810,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       theProj->SetWidth( width );
     else {
       Error( Here(here), "Error calculating width of projection \"%s\". "
-	     "Strip pitch too small? Fix database.", theProj->GetName() );
+  	     "Pitch too small? Fix database.", theProj->GetName() );
       return fStatus = kInitError;
     }
     // maxslope is the maximum expected track slope in the projection.
@@ -1818,27 +1820,27 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     if( dz > 0.01 ) {
       Double_t maxslope = width/dz;
       if( theProj->GetMaxSlope() < 0.01 ) {  // Consider unset
-	theProj->SetMaxSlope( maxslope );
+  	theProj->SetMaxSlope( maxslope );
       } else if( theProj->GetMaxSlope() > maxslope ) {
-	if( fDebug > 0 ) {
-	  Warning( Here(here), "For projection \"%s\", maxslope from "
-		   "database = %lf exceeds geometric maximum = %lf. "
-		   "Using smaller value.",
-		   theProj->GetName(), theProj->GetMaxSlope(), maxslope );
-	}
-	theProj->SetMaxSlope( maxslope );
+  	if( fDebug > 0 ) {
+  	  Warning( Here(here), "For projection \"%s\", maxslope from "
+  		   "database = %lf exceeds geometric maximum = %lf. "
+  		   "Using smaller value.",
+  		   theProj->GetName(), theProj->GetMaxSlope(), maxslope );
+  	}
+  	theProj->SetMaxSlope( maxslope );
       }
     } else {
       Error( Here(here), "Error calculating geometric maxslope for plane "
-	     "type \"%s\". z-range of planes too small. Fix database.",
-	     theProj->GetName() );
-	return fStatus = kInitError;
+  	     "type \"%s\". z-range of planes too small. Fix database.",
+  	     theProj->GetName() );
+  	return fStatus = kInitError;
     }
 
     // Now that the projection's list of planes, width, and maxslope is known,
     // do the level-2 initialization of the projections - load the pattern
     // database and initialize the hitpattern
-    //FIXME: no longer need 2-part Init
+    //FIXME: can we avoid this?
     status = theProj->InitLevel2(date);
     if( status )
       return fStatus = status;
@@ -1880,7 +1882,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   if( !file ) return kFileError;
 
   // Read fOrigin (detector position) and fSize. fOrigin is the position of
-  // the GEM detector relative to some superior coordinate system
+  // the Tracker relative to some superior coordinate system
   // (typically the spectrometer detector stack reference frame). 
   // fOrigin will be added to all tracks generated; if fOrigin.Z() is not
   // zero, tracks will be projected into the z=0 plane.
@@ -1893,18 +1895,14 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
 
   string planeconfig, calibconfig;
-  Int_t do_adc_cut = 1;
   f3dMatchCut = 1e-4;
   Int_t event_display = 0, disable_tracking = 0, disable_finetrack = 0;
-  Int_t maxmiss = -1, maxthreads = -1, ampcorr_maxmiss = -1;
-  fMaxCorrNsigma = 1.0;
+  Int_t maxmiss = -1, maxthreads = -1;
   Double_t conf_level = 1e-9;
-  ResetBit( k3dCorrAmpl );  // Set in Init()
-  ResetBit( k3dFastMatch );
+  ResetBit( k3dFastMatch ); // Set in Init()
   DBRequest request[] = {
     { "planeconfig",       &planeconfig,       kString },
-    { "cratemap",          cmap,               kIntM,   5 },
-    { "do_adc_cut",        &do_adc_cut,        kInt,    0, 1 },
+    { "cratemap",          cmap,               kIntM,   5 }, //===> TODO: MWDC has 6 fields
     { "3d_matchcut",       &f3dMatchCut,       kDouble, 0, 1 },
     { "event_display",     &event_display,     kInt,    0, 1 },
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
@@ -1912,8 +1910,6 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     { "calibrate",         &calibconfig,       kString, 0, 1 },
     { "3d_maxmiss",        &maxmiss,           kInt,    0, 1 },
     { "3d_chi2_conflevel", &conf_level,        kDouble, 0, 1 },
-    { "3d_ampcorr_maxmiss",&ampcorr_maxmiss,   kInt,    0, 1 },
-    { "3d_ampcorr_nsigma", &fMaxCorrNsigma,    kDouble, 0, 1 },
     { "maxthreads",        &maxthreads,        kInt,    0, 1 },
     { 0 }
   };
@@ -1949,7 +1945,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     return status;
 
   // Set analysis control flags
-  SetBit( kDoADCCut,      do_adc_cut );
+  // SetBit( kDoADCCut,      do_adc_cut );
   SetBit( kEventDisplay,  event_display );
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
@@ -1962,7 +1958,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   }
   vector<string> calibplanes = vsplit(calibconfig);
 
-  // Set up the readout planes
+  // Set up the planes
   for( ssiz_t i=0; i<planes.size(); ++i ) {
     assert( !planes[i].empty() );
     const char* name = planes[i].c_str();
@@ -1972,6 +1968,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       return kInitError;
     }
     Plane* newplane = 0;
+    //===> TODO: instantiate planes via factory, depending on te actual class we are
     try { newplane = new Plane( name, name, this ); }
     catch( bad_alloc ) { newplane = 0; }
     if( !newplane or newplane->IsZombie() ) {
@@ -2021,10 +2018,8 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 
   if( doing_tracking ) {
     // Convert maximum number of missing hits to ndof of fits
+    //===> TODO: Review
     fMinNdof = ( maxmiss >= 0 ) ? nplanes - 4 - maxmiss : 1;
-
-    // Set parameter for maximum number of amplitude correlation mismatches
-    fMaxCorrMismatches = ( ampcorr_maxmiss >= 0 ) ? ampcorr_maxmiss : 0;
 
     // Determine Chi2 confidence interval limits for the selected CL and the
     // possible degrees of freedom of the 3D track fit
@@ -2094,8 +2089,8 @@ void Tracker::Print(const Option_t* opt) const
 //_____________________________________________________________________________
 void Tracker::SetDebug( Int_t level )
 {
-  // Set debug level of this detector, including all readout planes
-  // (subdetectors) and projections
+  // Set debug level of this detector, including all planes (subdetectors)
+  // and projections
 
   THaTrackingDetector::SetDebug( level );
 
