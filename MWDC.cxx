@@ -907,11 +907,12 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-TClass* MWDC::GetPlaneClass() const
+Plane* MWDC::MakePlane( const char* name, const char* description, 
+			THaDetectorBase* parent ) const
 {
-  // Return ROOT class of the Planes used by this implementation
+  // Create an object of the plane class used by this implementation
 
-  return WirePlane::Class();
+  return new WirePlane( name, description, parent );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -1970,8 +1970,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       return kInitError;
     }
     Plane* newplane = 0;
-    //===> TODO: instantiate planes via factory, depending on te actual class we are
-    try { newplane = new Plane( name, name, this ); }
+    try { newplane = MakePlane( name, name, this ) };
     catch( bad_alloc ) { newplane = 0; }
     if( !newplane or newplane->IsZombie() ) {
       // Urgh. Something is very bad

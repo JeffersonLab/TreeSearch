@@ -1052,11 +1052,12 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-TClass* MWDC::GetPlaneClass() const
+Plane* MWDC::MakePlane( const char* name, const char* description, 
+			THaDetectorBase* parent ) const
 {
-  // Return ROOT class of the Planes used by this implementation
+  // Create an object of the plane class used by this implementation
 
-  return GEMPlane::Class();
+  return new GEMPlane( name, description, parent );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

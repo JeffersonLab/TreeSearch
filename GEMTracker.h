@@ -42,9 +42,10 @@ namespace TreeSearch {
     // 			  Rset_t& unique_found );
 			  
     // Podd interface
-    virtual Int_t   ReadDatabase( const TDatime& date );
+    virtual Int_t  ReadDatabase( const TDatime& date );
 
-    virtual TClass* GetPlaneClass() const;
+    virtual Plane* MakePlane( const char* name, const char* description = "",
+			      THaDetectorBase* parent = 0 ) const;
 
     ClassDef(GEMTracker,0)   // Tree search track reconstruction for GEM trackers
   };

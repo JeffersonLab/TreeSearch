@@ -142,9 +142,10 @@ namespace TreeSearch {
     UInt_t    GetDAQnchan( THaDetMap::Module* m ) const;
 
     // Podd interface
-    virtual Int_t   ReadDatabase( const TDatime& date );
+    virtual Int_t  ReadDatabase( const TDatime& date );
 
-    virtual TClass* GetPlaneClass() const = 0;
+    virtual Plane* MakePlane( const char* name, const char* description = "",
+			      THaDetectorBase* parent = 0 ) const = 0;
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };
