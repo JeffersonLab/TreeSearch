@@ -79,29 +79,37 @@ public:
 };
 class DAQmodule : public CSpair {
 public:
+  DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan )
+    : CSpair(crate, slot), fModel(model), fNchan(nchan),
+      fHasResolution(false) {}
   DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan,
-	     Double_t res = 0 )
-    : CSpair(crate, slot), fModel(model), fNchan(nchan), fResolution(res) {}
+	     Double_t res )
+    : CSpair(crate, slot), fModel(model), fNchan(nchan), 
+      fResolution(res*1e-12) /* NB: resolution in ps! */,
+      fHasResolution(true) {}
   virtual ~DAQmodule() {}
   virtual void Copy( TObject& obj ) const {
     TObject::Copy(obj);
     DAQmodule* m = dynamic_cast<DAQmodule*>(&obj);
-    if( !m ) return;
+    assert( m );
     m->fCrate = fCrate; m->fSlot = fSlot; m->fModel = fModel;
     m->fNchan = fNchan; m->fResolution = fResolution;
+    m->fHasResolution = fHasResolution;
   }
   virtual void Print( Option_t* ) const {
     cout << "DAQmodule: "
 	 << " crate = " << fCrate
 	 << " slot = "  << fSlot
 	 << " model = " << fModel
-	 << " nchan = " << fNchan
-	 << " res = "   << fResolution
-	 << endl;
+	 << " nchan = " << fNchan;
+    if( fHasResolution )
+      cout << " res = "   << fResolution*1e12 << " ps";
+    cout << endl;
   }
   UInt_t    fModel;
   UInt_t    fNchan;
   Double_t  fResolution;
+  bool      fHasResolution;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
