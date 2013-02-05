@@ -154,17 +154,29 @@ struct TrackThread {
   
 //_____________________________________________________________________________
 class ThreadCtrl {
-  //TODO: better encapsulation
-  friend THaAnalysisObject::EStatus Tracker::Init(const TDatime&);
-  friend Int_t Tracker::CoarseTrack(TClonesArray&);
 public:
-  ThreadCtrl() : fTrackStatus(0), fTrackToDo(0),
-		 fTrackStartM(new TMutex), fTrackDoneM(new TMutex),
-		 fTrackStart(new TCondition(fTrackStartM)),
-		 fTrackDone(new TCondition(fTrackDoneM)) {}
+  static const UInt_t kThreadTerminateBit = 8*sizeof(UInt_t)-1; // = 31
+
+  ThreadCtrl( const vector<Projection*>& vp )
+    : fTrackStatus(0), fTrackToDo(0),
+      fTrackStartM(new TMutex), fTrackDoneM(new TMutex),
+      fTrackStart(new TCondition(fTrackStartM)),
+      fTrackDone(new TCondition(fTrackDoneM))
+  {
+    if( !vp.empty() ) {
+      fTrack.reserve( vp.size() );
+      fTrackStartM->Lock();
+      for( vpsiz_t k = 0; k < vp.size(); ++k ) {
+	TThread* t = AddTrackThread( vp[k] );
+	t->Run();
+      }
+      fTrackStartM->UnLock();
+    }
+  }
   ~ThreadCtrl() {
-    // Terminate tracking threads
+    // Terminate all running tracking threads
     if( !fTrack.empty() ) {
+      fTrackDoneM->Lock();
       fTrackStartM->Lock();
       fTrackToDo = 0;
       for( vector<TrackThread>::iterator it = fTrack.begin(); it !=
@@ -173,14 +185,14 @@ public:
 	if( th and th->GetState() == TThread::kRunningState )
 	  SETBIT(fTrackToDo, (*it).proj->GetType());
       }
-      // negative sign is termination flag
-      SETBIT(fTrackToDo, 31);
+      // MSB is termination flag
+      SETBIT(fTrackToDo, kThreadTerminateBit);
       fTrackStart->Broadcast();
-      fTrackDoneM->Lock();
       fTrackStartM->UnLock();
       while( true ) {
 	Int_t ret = fTrackDone->Wait();
-	if( ret == 0 and fTrackToDo == BIT(31) )
+	assert( ret == 0 );
+	if( fTrackToDo == BIT(kThreadTerminateBit) )
 	  break;
       }
       fTrackDoneM->UnLock();
@@ -192,6 +204,39 @@ public:
     delete fTrackDoneM;
     delete fTrackStartM;
   }
+  Int_t Run( UInt_t maxthreads ) {
+    // Run our threads, at most maxthreads at a time
+    if( maxthreads == 0 or fTrack.empty() )
+      return 0;
+    if( maxthreads > kThreadTerminateBit )
+      maxthreads = kThreadTerminateBit;
+    fTrackDoneM->Lock();
+    fTrackStatus = 0;
+    vector<TrackThread>::iterator it = fTrack.begin();
+    while( it != fTrack.end() ) {
+      fTrackStartM->Lock();
+      fTrackToDo = 0;
+      UInt_t n = 0;
+      while( n < maxthreads and it != fTrack.end() ) {
+	SETBIT(fTrackToDo, (*it).proj->GetType());
+	++n;
+	++it;
+      }
+      // Start tracking within the threads
+      fTrackStart->Broadcast();
+      fTrackStartM->UnLock();
+      while( true ) {
+	// Wait for end of processing
+	Int_t ret = fTrackDone->Wait();
+	assert( ret == 0 );
+	if( fTrackToDo == 0 )
+	  break;
+      }
+    }    
+    fTrackDoneM->UnLock();
+    return fTrackStatus;
+  }
+private:
   TThread* AddTrackThread( Projection* proj ) {
     assert( proj );
     fTrack.push_back( TrackThread() );
@@ -208,15 +253,15 @@ public:
     t->thread  = new TThread( tn.c_str(), DoTrack, (void*)t );
     return t->thread;
   }
-private:
   vector<TrackThread>  fTrack;        // Tracking thread descriptors
   Int_t                fTrackStatus;  // Common status variable
-  UInt_t               fTrackToDo;    // Bitfield of projections to wait for
+  UInt_t               fTrackToDo;    // Bitfield of threads to wait for
   TMutex*              fTrackStartM;  // Mutex for start condition
   TMutex*              fTrackDoneM;   // Mutex for done condition
   TCondition*          fTrackStart;   // Start condition
   TCondition*          fTrackDone;    // Finish condition
 };
+
 
 //_____________________________________________________________________________
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
@@ -1265,11 +1310,12 @@ static void DoTrack( void* ptr )
 
     // Wait for start condition
     while( true ) {
-      Int_t ret = arg->start->Wait();
-      if( ret == 0 and TESTBIT(*arg->running, arg->proj->GetType()) )
+      Int_t ret = arg->start->Wait(); // unlocks arg->start_m
+      assert( ret == 0 );
+      terminate = TESTBIT(*arg->running, ThreadCtrl::kThreadTerminateBit);
+      if( TESTBIT(*arg->running, arg->proj->GetType()) or terminate )
 	break;
     }
-    terminate = TESTBIT(*arg->running, 31);
     arg->start_m->UnLock();
 
     Int_t nrd = 0;
@@ -1277,21 +1323,24 @@ static void DoTrack( void* ptr )
       // Process this event
       nrd = arg->proj->Track();
 
-    // Set error flag, if necessary, and decrement run counter
+    // Ensure we're the only one modifying/testing thread
+    // control data (arg->running)
     arg->done_m->Lock();
+    // Set error flag, if necessary
     if( nrd < 0 ) {
       *arg->status = 1;
     }
     // Clear the bit for this projection in the status bitfield
-    assert( TESTBIT(*arg->running, arg->proj->GetType()) );
     CLRBIT( *arg->running, arg->proj->GetType() );
-    // If all bits are zero, all threads have finished processing
-    if( (*arg->running & ~BIT(31)) == 0 )
+    // If all bits are zero, all threads have finished processing,
+    // in which case we wake up the main thread
+    if( (*arg->running & ~BIT(ThreadCtrl::kThreadTerminateBit)) == 0 )
       arg->done->Signal();
 
     if( !terminate )
       // Ensure that we enter Wait() before the main thread can send the
-      // next Broadcast()
+      // next Broadcast(). This must come before unlocking arg->done_m,
+      // or else we have a race condition in the main thread.
       arg->start_m->Lock();  
 
     arg->done_m->UnLock();
@@ -1320,31 +1369,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 
   bool do_thread = (fMaxThreads > 1);
   if( do_thread ) {
-    // Wake the tracking threads
-    fThreads->fTrackDoneM->Lock();
-    fThreads->fTrackStatus = 0;
-    EProjType type_beg = fProj.front()->GetType();
-    EProjType type_end = fProj.back()->GetType();
-    UInt_t all_todo = (BIT(type_end)-1) & ~(BIT(type_beg)-1);
-    UInt_t max_todo = BIT(fMaxThreads)-1;
-    Int_t start = type_beg;
-    while( start < type_end ) {
-      UInt_t now_todo = (max_todo << start) & all_todo;
-      fThreads->fTrackStartM->Lock();
-      fThreads->fTrackToDo = now_todo;
-      fThreads->fTrackStart->Broadcast();
-      fThreads->fTrackStartM->UnLock();
-      // Wait for end of processing
-      while( true ) {
-	Int_t ret = fThreads->fTrackDone->Wait();
-	if( ret == 0 and fThreads->fTrackToDo == 0 )
-	  break;
-      }
-      start += fMaxThreads;
-    }
-    // Retrieve status
-    err = fThreads->fTrackStatus;
-    fThreads->fTrackDoneM->UnLock();
+    err = fThreads->Run( fMaxThreads );
   } else {
     // Single-threaded execution: Track() each projection in turn
     for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
@@ -1864,14 +1889,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     gSystem->Load("libThread");
     //FIXME: check for successful load, warn and degrade if not
     delete fThreads;
-    fThreads = new ThreadCtrl;
-    fThreads->fTrack.reserve( fProj.size() );
-    fThreads->fTrackStartM->Lock();
-    for( vpsiz_t k = 0; k < fProj.size(); ++k ) {
-      TThread* t = fThreads->AddTrackThread( fProj[k] );
-      t->Run();
-    }
-    fThreads->fTrackStartM->UnLock();
+    fThreads = new ThreadCtrl( fProj );
   }
 
   return fStatus = kOK;
@@ -2053,23 +2071,19 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 	TMath::ChisquareQuantile( 1.0-conf_level, dof );
     }
   }
-  // If maxthreads set, use it
-  if( maxthreads > 0 ) {
-    fMaxThreads = max(maxthreads,1);
-    if( fMaxThreads > 20 ) { // Sanity limit
-      fMaxThreads = 20;
-      Warning( Here(here), "Excessive value of maxthreads = %d, "
-	       "limited to %u", maxthreads, fMaxThreads );
-    }
-  } else {
-    // If maxthreads not given, automatically use the number of cpus reported
-    SysInfo_t sysifo;
-    gSystem->GetSysInfo( &sysifo );
-    if( sysifo.fCpus > 0 )
-      fMaxThreads = sysifo.fCpus;
-    else
-      fMaxThreads = 1;
-  }
+
+  // Determine maximum number of threads to run. We set this to the smaller of
+  // maxthreads from the database and the number of CPUs reported. If no CPU
+  // info available, use the value from the database, else 1.
+  SysInfo_t sysifo;
+  gSystem->GetSysInfo( &sysifo );
+  if( sysifo.fCpus > 0 and maxthreads > 0 )
+    fMaxThreads = min(sysifo.fCpus, maxthreads);
+  else if( maxthreads > 0 )
+    // Currently, ThreadCtrl supports at most kThreadTerminateBit (=31) threads
+    fMaxThreads = min((UInt_t)maxthreads, ThreadCtrl::kThreadTerminateBit);
+  else
+    fMaxThreads = 1;
   
   fIsInit = kTRUE;
   return kOK;
