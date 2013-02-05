@@ -17,12 +17,12 @@
 #include <set>
 #include <list>
 #include <cassert>
+#include "TMatrixDSym.h"
 
 class THaTrack;
 class THaBenchmark;
 class TClonesArray;
 class THashTable;
-class TMatrixDSym;
 class TClass;
 
 using std::vector;
