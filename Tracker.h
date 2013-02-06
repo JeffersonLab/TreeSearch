@@ -24,6 +24,7 @@ class THaBenchmark;
 class TClonesArray;
 class THashTable;
 class TClass;
+class TSeqCollection;
 
 using std::vector;
 
@@ -31,6 +32,7 @@ namespace TreeSearch {
   class Plane;
   class Projection;
   class Road;
+  class Hit;
   class ThreadCtrl;  // Defined in implementation
 
   typedef std::vector<Road*> Rvec_t;
@@ -119,8 +121,6 @@ namespace TreeSearch {
     void      Add3dMatch( const Rvec_t& selected, Double_t matchval,
 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 			  Rset_t& unique_found ) const;
-    void      FindNearestHits( Plane* wp, const THaTrack* track,
-			       const Rvec_t& roads ) const;
     void      FitErrPrint( Int_t err ) const;
     Int_t     FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 			Double_t& chi2, TMatrixDSym* coef_covar = 0 ) const;
@@ -134,6 +134,17 @@ namespace TreeSearch {
     THaTrack* NewTrack( TClonesArray& tracks, const FitRes_t& fit_par );
     Bool_t    PassTrackCuts( const FitRes_t& fit_par ) const;
 
+    // Virtualization of the tracker class, specialized Trackers may/must override
+    virtual Plane* MakePlane( const char* name, const char* description = "",
+			      THaDetectorBase* parent = 0 ) const = 0;
+    virtual UInt_t GetCrateMapDBcols() const = 0;
+
+    virtual void   FindNearestHits( Plane* pl, const THaTrack* track,
+				    const Rvec_t& roads ) const;
+    virtual void   FindNearestHitsImpl( const TSeqCollection* hits,
+					Int_t first, Int_t last, Double_t x,
+					Hit*& hmin, Double_t& pmin ) const;
+
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
     Double_t  LoadDAQresolution( THaDetMap::Module* m ) const;
@@ -141,10 +152,6 @@ namespace TreeSearch {
 
     // Podd interface
     virtual Int_t  ReadDatabase( const TDatime& date );
-
-    virtual Plane* MakePlane( const char* name, const char* description = "",
-			      THaDetectorBase* parent = 0 ) const = 0;
-    virtual UInt_t GetCrateMapDBcols() const = 0;
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };
