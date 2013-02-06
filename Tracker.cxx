@@ -1886,10 +1886,15 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 
   // If threading requested, load thread library and start up threads
   if( fMaxThreads > 1 ) {
-    gSystem->Load("libThread");
-    //FIXME: check for successful load, warn and degrade if not
-    delete fThreads;
-    fThreads = new ThreadCtrl( fProj );
+    delete fThreads; fThreads = 0;
+    if( gSystem->Load("libThread") >= 0 ) {
+      fThreads = new ThreadCtrl( fProj );
+    } else {
+      // Error loading library
+      Warning( Here(here), "Error loading thread library. Falling back to "
+	       "single-threaded processing." );
+      fMaxThreads = 1;
+    }
   }
 
   return fStatus = kOK;
@@ -2072,18 +2077,33 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     }
   }
 
-  // Determine maximum number of threads to run. We set this to the smaller of
-  // maxthreads from the database and the number of CPUs reported. If no CPU
-  // info available, use the value from the database, else 1.
-  SysInfo_t sysifo;
-  gSystem->GetSysInfo( &sysifo );
-  if( sysifo.fCpus > 0 and maxthreads > 0 )
-    fMaxThreads = min(sysifo.fCpus, maxthreads);
-  else if( maxthreads > 0 )
-    // Currently, ThreadCtrl supports at most kThreadTerminateBit (=31) threads
-    fMaxThreads = min((UInt_t)maxthreads, ThreadCtrl::kThreadTerminateBit);
-  else
-    fMaxThreads = 1;
+  // Determine maximum number of threads to run. maxthreads from the database
+  // has priority. maxthreads = 0 or negative indicates that the number of
+  // CPUs/cores of the current host should be used. If not available, use 1.
+  // To ensure single-threaded processing, set maxthreads = 1 in the database.
+  // The number of threads is capped by the maximum that the ThreadCtrl class
+  // supports - currently 31 due to the size of UInt_t, which is more than
+  // enough since we never run more threads than the number of projections.
+  bool warn = false;
+  if( maxthreads > 0 )
+    fMaxThreads = maxthreads;
+  else {
+    SysInfo_t sysifo;
+    gSystem->GetSysInfo( &sysifo );
+    if( sysifo.fCpus > 0 )
+      fMaxThreads = sysifo.fCpus;
+    else {
+      warn = true;
+      fMaxThreads = 1;
+    }
+  }
+  // Currently, ThreadCtrl supports at most kThreadTerminateBit (=31) threads
+  fMaxThreads = min(fMaxThreads, ThreadCtrl::kThreadTerminateBit);
+  if( warn )
+    Warning( Here(here), "Cannot determine number of CPU cores. "
+	     "Falling back to single-threaded processing." );
+  else if( fDebug > 0 )
+    Info( Here(here), "Enabled up to %u threads", fMaxThreads );
   
   fIsInit = kTRUE;
   return kOK;
