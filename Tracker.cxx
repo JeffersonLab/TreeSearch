@@ -1984,8 +1984,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   if( status != kOK )
     return status;
 
-  // Set analysis control flags
-  // SetBit( kDoADCCut,      do_adc_cut );
+  // Set common analysis control flags
   SetBit( kEventDisplay,  event_display );
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
@@ -1998,7 +1997,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   }
   vector<string> calibplanes = vsplit(calibconfig);
 
-  // Set up the planes
+  // Set up the wire/readout planes
   for( ssiz_t i=0; i<planes.size(); ++i ) {
     assert( !planes[i].empty() );
     const char* name = planes[i].c_str();
@@ -2042,22 +2041,21 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       s.append(" ");
       s.append(calibplanes[i]);
     }
-    Warning( Here(here), "Requested calibration for undefined plane %s. "
+    Warning( Here(here), "Requested calibration for undefined %s. "
 	     "Error in database?", s.c_str() );
   }
 
   UInt_t nplanes = fPlanes.size();
-  if( nplanes < 5 ) {
-    Error( Here(here), "Insufficient number of planes = %u. Need at least 5. "
-	   "Fix database.", nplanes );
-    return kInitError;
-  }
   if( fDebug > 0 )
     Info( Here(here), "Loaded %u planes", nplanes );
 
   if( doing_tracking ) {
+    if( nplanes < 5 ) {
+      Error( Here(here), "Insufficient number of planes = %u. Need at least 5. "
+	     "Fix database.", nplanes );
+      return kInitError;
+    }
     // Convert maximum number of missing hits to ndof of fits
-    //===> TODO: Review
     fMinNdof = ( maxmiss >= 0 ) ? nplanes - 4 - maxmiss : 1;
 
     // Determine Chi2 confidence interval limits for the selected CL and the
