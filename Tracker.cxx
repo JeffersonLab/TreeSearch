@@ -2164,27 +2164,6 @@ void Tracker::EnableEventDisplay( Bool_t b )
 }
 
 //_____________________________________________________________________________
-EProjType MWDC::NameToType( const char* name )
-{
-  // Return the index corresponding to the given plane name.
-  // The comparison is not case-sensitive.
-
-  if( name and *name ) {
-    TString s(name);
-    s.ToLower();
-    for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
-      if( !fProj[type] )
-	continue;
-      TString ps( fProj[type]->GetName() );
-      ps.ToLower();
-      if( s == ps )
-	return type;
-    }
-  }
-  return kUndefinedType;
-}
-
-//_____________________________________________________________________________
 inline
 static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot, 
 				 const THashTable* table )

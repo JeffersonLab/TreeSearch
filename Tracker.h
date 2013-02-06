@@ -59,8 +59,6 @@ namespace TreeSearch {
     void            EnableEventDisplay( Bool_t enable = true );
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
 
-    EProjType       NameToType( const char* name );
-
     // Analysis control flags. Set via database.
     enum {
       k3dFastMatch= BIT(18), // Use fast 3D matching algorithm (auto detected)
