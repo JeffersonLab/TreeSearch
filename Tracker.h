@@ -127,12 +127,16 @@ namespace TreeSearch {
     template< typename Action > static
     Action    ForAllTrackPoints( const Rvec_t& roads, 
 				 const vector<Double_t>& coef, Action action );
-    UInt_t    MatchRoads( vector<Rvec_t>& roads,
-			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-			  Rset_t& unique_found );
-			  
     THaTrack* NewTrack( TClonesArray& tracks, const FitRes_t& fit_par );
     Bool_t    PassTrackCuts( const FitRes_t& fit_par ) const;
+
+    UInt_t MatchRoadsGeneric( vector<Rvec_t>& roads, UInt_t ncombos,
+			      std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+			      Rset_t& unique_found );
+
+    UInt_t MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t ncombos,
+			     std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+			     Rset_t& unique_found );
 
     // Virtualization of the tracker class, specialized Trackers may/must override
     virtual Plane* MakePlane( const char* name, const char* description = "",
@@ -144,6 +148,13 @@ namespace TreeSearch {
     virtual void   FindNearestHitsImpl( const TSeqCollection* hits,
 					Int_t first, Int_t last, Double_t x,
 					Hit*& hmin, Double_t& pmin ) const;
+
+    virtual UInt_t MatchRoads( vector<Rvec_t>& roads,
+			       std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+			       Rset_t& unique_found );
+    virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
+				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+				   Rset_t& unique_found ) = 0;
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
