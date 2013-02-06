@@ -268,7 +268,6 @@ Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0), 
     fMaxThreads(1), fThreads(0),
     f3dMatchvalScalefact(1), f3dMatchCut(0),
-    fMaxCorrMismatches(0), fMaxCorrNsigma(1.0),
     fMinNdof(1), fFailNhits(0), fFailNpat(0),
     fNcombos(0), fN3dFits(0), fEvNum(0),
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
@@ -2199,7 +2198,7 @@ UInt_t Tracker::LoadDAQmodel( THaDetMap::Module* mod ) const
 }
 
 //_____________________________________________________________________________
-Double_t MWDC::LoadDAQresolution( THaDetMap::Module* mod ) const
+Double_t Tracker::LoadDAQresolution( THaDetMap::Module* mod ) const
 {
   // Update detector map module 'mod' with the resolution from the cratemap
   DAQmodule* found = FindDAQmodule( mod->crate, mod->slot, fCrateMap );
