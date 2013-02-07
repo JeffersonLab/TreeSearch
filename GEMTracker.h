@@ -37,18 +37,22 @@ namespace TreeSearch {
     // void      FindNearestHits( ReadoutPlane* wp, const THaTrack* track,
     // 			       const Rvec_t& roads ) const;
 
-    // UInt_t    MatchRoads( vector<Rvec_t>& roads,
-    // 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-    // 			  Rset_t& unique_found );
-			  
-    // Podd interface
-    virtual Int_t  ReadDatabase( const TDatime& date );
+    UInt_t MatchRoadsCorrAmpl( vector<Rvec_t>& roads, UInt_t ncombos,
+			       std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+			       Rset_t& unique_found );
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
     virtual UInt_t GetCrateMapDBcols() const;
 
-    ClassDef(GEMTracker,0)   // Tree search track reconstruction for GEM trackers
+    virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
+				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+				   Rset_t& unique_found );
+
+     // Podd interface
+    virtual Int_t  ReadDatabase( const TDatime& date );
+
+    ClassDef(GEMTracker,0)   // TreeSearch track reconstruction for GEM trackers
   };
 
 }

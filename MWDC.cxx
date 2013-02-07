@@ -925,6 +925,25 @@ UInt_t MWDC::GetCrateMapDBcols() const
   return 6;
 }
 
+//_____________________________________________________________________________
+UInt_t MWDC::MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
+			     list<std::pair<Double_t,Rvec_t> >& combos_found,
+			     Rset_t& unique_found )
+{
+  // Implementation of MatchRoads for MWDCs. Supports the generic and fast
+  // geometric matching algorithms. Fast matching is selected automatically
+  // in Init if the detector configuration is appropriate.
+
+  UInt_t nfound;
+
+  if( TestBit(k3dFastMatch) ) {
+    nfound = MatchRoadsFast3D( roads, ncombos, combos_found, unique_found );
+  } else {
+    nfound = MatchRoadsGeneric( roads, ncombos, combos_found, unique_found );
+  }
+  return nfound;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch

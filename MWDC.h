@@ -40,18 +40,19 @@ namespace TreeSearch {
     //===> TODO: candidates for virtual functions
     // void      FindNearestHits( WirePlane* wp, const THaTrack* track,
     // 			       const Rvec_t& roads ) const;
-    // UInt_t    MatchRoads( vector<Rvec_t>& roads,
-    // 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-    // 			  Rset_t& unique_found );
 			  
-    // Podd interface
-    virtual Int_t  ReadDatabase( const TDatime& date );
-
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
     virtual UInt_t GetCrateMapDBcols() const;
 
-    ClassDef(MWDC,0)   // Tree search reconstruction of BigBite MWDCs
+    virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
+				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+				   Rset_t& unique_found );
+
+    // Podd interface
+    virtual Int_t  ReadDatabase( const TDatime& date );
+
+    ClassDef(MWDC,0)   // TreeSearch reconstruction of a horizontal drift chamber system
   };
 
 }

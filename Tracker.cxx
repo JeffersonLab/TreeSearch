@@ -911,7 +911,6 @@ UInt_t Tracker::MatchRoadsGeneric( vector<Rvec_t>& roads, const UInt_t ncombos,
   // Vector holding a combination of roads to test. One road from each
   // projection
   Rvec_t selected;
-  selected.reserve(nproj);
 
   UInt_t nfound = 0;
   Double_t zback = fPlanes.back()->GetZ();
@@ -1000,6 +999,10 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   cout << "fast algo):";
 #endif
 
+  // Vector holding a combination of roads to test. One road from each
+  // projection
+  Rvec_t selected( nproj, 0 );
+
   // Fetch coefficients for coordinate transformations
   vpiter_t ip = fProj.begin();
   assert( (*ip)->GetType() == kUPlane );
@@ -1030,11 +1033,6 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   // by ascending front position
   sort( ALL(roads[2]), Road::PosIsLess() );
   Road::PosIsNear pos_near( TMath::Sqrt(f3dMatchCut) );
-
-  // Vector holding a combination of roads to test. One road from each
-  // projection
-  Rvec_t selected;
-  selected.reserve(nproj);
 
   UInt_t nfound = 0;
   Double_t zback = fPlanes.back()->GetZ();
@@ -1134,14 +1132,6 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
     ncombos = 0;
     inrange = false;
   }
-//   bool fast_3d = TestBit(k3dFastMatch);
-//   bool correlate_amplitudes = TestBit(k3dCorrAmpl);
-
-//   // Limitation: amplitude correlation algo only implemented for 2 projections
-//   assert( nproj == 2 or not correlate_amplitudes );
-
-//   // Fast 3D matching and amplitude correlation are mutually exclusive
-//   assert( not (fast_3d and correlate_amplitudes) );
 
 #ifdef VERBOSE
   if( fDebug > 0 ) {
@@ -1168,149 +1158,10 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
   fNcombos = ncombos;
 #endif
 
-  //  if( ncombos == 0 or (nproj == 2 and not correlate_amplitudes) )
   if( ncombos == 0 )
     return 0;
 
   UInt_t nfound = MatchRoadsImpl( roads, ncombos, combos_found, unique_found );
-
-
-  // // Vector holding a combination of roads to test. One road from each
-  // // projection
-  // Rvec_t selected;
-  // selected.reserve(nproj);
-
-//   if( correlate_amplitudes ) {
-//     assert( nproj == 2 );
-//     assert( not (roads[0].empty() or roads[1].empty()) );
-
-//     const Rpvec_t& xplanes =
-//       roads[0].front()->GetProjection()->GetListOfPlanes();
-//     const Rpvec_t& yplanes =
-//       roads[1].front()->GetProjection()->GetListOfPlanes();
-
-//     assert( not xplanes.empty() and (xplanes.size() == yplanes.size()) );
-//     assert( xplanes.front()->GetType() != yplanes.front()->GetType() );
-
-//     selected.assign( nproj, 0 );
-
-//     UInt_t nplanes = xplanes.size();
-//     TBits xybits(nplanes), ybits(nplanes); 
-//     // Look at all possible combinations of x-roads and y-roads.
-//     // Try to match them via the ADC amplitudes of the hits in the shared
-//     // readout planes. Amplitudes should correlate well in the absence
-//     // of pileup. 
-//     for( Rvec_t::iterator itx = roads[0].begin(); itx != roads[0].end();
-// 	 ++itx ) {
-//       Road* xroad = *itx;
-//       const Road::Pvec_t& xpoints = xroad->GetPoints();
-//       UInt_t xpat = xroad->GetPlanePattern();
-//       for( Rvec_t::iterator ity = roads[1].begin(); ity != roads[1].end();
-// 	   ++ity ) {
-// 	Road* yroad = *ity;
-
-// 	// xpat and ypat are bitpatterns of the plane numbers that have hits.
-// 	// The AND of these patters is the pattern of planes where both read-
-// 	// out directions have hits (matching or not). Check here if there
-// 	// are enough such common active planes, else all following work can
-// 	// be skipped.
-// 	UInt_t ypat = yroad->GetPlanePattern();
-// 	xybits.Set( nplanes, &xpat );
-// 	ybits.Set( nplanes, &ypat );
-// 	xybits &= ybits;
-// 	assert( xybits.CountBits() <= nplanes );
-// 	if( xybits.CountBits() + fMaxCorrMismatches < nplanes )
-// 	  continue;
-
-// 	// For all points (=hits that yield the best fit) of this xroad, 
-// 	// get the yroad point in the same plane (if available), then check
-// 	// if their ADC amplitudes approximately match (within a hard cut)
-// 	const Road::Pvec_t& ypoints = yroad->GetPoints();
-// 	Road::Pvec_t::const_iterator ityp = ypoints.begin();
-// 	UInt_t nmatches = 0;
-// 	Double_t matchval = 0.0;
-// 	for( Road::Pvec_t::const_iterator itxp = xpoints.begin();
-// 	     itxp != xpoints.end(); ++itxp ) {
-// 	  const Road::Point* xp = *itxp;
-// 	  assert( xp and xp->hit );
-// 	  const Plane* xplane = xp->hit->GetPlane();
-// 	  assert( xplane );
-// 	  UInt_t xnum = xplane->GetPlaneNum();
-// 	  assert( xnum < xplanes.size() );
-// 	  // No hit in the other readout direction of this plane?
-// 	  if( not ybits.TestBitNumber(xnum) )
-// 	    continue;
-// 	  // Move y-iterator forward until it gets to the same plane
-// 	  while( ityp != ypoints.end() and
-// 		 (*ityp)->hit->GetPlaneNum() != xnum ) {
-// 	    ++ityp;
-// 	  }
-// 	  // Must find a corresponding hit here, else bug in ybits test
-// 	  assert( ityp != ypoints.end() );
-// 	  if( ityp == ypoints.end() ) break;
-// 	  const Road::Point* yp = *ityp;
-// 	  assert( yp and yp->hit );
-// 	  const Plane* yplane = yp->hit->GetPlane();
-// 	  assert( yplane );
-// 	  assert( yplane->GetPartner() == xplane );
-
-// 	  // Get ratio of hit amplitudes
-// 	  Double_t xampl = xp->hit->GetADCsum();
-// 	  Double_t yampl = yp->hit->GetADCsum();
-// 	  assert( xampl > 0.0 and yampl > 0.0 ); // ensured in Decoder
-// 	  if( xampl < 1.0 or yampl < 1.0 )
-// 	    continue;
-// 	  Double_t ratio = xampl/yampl;
-// 	  Double_t asym = (xampl - yampl)/(xampl + yampl);
-// 	  // Compute the cutoff. In general, the sigma of the distribution can
-// 	  // be amplitude-dependent, so we get it via a calibration function
-// 	  // that is a property of each readout plane
-// // 	  Double_t xsigma = xplane->GetAmplSigma( xampl );
-// // 	  Double_t ysigma = yplane->GetAmplSigma( yampl );
-// 	  // Apply overall scale factor ("number of sigmas") from the database
-// // 	  Double_t cutoff = fMaxCorrNsigma / yampl *
-// // 	    TMath::Sqrt( xsigma*xsigma + ysigma*ysigma*ratio*ratio );
-// 	  Double_t cutoff = fMaxCorrNsigma;
-// #ifdef VERBOSE
-// 	  if( fDebug > 3 ) {
-// 	    cout << xplane->GetName() << yplane->GetName()
-// 		 << " ampl = (" << xampl << ", " << yampl << ")"
-// 		 << ",\tratio = " << ratio
-// 		 << ", asym = " << asym << endl;
-// 	  }
-// #endif
-// 	  // Count readout planes whose x/y-hit amplitudes match
-// 	  if( TMath::Abs(asym) < cutoff ) {
-// 	    matchval += TMath::Abs(asym);  // not really used later (yet)
-// 	    ++nmatches;
-// 	  }
-// 	} //xpoints
-	  
-// #ifdef VERBOSE
-// 	if( fDebug > 3 ) {
-// 	  cout <<   "nmatches = " << nmatches 
-// 	       << ", matchval = " << matchval << "   ";
-// 	}
-// #endif
-// 	// If enough planes have correlated x/y hit amplitudes, save this
-// 	// x/y road pair as a possible 3D track candidate. The 3D track fit
-// 	// will separate the wheat from the chaff later
-// 	if( nmatches + fMaxCorrMismatches >= nplanes ) {
-// 	  selected[0] = xroad;
-// 	  selected[1] = yroad;
-// 	  Add3dMatch( selected, matchval, combos_found, unique_found );
-// 	  ++nfound;
-//         }
-// #ifdef VERBOSE
-// 	else if( fDebug > 3 ) { cout << endl; }
-// #endif
-//       } //yroads
-//     }   //xroads
-
-//   } else if( fast_3d ) {
-//   } else {
-
-//   } //matching methods
 
 #ifdef VERBOSE
   if( fDebug > 0 ) {
