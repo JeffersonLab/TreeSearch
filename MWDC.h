@@ -45,6 +45,10 @@ namespace TreeSearch {
 			      THaDetectorBase* parent = 0 ) const;
     virtual UInt_t GetCrateMapDBcols() const;
 
+    virtual void   FindNearestHitsImpl( const TSeqCollection* hits,
+					Int_t first, Int_t last, Double_t x,
+					Hit*& hmin, Double_t& pmin ) const;
+
     virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
 				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 				   Rset_t& unique_found );

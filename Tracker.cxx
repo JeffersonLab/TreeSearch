@@ -605,29 +605,34 @@ void Tracker::FindNearestHits( Plane* pl, const THaTrack* track,
   Double_t x     = track->GetDX()*cosa + track->GetDY()*sina + slope*z;
   Double_t pmin  = kBig;
   Hit* hmin = 0;
-  // Binary search the hits array for the track crossing position x, similar
-  // to std::lower_bound(). This finds the first hit with position >= x.
+
   const TSeqCollection* hits = pl->GetHits();
-  Int_t first = 0, last = hits->GetSize();
+  Int_t last = hits->GetSize();
+  // If "hits" is a TObjArray or TClonesArray, we must get the size using
+  // GetLast() instead of GetSize() (a ROOT quirk)
   const TObjArray* arr = dynamic_cast<const TObjArray*>(hits);
   if( arr )
-    // GetSize() is incorrect for TObjArrays and TClonesArrays
     last = arr->GetLast()+1;
-  Int_t len = last - first;
-  Int_t half, middle;
-  while( len > 0 ) {
-    half = len >> 1;
-    middle = first + half;
-    if( static_cast<Hit*>(hits->At(middle))->GetPos() < x ) {
-      first = middle + 1;
-      len -= half + 1;
-    } else
-      len = half;
-  }
 
-  // Find the hit (hmin) and its coordinate of closest approach (pmin).
-  // Details depend on the type of detector technology (wires, strips).
-  FindNearestHitsImpl( hits, first, last, x, hmin, pmin );
+  if( last > 0 ) {
+    // Binary search the hits array for the track crossing position x, similar
+    // to std::lower_bound(). This finds the first hit with position >= x.
+    Int_t first = 0, len = last - first;
+    while( len > 0 ) {
+      Int_t half = len >> 1;
+      Int_t middle = first + half;
+      if( static_cast<Hit*>(hits->At(middle))->GetPos() < x ) {
+	first = middle + 1;
+	len -= half + 1;
+      } else
+	len = half;
+    }
+    assert( first <= last );
+
+    // Find the hit (hmin) and its coordinate of closest approach (pmin).
+    // Details depend on the type of detector technology (wires, strips).
+    FindNearestHitsImpl( hits, first, last, x, hmin, pmin );
+  }
 
   // The road vector does not necessarily contain all projections, so
   // search for the road of the type of this readout plane, taking advantage
@@ -661,31 +666,28 @@ void Tracker::FindNearestHitsImpl( const TSeqCollection* hits,
   // strips.
 
   // Decide whether the hit >= x or the first one < x are closest.
-  if( last > 0 ) {
-    assert( first <= last );
-    Hit *hnext = 0, *hprev = 0;
-    if( first < last ) {
-      hnext = static_cast<Hit*>(hits->At(first));
-      assert( hnext->GetPos() >= x );
-    }
-    if( first > 0 ) {
-      hprev = static_cast<Hit*>(hits->At(first-1));
-      assert( hprev->GetPos() < x );
-      if( hnext ) {
-	assert( hprev->GetPos() < hnext->GetPos() );
-	if( x - hprev->GetPos() < hnext->GetPos() - x )
-	  hnext = 0;
-  	else
-	  hprev = 0;
-      }
-    }
-    assert( (hprev != 0) xor (hnext != 0) );
-    if( hnext )
-      hmin = hnext;
-    else
-      hmin = hprev;
-    pmin = hmin->GetPos();
+  Hit *hnext = 0, *hprev = 0;
+  if( first < last ) {
+    hnext = static_cast<Hit*>(hits->At(first));
+    assert( hnext->GetPos() >= x );
   }
+  if( first > 0 ) {
+    hprev = static_cast<Hit*>(hits->At(first-1));
+    assert( hprev->GetPos() < x );
+    if( hnext ) {
+      assert( hprev->GetPos() < hnext->GetPos() );
+      if( x - hprev->GetPos() < hnext->GetPos() - x )
+	hnext = 0;
+      else
+	hprev = 0;
+    }
+  }
+  assert( (hprev != 0) xor (hnext != 0) );
+  if( hnext )
+    hmin = hnext;
+  else
+    hmin = hprev;
+  pmin = hmin->GetPos();
 }
 
 //_____________________________________________________________________________
