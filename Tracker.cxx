@@ -1514,7 +1514,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 
   static const char* const here = "Init";
 
-  // The "cratemap" is only needed during Init of GEM and Plane
+  // The "cratemap" is only needed during Init of Tracker and Plane
   assert( fCrateMap == 0 );
   fCrateMap = new THashTable(100);
   fCrateMap->SetOwner();
@@ -2064,7 +2064,7 @@ inline
 static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot, 
 				 const THashTable* table )
 {
-  if( !table ) return 0;
+  assert(table);
   CSpair m( crate, slot );
   return static_cast<DAQmodule*>( table->FindObject(&m) );
 }
