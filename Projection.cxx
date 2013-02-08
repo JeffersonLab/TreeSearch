@@ -8,7 +8,7 @@
 
 #include "Projection.h"
 #include "Hitpattern.h"
-#include "WirePlane.h"
+#include "Plane.h"
 #include "THaDetectorBase.h"
 #include "PatternTree.h"
 #include "PatternGenerator.h"
@@ -16,7 +16,7 @@
 #include "Road.h"
 #include "Helper.h"
 #include "Hit.h"
-#include "MWDC.h"   // for MWDC bits
+#include "Tracker.h"   // for Tracker bits
 
 #include "TMath.h"
 #include "TString.h"
@@ -35,17 +35,20 @@ using namespace std;
 
 namespace TreeSearch {
 
-typedef vector<WirePlane*>::size_type vwsiz_t;
-typedef vector<WirePlane*>::iterator  vwiter_t;
+typedef vector<Plane*>::size_type vplsiz_t;
+typedef vector<Plane*>::iterator  vpliter_t;
 
 #define ALL(c) (c).begin(), (c).end()
+
+// Need at least 3 planes to do proper fits
+static const UInt_t kMinFitPlanes = 3;
 
 //_____________________________________________________________________________
 Projection::Projection( EProjType type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
-    fMinFitPlanes(3), fMaxMiss(0), fRequire1of2(true),
+    fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
     fPlaneCombos(0), fMaxPat(kMaxUInt), fFrontMaxBinDist(kMaxUInt),
     fBackMaxBinDist(kMaxUInt), fHitMaxDist(0), fConfLevel(1e-3),
     fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
@@ -80,18 +83,18 @@ Projection::~Projection()
 }
 
 //_____________________________________________________________________________
-void Projection::AddPlane( WirePlane* wp, WirePlane* partner )
+void Projection::AddPlane( Plane* pl, Plane* partner )
 {
-  // Add wire plane wp (and optional partner plane) to this projection. 
+  // Add plane pl (and optional partner plane) to this projection. 
   // Sets plane numbers.
 
-  assert(wp);
+  assert(pl);
 
-  wp->SetPlaneNum( fPlanes.size() );
-  fPlanes.push_back( wp );
-  wp->SetProjection( this );
+  pl->SetPlaneNum( fPlanes.size() );
+  fPlanes.push_back( pl );
+  pl->SetProjection( this );
   if( partner ) {
-    assert( partner->GetZ() > wp->GetZ() ); // Planes must be ordered
+    //    assert( partner->GetZ() > pl->GetZ() ); // Planes must be ordered
     partner->SetPlaneNum( fPlanes.size() );
     fPlanes.push_back( partner );
     partner->SetProjection( this );
@@ -126,9 +129,9 @@ Int_t Projection::Decode( const THaEvData& evdata )
 
   Int_t sum = 0;
   bool err = false;
-  for( vwsiz_t i = 0; i < GetNplanes(); ++i ) {
-    WirePlane* wp = fPlanes[i];
-    Int_t nhits = wp->Decode( evdata );
+  for( vplsiz_t i = 0; i < GetNplanes(); ++i ) {
+    Plane* pl = fPlanes[i];
+    Int_t nhits = pl->Decode( evdata );
     if( nhits < 0 ) {
       err = true;
       sum -= nhits;
@@ -144,16 +147,17 @@ Int_t Projection::Decode( const THaEvData& evdata )
 //_____________________________________________________________________________
 Double_t Projection::GetPlaneZ( UInt_t i ) const
 {
-  // Return the z-position of the i-th wire plane.
+  // Return z-position of i-th plane.
 
   assert( i<fPlanes.size() );
   return fPlanes[i]->GetZ();
 }
 
 //_____________________________________________________________________________
-void Projection::Reset()
+void Projection::Reset( Option_t* opt )
 {
-  // Reset parameters, clear list of planes, delete Hitpattern
+  // Reset parameters, delete dynamically allocated objects.
+  // If opt="FULL", reset everything, including the list of planes.
   
   fIsInit = kFALSE;
   fPlanes.clear();
@@ -162,19 +166,26 @@ void Projection::Reset()
   delete fPatternTree; fPatternTree = 0;
   delete fPlaneCombos; fPlaneCombos = 0;
   delete fRoadCorners; fRoadCorners = 0;
+  if( opt and *opt ) {
+    TString s(opt);
+    if( s.Contains( "FULL", TString::kIgnoreCase )) {
+      fPlanes.clear();
+    }
+  }
 }
 
 //_____________________________________________________________________________
 THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 {
-  // Initialize the Projection object. Called after MWDC basic initialization.
+  // Initialize the Projection object. Called after basic Tracker 
+  // initialization.
   // Sets up event display support, then continues with standard 
   // initialization.
 
   Reset();
 
   // Set up the event display support if corresponding bit is set in the MWDC
-  if( fDetector->TestBit(MWDC::kEventDisplay) ) {
+  if( fDetector->TestBit(Tracker::kEventDisplay) ) {
     assert( fRoadCorners == 0 );
     fRoadCorners = new TClonesArray("TreeSearch::Road::Corners", 3);
     R__ASSERT(fRoadCorners);
@@ -190,55 +201,73 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
 {
   // Level-2 initialization - load pattern database and initialize hitpattern.
-  // Requires the wire planes to be fully initialized.
+  // Requires the planes to be fully initialized.
 
   static const char* const here = "InitLevel2";
 
-  vector<Double_t> zpos;
-  for( UInt_t i = 0; i < GetNplanes(); ++i )
-    zpos.push_back( GetPlaneZ(i) );
-  TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
+  // Require at least kMinFitPlanes planes
+  // TODO: allow dummy/inactive projections?
+  if( GetNplanes() < kMinFitPlanes ) {
+    Error( Here(here), "Too few planes of type \"%s\" defined. "
+          "Need >= %u, have %u. Fix database.",
+	   GetName(), kMinFitPlanes, GetNplanes() );
+    return kInitError;
+  }
+
+  // No need to set up pattern tree and hitpattern if no tracking requested
+  bool doing_tracking = fDetector->TestBit(Tracker::kDoCoarse);
+  if( doing_tracking ) {
+
+    vector<Double_t> zpos;
+    for( UInt_t i = 0; i < GetNplanes(); ++i )
+      zpos.push_back( GetPlaneZ(i) );
+    TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
 		  
-  if( tp.Normalize() != 0 )
-    return fStatus = kInitError;
-
-  // Attempt to read the pattern database from file
-  assert( fPatternTree == 0 );
-  //TODO: Make the file name
-  const char* filename = "test.tree";
-  fPatternTree = PatternTree::Read( filename, tp );
-  
-  // If the tree cannot not be read (or the parameters mismatch), then
-  // create it from scratch (takes a few seconds)
-  if( !fPatternTree ) {
-    PatternGenerator pg;
-    fPatternTree = pg.Generate( tp );
-    if( fPatternTree ) {
-      // Write the freshly-generated tree to file
-      // FIXME: hmmm... we don't necesarily have write permission to DB_DIR
-//       fPatternTree->Write( filename );
-    } else 
+    if( tp.Normalize() != 0 )
       return fStatus = kInitError;
-  } 
 
-  // Set up a hitpattern object with the parameters of this projection
-  assert( fHitpattern == 0 );
-  fHitpattern = new Hitpattern( *fPatternTree );
-  if( !fHitpattern || fHitpattern->IsError() )
-    return fStatus = kInitError;
-  assert( GetNplanes() == fHitpattern->GetNplanes() );
+    // Attempt to read the pattern database from file
+    assert( fPatternTree == 0 );
+    //TODO: Make the file name
+    // const char* filename = "test.tree";
+    // fPatternTree = PatternTree::Read( filename, tp );
+  
+    // If the tree cannot not be read (or the parameters mismatch), then
+    // create it from scratch (takes a few seconds)
+    // if( !fPatternTree ) {
+      PatternGenerator pg;
+      fPatternTree = pg.Generate( tp );
+      if( fPatternTree ) {
+	// Write the freshly-generated tree to file
+	// FIXME: hmmm... we don't necesarily have write permission to DB_DIR
+	//       fPatternTree->Write( filename );
+      } else 
+	return fStatus = kInitError;
+    // } 
 
-  // Determine maximum search distance (in bins) for combining patterns,
-  // separately for front and back planes since they can have different
-  // parameters.
-  // This is the max distance of bins that can belong to the same hit 
-  // plus an allowance for extra slope of a pattern if a front/back hit
-  // is missing
-  WirePlane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
-  Double_t dxf= front_plane->GetMaxLRdist() + 2.0*front_plane->GetResolution();
-  Double_t dxb= back_plane->GetMaxLRdist()  + 2.0*back_plane->GetResolution();
-  fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() ) + 2;
-  fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() ) + 2;
+    // Set up a hitpattern object with the parameters of this projection
+    assert( fHitpattern == 0 );
+    fHitpattern = new Hitpattern( *fPatternTree );
+    if( !fHitpattern || fHitpattern->IsError() )
+      return fStatus = kInitError;
+    assert( GetNplanes() == fHitpattern->GetNplanes() );
+
+    // Determine maximum search distance (in bins) for combining patterns,
+    // separately for front and back planes since they can have different
+    // parameters.
+    // This is the max distance of bins that can belong to the same hit 
+    // plus an allowance for extra slope of a pattern if a front/back hit
+    // is missing
+    Plane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
+    //TODO: ===> fix this in a generic way
+    // Double_t dxf= front_plane->GetMaxLRdist() + 2.0*front_plane->GetResolution();
+    // Double_t dxb= back_plane->GetMaxLRdist()  + 2.0*back_plane->GetResolution();
+    Double_t dxf = 2.0*front_plane->GetResolution();
+    Double_t dxb = 2.0*back_plane->GetResolution();
+    fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() ) + 2;
+    fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() ) + 2;
+
+  } // doing_tracking
 
   // Special handling of calibration mode: Allow missing hits in calibration
   // planes, and require hits in all other planes 
@@ -266,35 +295,25 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
     }
   }
 
-  // Check range of fMinFitPlanes (minimum number of planes require for fit)
-  // and fMaxMiss (maximum number of missing planes allowed in a hitpattern).
+  // Check fMaxMiss (maximum number of missing planes allowed in a hitpattern).
   // This is done here instead of in ReadDatabase because we need GetNplanes().
-  if( fMinFitPlanes < 3 or fMinFitPlanes > GetNplanes() ) {
-    Error( Here(here), "Illegal number of required planes for projection "
-	   "track fitting = %u. Must be >= 3 and <= %u. Fix database.",
-	   fMinFitPlanes, GetNplanes() );
-    return kInitError;
-  }
-  if( fMaxMiss > GetNplanes()-2 ) {
-    Error( Here(here), "Illegal number of allowed missing planes = %u. "
-	   "Must be <= %u. Fix database.", fMaxMiss, GetNplanes()-2 );
-    return kInitError;
-  }
-  // There cannot be so many planes missing that we don't have at least
-  // fMinFitPlanes left
-  UInt_t allowed_maxmiss = GetNplanes()-fMinFitPlanes;
+  assert( kMinFitPlanes <= GetNplanes() ); // ensured above
+  UInt_t allowed_maxmiss = GetNplanes()-kMinFitPlanes;
+  // There cannot be so many planes missing/calibrating that we don't have at
+  // least kMinFitPlanes left
   if( fMaxMiss > allowed_maxmiss ) {
     if( ncalib == 0 ) {
-      Warning( Here(here), "Allowed number of missing planes = %u reduced "
-	       "to %u to satisfy min_fit_planes = %u.  Fix database.", 
-	       fMaxMiss, allowed_maxmiss, fMinFitPlanes );
-      fMaxMiss = allowed_maxmiss;
+      Error( Here(here), "Illegal number of allowed missing planes = %u. "
+	     "Max allowed = %u. Fix database.", fMaxMiss, allowed_maxmiss );
     } else {
-      Error( Here(here), "Too many planes in calibration mode, found %d, "
-	     "max allowed = %d. Fix database.", ncalib, allowed_maxmiss );
-      return kInitError;
+      Error( Here(here), "Too many planes in calibration mode, found %u, "
+	     "max allowed = %u. Fix database.", ncalib, allowed_maxmiss );
     }
+    return kInitError;
   }
+  assert( fMaxMiss+kMinFitPlanes <= GetNplanes() );
+  fMinFitPlanes = GetNplanes()-fMaxMiss;
+  assert( fMinFitPlanes >= kMinFitPlanes );
 
   // Set up the lookup bitpattern indicating which planes are allowed to have 
   // missing hits. The value of the bit pattern of plane hits is used as an
@@ -334,7 +353,7 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
   // possible degrees of freedom (minfit-2...nplanes-2) of the projection fit
   fChisqLimits.clear();
   fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
-  for( vec_pdbl_t::size_type dof = fMinFitPlanes-2;
+  for( vec_pdbl_t::size_type dof = kMinFitPlanes-2;
        dof < fChisqLimits.size(); ++dof ) {
     fChisqLimits[dof].first = TMath::ChisquareQuantile( fConfLevel, dof );
     fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
@@ -357,17 +376,15 @@ Int_t Projection::ReadDatabase( const TDatime& date )
 
   Double_t angle = kBig;
   fHitMaxDist = 0;
-  fMinFitPlanes = 3;
   fMaxMiss = 0;
   fMaxPat  = kMaxUInt;
   fConfLevel = 1e-3;
-  Int_t req1of2 = 1;
+  Int_t req1of2 = 0;
   const DBRequest request[] = {
     { "angle",           &angle,         kDouble, 0, 1 },
     { "maxslope",        &fMaxSlope,     kDouble, 0, 1, -1 },
     { "search_depth",    &fNlevels,      kUInt,   0, 0, -1 },
     { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, -1 },
-    { "min_fit_planes",  &fMinFitPlanes, kUInt,   0, 1, -1 },
     { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, -1 },
     { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, -1 },
     { "req1of2",         &req1of2,       kInt,    0, 1, -1 },
@@ -405,6 +422,13 @@ Int_t Projection::ReadDatabase( const TDatime& date )
 
   fRequire1of2 = (req1of2 != 0);
 
+// If any planes defined, update their coordinate offset
+// based on our possibly new angle
+  for( vplsiz_t i = 0; i < fPlanes.size(); ++i ) {
+    assert( fPlanes[i]->GetProjection() == this ); // else bug in AddPlane
+    fPlanes[i]->UpdateOffset();
+  }
+
   fIsInit = kTRUE;
   return kOK;
 }
@@ -416,6 +440,10 @@ Int_t Projection::DefineVariables( EMode mode )
 
   if( mode == kDefine && fIsSetup ) return kOK;
   fIsSetup = ( mode == kDefine );
+
+  // Don't bother with these global variables if no tracking is done
+  bool doing_tracking = fDetector->TestBit(Tracker::kDoCoarse);
+  if( !doing_tracking ) return kOK;
 
   // Global variables
   RVarDef vars[] = {
@@ -478,21 +506,27 @@ Int_t Projection::DefineVariables( EMode mode )
 //_____________________________________________________________________________
 Int_t Projection::FillHitpattern()
 {
-  // Fill this projection's hitpattern with hits from the wire planes.
-  // Returns the total number of hits processed (where hit pairs on plane
-  // and partner plane count as one).
+  // Fill this projection's hitpattern from hits in the planes.
+  // Returns the total number of hits processed.
 
   Int_t ntot = 0;
-  for( vwiter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
-    WirePlane *plane = *it, *partner = plane->GetPartner();
-    // If a plane has a partner (usually with staggered wires), scan them
-    // together to resolve some of the L/R ambiguity of the hit positions
-    ntot += fHitpattern->ScanHits( plane, partner );
-    // If the partner plane was just scanned, don't scan it again
-    if( partner ) {
-      ++it;
-      assert( it != fPlanes.end() );
-      assert( *it == partner );
+  for( vpliter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
+    Plane* plane = *it;
+    if( fHitpattern->IsLR() ) {
+      // Hitpatterns expects hits with L/R ambiguity
+      Plane* partner = plane->GetPartner();
+      // If a plane has a partner (usually with staggered wires), scan them
+      // together to resolve some of the L/R ambiguity of the hit positions
+      ntot += fHitpattern->ScanHits( plane, partner );
+      // If the partner plane was just scanned, don't scan it again
+      if( partner ) {
+	++it;
+	assert( it != fPlanes.end() );
+	assert( *it == partner );
+      }
+    } else {
+      // Simple case: no L/R ambiguity handling
+      ntot += fHitpattern->ScanHits( plane );
     }
   }
 #ifdef TESTCODE
@@ -646,7 +680,7 @@ static void PrintNode( const Node_t& node )
     bool seq = false;
     do {
       if( seq )  cout << " ";
-      cout << (*ihit)->GetWireNum();
+      cout << (*ihit)->GetPos();
       seq = true;
       ++ihit;
     } while( ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
@@ -922,7 +956,7 @@ Double_t Projection::GetZsize() const
 //_____________________________________________________________________________
 void Projection::SetAngle( Double_t angle )
 {
-  // Set wire angle (rad)
+  // Set angle of the axis perpendicular to the wires/strips (rad)
   
   fAxis.Set( TMath::Cos(angle), TMath::Sin(angle) );
 }
@@ -944,19 +978,39 @@ void Projection::Print( Option_t* opt ) const
        << " type="  << GetType()
        << " npl="   << fPlanes.size()
        << " nlev="  << GetNlevels()
-       << " zsize=" << GetZsize()
+       << " zsize=" << (fPlanes.empty() ? 0.0 : GetZsize())
        << " maxsl=" << GetMaxSlope()
        << " width=" << GetWidth()
        << " angle=" << GetAngle()*TMath::RadToDeg();
   cout << endl;
 
   if( verbose > 0 ) {
-    for( vwsiz_t i = 0; i < fPlanes.size(); ++i ) {
-      WirePlane* wp = fPlanes[i];
-      wp->Print(opt);
+    for( vplsiz_t i = 0; i < fPlanes.size(); ++i ) {
+      Plane* pl = fPlanes[i];
+      pl->Print(opt);
     }
   }
 }
+
+//_____________________________________________________________________________
+EProjType Projection::NameToType( const char* name )
+{
+  // Return the index corresponding to the given plane name.
+  // The comparison is not case-sensitive.
+
+  if( name and *name ) {
+    TString s(name);
+    s.ToLower();
+    for( EProjType type = kTypeBegin; type < kTypeEnd; ++type ) {
+      TString ps( kProjParam[type].name );
+      ps.ToLower();
+      if( s == ps )
+	return type;
+    }
+  }
+  return kUndefinedType;
+}
+
 
 //_____________________________________________________________________________
 NodeVisitor::ETreeOp 

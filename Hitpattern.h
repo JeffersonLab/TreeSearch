@@ -1,3 +1,5 @@
+//*-- Author:  Ole Hansen<mailto:ole@jlab.org>; Jefferson Lab; 13-Aug-2007
+//
 #ifndef ROOT_TreeSearch_Hitpattern
 #define ROOT_TreeSearch_Hitpattern
 
@@ -34,7 +36,7 @@ namespace TreeSearch {
   };
 
   class PatternTree;
-  class WirePlane;
+  class Plane;
   class Hit;
 
   class Hitpattern {
@@ -45,6 +47,9 @@ namespace TreeSearch {
     Hitpattern( const Hitpattern& orig );
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
+
+    virtual Int_t  ScanHits( Plane* A, Plane* B = 0 );
+    virtual Bool_t IsLR() const;
 
     std::pair<UInt_t,UInt_t> ContainsPattern( const NodeDescriptor& nd ) const;
 
@@ -68,7 +73,6 @@ namespace TreeSearch {
     void     SetPosition( Double_t pos, Double_t res, UInt_t plane,
 			  Hit* hit )
     { SetPositionRange( pos-res, pos+res, plane, hit ); }
-    Int_t    ScanHits( WirePlane* A, WirePlane* B );
     //Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
     //Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
 
@@ -91,7 +95,7 @@ namespace TreeSearch {
   protected:
 
     UInt_t   fNlevels;  // Number of levels in the pattern tree 
-    UInt_t   fNplanes;  // Number of wire planes contained in the pattern
+    UInt_t   fNplanes;  // Number of planes contained in the pattern
     Double_t fScale;    // 1/(bin resolution) = 2^(fNlevels-1)/width (1/m)
     Double_t fBinWidth; // 1/fScale (meters per bin)
     Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
@@ -115,13 +119,14 @@ namespace TreeSearch {
 
     void AddHit( UInt_t plane, UInt_t bin, Hit* hit );
 
-    // Only needed for TESTCODE
+#ifdef TESTCODE
     UInt_t  fMaxhitBin;  // Maximum depth of hit array per bin
+#endif
 
   private:
     void Init( Double_t width );
 
-    ClassDef(Hitpattern,0)  // Wire chamber hitpattern at multiple resolutions
+    ClassDef(Hitpattern,0)  // Tracker hitpattern at multiple resolutions
   };
 
   //___________________________________________________________________________

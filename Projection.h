@@ -26,7 +26,7 @@ namespace TreeSearch {
 
   class Hitpattern;
   class PatternTree;
-  class WirePlane;
+  class Plane;
   class Road;
 
   class Projection : public THaAnalysisObject {
@@ -38,18 +38,19 @@ namespace TreeSearch {
 		   fHitpattern(0), fRoads(0), fRoadCorners(0) {} // ROOT RTTI
     virtual ~Projection();
 
-    void            AddPlane( WirePlane* wp, WirePlane* partner = 0 );
+    void            AddPlane( Plane* pl, Plane* partner = 0 );
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
     EStatus         InitLevel2( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
-    void            Reset();
+    void            Reset( Option_t* opt="" );
 
     Int_t           FillHitpattern();
     Int_t           Track();
     Int_t           MakeRoads();
 
+    static EProjType NameToType( const char* name );
 
     Double_t        GetAngle()        const;
     const TVector2& GetAxis()         const { return fAxis; }
@@ -68,7 +69,7 @@ namespace TreeSearch {
     UInt_t          GetNplanes()      const { return (UInt_t)fPlanes.size(); }
     UInt_t          GetNroads()       const;
     TBits*          GetPlaneCombos()  const { return fPlaneCombos; }
-    WirePlane*      GetPlane ( UInt_t plane ) const { return fPlanes[plane]; }
+    Plane*          GetPlane ( UInt_t plane ) const { return fPlanes[plane]; }
     Double_t        GetPlaneZ( UInt_t plane ) const;
     Road*           GetRoad  ( UInt_t i )     const;
     Double_t        GetSinAngle()     const { return fAxis.Y(); }
@@ -80,13 +81,31 @@ namespace TreeSearch {
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
     void            SetWidth( Double_t width ) { fWidth = width; }
     
-#ifdef TESTCODE
-    std::vector<TreeSearch::WirePlane*>& GetListOfPlanes() { return fPlanes; }
-#endif
+    const std::vector<TreeSearch::Plane*>&
+                    GetListOfPlanes() const { return fPlanes; }
 
     // Analysis control flags
     enum {
       kEventDisplay = BIT(14) // Support event display
+    };
+
+    // Helper functors for STL algos
+    struct ByType
+      : public std::binary_function< Projection*, Projection*, bool >
+    {
+      bool operator() ( const Projection* a, const Projection* b ) const
+      { 
+	assert( a && b );
+	return( a->GetType() < b->GetType() );
+      }
+    };
+    class TypeEquals : public std::unary_function< Projection*, bool > {
+    public:
+      TypeEquals( EProjType t ) : type(t) {}
+      bool operator() ( const Projection* p ) const
+      { assert(p); return ( p->GetType() == type ); }
+    private:
+      EProjType type;
     };
 
   protected:
@@ -94,18 +113,18 @@ namespace TreeSearch {
 
     // Configuration
     EProjType        fType;          // Type of plane (u,v,x,y...)
-    std::vector<WirePlane*> fPlanes; // Wire planes in this projection
+    std::vector<Plane*> fPlanes;     // Planes in this projection
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
     Double_t         fWidth;         // Width of tracking region (m)
-    TVector2         fAxis;          // Nominal projection axis normal to wires
+    TVector2         fAxis;          // Projection axis, normal to strips
     THaDetectorBase* fDetector;      //! Parent detector
     PatternTree*     fPatternTree;   // Precomputed template database
 
     // Plane occupancy parameters
     UInt_t           fMinFitPlanes;  // Min num of planes required for fitting
     UInt_t           fMaxMiss;       // Allowed number of missing planes
-    Bool_t           fRequire1of2;   // Require one plane of a plane pair
+    Bool_t           fRequire1of2;   // Require hit in at least one plane of a pair
     TBits*           fPlaneCombos;   // Allowed plane occupancy patterns
 
     // Road construction control
@@ -126,10 +145,12 @@ namespace TreeSearch {
     UInt_t           fNgoodRoads;    // Good roads in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
 
-    // Statistics (only needed for TESTCODE, but kept for binary compatibility)
+#ifdef TESTCODE
+    // Statistics
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
     UInt_t n_test, n_pat, n_roads, n_dupl, n_badfits;
     Double_t t_treesearch, t_roads, t_fit, t_track;
+#endif
 
     Bool_t  FitRoads();
     Bool_t  RemoveDuplicateRoads();
@@ -149,7 +170,9 @@ namespace TreeSearch {
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
 		      NodeVec_t* matches )
 	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches)
+#ifdef TESTCODE
 	, fNtest(0)
+#endif
       { assert(fHitpattern && fPlaneCombos && fMatches); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
 #ifdef TESTCODE
@@ -159,8 +182,9 @@ namespace TreeSearch {
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
       NodeVec_t*        fMatches;      // Set of matching patterns
-      // Only needed for TESTCODE
+#ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
+#endif
     };
 
   private:
@@ -175,7 +199,7 @@ namespace TreeSearch {
   inline
   Double_t Projection::GetAngle() const
   {
-    // Return wire angle in rad, normalized to [-pi,pi]
+    // Return axis angle in rad, normalized to [-pi,pi]
     
     return TMath::ATan2( fAxis.Y(), fAxis.X() );
   }
