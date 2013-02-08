@@ -13,6 +13,7 @@ ChangeLog
 # Editor lint
 .#*
 *~
+\#*#
 
 # Work directory clutter, test files, replay output etc.
 /db*.dat
