@@ -43,6 +43,9 @@ namespace TreeSearch {
 			  
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
+    virtual Projection* MakeProjection( EProjType type, const char* name,
+					Double_t angle,
+					THaDetectorBase* parent ) const;
     virtual UInt_t GetCrateMapDBcols() const;
 
     virtual void   FindNearestHitsImpl( const TSeqCollection* hits,

@@ -141,6 +141,9 @@ namespace TreeSearch {
     // Virtualization of the tracker class, specialized Trackers may/must override
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const = 0;
+    virtual Projection* MakeProjection( EProjType type, const char* name,
+					Double_t angle,
+					THaDetectorBase* parent ) const = 0;
     virtual UInt_t GetCrateMapDBcols() const = 0;
 
     virtual void   FindNearestHits( Plane* pl, const THaTrack* track,

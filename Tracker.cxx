@@ -1611,11 +1611,11 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       proj = *it;
     } else {
       try {
-  	proj = new Projection( type,
-  			       kProjParam[type].name, 
-  			       kProjParam[type].angle*TMath::DegToRad(),
-  			       this 
-  			       );
+	proj = MakeProjection( type,
+			       kProjParam[type].name,
+			       kProjParam[type].angle*TMath::DegToRad(),
+			       this
+			       );
       }
       catch( bad_alloc ) { proj = 0; }
       if( !proj or proj->IsZombie() ) {
@@ -1903,7 +1903,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       return kInitError;
     }
     Plane* newplane = 0;
-    try { newplane = MakePlane( name, name, this ) };
+    try { newplane = MakePlane( name, name, this ); }
     catch( bad_alloc ) { newplane = 0; }
     if( !newplane or newplane->IsZombie() ) {
       // Urgh. Something is very bad

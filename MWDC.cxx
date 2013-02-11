@@ -654,6 +654,18 @@ Plane* MWDC::MakePlane( const char* name, const char* description,
 }
 
 //_____________________________________________________________________________
+Projection* MWDC::MakeProjection( EProjType type, const char* name,
+				  Double_t angle, 
+				  THaDetectorBase* parent ) const
+{
+  // Create an object of the projection class used by this implementation.
+  // The type of projection determines basically the method with which the
+  // Hitpattern will be filled.
+
+  return new ProjectionLR( type, name, angle, parent );
+}
+
+//_____________________________________________________________________________
 UInt_t MWDC::GetCrateMapDBcols() const
 {
   // Return number of columns for the detector crate map in the database.
