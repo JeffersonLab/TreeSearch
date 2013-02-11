@@ -12,7 +12,7 @@
 
 #include "MWDC.h"
 #include "WirePlane.h"
-#include "Projection.h"
+#include "ProjectionLR.h"
 #include "WireHit.h"
 #include "Road.h"
 #include "Helper.h"

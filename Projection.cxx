@@ -976,6 +976,16 @@ void Projection::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
+Hitpattern* Projection::MakeHitpattern( const PatternTree& pt )
+{
+  // Instantiate Hitpattern to be used for this type of projection.
+  // The Hitpattern determines how hit information it processed,
+  // either as single position measurements or L/R-ambiguous wire hits.
+
+  return new Hitpattern( pt );
+}
+
+//_____________________________________________________________________________
 EProjType Projection::NameToType( const char* name )
 {
   // Return the index corresponding to the given plane name.

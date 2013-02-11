@@ -195,19 +195,6 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
        it != planes.end(); ++it ) {
     Plane* plane = *it;
     assert( plane );
-    //   // Hitpatterns expects hits with L/R ambiguity
-    //   Plane* partner = plane->GetPartner();
-    //   // If a plane has a partner (usually with staggered wires), scan them
-    //   // together to resolve some of the L/R ambiguity of the hit positions
-    //   ntot += ScanHits( plane, partner );
-    //   // If the partner plane was just scanned, don't scan it again
-    //   if( partner ) {
-    // 	++it;
-    // 	assert( it != fPlanes.end() );
-    // 	assert( *it == partner );
-    //   }
-    // } else {
-    // Simple case: no L/R ambiguity handling
     ntot += ScanHits( plane );
 
 #ifndef NDEBUG
@@ -306,90 +293,6 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
   }
   return nhits;
 }
-
-
-//_____________________________________________________________________________
-// Int_t Hitpattern::ScanHits( WirePlane* A, WirePlane* B )
-// {
-//   // Set the points at all depths of the hit pattern that correspond to
-//   // the hits in plane A. The plane number is extracted from A.
-//   // The second, optional plane B represents an optional partner
-//   // plane of A, i.e. a nearby plane with (usually) staggered wires. 
-//   // If B is present, test for pairs of hits in A and B.
-//   // Naturally, the two planes and their wires must be parallel.
-//   //
-//   // Returns number of hits processed
-
-//   if( !A ) return 0;
-//   UInt_t planeA = A->GetPlaneNum();
-//   assert( planeA < fNplanes );
-//   Double_t maxdist = 0.0;
-//   UInt_t planeB = fNplanes;
-//   if( B ) {
-//     maxdist = A->GetMaxSlope() * (B->GetZ() - A->GetZ());
-//     planeB = B->GetPlaneNum();
-//     assert( planeB < fNplanes );
-//   }
-//   bool do_single_hits =
-//     ( A->GetMWDC()->TestBit(MWDC::kPairsOnly) == kFALSE || B == 0 );
-
-//   Int_t nhits = 0;
-
-//   HitPairIter it( A->GetHits(), B ? B->GetHits() : 0, maxdist );
-//   while( it ) {
-//     // At least one hit found
-//     nhits++;
-//     Hit* hitA = static_cast<Hit*>((*it).first);
-//     Hit* hitB = static_cast<Hit*>((*it).second);
-//     assert( hitA || hitB );
-//     if( hitA && hitB ) {
-//       // A pair of hits registered in partner planes. One or more combinations
-//       // of hit positions may be within maxdist of each other.
-//       // Determine which combinations these are and set their bins.
-//       int set = 0, bitA, bitB;
-//       Double_t posA, posB;
-//       for( int i = 4; i; ) { --i;
-// 	if( i&2 ) { posA = hitA->GetPosL(); bitA = 8; }
-// 	else      { posA = hitA->GetPosR(); bitA = 4; }
-// 	if( i&1 ) { posB = hitB->GetPosL(); bitB = 2; }
-// 	else      { posB = hitB->GetPosR(); bitB = 1; }
-// 	if( TMath::Abs( posA-posB ) <= maxdist ) {
-// 	  if( (bitA & set) == 0 ) {
-// 	    SetPosition( posA+fOffset, hitA->GetResolution(), planeA, hitA );
-// 	    // Prevent duplicate entries for zero-drift hits
-// 	    if( hitA->GetDriftDist() == 0 )
-// 	      set |= 12;
-// 	    else
-// 	      set |= bitA;
-// 	  }
-// 	  if( (bitB & set) == 0 ) {
-// 	    SetPosition( posB+fOffset, hitB->GetResolution(), planeB, hitB );
-// 	    if( hitB->GetDriftDist() == 0 )
-// 	      set |= 3;
-// 	    else
-// 	      set |= bitB;
-// 	  }
-// 	}
-//       }
-//     }
-//     else if( do_single_hits ) {
-//       // Unpaired hit in only one plane
-//       if( hitA ) {
-// 	SetPosition( hitA->GetPosL()+fOffset, hitA->GetResolution(),
-// 		     planeA, hitA );
-// 	SetPosition( hitA->GetPosR()+fOffset, hitA->GetResolution(),
-// 		     planeA, hitA );
-//       } else {
-// 	SetPosition( hitB->GetPosL()+fOffset, hitB->GetResolution(),
-// 		     planeB, hitB );
-// 	SetPosition( hitB->GetPosR()+fOffset, hitB->GetResolution(),
-// 		     planeB, hitB );
-//       }
-//     }
-//     ++it;
-//   }
-//   return nhits;
-// }
 
 
 //_____________________________________________________________________________
