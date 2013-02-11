@@ -48,8 +48,8 @@ namespace TreeSearch {
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~Hitpattern();
 
-    virtual Int_t  ScanHits( Plane* A, Plane* B = 0 );
-    virtual Bool_t IsLR() const;
+    virtual Int_t Fill( const std::vector<TreeSearch::Plane*>& planes );
+    virtual Int_t ScanHits( Plane* A, Plane* B = 0 );
 
     std::pair<UInt_t,UInt_t> ContainsPattern( const NodeDescriptor& nd ) const;
 

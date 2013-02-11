@@ -192,6 +192,8 @@ namespace TreeSearch {
     Projection( const Projection& orig );
     const Projection& operator=( const Projection& rhs );
 
+    virtual Hitpattern* MakeHitpattern( const PatternTree& );
+
     ClassDef(Projection,0)  // A track projection plane
   };
 

@@ -247,7 +247,8 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
 
     // Set up a hitpattern object with the parameters of this projection
     assert( fHitpattern == 0 );
-    fHitpattern = new Hitpattern( *fPatternTree );
+    try { fHitpattern = MakeHitpattern( *fPatternTree ); }
+    catch( bad_alloc ) { fHitpattern = 0; }
     if( !fHitpattern || fHitpattern->IsError() )
       return fStatus = kInitError;
     assert( GetNplanes() == fHitpattern->GetNplanes() );
@@ -509,26 +510,8 @@ Int_t Projection::FillHitpattern()
   // Fill this projection's hitpattern from hits in the planes.
   // Returns the total number of hits processed.
 
-  Int_t ntot = 0;
-  for( vpliter_t it = fPlanes.begin(); it != fPlanes.end(); ++it ) {
-    Plane* plane = *it;
-    if( fHitpattern->IsLR() ) {
-      // Hitpatterns expects hits with L/R ambiguity
-      Plane* partner = plane->GetPartner();
-      // If a plane has a partner (usually with staggered wires), scan them
-      // together to resolve some of the L/R ambiguity of the hit positions
-      ntot += fHitpattern->ScanHits( plane, partner );
-      // If the partner plane was just scanned, don't scan it again
-      if( partner ) {
-	++it;
-	assert( it != fPlanes.end() );
-	assert( *it == partner );
-      }
-    } else {
-      // Simple case: no L/R ambiguity handling
-      ntot += fHitpattern->ScanHits( plane );
-    }
-  }
+  Int_t ntot = fHitpattern->Fill( fPlanes );
+
 #ifdef TESTCODE
   n_hits = ntot;
   n_bins = fHitpattern->GetBinsSet();
