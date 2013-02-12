@@ -2,7 +2,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 //                                                                           //
-// TreeSearch::WireHit                                                           //
+// TreeSearch::WireHit                                                       //
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -13,7 +13,6 @@
 
 using std::cout;
 using std::endl;
-using std::make_pair;
 
 ClassImp(TreeSearch::WireHit)
 ClassImp(TreeSearch::MCWireHit)

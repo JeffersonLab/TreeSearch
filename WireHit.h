@@ -22,9 +22,6 @@ namespace TreeSearch {
 	     WirePlane* wp ) :
       Hit(pos, res, static_cast<Plane*>(wp)), fWireNum(wnum), fRawTDC(tdc),
       fTime(time), fPosL(pos), fPosR(pos), fCl(0), fMulti(0), fTdiff(0.0) {}
-    // Default copy and assignment are fine
-    //    WireHit( const WireHit& );
-    //    WireHit& operator=( const WireHit& );
     virtual ~WireHit() {}
 
     virtual Int_t Compare( const TObject* obj ) const;
