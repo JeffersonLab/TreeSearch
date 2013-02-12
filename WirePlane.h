@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Types.h"
-#include "THaSubDetector.h"
+#include "Plane.h"
 #include "TClonesArray.h"
 #include "TVector2.h"
 #include "TMath.h"
@@ -31,7 +31,7 @@ namespace TreeSearch {
   class FitCoord;
   extern const Double_t kBig;
 
-  class WirePlane : public THaSubDetector {
+  class WirePlane : public Plane {
 
   public:
     WirePlane( const char* name, const char* description = "", 

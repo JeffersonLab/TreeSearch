@@ -1,4 +1,4 @@
-//*-- Author:  Ole Hansen<mailto:ole@jlab.org>; Jefferson Lab; 11-Feb-2013
+//*-- Author:  Ole Hansen<mailto:ole@jlab.org>; Jefferson Lab; 27-Jun-2007
 //
 #ifndef ROOT_TreeSearch_Hit
 #define ROOT_TreeSearch_Hit
@@ -16,6 +16,9 @@
 #include <cassert>
 #include <functional>
 #include <iostream>
+
+class TSeqCollection;
+class TIterator;
 
 namespace TreeSearch {
 
@@ -93,6 +96,65 @@ namespace TreeSearch {
     Double_t fMCPos;       // Exact MC track crossing position (m)
 
     ClassDef(MCHit,1)      // Generic Monte Carlo hit info
+  };
+
+  //___________________________________________________________________________
+  // Utility class for iterating over one or two collections of hits.
+  // Used for generating hit patterns. If two collections are given, they
+  // are assumed to contain hits from adjacent planes with parallel 
+  // (and usually staggered) wires, and hit pairs are returned for hits
+  // whose positions are within 'maxdist' of each other.
+
+  typedef std::pair<TObject*,TObject*> ObjPair_t;
+
+  class HitPairIter {
+
+  public:
+    HitPairIter( const TSeqCollection* collA, const TSeqCollection* collB,
+		 Double_t maxdist );
+    HitPairIter( const HitPairIter& rhs );
+    HitPairIter& operator=( const HitPairIter& rhs );
+    virtual ~HitPairIter();
+
+    const TSeqCollection* GetCollection( Int_t n=0 ) const 
+    { return (n==0) ? fCollA : fCollB; }
+    void Reset();
+
+    // Iterator functions. 
+    HitPairIter& Next();
+    HitPairIter& operator++() { return Next(); }
+    const HitPairIter operator++(int) {
+      HitPairIter clone(*this);  Next();  return clone;
+    }
+    // Current value. 
+    ObjPair_t  operator()() const  { return fCurrent; }
+    ObjPair_t& operator* ()        { return fCurrent; }
+    // Comparisons
+    bool operator==( const HitPairIter& rhs ) const { 
+      return( fCollA == rhs.fCollA && fCollB == rhs.fCollB && 
+	      fCurrent == rhs.fCurrent );
+    }
+    bool operator!=( const HitPairIter& rhs ) const { return !(*this==rhs); }
+    operator bool() const 
+    { return (fCurrent.first != 0 || fCurrent.second != 0); }
+    bool operator!() const { return !((bool)*this); }
+
+  private:
+    const TSeqCollection* fCollA;
+    const TSeqCollection* fCollB;
+    TIterator* fIterA;
+    TIterator* fIterB;
+    TIterator* fSaveIter;
+    Hit* fSaveHit;
+    Double_t fMaxDist;
+    Bool_t fStarted;
+    Bool_t fScanning;
+    ObjPair_t fCurrent;
+    ObjPair_t fNext;
+
+    HitPairIter();
+
+    ClassDef(HitPairIter,0)  // Iterator over two lists of hits
   };
 
   //___________________________________________________________________________

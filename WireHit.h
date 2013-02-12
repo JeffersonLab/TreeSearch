@@ -1,4 +1,4 @@
-//*-- Author:  Ole Hansen<mailto:ole@jlab.org>; Jefferson Lab; 27-Jun-2007
+//*-- Author:  Ole Hansen<mailto:ole@jlab.org>; Jefferson Lab; 11-Feb-2013
 //
 #ifndef ROOT_TreeSearch_WireHit
 #define ROOT_TreeSearch_WireHit
@@ -10,13 +10,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Hit.h"
-
-class TSeqCollection;
-class TIterator;
+#include "WirePlane.h"
 
 namespace TreeSearch {
-
-  class WirePlane;
 
   class WireHit : public Hit {
 
@@ -24,8 +20,8 @@ namespace TreeSearch {
     WireHit() {}
     WireHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
 	     WirePlane* wp ) :
-      Hit( pos, res, wp ), fWireNum(wnum), fRawTDC(tdc), fTime(time),
-      fPosL(pos), fPosR(pos), fCl(0), fMulti(0), fTdiff(0.0) {}
+      Hit(pos, res, static_cast<Plane*>(wp)), fWireNum(wnum), fRawTDC(tdc),
+      fTime(time), fPosL(pos), fPosR(pos), fCl(0), fMulti(0), fTdiff(0.0) {}
     // Default copy and assignment are fine
     //    WireHit( const WireHit& );
     //    WireHit& operator=( const WireHit& );
@@ -130,65 +126,6 @@ namespace TreeSearch {
   };
 
   //___________________________________________________________________________
-  // Utility class for iterating over one or two collections of hits.
-  // Used for generating hit patterns. If two collections are given, they
-  // are assumed to contain hits from adjacent planes with parallel 
-  // (and usually staggered) wires, and hit pairs are returned for hits
-  // whose positions are within 'maxdist' of each other.
-
-  typedef std::pair<TObject*,TObject*> ObjPair_t;
-
-  class HitPairIter {
-
-  public:
-    HitPairIter( const TSeqCollection* collA, const TSeqCollection* collB,
-		 Double_t maxdist );
-    HitPairIter( const HitPairIter& rhs );
-    HitPairIter& operator=( const HitPairIter& rhs );
-    virtual ~HitPairIter();
-
-    const TSeqCollection* GetCollection( Int_t n=0 ) const 
-    { return (n==0) ? fCollA : fCollB; }
-    void Reset();
-
-    // Iterator functions. 
-    HitPairIter& Next();
-    HitPairIter& operator++() { return Next(); }
-    const HitPairIter operator++(int) {
-      HitPairIter clone(*this);  Next();  return clone;
-    }
-    // Current value. 
-    ObjPair_t  operator()() const  { return fCurrent; }
-    ObjPair_t& operator* ()        { return fCurrent; }
-    // Comparisons
-    bool operator==( const HitPairIter& rhs ) const { 
-      return( fCollA == rhs.fCollA && fCollB == rhs.fCollB && 
-	      fCurrent == rhs.fCurrent );
-    }
-    bool operator!=( const HitPairIter& rhs ) const { return !(*this==rhs); }
-    operator bool() const 
-    { return (fCurrent.first != 0 || fCurrent.second != 0); }
-    bool operator!() const { return !((bool)*this); }
-
-  private:
-    const TSeqCollection* fCollA;
-    const TSeqCollection* fCollB;
-    TIterator* fIterA;
-    TIterator* fIterB;
-    TIterator* fSaveIter;
-    WireHit* fSaveHit;
-    Double_t fMaxDist;
-    Bool_t fStarted;
-    Bool_t fScanning;
-    ObjPair_t fCurrent;
-    ObjPair_t fNext;
-
-    HitPairIter();
-
-    ClassDef(HitPairIter,0)  // Iterator over two lists of hits
-  };
-
-  //___________________________________________________________________________
   inline
   Int_t WireHit::Compare( const TObject* obj ) const 
   {
@@ -201,8 +138,12 @@ namespace TreeSearch {
     // wire number and, for each wire, will be in the order in which they hit
     // the wire
 
+#ifdef NDEBUG
+    const WireHit* rhs = static_cast<const WireHit*>(obj);
+#else
     const WireHit* rhs = dynamic_cast<const WireHit*>(obj);
     assert( rhs );
+#endif
     Int_t ret = Hit::Compare(obj);
     if( ret != 0 ) return ret;
 
@@ -217,8 +158,12 @@ namespace TreeSearch {
   {
     // Determine if two hits are within maxdist of each other.
     // Returns -1 if this<rhs, 0 if overlap, +1 if this>rhs.
-    const WireHit* rhs = dynamic_cast<const WireHit*>(obj);
+#ifdef NDEBUG
+    const WireHit* rhs = static_cast<const WireHit*>(hit);
+#else
+    const WireHit* rhs = dynamic_cast<const WireHit*>(hit);
     assert( rhs );
+#endif
     if( fPosR+maxdist < rhs->fPosL )
       // this hit is "smaller than" (to the left of) rhs
       return -1;
