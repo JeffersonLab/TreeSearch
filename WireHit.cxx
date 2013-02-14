@@ -62,8 +62,7 @@ void MCWireHit::Print( Option_t* ) const
   // Print hit info
 
   WireHit::Print("C");
-  cout << " MCpos=" << GetMCPos()
-       << endl;
+  MCPrint();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -98,26 +98,17 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
-  //TODO: Skeleton version - to be fleshed out
 
-  class MCTrack;
-  class MCWireHit : public WireHit {
+  class MCWireHit : public WireHit, public MCHitInfo {
 
   public:
-    MCWireHit() : fMCTrack(0) {}
+    MCWireHit() {}
     MCWireHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
 	       WirePlane* wp, MCTrack* mctrk, Double_t mcpos )
-      : WireHit(wnum, pos, tdc, time, res, wp), fMCTrack(mctrk), fMCPos(mcpos) {}
+      : WireHit(wnum, pos, tdc, time, res, wp), MCHitInfo(mctrk, mcpos) {}
     virtual ~MCWireHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
-
-    MCTrack* GetMCTrack() const { return fMCTrack; }
-    Double_t GetMCPos()   const { return fMCPos; }
-
-  protected:
-    MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
-    Double_t fMCPos;       // Exact MC track crossing position (m)
 
     ClassDef(MCWireHit,1)  // Monte Carlo hit in horizontal drift chamber
   };

@@ -40,26 +40,17 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
-  //TODO: Skeleton version - to be fleshed out
 
-  class MCTrack;
-  class MCGEMHit : public GEMHit {
+  class MCGEMHit : public GEMHit, public MCHitInfo {
 
   public:
-    MCGEMHit() : fMCTrack(0) {}
+    MCGEMHit() {}
     MCGEMHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
 	      GEMPlane* pl, MCTrack* mctrk, Double_t mcpos )
-      : GEMHit(wnum, pos, tdc, time, res, pl), fMCTrack(mctrk), fMCPos(mcpos) {}
+      : GEMHit(wnum, pos, tdc, time, res, pl), MCHitInfo(mctrk, mcpos) {}
     virtual ~MCGEMHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
-
-    MCTrack* GetMCTrack() const { return fMCTrack; }
-    Double_t GetMCPos()   const { return fMCPos; }
-
-  protected:
-    MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
-    Double_t fMCPos;       // Exact MC track crossing position (m)
 
     ClassDef(MCGEMHit,1)   // Monte Carlo hit in ADC-based readout plane
   };

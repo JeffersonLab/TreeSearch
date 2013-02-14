@@ -22,12 +22,9 @@ void GEMHit::Print( Option_t* opt ) const
 {
   // Print hit info
 
-  cout << "Hit: plane=" << (fPlane ? fPlane->GetName() : "??")
-       << " pos="       << GetPos()
-       << " z="         << GetZ()
-       << " res="       << GetResolution()
-       << " size="      << GetSize()
-       << " type="      << GetType();
+  Hit::Print("C");
+  cout << " size="  << GetSize()
+       << " type="  << GetType();
   if( *opt != 'C' )
     cout << endl;
 }
@@ -38,8 +35,7 @@ void MCGEMHit::Print( Option_t* ) const
   // Print hit info
 
   GEMHit::Print("C");
-  cout << " MCpos=" << GetMCPos()
-       << endl;
+  MCPrint();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

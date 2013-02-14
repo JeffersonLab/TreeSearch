@@ -74,19 +74,19 @@ namespace TreeSearch {
 
 
   //___________________________________________________________________________
-  // Monte Carlo hit class. Same as a hit plus the MC truth info.
+  // Monte Carlo truth info for a hit.
   //TODO: Skeleton version - to be fleshed out
 
   class MCTrack;
-  class MCHit : public Hit {
+  class MCHitInfo {
 
   public:
-    MCHit() : fMCTrack(0) {}
-    MCHit( Double_t pos, Double_t res, Plane* wp, MCTrack* mctrk, Double_t mcpos )
-      : Hit(pos, res, wp), fMCTrack(mctrk), fMCPos(mcpos) {}
-    virtual ~MCHit() {}
+    MCHitInfo() : fMCTrack(0) {}
+    MCHitInfo( MCTrack* mctrk, Double_t mcpos )
+      : fMCTrack(mctrk), fMCPos(mcpos) {}
+    virtual ~MCHitInfo() {}
 
-    virtual void Print( Option_t* opt="" ) const;
+    virtual void MCPrint() const;
 
     MCTrack* GetMCTrack() const { return fMCTrack; }
     Double_t GetMCPos()   const { return fMCPos; }
@@ -95,7 +95,7 @@ namespace TreeSearch {
     MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
     Double_t fMCPos;       // Exact MC track crossing position (m)
 
-    ClassDef(MCHit,1)      // Generic Monte Carlo hit info
+    ClassDef(MCHitInfo,1)  // Generic Monte Carlo hit info
   };
 
   //___________________________________________________________________________
