@@ -1827,7 +1827,8 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 
   string planeconfig, calibconfig;
   f3dMatchCut = 1e-4;
-  Int_t event_display = 0, disable_tracking = 0, disable_finetrack = 0;
+  Int_t mc_data = 0, event_display = 0, disable_tracking = 0,
+    disable_finetrack = 0;
   Int_t maxmiss = -1, maxthreads = -1;
   Double_t conf_level = 1e-9;
   ResetBit( k3dFastMatch ); // Set in Init()
@@ -1835,6 +1836,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   DBRequest request[] = {
     { "planeconfig",       &planeconfig,       kString },
     { "cratemap",          cmap,               kIntM,   GetCrateMapDBcols() },
+    { "MCdata",            &mc_data,           kInt,    0, 1 },
     { "3d_matchcut",       &f3dMatchCut,       kDouble, 0, 1 },
     { "event_display",     &event_display,     kInt,    0, 1 },
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
@@ -1881,6 +1883,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     return status;
 
   // Set common analysis control flags
+  SetBit( kMCdata,        mc_data );
   SetBit( kEventDisplay,  event_display );
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
