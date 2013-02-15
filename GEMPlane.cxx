@@ -11,7 +11,7 @@
 
 #include "GEMPlane.h"
 #include "GEMHit.h"
-#include "Tracker.h"
+#include "GEMTracker.h"
 #include "Projection.h"
 
 #include "THaDetMap.h"
@@ -41,15 +41,17 @@ GEMPlane::GEMPlane( const char* name, const char* description,
 
   static const char* const here = "GEMPlane";
 
+  assert( dynamic_cast<GEMTracker*>(fTracker) );
+
   try {
-    if( GetTracker()->TestBit(Tracker::kMCdata) ) // Monte Carlo data mode?
+    if( fTracker->TestBit(Tracker::kMCdata) ) // Monte Carlo data mode?
       fHits = new TClonesArray("TreeSearch::MCGEMHit", 200);
     else
       fHits = new TClonesArray("TreeSearch::GEMHit", 200);
   }
   catch( std::bad_alloc ) {
-    Error( Here(here), "Out of memory allocating hit array for plane %s. "
-	   "Call expert.", name );
+    Error( Here(here), "Out of memory allocating hit array for readout "
+	   "plane %s. Call expert.", name );
     MakeZombie();
     return;
   }
@@ -241,7 +243,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 
   //  static const char* const here = "Decode";
 
-  bool mc_data = GetTracker()->TestBit(Tracker::kMCdata);
+  bool mc_data = fTracker->TestBit(Tracker::kMCdata);
 
   assert( fADC );
   assert( fADCped );
@@ -580,7 +582,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
   if( ret != kOK )
     return ret;
 
-  if( !GetTracker()->TestBit(Tracker::kMCdata) ) {
+  if( !fTracker->TestBit(Tracker::kMCdata) ) {
     // Non-Monte Carlo hit data
     RVarDef nonmcvars[] = {
       { "hit.pos",  "Hit centroid (m)",      "fHits.TreeSearch::GEMHit.fPos" },

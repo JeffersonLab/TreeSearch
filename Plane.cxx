@@ -43,6 +43,9 @@ Plane::Plane( const char* name, const char* description,
 
   assert( name && parent );
 
+  fTracker = dynamic_cast<Tracker*>( GetMainDetector() );
+  assert( fTracker );
+
   try {
     fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );
   }
@@ -182,20 +185,16 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
   if( status != kOK )
     return status;
 
-  // Get the Tracker detector we're part of
-  Tracker* tracker = dynamic_cast<Tracker*>( GetMainDetector() );
-  assert(tracker);
-
   // Retrieve DAQ module parameters for our crateslots
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module* d = fDetMap->GetModule(imod);
-    tracker->LoadDAQmodel(d);
-    tracker->LoadDAQresolution(d);
+    fTracker->LoadDAQmodel(d);
+    fTracker->LoadDAQresolution(d);
     if( TestBit(kTDCReadout) )
       d->MakeTDC();
     else
       d->MakeADC();
-    UInt_t nchan = tracker->GetDAQnchan(d);
+    UInt_t nchan = fTracker->GetDAQnchan(d);
     if( d->hi >= nchan ) {
       Error( Here(here), "Detector map channel out of range for module "
           "cr/sl/lo/hi = %u/%u/%u/%u. Must be < %u. Fix database.",
@@ -309,18 +308,6 @@ Double_t Plane::GetMaxSlope() const
 { 
   return fProjection ? fProjection->GetMaxSlope() : kBig;
 }
-
-//_____________________________________________________________________________
-#ifndef NDEBUG
-Tracker* Plane::GetTrackerSafe() const
-{ 
-  // Get parent detector object and ensure that it is a Tracker
-
-  Tracker* tr = dynamic_cast<Tracker*>( GetMainDetector() );
-  assert( tr );
-  return tr;
-}
-#endif
 
 //_____________________________________________________________________________
 

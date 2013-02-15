@@ -64,7 +64,7 @@ namespace TreeSearch {
     Plane*          GetPartner()     const { return fPartner; }
     void            SetPartner( Plane* p );
     const char*     GetPartnerName() const { return fPartnerName.Data(); }
-    Tracker*        GetTracker()     const;
+    Tracker*        GetTracker()     const { return fTracker; }
     Double_t        GetResolution()  const { return fResolution; }
     Double_t        GetMaxSlope()    const; 
     Double_t        GetStart()       const { return fStart+fCoordOffset; }
@@ -115,11 +115,12 @@ namespace TreeSearch {
     UInt_t        fDefinedNum;  // Ordinal of this plane in planeconfig string
     EProjType     fType;        // Plane type (e.g. x,y,u,v)
     Double_t      fStart;       // Position of 1st sensor (e.g. wire/strip) (m)
-    Double_t      fPitch;       // Sensor pitch (assumed constant) (m)
+    Double_t      fPitch;       // Sensor spacing (assumed constant) (m)
     Double_t      fCoordOffset; // Coord offset wrt Tracker due to fOrigin
+    TString       fPartnerName; // Name of partner plane in same 2-D readout
     Plane*        fPartner;     //! Partner plane
     Projection*   fProjection;  //! The projection that we belong to
-    TString       fPartnerName; // Name of partner plane in same 2-D readout
+    Tracker*      fTracker;     //! Our parent detector
 
     // Parameters, calibration, flags
     Double_t      fResolution;  // Sensor position resolution (sigma) (m)
@@ -186,19 +187,6 @@ namespace TreeSearch {
     // Enable/disable calibration mode flag
 
     SetBit( kCalibrating, enable );
-  }
-  
-  //___________________________________________________________________________
-  inline
-  Tracker* Plane::GetTracker() const
-  {
-    // Get the Tracker detetector that this Plane belongs to
-
-#ifdef NDEBUG
-    return static_cast<Tracker*>( GetMainDetector() );
-#else
-    return GetTrackerSafe();
-#endif
   }
   
   //___________________________________________________________________________
