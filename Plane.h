@@ -144,6 +144,11 @@ namespace TreeSearch {
 #endif
     };
 
+  private:
+#ifndef NDEBUG
+    Tracker* GetTrackerSafe()  const;
+#endif
+    
     ClassDef(Plane,0)  // One Tracker plane coordinate direction
   };
 
@@ -177,6 +182,19 @@ namespace TreeSearch {
     // Enable/disable calibration mode flag
 
     SetBit( kCalibrating, enable );
+  }
+  
+  //___________________________________________________________________________
+  inline
+  Tracker* Plane::GetTracker() const
+  {
+    // Get the Tracker detetector that this Plane belongs to
+
+#ifdef NDEBUG
+    return static_cast<Tracker*>( GetMainDetector() );
+#else
+    return GetTrackerSafe();
+#endif
   }
   
   //___________________________________________________________________________

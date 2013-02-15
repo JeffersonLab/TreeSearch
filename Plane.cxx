@@ -1,11 +1,10 @@
-//*-- Author :    Ole Hansen, Jefferson Lab   11-Jan-2010
+//*-- Author :    Ole Hansen, Jefferson Lab   08-Feb-2013
 
 //////////////////////////////////////////////////////////////////////////////
 //                                                                          //
 // TreeSearch::Plane                                                        //
 //                                                                          //
-// A 1-dimensional readout plane of a GEM chamber.                          //
-// Use two of these objects for a 2-d readout plane.                        //
+// Base class for a 1-dimensional tracker sensor plane.                     //
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -40,7 +39,19 @@ Plane::Plane( const char* name, const char* description,
 {
   // Constructor
 
+  static const char* const here = "Plane";
+
   assert( name && parent );
+
+  try {
+    fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );
+  }
+  catch( std::bad_alloc ) {
+    Error( Here(here), "Out of memory constructing plane %s. "
+	   "Call expert.", name );
+    MakeZombie();
+    return;
+  }
 
 #ifdef TESTCODE
   // No diagnostic histograms by default
@@ -55,9 +66,6 @@ Plane::~Plane()
 
   // Histograms in fHist should be automatically deleted by ROOT when 
   // the output file is closed
-
-  if( fIsSetup )
-    RemoveVariables();
 
   delete fFitCoords;
   delete fHits;
@@ -75,9 +83,9 @@ FitCoord* Plane::AddFitCoord( const FitCoord& coord )
 //_____________________________________________________________________________
 Int_t Plane::Begin( THaRunBase* /* run */ )
 {
-#ifdef TESTCODE
   // Book diagnostic histos if not already done
 
+#ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
     //TODO: check if exist
     string hname, htitle;
@@ -101,9 +109,9 @@ void Plane::Clear( Option_t* opt )
 //_____________________________________________________________________________
 Int_t Plane::End( THaRunBase* /* run */ )
 {
-#ifdef TESTCODE
   // Write diagnostic histograms to file
 
+#ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
     if( fHitMap ) fHitMap->Write();
   }
@@ -318,10 +326,22 @@ Double_t Plane::GetMaxSlope() const
 }
 
 //_____________________________________________________________________________
+#ifndef NDEBUG
+Tracker* Plane::GetTrackerSafe() const
+{ 
+  // Get parent detector object and ensure that it a Tracker
+
+  Tracker* tr = dynamic_cast<Tracker*>( GetMainDetector() );
+  assert( tr );
+  return tr;
+}
+#endif
+
+//_____________________________________________________________________________
 
 }
 
 ClassImp(TreeSearch::Plane)
 
-  ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
