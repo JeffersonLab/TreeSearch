@@ -81,7 +81,8 @@ namespace TreeSearch {
 
     void            SetPlaneNum( UInt_t n )   { fPlaneNum = n; }
     void            SetDefinedNum( UInt_t n ) { fDefinedNum = n; }
-    void            SetProjection( Projection* p );
+    void            SetProjection( Projection* p )
+    { fProjection = p; UpdateOffset(); }
     void            SetRequired( Bool_t enable = true );
     void            UpdateOffset();
 
