@@ -4,12 +4,12 @@
 //                                                                          //
 // TreeSearch::WirePlane                                                    //
 //                                                                          //
-//                                                                          //
+// A 1-dimensional plane of horizontal drift chamber wires                  //
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
 #include "WirePlane.h"
-#include "Hit.h"
+#include "WireHit.h"
 #include "MWDC.h"
 #include "TimeToDistConv.h"
 #include "Projection.h"
@@ -17,11 +17,13 @@
 #include "THaDetMap.h"
 #include "THaEvData.h"
 #include "TClonesArray.h"
+#include "TError.h"
 
 #include "TClass.h"
 
 #include <iostream>
 #include <string>
+#include <stdexcept>
 
 using namespace std;
 
@@ -33,59 +35,41 @@ namespace TreeSearch {
 //_____________________________________________________________________________
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
-  : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
-    fType(kUndefinedType), fWireStart(0.0), fWireSpacing(0.0), fCoordOffset(0),
-    fPartner(0), fProjection(0), fMWDC(0), fResolution(0.0),
-    fMinTime(-kBig), fMaxTime(kBig), fMaxHits(kMaxUInt), fTTDConv(0),
-    fHits(0), fFitCoords(0)
+  : Plane(name,description,parent), 
+    fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0)
   , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
     fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
 {
   // Constructor
 
   static const char* const here = "WirePlane";
-  assert( name && parent );
 
-  // Wire planes must be subdetectors of an MWDC
-  fMWDC = dynamic_cast<MWDC*>( GetMainDetector() );
-  assert( fMWDC );
+  assert( dynamic_cast<MWDC*>(fTracker) );
 
-  if( fMWDC->TestBit(MWDC::kMCdata) ) // Monte Carlo data mode?
-    fHits = new TClonesArray("TreeSearch::MCHit", 200);
-  else
-    fHits = new TClonesArray("TreeSearch::Hit", 200);
-
-  fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );
-
-  if( !fHits or !fFitCoords ) {
-    Fatal( Here(here), "Allocating hit array in wire plane %s failed. "
-	   "Call expert." );
+  try {
+    if( fTracker->TestBit(Tracker::kMCdata) ) // Monte Carlo data mode?
+      fHits = new TClonesArray("TreeSearch::MCWireHit", 200);
+    else
+      fHits = new TClonesArray("TreeSearch::WireHit", 200);
+  }
+  catch( std::bad_alloc ) {
+    Error( Here(here), "Out of memory allocating hit array for wire plane %s. "
+	   "Call expert.", name );
     MakeZombie();
     return;
   }
-  
 
+  // Tell common code that our frontends are TDC based
+  SetBit(kTDCReadout);
 }
 
 //_____________________________________________________________________________
 WirePlane::~WirePlane()
 {
-  // Destructor.
+  // Destructor
 
   if( fIsSetup )
     RemoveVariables();
-
-  delete fFitCoords;
-  delete fHits;
-}
-
-//_____________________________________________________________________________
-FitCoord* WirePlane::AddFitCoord( const FitCoord& coord )
-{ 
-  // Add given fit coordinate data to this plane's array of fit coordinates
-
-  return
-    new( (*fFitCoords)[GetNcoords()] ) FitCoord(coord);
 }
 
 //_____________________________________________________________________________
@@ -93,8 +77,8 @@ void WirePlane::Clear( Option_t* opt )
 {    
   // Clear event-by-event data (hits)
 
-  fHits->Clear(opt);
-  fFitCoords->Clear(opt);
+  Plane::Clear(opt);
+
 #ifdef TESTCODE
   fWasSorted = 0;
   fNmiss = fNrej = fNhitwires = fNmultihit = fNmaxmul = 0;
@@ -113,9 +97,9 @@ void WirePlane::CheckCrosstalk()
   UInt_t cursiz = 1;
   fClsiz = 1;
   Int_t prev_iw = -(1<<16);
-  Hit* prev_hit = 0;
+  WireHit* prev_hit = 0;
   for( Int_t i = 0; i < GetNhits(); ++i ) {
-    Hit* hit = (Hit*)fHits->At(i);
+    WireHit* hit = (WireHit*)fHits->At(i);
     Int_t iw = hit->GetWireNum();
     Int_t dw = TMath::Abs(iw - prev_iw);
     if( dw == 0 ) {
@@ -154,9 +138,16 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 
   //  static const char* const here = "Decode";
 
+#ifdef NDEBUG
+  MWDC* mwdc = static_cast<MWDC*>( fTracker );
+#else
+  MWDC* mwdc = dynamic_cast<MWDC*>( fTracker );
+  assert( mwdc );
+#endif
+
   UInt_t nHits = 0;
-  bool no_time_cut = fMWDC->TestBit(MWDC::kDoTimeCut) == kFALSE;
-  bool mc_data     = fMWDC->TestBit(MWDC::kMCdata);
+  bool no_time_cut = !fTracker->TestBit(MWDC::kDoTimeCut);
+  bool mc_data     = fTracker->TestBit(Tracker::kMCdata);
 
   // Decode data. This is done fairly efficiently by looping over only the 
   // channels with hits on each module. 
@@ -165,11 +156,11 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   // NB: certain indices below are guaranteed to be in range by construction
   // in ReadDatabase, so we can avoid unneeded checks.
   bool sorted = true;
-  Hit* prevHit = 0;
+  WireHit* prevHit = 0;
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module * d = fDetMap->GetModule(imod);
     Double_t ref_time =
-      (d->refindex >= 0) ? fMWDC->GetRefTime(d->refindex) : 0.0;
+      (d->refindex >= 0) ? mwdc->GetRefTime(d->refindex) : 0.0;
 
     // Get number of channels with hits and loop over them, skipping channels
     // that are not part of this module
@@ -219,27 +210,27 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	// use common-stop TDCs, so t_drift = t_tdc(drift=0)-t_tdc(data).
 	Double_t time = tdc_offset+ref_time - d->resolution*(data+0.5);
 	if( no_time_cut || (fMinTime < time && time < fMaxTime) ) {
-	  Hit* theHit;
+	  WireHit* theHit;
 	  if( mc_data ) {
 	    theHit = new( (*fHits)[nHits++] ) 
-	      MCHit( iw, 
-		     GetWireStart() + iw * fWireSpacing,
-		     data,
-		     time,
-		     fResolution,
-		     this,
-		     // TODO: fill MC info here
-		     0, 0.0
-		     );
+	      MCWireHit( iw, 
+			 GetStart() + iw * GetPitch(),
+			 data,
+			 time,
+			 fResolution,
+			 this,
+			 // TODO: fill MC info here
+			 0, 0.0
+			 );
 	  } else
 	    theHit = new( (*fHits)[nHits++] )
-	      Hit( iw, 
-		   GetWireStart() + iw * fWireSpacing,
-		   data,
-		   time,
-		   fResolution,
-		   this
-		   );
+	      WireHit( iw, 
+		       GetStart() + iw * GetPitch(),
+		       data,
+		       time,
+		       fResolution,
+		       this
+		       );
 	  // Preliminary calculation of drift distance. Once tracks are known,
 	  // the distance can be recomputed using the track slope.
 	  theHit->ConvertTimeToDist( 0.0 );
@@ -248,7 +239,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	  // come in sorted if the lowest logical channel corresponds to
 	  // the smallest wire positiion. If they do, we can skip 
 	  // quicksorting an already-sorted array ;)
-	  if( sorted && prevHit && theHit->Hit::Compare(prevHit) < 0 )
+	  if( sorted && prevHit && theHit->Compare(prevHit) < 0 )
 	    sorted = false;
 	  prevHit = theHit;
 	}
@@ -288,39 +279,21 @@ Int_t WirePlane::DefineVariables( EMode mode )
   // Register variables in global list
 
   RVarDef vars[] = {
-    { "nhits",       "Num accepted hits",  "GetNhits()" },
-    { "hit.wire",    "Hit wire number",    "fHits.TreeSearch::Hit.fWireNum" },
-    { "hit.tdc",     "Hit TDC value",      "fHits.TreeSearch::Hit.fRawTDC" },
-    { "hit.time",    "Hit time (s)",       "fHits.TreeSearch::Hit.fTime" },
-    { "hit.dist",    "Drift distance (m)",
-                                    "fHits.TreeSearch::Hit.GetDriftDist()" },
-    { "ncoords",     "Num fit coords",     "GetNcoords()" },
-    { "coord.rank",  "Fit rank of coord",
-                                "fFitCoords.TreeSearch::FitCoord.fFitRank" },
-    { "coord.wire", "Wire number of fitted hit",
-                            "fFitCoords.TreeSearch::FitCoord.GetWireNum()" },
-    { "coord.time", "Drift time of hit (s)",
-                          "fFitCoords.TreeSearch::FitCoord.GetDriftTime()" },
-    { "coord.dist", "Drift distance of hit (m)",
-                          "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
-    { "coord.pos",   "Position used in fit (wirepos +/- dist) (m)",
-                                    "fFitCoords.TreeSearch::FitCoord.fPos" },
-    { "coord.trkpos","Track pos from projection fit (m)",
-                               "fFitCoords.TreeSearch::FitCoord.fTrackPos" },
-    { "coord.trkslope","Track slope from projection fit",
-                             "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },
-    { "coord.resid", "Residual of trkpos (m)",
-                           "fFitCoords.TreeSearch::FitCoord.GetResidual()" },
-    { "coord.trkdist", "Distance of trkpos to wire (m)",
-                          "fFitCoords.TreeSearch::FitCoord.GetTrackDist()" },
-    { "coord.3Dpos",  "Crossing position of fitted 3D track (m)",
-                               "fFitCoords.TreeSearch::FitCoord.f3DTrkPos" },
-    { "coord.3Ddist", "Distance of 3D trkpos to wire (m)",
-                          "fFitCoords.TreeSearch::FitCoord.Get3DTrkDist()" },
-    { "coord.3Dresid","Residual of 3D trkpos (m)",
-                         "fFitCoords.TreeSearch::FitCoord.Get3DTrkResid()" },
-    { "coord.3Dslope","Slope of fitted 3D track wrt projection",
-                             "fFitCoords.TreeSearch::FitCoord.f3DTrkSlope" },
+    { "nhits",       "Num accepted hits",                           "GetNhits()" },
+    { "ncoords",     "Num fit coords",                              "GetNcoords()" },
+    { "coord.rank",  "Fit rank of coord",                           "fFitCoords.TreeSearch::FitCoord.fFitRank" },
+    // { "coord.wire", "Wire number of fitted hit",                    "fFitCoords.TreeSearch::FitCoord.GetWireNum()" },
+    // { "coord.time", "Drift time of hit (s)",                        "fFitCoords.TreeSearch::FitCoord.GetDriftTime()" },
+    // { "coord.dist", "Drift distance of hit (m)",                    "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
+    { "coord.pos",   "Position used in fit (wirepos +/- dist) (m)", "fFitCoords.TreeSearch::FitCoord.fPos" },
+    { "coord.trkpos","Track pos from projection fit (m)",           "fFitCoords.TreeSearch::FitCoord.fTrackPos" },
+    { "coord.trkslope","Track slope from projection fit",           "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },
+    { "coord.resid", "Residual of trkpos (m)",                      "fFitCoords.TreeSearch::FitCoord.GetResidual()" },
+    { "coord.trkdist", "Distance of trkpos to wire (m)",            "fFitCoords.TreeSearch::FitCoord.GetTrackDist()" },
+    { "coord.3Dpos",  "Crossing position of fitted 3D track (m)",   "fFitCoords.TreeSearch::FitCoord.f3DTrkPos" },
+    { "coord.3Ddist", "Distance of 3D trkpos to wire (m)",          "fFitCoords.TreeSearch::FitCoord.Get3DTrkDist()" },
+    { "coord.3Dresid","Residual of 3D trkpos (m)",                  "fFitCoords.TreeSearch::FitCoord.Get3DTrkResid()" },
+    { "coord.3Dslope","Slope of fitted 3D track wrt projection",    "fFitCoords.TreeSearch::FitCoord.f3DTrkSlope" },
 #ifdef TESTCODE
     { "nmiss",       "Decoder misses",     "fNmiss" },
     { "nrej",        "Time cut nopass",    "fNrej" },
@@ -331,36 +304,44 @@ Int_t WirePlane::DefineVariables( EMode mode )
     { "ncl",         "Num clusters",       "fNcl" },
     { "ndbl",        "Num double hits ",   "fNdbl" },
     { "maxclsiz",    "Max cluster size",   "fClsiz" },
-    { "hit.iscl",    "Hit has neighbor",   "fHits.TreeSearch::Hit.fCl" },
-    { "hit.ismulti", "Wire has multihits", "fHits.TreeSearch::Hit.fMulti" },
-    { "hit.tdiff",   "multi hits tdiff",   "fHits.TreeSearch::Hit.fTdiff" },
 #endif
     { 0 }
   };
   Int_t ret = DefineVarsFromList( vars, mode );
 
-  if( fMWDC->TestBit(MWDC::kMCdata) && ret == kOK ) {
-    // Additional variables for Monte Carlo data
+  if( !fTracker->TestBit(MWDC::kMCdata) && ret == kOK ) {
+    // Non-Monte Carlo hit data
+    RVarDef nonmcvars[] = {
+      { "hit.wire",    "Hit wire number",    "fHits.TreeSearch::WireHit.fWireNum" },
+      { "hit.tdc",     "Hit TDC value",      "fHits.TreeSearch::WireHit.fRawTDC" },
+      { "hit.time",    "Hit time (s)",       "fHits.TreeSearch::WireHit.fTime" },
+      { "hit.dist",    "Drift distance (m)", "fHits.TreeSearch::WireHit.GetDriftDist()" },
+#ifdef TESTCODE
+      { "hit.iscl",    "Hit has neighbor",   "fHits.TreeSearch::WireHit.fCl" },
+      { "hit.ismulti", "Wire has multihits", "fHits.TreeSearch::WireHit.fMulti" },
+      { "hit.tdiff",   "multi hits tdiff",   "fHits.TreeSearch::WireHit.fTdiff" },
+#endif
+      { 0 }
+    };
+    ret = DefineVarsFromList( nonmcvars, mode );
+  } else { 
+    // Monte Carlo hit data includes the truth information
     RVarDef mcvars[] = {
-      { "mcpos", "MC track position (m)", "fHits.TreeSearch::MCHit.fMCPos" },
+      { "hit.wire",    "Hit wire number",    "fHits.TreeSearch::MCWireHit.fWireNum" },
+      { "hit.tdc",     "Hit TDC value",      "fHits.TreeSearch::MCWireHit.fRawTDC" },
+      { "hit.time",    "Hit time (s)",       "fHits.TreeSearch::MCWireHit.fTime" },
+      { "hit.dist",    "Drift distance (m)", "fHits.TreeSearch::MCWireHit.GetDriftDist()" },
+#ifdef TESTCODE
+      { "hit.iscl",    "Hit has neighbor",   "fHits.TreeSearch::MCWireHit.fCl" },
+      { "hit.ismulti", "Wire has multihits", "fHits.TreeSearch::MCWireHit.fMulti" },
+      { "hit.tdiff",   "multi hits tdiff",   "fHits.TreeSearch::MCWireHit.fTdiff" },
+#endif
+      { "mcpos", "MC track position (m)", "fHits.TreeSearch::MCWireHit.fMCPos" },
       { 0 }
     };
     ret = DefineVarsFromList( mcvars, mode );
   }
   return ret;
-}
-
-//_____________________________________________________________________________
-THaAnalysisObject::EStatus WirePlane::Init( const TDatime& date )
-{
-  // Calls its own Init(), then initializes subdetectors, then calculates
-  // some local geometry data.
-
-  EStatus status = THaSubDetector::Init( date );
-  if( status ) 
-    return fStatus = status;
-
-  return fStatus = kOK;
 }
 
 //_____________________________________________________________________________
@@ -370,56 +351,47 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 
   static const char* const here = "ReadDatabase";
 
+  // Read the database for the base class, quit if error
+  Int_t status = ReadDatabaseCommon(date);
+  if( status != kOK )
+    return status;
+
+  // Now read additional info needed for this derived class
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
 
-  // Read fOrigin (plane position) and fSize. fOrigin is the chamber
-  // position relative to the MWDC reference frame - which in turn can be
-  // offset as a whole. Thus, with respect to some absolute frame
-  // (whatever it may be), each wire plane is positioned at 
-  // fOrigin(MWDC) + fOrigin(plane)
-  Int_t err = ReadGeometry( file, date, kTRUE );
-  if( err )
-    return err;
-
-  TString plane_type, ttd_conv;
-  // Putting these containers on the stack may cause a stack overflow
-  vector<Int_t>* detmap = new vector<Int_t>;
-  vector<double>* ttd_param = new vector<double>;
+  TString ttd_conv;
+  vector<double>* ttd_param = 0;
   // Default values for optional parameters
   fMinTime = -kBig;
   fMaxTime =  kBig;
-  fMaxHits =  kMaxUInt;
-  Int_t required = 0;
-  const DBRequest request[] = {
-    { "detmap",        detmap,        kIntV },
-    { "nwires",        &fNelem,       kInt },
-    { "type",          &plane_type,   kTString, 0, 1 },
-    { "wire.pos",      &fWireStart },
-    { "wire.spacing",  &fWireSpacing, kDouble,  0, 0, -1 },
-    { "ttd.converter", &ttd_conv,     kTString, 0, 0, -1 },
-    { "ttd.param",     ttd_param,     kDoubleV, 0, 0, -1 },
-    { "xp.res",        &fResolution,  kDouble,  0, 0, -1 },
-    { "tdc.offsets",   &fTDCOffset,   kFloatV,  0, 0 },
-    { "description",   &fTitle,       kTString, 0, 1 },
-    { "drift.min",     &fMinTime,     kDouble,  0, 1, -1 },
-    { "drift.max",     &fMaxTime,     kDouble,  0, 1, -1 },
-    { "required",      &required,     kInt,     0, 1 },
-    { "maxhits",       &fMaxHits,     kUInt,    0, 1, -1 },
-    { 0 }
-  };
+  try {
+    // Putting this container on the stack may cause a stack overflow
+    ttd_param = new vector<double>;
 
-  Int_t status = kInitError;
-  UInt_t flags;
-  err = LoadDB( file, date, request, fPrefix );
-  fclose(file);
-  if( !err ) {
-    // Parse the detector map of the data channels
-    flags = THaDetMap::kFillRefChan;
-    if( FillDetMap( *detmap, flags, here ) > 0 )
-      status = kOK;
+    const DBRequest request[] = {
+      { "nwires",        &fNelem,       kInt,     0, 0, -1 },
+      { "wire.pos",      &fStart },
+      { "wire.spacing",  &fPitch,       kDouble,  0, 0, -1 },
+      { "ttd.converter", &ttd_conv,     kTString, 0, 0, -1 },
+      { "ttd.param",     ttd_param,     kDoubleV, 0, 0, -1 },
+      { "tdc.offsets",   &fTDCOffset,   kFloatV,  0, 0 },
+      { "drift.min",     &fMinTime,     kDouble,  0, 1, -1 },
+      { "drift.max",     &fMaxTime,     kDouble,  0, 1, -1 },
+      { 0 }
+    };
+    status = LoadDB( file, date, request, fPrefix );
   }
-  delete detmap; detmap = 0;
+  // Catch exceptions here so that we can close the file
+  catch(...) {
+    fclose(file);
+    throw;
+  }
+
+  // Finished reading the database
+  fclose(file);
+  if( status != kOK )
+    return status;
 
   // Create time-to-distance converter
   if( status == kOK ) {
@@ -457,27 +429,6 @@ ttderr:
   if( status != kOK )
     return status;
 
-  // Retrieve TDC resolution and model number for our crateslots
-  for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
-    THaDetMap::Module* d = fDetMap->GetModule(imod);
-    fMWDC->LoadDAQmodel(d);
-    fMWDC->LoadDAQresolution(d);
-    d->MakeTDC();
-    UInt_t nchan = fMWDC->GetDAQnchan(d);
-    if( d->hi >= nchan ) {
-      Error( Here(here), "Detector map channel out of range for module "
-	     "cr/sl/lo/hi = %u/%u/%u/%u. Must be < %u. Fix database.",
-	     d->crate, d->slot, d->lo, d->hi, nchan );
-      return kInitError;
-    }
-    if( d->refchan >= static_cast<Int_t>(nchan) ) {
-      Error( Here(here), "Detector map reference channel %d out of range for "
-	     "module cr/sl/lo/hi = %u/%u/%u/%u. Must be < %u. Fix database.",
-	     d->refchan, d->crate, d->slot, d->lo, d->hi, nchan );
-      return kInitError;
-    }
-  }
-
   // Sanity checks
   if( fNelem <= 0 ) {
     Error( Here(here), "Invalid number of wires: %d", fNelem );
@@ -503,104 +454,16 @@ ttderr:
   if( fMinTime > -kBig )  fMinTime *= kTDCscale;
   if( fMaxTime <  kBig )  fMaxTime *= kTDCscale;
 
-  // Determine the type of this plane. If the optional plane type variable is
-  // not given, use the first character of the plane name.
-  TString name = plane_type.IsNull() ? fName[0] : plane_type[0];
-  fType = fMWDC->NameToType( name );
-  if( fType == kUndefinedType ) {
-    TString names;
-    for( EProjType i = kTypeBegin; i < kTypeEnd; ++i ) {
-      names += fMWDC->fProj[i]->GetName();
-      if( i+1 != kTypeEnd ) 
-	names += " ";
-    }
-    Error( Here(here), "Unsupported plane type \"%s\". Must be one of "
-	   "%s. Fix database.", name.Data(), names.Data() );
-    return kInitError;
-  }
-
-  if( required )
-    SetBit( kIsRequired );
-
   fIsInit = true;
   return kOK;
 }
 
 //_____________________________________________________________________________
-void WirePlane::SetPartner( WirePlane* p )
-{    
-  // Partner this plane with plane 'p'. Partner planes are expected to
-  // be located close to each other and usually to have staggered wires.
-
-  if( p )
-    p->fPartner = this;
-  else if( fPartner ) {
-    assert( this == fPartner->fPartner );
-    fPartner->fPartner = 0;
-  }
-  fPartner = p;
-
-  return;
-}
-
-//_____________________________________________________________________________
-void WirePlane::SetProjection( Projection* proj )
-{
-  // Associate this plane with the given projection.
-  // Also updates fCoordOffset based on the orientation of the projection
-  // and this plane's fOrigin.
-
-  fProjection = proj;
-  if( proj ) {
-    assert( proj->IsInit() );
-    // Calculate the offset to be applied to the wire positions if the
-    // chamber has a position offset. This will translate the hit positions
-    // into the MWDC frame, which is the reference frame for tracking
-    TVector2 off( fOrigin.X(), fOrigin.Y() );
-    fCoordOffset = off * proj->GetAxis();
-  } else
-    fCoordOffset = 0;
-}
-
-//_____________________________________________________________________________
-void WirePlane::Print( Option_t* ) const
+void WirePlane::Print( Option_t* opt ) const
 {    
   // Print plane info
 
-  cout << "WirePlane:  #" << GetPlaneNum() << " "
-       << GetName()   << "\t"
-    //       << GetTitle()        << "\t"
-       << fNelem << " wires\t"
-       << "z = " << GetZ();
-  if( fPartner ) {
-    cout << "\t partner = " 
-	 << fPartner->GetName();
-    //	 << fPartner->GetTitle();
-  }
-  cout << endl;
-}
-
-//_____________________________________________________________________________
-// Int_t WirePlane::Compare( const TObject* obj ) const 
-// {
-//   // Used to sort planes in a TCollection/TList by z-position
-
-//   // Fail if comparing to some other type of object
-//   assert( obj && IsA() == obj->IsA() );
-
-//   if( obj == this )
-//     return 0;
-
-//   const WirePlane* other = static_cast<const WirePlane*>( obj );
-//   if( GetZ() < other->GetZ() ) return -1;
-//   if( GetZ() > other->GetZ() ) return  1;
-//   return 0;
-// }
-
-//_____________________________________________________________________________
-Double_t WirePlane::GetMaxSlope() const
-{ 
-  return fProjection ? fProjection->GetMaxSlope() : kBig;
+  Plane::Print(opt);
 }
 
 //_____________________________________________________________________________
