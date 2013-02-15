@@ -94,9 +94,11 @@ Int_t GEMPlane::Begin( THaRunBase* run )
 }
 
 //_____________________________________________________________________________
-void GEMPlane::Clear( Option_t* /* opt */ )
+void GEMPlane::Clear( Option_t* opt )
 {    
   // Clear event-by-event data (hits)
+
+  Plane::Clear(opt);
 
   assert( fADC );
   memset( fADC, 0, fNelem*sizeof(Float_t) );
