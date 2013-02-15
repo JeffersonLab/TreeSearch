@@ -192,16 +192,16 @@ namespace TreeSearch {
     // Int_t     GetWireNum()    const { return fHit ? fHit->GetWireNum() : -1; }
     
   private:
-    Hit*      fHit;      // Decoded raw hit data
-    Road*     fRoad;     // Road that created this fit
-    Double_t  fPos;      // Uncorrected hit position (posL/R) used in fit (m)
-    Double_t  fTrackPos; // Track crossing position from projection fit (m)
+    Hit*      fHit;        // Decoded raw hit data
+    Road*     fRoad;       // Road that created this fit
+    Double_t  fPos;        // Uncorrected hit position (posL/R) used in fit (m)
+    Double_t  fTrackPos;   // Track crossing position from projection fit (m)
     Double_t  fTrackSlope; // Track slope from projection fit
-    Double_t  f3DTrkPos; // Crossing position of fitted 3D track (m)
+    Double_t  f3DTrkPos;   // Crossing position of fitted 3D track (m)
     Double_t  f3DTrkSlope; // Slope of fitted 3D track
     //TODO: add more members (for correction data etc)
 
-    UInt_t    fFitRank;  // Fit rank by chi2 within the road (0 = best)
+    UInt_t    fFitRank;    // Fit rank by chi2 within the road (0 = best)
 
     ClassDef(FitCoord,1) // Coordinate information from road fit
   };
