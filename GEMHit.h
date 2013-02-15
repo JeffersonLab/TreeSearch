@@ -45,9 +45,10 @@ namespace TreeSearch {
 
   public:
     MCGEMHit() {}
-    MCGEMHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
-	      GEMPlane* pl, MCTrack* mctrk, Double_t mcpos )
-      : GEMHit(wnum, pos, tdc, time, res, pl), MCHitInfo(mctrk, mcpos) {}
+    MCGEMHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
+	      Double_t res, GEMPlane* pl, MCTrack* mctrk, Double_t mcpos )
+      : GEMHit(pos, adc_sum, num_strips, type, res, pl),
+	MCHitInfo(mctrk, mcpos) {}
     virtual ~MCGEMHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
