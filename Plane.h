@@ -49,6 +49,8 @@ namespace TreeSearch {
     virtual Int_t   Begin( THaRunBase* r=0 );
     virtual Int_t   End( THaRunBase* r=0 );
 
+    virtual Double_t GetMaxLRdist() const { return 0; }
+
 //     virtual Int_t   Compare ( const TObject* obj ) const;
 //     virtual Bool_t  IsSortable () const { return kTRUE; }
 

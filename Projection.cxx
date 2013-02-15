@@ -260,11 +260,8 @@ THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
     // plus an allowance for extra slope of a pattern if a front/back hit
     // is missing
     Plane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
-    //TODO: ===> fix this in a generic way
-    // Double_t dxf= front_plane->GetMaxLRdist() + 2.0*front_plane->GetResolution();
-    // Double_t dxb= back_plane->GetMaxLRdist()  + 2.0*back_plane->GetResolution();
-    Double_t dxf = 2.0*front_plane->GetResolution();
-    Double_t dxb = 2.0*back_plane->GetResolution();
+    Double_t dxf= front_plane->GetMaxLRdist() + 2.0*front_plane->GetResolution();
+    Double_t dxb= back_plane->GetMaxLRdist()  + 2.0*back_plane->GetResolution();
     fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() ) + 2;
     fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() ) + 2;
 
