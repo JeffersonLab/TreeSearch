@@ -120,7 +120,7 @@ Int_t Plane::End( THaRunBase* /* run */ )
 }
 
 //_____________________________________________________________________________
-Int_t Plane::ReadDatabase( const TDatime& date )
+Int_t Plane::ReadDatabaseCommon( const TDatime& date )
 {
   // Read database
 
@@ -204,19 +204,6 @@ Int_t Plane::ReadDatabase( const TDatime& date )
     }
   }
 
-  // Sanity checks
-  if( fNelem <= 0 or fNelem > 1000000 ) { // arbitray upper limit
-    Error( Here(here), "Invalid number of channels: %d", fNelem );
-    return kInitError;
-  }
-
-  Int_t nchan = fDetMap->GetTotNumChan();
-  if( nchan != fNelem ) {
-    Error( Here(here), "Number of detector map channels (%d) "
-	   "disagrees with number of wires/strips (%d)", nchan, fNelem );
-    return kInitError;
-  }
-
   // Determine the type of this plane. If the optional plane type variable is
   // not given, use the first character of the plane name.
   TString name = plane_type.IsNull() ? fName[0] : plane_type[0];
@@ -244,7 +231,6 @@ Int_t Plane::ReadDatabase( const TDatime& date )
   // Update fCoordOffset based on the orientation of fProjection (if defined)
   UpdateOffset();
 
-  fIsInit = true;
   return kOK;
 }
 //_____________________________________________________________________________
@@ -289,14 +275,13 @@ void Plane::Print( Option_t* ) const
 {    
   // Print plane info
 
-  cout << "Plane:  #" << GetPlaneNum() << " "
-    << GetName()   << "\t"
-    //       << GetTitle()        << "\t"
-    << fNelem << " channels\t"
-    << "z = " << GetZ();
+  cout << IsA()->GetName() << ":  #" << GetPlaneNum() << " "
+       << GetName() << " \"" << GetTitle() << "\"\t"
+       << fNelem << " channels\t"
+       << "z = " << GetZ();
   if( fPartner ) {
     cout << "\t partner = " 
-      << fPartner->GetName();
+	 << fPartner->GetName();
     //	 << fPartner->GetTitle();
   }
   cout << endl;
@@ -329,7 +314,7 @@ Double_t Plane::GetMaxSlope() const
 #ifndef NDEBUG
 Tracker* Plane::GetTrackerSafe() const
 { 
-  // Get parent detector object and ensure that it a Tracker
+  // Get parent detector object and ensure that it is a Tracker
 
   Tracker* tr = dynamic_cast<Tracker*>( GetMainDetector() );
   assert( tr );

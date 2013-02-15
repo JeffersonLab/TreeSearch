@@ -18,6 +18,7 @@
 #include "THaEvData.h"
 #include "TClonesArray.h"
 #include "TH1.h"
+#include "TError.h"
 
 #include <iostream>
 #include <string>
@@ -38,6 +39,20 @@ GEMPlane::GEMPlane( const char* name, const char* description,
 {
   // Constructor
 
+  static const char* const here = "GEMPlane";
+
+  try {
+    if( GetTracker()->TestBit(Tracker::kMCdata) ) // Monte Carlo data mode?
+      fHits = new TClonesArray("TreeSearch::MCGEMHit", 200);
+    else
+      fHits = new TClonesArray("TreeSearch::GEMHit", 200);
+  }
+  catch( std::bad_alloc ) {
+    Error( Here(here), "Out of memory allocating hit array for plane %s. "
+	   "Call expert.", name );
+    MakeZombie();
+    return;
+  }
 }
 
 //_____________________________________________________________________________
@@ -51,6 +66,7 @@ GEMPlane::~GEMPlane()
   if( fIsSetup )
     RemoveVariables();
 
+  // fHits deleted in base class
   delete fADC;
   delete fADCped;
   delete fTimeCentroid;
@@ -221,10 +237,11 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   // Finds clusters of active strips (=above software threshold) and
   // computes weighted average of position. Each such cluster makes one "Hit".
 
-  //  static const char* const here = "Decode";
-  //bool mc_data = fGEM->TestBit(GEM::kMCdata);
-
   typedef map<Int_t,Float_t> Hitmap_t;
+
+  //  static const char* const here = "Decode";
+
+  bool mc_data = GetTracker()->TestBit(Tracker::kMCdata);
 
   assert( fADC );
   assert( fADCped );
@@ -485,15 +502,35 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     }
     Double_t pos = xsum/adcsum;
 #ifndef NDEBUG
-    Hit* theHit = 
+    Hit* theHit = 0;
 #endif
-      new( (*fHits)[nHits++] ) GEMHit( pos,
-				       adcsum,
-				       size,
-				       type,
-				       resolution,
-				       this
-				       );
+    if( !mc_data ) {
+#ifndef NDEBUG
+      theHit =
+#endif
+	new( (*fHits)[nHits++] ) GEMHit( pos,
+					 adcsum,
+					 size,
+					 type,
+					 resolution,
+					 this
+					 );
+    } else {
+      // Monte Carlo data
+#ifndef NDEBUG
+      theHit =
+#endif
+	new( (*fHits)[nHits++] ) MCGEMHit( pos,
+					   adcsum,
+					   size,
+					   type,
+					   resolution,
+					   this,
+					   //TODO:
+					   0,  // MCtrack
+					   0   // MCpos
+					   );
+    }
 #ifndef NDEBUG
     // Ensure hits are ordered by position (should be guaranteed by std::map)
     assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
@@ -519,39 +556,55 @@ Int_t GEMPlane::DefineVariables( EMode mode )
   // Register variables in global list
 
   RVarDef vars[] = {
-    { "nstrips",     "Num strips with hits > adc.min",   "fNRawHits" },
-    { "rawocc",      "strips w/data / n_all_strips",     "fRawOcc" },
-    { "occupancy",   "nstrips / n_all_strips",           "fOccupancy" },
-    { "strip.adc",   "Raw strip ADC values",             "fADC" },
-    { "strip.adc_p", "Pedstal sub strip ADC values",     "fADCped" },
-    { "strip.time",  "Centroid of strip signal (ns)",    "fTimeCentroid" },
-    { "nhits",       "Num hits (clusters of strips)",    "GetNhits()" },
-    { "hit.pos",     "Hit centroid (m)",    "fHits.TreeSearch::Hit.fPos" },
-    { "hit.adc",     "Hit ADC sum",         "fHits.TreeSearch::Hit.fADCsum" },
-    { "hit.size",    "Num strips ",         "fHits.TreeSearch::Hit.fSize" },
-    { "hit.type",    "Hit analysis result", "fHits.TreeSearch::Hit.fType" },
-    { "noise",       "Noise",               "fDnoise" },
-    { "ncoords",     "Num fit coords",     "GetNcoords()" },
-    { "coord.rank",  "Fit rank of coord",
-      "fFitCoords.TreeSearch::FitCoord.fFitRank" },
-    { "coord.pos",   "Position used in fit (m)",
-      "fFitCoords.TreeSearch::FitCoord.fPos" },
-    { "coord.trkpos","Track pos from projection fit (m)",
-      "fFitCoords.TreeSearch::FitCoord.fTrackPos" },
-    { "coord.trkslope","Track slope from projection fit",
-      "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },
-    { "coord.resid", "Residual of trkpos (m)",
-      "fFitCoords.TreeSearch::FitCoord.GetResidual()" },
-    { "coord.3Dpos",  "Crossing position of fitted 3D track (m)",
-      "fFitCoords.TreeSearch::FitCoord.f3DTrkPos" },
-    { "coord.3Dresid","Residual of 3D trkpos (m)",
-      "fFitCoords.TreeSearch::FitCoord.Get3DTrkResid()" },
-    { "coord.3Dslope","Slope of fitted 3D track wrt projection",
-      "fFitCoords.TreeSearch::FitCoord.f3DTrkSlope" },
+    { "nstrips",        "Num strips with hits > adc.min",   "fNRawHits" },
+    { "rawocc",         "strips w/data / n_all_strips",     "fRawOcc" },
+    { "occupancy",      "nstrips / n_all_strips",           "fOccupancy" },
+    { "strip.adc",      "Raw strip ADC values",             "fADC" },
+    { "strip.adc_p",    "Pedstal sub strip ADC values",     "fADCped" },
+    { "strip.time",     "Centroid of strip signal (ns)",    "fTimeCentroid" },
+    { "nhits",          "Num hits (clusters of strips)",    "GetNhits()" },
+    { "noise",          "Noise",                            "fDnoise" },
+    { "ncoords",        "Num fit coords",                   "GetNcoords()" },
+    { "coord.rank",     "Fit rank of coord",                "fFitCoords.TreeSearch::FitCoord.fFitRank" },
+    { "coord.pos",      "Position used in fit (m)",         "fFitCoords.TreeSearch::FitCoord.fPos" },
+    { "coord.trkpos",   "Track pos from projection fit (m)","fFitCoords.TreeSearch::FitCoord.fTrackPos" },
+    { "coord.trkslope", "Track slope from projection fit",  "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },
+    { "coord.resid",    "Residual of trkpos (m)",           "fFitCoords.TreeSearch::FitCoord.GetResidual()" },
+    { "coord.3Dpos",    "Crossing position of fitted 3D track (m)", "fFitCoords.TreeSearch::FitCoord.f3DTrkPos" },
+    { "coord.3Dresid",  "Residual of 3D trkpos (m)",        "fFitCoords.TreeSearch::FitCoord.Get3DTrkResid()" },
+    { "coord.3Dslope",  "Slope of fitted 3D track wrt projection",  "fFitCoords.TreeSearch::FitCoord.f3DTrkSlope" },
     { 0 }
   };
   Int_t ret = DefineVarsFromList( vars, mode );
 
+  if( ret != kOK )
+    return ret;
+
+  if( !GetTracker()->TestBit(Tracker::kMCdata) ) {
+    // Non-Monte Carlo hit data
+    RVarDef nonmcvars[] = {
+      { "hit.pos",  "Hit centroid (m)",      "fHits.TreeSearch::GEMHit.fPos" },
+      { "hit.adc",  "Hit ADC sum",           "fHits.TreeSearch::GEMHit.fADCsum" },
+      { "hit.size", "Num strips ",           "fHits.TreeSearch::GEMHit.fSize" },
+      { "hit.type", "Hit analysis result",   "fHits.TreeSearch::GEMHit.fType" },
+      { 0 }
+    };
+    ret = DefineVarsFromList( nonmcvars, mode );
+  } else { 
+    // Monte Carlo hit data includes the truth information
+    // For safety, we make sure that all hit variables are referenced with
+    // respect to the MCGEMHit class and not just GEMHit - the memory layout
+    // of classes under multiple inheritance might be implemetation-dependent
+    RVarDef mcvars[] = {
+      { "hit.pos",  "Hit centroid (m)",      "fHits.TreeSearch::MCGEMHit.fPos" },
+      { "hit.adc",  "Hit ADC sum",           "fHits.TreeSearch::MCGEMHit.fADCsum" },
+      { "hit.size", "Num strips ",           "fHits.TreeSearch::MCGEMHit.fSize" },
+      { "hit.type", "Hit analysis result",   "fHits.TreeSearch::MCGEMHit.fType" },
+      { "mcpos",    "MC track position (m)", "fHits.TreeSearch::MCGEMHit.fMCPos" },
+      { 0 }
+    };
+    ret = DefineVarsFromList( mcvars, mode );
+  }
   return ret;
 }
 
@@ -577,9 +630,8 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
 
   static const char* const here = "ReadDatabase";
 
-  // Read the info needed for the base class, quit if error
-  Int_t status = Plane::ReadDatabase(date);
-  fIsInit = false;
+  // Read the database for the base class, quit if error
+  Int_t status = ReadDatabaseCommon(date);
   if( status != kOK )
     return status;
 
@@ -603,7 +655,6 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   if( status == kOK ) {
     try {
       const DBRequest request[] = {
-	//TODO: make nstrips/pos/pitch optional if already read in base class
 	{ "nstrips",        &fNelem,          kInt,     0, 0, -1 },
 	{ "strip.pos",      &fStart },
 	{ "strip.pitch",    &fPitch,          kDouble,  0, 0, -1 },
@@ -633,15 +684,15 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     return status;
 
   // Sanity checks
-  if( fNelem <= 0 or fNelem > 65536 ) { // arbitray upper limit
-    Error( Here(here), "Invalid number of strips: %d", fNelem );
+  if( fNelem <= 0 or fNelem > 1000000 ) { // arbitray upper limit
+    Error( Here(here), "Invalid number of channels: %d", fNelem );
     return kInitError;
   }
 
   Int_t nchan = fDetMap->GetTotNumChan();
   if( nchan != fNelem ) {
     Error( Here(here), "Number of detector map channels (%d) "
-        "disagrees with number of strips (%d)", nchan, fNelem );
+	   "disagrees with number of wires/strips (%d)", nchan, fNelem );
     return kInitError;
   }
 
@@ -759,22 +810,12 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   return kOK;
 }
 //_____________________________________________________________________________
-void GEMPlane::Print( Option_t* ) const
+void GEMPlane::Print( Option_t* opt ) const
 {    
   // Print plane info
 
+  Plane::Print( opt );
   //TODO: add detailed info
-  cout << "GEMPlane:  #" << GetPlaneNum() << " "
-    << GetName()   << "\t"
-    //       << GetTitle()        << "\t"
-    << fNelem << " strips\t"
-    << "z = " << GetZ();
-  if( fPartner ) {
-    cout << "\t partner = " 
-      << fPartner->GetName();
-    //	 << fPartner->GetTitle();
-  }
-  cout << endl;
 }
 
 //_____________________________________________________________________________

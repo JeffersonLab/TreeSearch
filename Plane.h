@@ -127,8 +127,10 @@ namespace TreeSearch {
     TClonesArray* fHits;        // Cluster data (groups of hits)
     TClonesArray* fFitCoords;   // Cluster coordinates used by good road fits
 
+    Int_t ReadDatabaseCommon( const TDatime& date );
+
     // Podd interface
-    virtual Int_t ReadDatabase( const TDatime& date );
+    virtual Int_t ReadDatabase( const TDatime& date ) = 0;
 
     // Only for TESTCODE, but kept for binary compatibility
     TH1*          fHitMap;     // Histogram of active sensor numbers
