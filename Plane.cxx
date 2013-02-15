@@ -58,7 +58,7 @@ Plane::Plane( const char* name, const char* description,
 
 #ifdef TESTCODE
   // No diagnostic histograms by default
-  SetBit(kDoHistos,0);
+  ResetBit(kDoHistos);
 #endif
 }
 
@@ -88,6 +88,8 @@ Int_t Plane::Begin( THaRunBase* /* run */ )
 {
   // Book diagnostic histos if not already done
 
+  assert( fIsInit && fNelem > 0 );
+
 #ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
     //TODO: check if exist
@@ -105,6 +107,8 @@ void Plane::Clear( Option_t* opt )
 {    
   // Clear event-by-event data (hits)
 
+  assert( fIsInit );
+
   fHits->Clear(opt);
   fFitCoords->Clear(opt);
 }
@@ -114,9 +118,12 @@ Int_t Plane::End( THaRunBase* /* run */ )
 {
   // Write diagnostic histograms to file
 
+  assert( fIsInit );
+
 #ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
-    if( fHitMap ) fHitMap->Write();
+    assert( fHitMap );
+    fHitMap->Write();
   }
 #endif
   return 0;
@@ -147,7 +154,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
   if( status == kOK ) {
     vector<Int_t>* detmap = 0;
     try {
-      // Putting this container on the stack may cause a stack overflow
+      // Oddly, putting this container on the stack may cause a stack overflow
       detmap = new vector<Int_t>;
 
       const DBRequest request[] = {

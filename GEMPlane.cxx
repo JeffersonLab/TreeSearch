@@ -401,7 +401,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   //
   Double_t frac_down = 1.0 - fSplitFrac, frac_up = 1.0 + fSplitFrac;
 #ifndef NDEBUG
-  Hit* prevHit = 0;
+  GEMHit* prevHit = 0;
 #endif
   Hitmap_t::iterator next = rawhits.begin();
   while( next != rawhits.end() ) {
@@ -506,7 +506,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     }
     Double_t pos = xsum/adcsum;
 #ifndef NDEBUG
-    Hit* theHit = 0;
+    GEMHit* theHit = 0;
 #endif
     if( !mc_data ) {
 #ifndef NDEBUG
@@ -621,7 +621,8 @@ Int_t GEMPlane::End( THaRunBase* run )
 
 #ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
-    if( fADCMap ) fADCMap->Write();
+    assert( fADCMap );
+    fADCMap->Write();
   }
 #endif
   return 0;
@@ -656,30 +657,28 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   fADCsamp.clear();
   fAmplSigma = 0.36; // default, an educated guess
 
-  if( status == kOK ) {
-    try {
-      const DBRequest request[] = {
-	{ "nstrips",        &fNelem,          kInt,     0, 0, -1 },
-	{ "strip.pos",      &fStart },
-	{ "strip.pitch",    &fPitch,          kDouble,  0, 0, -1 },
-	{ "maxclustsiz",    &fMaxClusterSize, kUInt,    0, 1, -1 },
-	{ "maxsamp",        &fMaxSamp,        kUInt,    0, 1, -1 },
-	{ "adc.min",        &fMinAmpl,        kDouble,  0, 1, -1 },
-	{ "split.frac",     &fSplitFrac,      kDouble,  0, 1, -1 },
-	{ "mapping",        &mapping,         kTString, 0, 1, -1 },
-	{ "chanmap",        &fChanMap,        kIntV,    0, 1, -1 },
-	{ "pedestal",       &fPed,            kFloatV,  0, 1 },
-	{ "do_noise",       &do_noise,        kInt,     0, 1, -1 },
-	{ "adc.sigma",      &fAmplSigma,      kDouble,  0, 1, -1 },
-	{ 0 }
-      };
-      status = LoadDB( file, date, request, fPrefix );
-    }
-    // Catch exceptions here so that we can close the file
-    catch(...) {
-      fclose(file);
-      throw;
-    }
+  try {
+    const DBRequest request[] = {
+      { "nstrips",        &fNelem,          kInt,     0, 0, -1 },
+      { "strip.pos",      &fStart },
+      { "strip.pitch",    &fPitch,          kDouble,  0, 0, -1 },
+      { "maxclustsiz",    &fMaxClusterSize, kUInt,    0, 1, -1 },
+      { "maxsamp",        &fMaxSamp,        kUInt,    0, 1, -1 },
+      { "adc.min",        &fMinAmpl,        kDouble,  0, 1, -1 },
+      { "split.frac",     &fSplitFrac,      kDouble,  0, 1, -1 },
+      { "mapping",        &mapping,         kTString, 0, 1, -1 },
+      { "chanmap",        &fChanMap,        kIntV,    0, 1, -1 },
+      { "pedestal",       &fPed,            kFloatV,  0, 1 },
+      { "do_noise",       &do_noise,        kInt,     0, 1, -1 },
+      { "adc.sigma",      &fAmplSigma,      kDouble,  0, 1, -1 },
+      { 0 }
+    };
+    status = LoadDB( file, date, request, fPrefix );
+  }
+  // Catch exceptions here so that we can close the file
+  catch(...) {
+    fclose(file);
+    throw;
   }
 
   // Finished reading the database
