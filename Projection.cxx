@@ -182,19 +182,65 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   // Sets up event display support, then continues with standard 
   // initialization.
 
+  static const char* const here = "Init";
+
   Reset();
 
-  // Set up the event display support if corresponding bit is set in the MWDC
+  // Set up the event display support if requested
   if( fDetector->TestBit(Tracker::kEventDisplay) ) {
+    // Create fRoadCorners array needed for event display
     assert( fRoadCorners == 0 );
-    fRoadCorners = new TClonesArray("TreeSearch::Road::Corners", 3);
-    R__ASSERT(fRoadCorners);
-    // Set local bit to indicate that initialization is done
+    try {
+      fRoadCorners = new TClonesArray("TreeSearch::Road::Corners", 3);
+    }
+    catch( bad_alloc ) { fRoadCorners = 0; }
+    if( !fRoadCorners or fRoadCorners->IsZombie() ) {
+      Error( Here(here), "Out of memory creating event display for "
+	     "projection \"%s\". Call expert.", GetName() );
+      delete fRoadCorners; fRoadCorners = 0;
+      return fStatus = kInitError;
+    }
+    // Set local bit for efficiency
     SetBit(kEventDisplay);
   }
 
   // Standard initialization. This calls ReadDatabase() and DefineVariables()
-  return THaAnalysisObject::Init(date);
+  THaAnalysisObject::EStatus status = THaAnalysisObject::Init(date);
+  if( status )
+    return fStatus = status;
+
+  // Determine the width of this projection based on the plane geometry
+  assert( fWidth == 0.0 );  // fWidth set to 0.0 in Reset()
+  for( vplsiz_t i = 0; i < fPlanes.size(); ++i ) {
+    Plane* thePlane = fPlanes[i];
+    assert( thePlane->IsInit() );
+    // Determine the "width" of this projection plane (=width along the
+    // projection coordinate).
+    // The idea is that all possible hit positions in all planes of a 
+    // given projection must fall within the range [-W/2,W/2]. It is normal
+    // that some planes cover less than this width (e.g. because they are 
+    // smaller or offset) - it is meant to be the enclosing range for all
+    // planes. In this way, the tree search can use one fixed bin width.
+    // The total width found here divided by the number of bins used in
+    // tree search is the resolution of the roads.
+    // Of course, this will become inefficient for grotesque geometries.
+    Double_t s = thePlane->GetStart();
+    Double_t d = thePlane->GetPitch();
+    Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
+    Double_t lo = s - 0.5*d;
+    Double_t hi = s + (n-0.5)*d;
+    Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
+    if( w > fWidth )
+      fWidth = w;
+  }
+  fWidth *= 2.0;
+  if( fWidth < 0.01 ) {
+    Error( Here(here), "Error calculating width of projection \"%s\". "
+	   "Pitch too small? Fix database.", GetName() );
+    return fStatus = kInitError;
+  }
+
+  return fStatus = kOK;
 }
 
 //_____________________________________________________________________________
