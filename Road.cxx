@@ -11,7 +11,7 @@
 #include "Projection.h"
 #include "Hitpattern.h"
 #include "Hit.h"
-#include "WirePlane.h"
+#include "Plane.h"
 #include "Helper.h"
 
 #include "TMath.h"
@@ -23,6 +23,7 @@
 #include <numeric>
 #include <map>
 #include <utility>
+#include <stdexcept>
 
 using namespace std;
 
@@ -138,10 +139,12 @@ public:
 
 //_____________________________________________________________________________
 Road::Road( const Projection* proj ) 
-  : TObject(), fProjection(proj), fZL(kBig), fZU(kBig), 
+  : TObject(), fPlanePattern(0), fProjection(proj), fZL(kBig), fZU(kBig), 
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fTrack(0), fBuild(0), fGrown(false)
+#ifdef TESTCODE
   , fNfits(0)
+#endif
 {
   // Construct empty road
 
@@ -155,10 +158,12 @@ Road::Road( const Projection* proj )
 
 //_____________________________________________________________________________
 Road::Road( const Node_t& nd, const Projection* proj )
-  : TObject(), fPatterns(1,&nd), fProjection(proj), fZL(kBig), fZU(kBig),
-    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
-    fTrack(0), fBuild(0), fGrown(true)
+  : TObject(), fPatterns(1,&nd), fPlanePattern(0), fProjection(proj),
+    fZL(kBig), fZU(kBig), fPos(kBig), fSlope(kBig), fChi2(kBig),
+    fDof(kMaxUInt), fGood(true), fTrack(0), fBuild(0), fGrown(true)
+#ifdef TESTCODE
   , fNfits(0)
+#endif
 {
   // Construct from pattern
 
@@ -182,8 +187,10 @@ Road::Road( const Node_t& nd, const Projection* proj )
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) : 
   TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits),
-  fGrown(orig.fGrown)
+  fPlanePattern(orig.fPlanePattern), fGrown(orig.fGrown)
+#ifdef TESTCODE
   , fNfits(orig.fNfits)
+#endif
 {
   // Copy constructor
 
@@ -215,6 +222,7 @@ Road& Road::operator=( const Road& rhs )
     fFitCoord.clear();
     DeleteContainerOfContainers( fPoints );
     CopyPointData( rhs );
+    fPlanePattern = rhs.fPlanePattern;
 
     delete fBuild;
     if( rhs.fBuild )
@@ -556,14 +564,17 @@ Bool_t Road::CollectCoordinates()
   for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
     Hit* hit = const_cast<Hit*>(*it);
     // Skip all hits from planes in calibration mode - these are not fitted
-    if( hit->GetWirePlane()->IsCalibrating() )
+    if( hit->GetPlane()->IsCalibrating() )
       continue;
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetPlaneNum();
     // Prevent duplicate entries for hits with zero drift
-    int i = (hit->GetDriftDist() == 0.0) ? 1 : 2;
+    //----> TODO: fix for GEMs
+    //    int i = (hit->GetDriftDist() == 0.0) ? 1 : 2;
+    int i = 1;
     do {
-      Double_t x = (--i != 0) ? hit->GetPosL() : hit->GetPosR();
+      //      Double_t x = (--i != 0) ? hit->GetPosL() : hit->GetPosR();
+      Double_t x = (--i != 0) ? hit->GetPos() : hit->GetPos();
       if( TMath::IsInside( x, z, kNcorner, &fCornerX[0], zp )) {
 	// The hits are sorted by ascending plane number
 	if( np != last_np ) {
@@ -633,6 +644,7 @@ Bool_t Road::Fit()
     assert( fChi2 == kBig );
   else {
     fFitCoord.clear();
+    fPlanePattern = 0;
     fV[2]= fV[1] = fV[0] = fChi2 = fSlope = fPos = kBig;
     fDof = kMaxUInt;
   }
@@ -643,14 +655,19 @@ Bool_t Road::Fit()
 
   // Collect coordinates of hits that are within the width of the road
   if( !CollectCoordinates() )
+    // TODO: keep statistics
     return false;
 
   // Determine number of permutations
-  //TODO: protect against overflow
-  UInt_t n_combinations = accumulate( ALL(fPoints),
-				      (UInt_t)1, SizeMul<Pvec_t>() );
+  UInt_t n_combinations;
+  try {
+    n_combinations = accumulate( ALL(fPoints),
+				 (UInt_t)1, SizeMul<Pvec_t>() );
+  }
+  catch( overflow_error ) {
+    return false;
+  }
   if( n_combinations > kMaxNhitCombos ) {
-    // TODO: keep statistics
     return false;
   }
 
@@ -670,6 +687,7 @@ Bool_t Road::Fit()
     // We fit x = a1 + a2*z (z independent).
     // Notation from: Review of Particle Properties, PRD 50, 1277 (1994)
     Double_t S11 = 0, S12 = 0, S22 = 0, G1 = 0, G2 = 0, chi2 = 0;
+    UInt_t pat = 0;
     for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
       register Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
@@ -689,6 +707,9 @@ Bool_t Road::Fit()
       register Point* p = selected[j];
       Double_t d = a1 + a2*p->z - p->x;
       chi2 += d*d * w[j];
+      // Must never use two points in the same plane
+      assert( (pat & (1U << p->hit->GetPlaneNum())) == 0 );
+      pat |= 1U << p->hit->GetPlaneNum();
     }
 
 #ifdef VERBOSE
@@ -720,6 +741,7 @@ Bool_t Road::Fit()
       memcpy( fV, V, 3*sizeof(Double_t) );
       // Save points used for this fit
       fFitCoord.swap( selected );
+      fPlanePattern = pat;
       fGood = true;
 #ifdef VERBOSE
       if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;

@@ -40,7 +40,7 @@ namespace TreeSearch {
       Double_t res() const { return hit->GetResolution(); }
       Double_t x;    // Selected x coordinates
       Double_t z;    // z coordinate
-      Hit*     hit;  // Associated hit (stored in WirePlane)
+      Hit*     hit;  // Associated hit (stored in Plane)
       ClassDef(Point,0)
     };
 
@@ -86,6 +86,7 @@ namespace TreeSearch {
     Double_t       GetPos()     const { return fPos; }
     Double_t       GetPos( Double_t z ) const { return fPos + z*fSlope; }
     Double_t       GetPosErrsq( Double_t z ) const;
+    UInt_t         GetPlanePattern()  const { return fPlanePattern; }
     const Projection* GetProjection() const { return fProjection; }
     Double_t       GetSlope()   const { return fSlope; }
     THaTrack*      GetTrack()   const { return fTrack; }
@@ -130,6 +131,7 @@ namespace TreeSearch {
     Hset_t         fHits;       // All hits linked to the patterns
     vector<Pvec_t> fPoints;     // All hit coordinates within road [nplanes][]
     Pvec_t         fFitCoord;   // fPoints used in best fit [nplanes]
+    UInt_t         fPlanePattern; // Bitpattern of active planes
 
     const Projection* fProjection; //! Projection that this Road belongs to
 
