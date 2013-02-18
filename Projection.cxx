@@ -240,16 +240,45 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     return fStatus = kInitError;
   }
 
-  return fStatus = kOK;
-}
+  // Determine maxslope, the maximum expected track slope in the projection.
+  // width/depth is the maximum geometrically possible slope. It may be
+  // further limited by the trigger acceptance, optics, etc.
+  Double_t dz = TMath::Abs(GetZsize());
+  if( dz >= 0.01 ) {
+    Double_t maxslope = fWidth/dz;
+    if( fMaxSlope < 0.01 ) {
+      // maxslope not set in the database -> use the calculated value
+      fMaxSlope = maxslope;
+    } else if( fMaxSlope > maxslope ) {
+      // Otherwise limit maxslope to the calculated value
+      if( fDebug > 0 ) {
+	Warning( Here(here), "For projection \"%s\", maxslope from "
+		 "database = %lf exceeds geometric maximum = %lf. "
+		 "Using smaller value.", GetName(), fMaxSlope, maxslope );
+      }
+      fMaxSlope = maxslope;
+    }
+  } else {
+    Error( Here(here), "Error calculating geometric maxslope for plane "
+	   "type \"%s\". z-range of planes too small. Fix database.",
+	   GetName() );
+    return fStatus = kInitError;
+  }
 
-//_____________________________________________________________________________
-THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
-{
+  // Now that the projection's list of planes, width, and maxslope are known,
+  // do the level-2 initialization of the projections - load the pattern
+  // database and initialize the hitpattern
+//   return InitLevel2(date);
+
+// }
+
+// //_____________________________________________________________________________
+// THaAnalysisObject::EStatus Projection::InitLevel2( const TDatime& )
+// {
   // Level-2 initialization - load pattern database and initialize hitpattern.
   // Requires the planes to be fully initialized.
 
-  static const char* const here = "InitLevel2";
+  // static const char* const here = "InitLevel2";
 
   // Require at least kMinFitPlanes planes
   // TODO: allow dummy/inactive projections?

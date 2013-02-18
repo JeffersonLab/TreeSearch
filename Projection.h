@@ -42,7 +42,7 @@ namespace TreeSearch {
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
-    EStatus         InitLevel2( const TDatime& date );
+    // EStatus         InitLevel2( const TDatime& date );
     virtual void    Print( Option_t* opt="" ) const;
     void            Reset( Option_t* opt="" );
 
@@ -77,7 +77,6 @@ namespace TreeSearch {
     Double_t        GetWidth()        const { return fWidth; }
     Double_t        GetZsize()        const;
 
-    void            SetMaxSlope( Double_t m ) { fMaxSlope = m; }
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
     
     const std::vector<TreeSearch::Plane*>&
