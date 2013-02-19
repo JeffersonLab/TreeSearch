@@ -1631,6 +1631,11 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 	// Error message is printed by Projection constructor in this case
 	delete proj; proj = 0;
       }
+      catch( exception& e ) {
+	Error( Here(here), "Caught %s when creating projection \"%s\". "
+	       "Call expert.", e.what(), kProjParam[type].name );
+	delete proj; proj = 0;
+      }
       if( proj && proj->IsZombie() ) {
 	delete proj; proj = 0;
       }
