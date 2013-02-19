@@ -24,6 +24,7 @@
 #include "TError.h"
 
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 #include <utility>
 #ifdef TESTCODE
@@ -42,6 +43,9 @@ typedef vector<Plane*>::iterator  vpliter_t;
 
 // Need at least 3 planes to do proper fits
 static const UInt_t kMinFitPlanes = 3;
+
+// Parameter for angle consistency check in SetAngle (rad)
+static const Double_t kAngleTolerance = 1.0 * TMath::DegToRad();
 
 //_____________________________________________________________________________
 Projection::Projection( EProjType type, const char* name, Double_t angle,
@@ -1013,6 +1017,27 @@ void Projection::SetAngle( Double_t angle )
 {
   // Set angle of the axis perpendicular to the wires/strips (rad)
   
+  // Ensure that the angle is consistent with the plane type:
+  // x and y planes must have angles close to zero or 90 degrees.
+  // All other plane types must NOT be close to zero or 90 degrees. 
+  // Here, "close" means "within kAngleTolerance".
+  // Throws bad_angle exception if the restrictions are violated.
+  
+  Double_t d = angle -
+    TMath::FloorNint( angle/TMath::PiOver2() ) * TMath::PiOver2();
+  Bool_t near_zero_or_90 =
+    (TMath::Abs(d-TMath::PiOver4()) > TMath::PiOver4()-kAngleTolerance);
+  Bool_t x_or_y = (fType == kXPlane or fType == kYPlane);
+  if( near_zero_or_90 xor x_or_y ) {
+    stringstream msg("Angle = ");
+    msg << angle*TMath::RadToDeg()
+	<< " too " << (( x_or_y ) ? "far off from" : "close to")
+	<< "0 or 90 degrees for projection type \"" 
+	<< kProjParam[fType].name << "\". Fix database.";
+    Error( Here("SetAngle"), "%s", msg.str().c_str() );
+    throw bad_angle(msg.str());
+  }
+
   fAxis.Set( TMath::Cos(angle), TMath::Sin(angle) );
 }
 

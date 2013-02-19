@@ -18,6 +18,8 @@
 #include <cassert>
 #include <functional>
 #include <list>
+#include <exception>
+#include <string>
 
 class THaDetectorBase;
 class TBits;
@@ -104,6 +106,12 @@ namespace TreeSearch {
       { assert(p); return ( p->GetType() == type ); }
     private:
       EProjType type;
+    };
+
+    // Bad angle exception, may be thrown by SetAngle and constructors
+    class bad_angle : public std::range_error {
+    public:
+      bad_angle( const std::string& what_arg ) : std::range_error(what_arg) {}
     };
 
   protected:

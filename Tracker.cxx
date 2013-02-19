@@ -1617,13 +1617,21 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 			       this
 			       );
       }
-      catch( bad_alloc ) { proj = 0; }
-      if( !proj or proj->IsZombie() ) {
-  	// Urgh. Something very bad is going on
-  	Error( Here(here), "Error creating projection %s. Call expert.", 
-  	       kProjParam[type].name );
-  	return fStatus = kInitError;
+      catch( bad_alloc ) {
+	Error( Here(here), "Out of memory creating projection \"%s\". "
+	       "Call expert.", kProjParam[type].name );
       }
+      catch( bad_angle ) {
+	// Error message is printed by Projection constructor in this case
+	delete proj; proj = 0;
+      }
+      if( proj && proj->IsZombie() ) {
+	delete proj; proj = 0;
+      }
+      if( !proj )
+	return fStatus = kInitError;
+
+      proj->SetDebug( fDebug ); // Projections inherit parent's debug level
       fProj.push_back( proj );
     }
     proj->AddPlane( thePlane );
