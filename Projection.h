@@ -36,8 +36,9 @@ namespace TreeSearch {
 
     Projection( EProjType type, const char* name, Double_t angle,
 		THaDetectorBase* parent );
-    Projection() : fDetector(0), fPatternTree(0), fPlaneCombos(0),
-		   fHitpattern(0), fRoads(0), fRoadCorners(0) {} // ROOT RTTI
+    Projection() : fType(kUndefinedType), fDetector(0), fPatternTree(0),
+		   fPlaneCombos(0), fHitpattern(0), fRoads(0),
+		   fRoadCorners(0) {} // ROOT RTTI
     virtual ~Projection();
 
     void            AddPlane( Plane* pl, Plane* partner = 0 );

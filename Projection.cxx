@@ -499,8 +499,8 @@ Int_t Projection::ReadDatabase( const TDatime& date )
 
   fRequire1of2 = (req1of2 != 0);
 
-// If any planes defined, update their coordinate offset
-// based on our possibly new angle
+  // If any planes defined, update their coordinate offset
+  // based on our possibly new angle
   for( vplsiz_t i = 0; i < fPlanes.size(); ++i ) {
     assert( fPlanes[i]->GetProjection() == this ); // else bug in AddPlane
     fPlanes[i]->UpdateOffset();
@@ -1055,8 +1055,9 @@ void Projection::Print( Option_t* opt ) const
 
   cout << "Projection:  " 
        << GetName()
-       << " type="  << GetType()
-       << " npl="   << fPlanes.size()
+       << " type="  << (GetType() == kUndefinedType
+			? "(undef)" : kProjParam[GetType()].name)
+       << " npl="   << GetNplanes()
        << " nlev="  << GetNlevels()
        << " zsize=" << (fPlanes.empty() ? 0.0 : GetZsize())
        << " maxsl=" << GetMaxSlope()
