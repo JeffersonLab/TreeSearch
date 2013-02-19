@@ -1523,11 +1523,17 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   EStatus status = THaTrackingDetector::Init(date);
 
   // Initialize the planes
-  if( !status ) {
-    for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-      status = fPlanes[iplane]->Init(date);
-      if( status )
-	break;
+  if( status == kOK ) {
+    try {
+      for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+	status = fPlanes[iplane]->Init(date);
+	if( status )
+	  break;
+      }
+    }
+    catch(...) {
+      Error( Here(here), "Failed to initialize planes. Call expert." );
+      return status = kInitError;
     }
   }
   delete fCrateMap; fCrateMap = 0;
