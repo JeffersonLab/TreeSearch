@@ -1038,6 +1038,9 @@ void Projection::SetAngle( Double_t angle )
     throw bad_angle(msg.str());
   }
 
+  // Normalize the angle to -180...180 degrees
+  angle = TVector2::Phi_mpi_pi(angle);
+
   fAxis.Set( TMath::Cos(angle), TMath::Sin(angle) );
 }
 
