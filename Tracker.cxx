@@ -1483,7 +1483,7 @@ Int_t Tracker::DefineVariables( EMode mode )
   // Register variables in global list
   
   RVarDef vars[] = {
-    { "fail.nhits", "Too many hits in readout plane(s)",  "fFailNhits" },
+    { "fail.nhits", "Too many hits in plane(s)",  "fFailNhits" },
     { 0 },
   };
   DefineVarsFromList( vars, mode );
@@ -1838,8 +1838,10 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   // zero, tracks will be projected into the z=0 plane.
   fOrigin.SetXYZ(0,0,0);
   Int_t err = ReadGeometry( file, date );
-  if( err )
+  if( err ) {
+    fclose(file);
     return err;
+  }
 
   // Putting this container on the stack may cause strange stack overflows!
   vector<vector<Int_t> > *cmap = new vector<vector<Int_t> >;
@@ -1931,6 +1933,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       // Urgh. Something is very bad
       Error( Here(here), "Error creating readout plane %s. Call expert.",
 	     name );
+      delete newplane;
       return kInitError;
     }
     fPlanes.push_back( newplane );
