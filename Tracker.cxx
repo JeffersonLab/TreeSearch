@@ -1627,7 +1627,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 	Error( Here(here), "Out of memory creating projection \"%s\". "
 	       "Call expert.", kProjParam[type].name );
       }
-      catch( bad_angle ) {
+      catch( Projection::bad_angle ) {
 	// Error message is printed by Projection constructor in this case
 	delete proj; proj = 0;
       }
