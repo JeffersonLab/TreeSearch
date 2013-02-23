@@ -33,24 +33,22 @@ namespace TreeSearch {
     UInt_t         fMaxCorrMismatches;   // Max # planes w/o amplitude match
     Double_t       fMaxCorrNsigma;       // Amplitude correlation cutoff (#sig)
 
-    // ===> TODO: candidates for virtual functions
-    // void      FindNearestHits( ReadoutPlane* wp, const THaTrack* track,
-    // 			       const Rvec_t& roads ) const;
-
     UInt_t MatchRoadsCorrAmpl( vector<Rvec_t>& roads, UInt_t ncombos,
 			       std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 			       Rset_t& unique_found );
+
+    virtual UInt_t GetCrateMapDBcols() const;
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
     virtual Projection* MakeProjection( EProjType type, const char* name,
 					Double_t angle,
 					THaDetectorBase* parent ) const = 0;
-    virtual UInt_t GetCrateMapDBcols() const;
-
     virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
 				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 				   Rset_t& unique_found );
+
+    virtual THaAnalysisObject::EStatus PartnerPlanes();
 
      // Podd interface
     virtual Int_t  ReadDatabase( const TDatime& date );
