@@ -13,7 +13,7 @@
 #include "GEMTracker.h"
 #include "GEMPlane.h"
 #include "Projection.h"
-#include "Hit.h"
+#include "GEMHit.h"
 #include "Road.h"
 #include "Helper.h"
 
@@ -326,8 +326,10 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	assert( yplane->GetPartner() == xplane );
 
 	// Get ratio of hit amplitudes
-	Double_t xampl = xp->hit->GetADCsum();
-	Double_t yampl = yp->hit->GetADCsum();
+	assert( dynamic_cast<GEMHit*>(xp->hit) );
+	assert( dynamic_cast<GEMHit*>(yp->hit) );
+	Double_t xampl = static_cast<GEMHit*>(xp->hit)->GetADCsum();
+	Double_t yampl = static_cast<GEMHit*>(yp->hit)->GetADCsum();
 	assert( xampl > 0.0 and yampl > 0.0 ); // ensured in Decoder
 	if( xampl < 1.0 or yampl < 1.0 )
 	  continue;
