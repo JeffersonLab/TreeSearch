@@ -15,24 +15,13 @@
 #include "Projection.h"
 #include "GEMHit.h"
 #include "Road.h"
-#include "Helper.h"
-
-#include "THaDetMap.h"
-#include "THaEvData.h"
-#include "THaTrack.h"
 
 #include "TString.h"
 #include "TMath.h"
-#include "THashTable.h"
-#include "TVector2.h"
 #include "TBits.h"
 
 #include <iostream>
 #include <algorithm>
-#include <numeric>
-#include <map>
-#include <string>
-#include <stdexcept>
 
 using namespace std;
 
