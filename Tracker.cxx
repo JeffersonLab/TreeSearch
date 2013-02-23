@@ -130,6 +130,33 @@ const Double_t kBig = 1e38;
 
 static void DoTrack( void* ptr );
 
+// Default value for minimum difference between all projection angles
+static const Double_t kMinProjAngleDiff = 5.0 * TMath::DegToRad();
+
+//_____________________________________________________________________________
+// Structures we want to put into STL containers
+
+// A projection angle along with a pointer to the corresponding projection, 
+// sortable by angle
+struct ProjAngle_t {
+  ProjAngle_t( const Projection* p ) : m_proj(p) {
+    assert(p);
+    m_angle = p->GetAngle();
+    assert( TMath::Abs(m_angle) <= TMath::Pi() ); // ensured in Projection::SetAngle
+  }
+  Double_t angle( bool flip = false ) const {
+    if( flip )
+      return m_angle - TMath::Sign(TMath::Pi(), m_angle);
+    else
+      return m_angle;
+  }
+  bool operator<( const ProjAngle_t & rhs ) const {
+    return (m_angle < rhs.m_angle);
+  }
+  Double_t m_angle;
+  const Projection* m_proj;
+};
+
 //_____________________________________________________________________________
 // Support classes for data-processing threads
 
@@ -265,8 +292,8 @@ private:
 
 //_____________________________________________________________________________
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
-  : THaTrackingDetector(name,desc,app), fCrateMap(0), 
-    fMaxThreads(1), fThreads(0),
+  : THaTrackingDetector(name,desc,app), fCrateMap(0), fAllPartnered(false),
+    fMinProjAngleDiff(kMinProjAngleDiff), fMaxThreads(1), fThreads(0),
     f3dMatchvalScalefact(1), f3dMatchCut(0),
     fMinNdof(1), fFailNhits(0), fFailNpat(0),
     fNcombos(0), fN3dFits(0), fEvNum(0),
@@ -984,6 +1011,30 @@ UInt_t Tracker::MatchRoadsGeneric( vector<Rvec_t>& roads, const UInt_t ncombos,
 }
 
 //_____________________________________________________________________________
+// Functor for sorting a vector< vector<Road*> > according to the order
+// of projections types defined by the supplied lookup table.
+// Used for generalizing MatchRoadsFast3D for arbitrary combinations of
+// projections.
+
+class ByProjTypeMap
+  : public std::binary_function< Rvec_t, Rvec_t, bool >
+{
+public:
+  ByProjTypeMap( const vec_uint_t& lookup_table ) : fLookup(lookup_table) {}
+  bool operator() ( const Rvec_t& a, const Rvec_t& b ) const
+  { 
+    assert( !a.empty() and !b.empty() );
+    EProjType ta = a.front()->GetProjection()->GetType();
+    EProjType tb = b.front()->GetProjection()->GetType();
+    assert( ta != tb );
+    assert( fLookup[ta] < 3 and fLookup[tb] < 3 ); // else bug in Tracker::Init
+    return ( fLookup[ta] < fLookup[tb] );
+  }
+private:
+  const vec_uint_t& fLookup; // Lookup index proj type -> sort order index
+};
+
+//_____________________________________________________________________________
 UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 				  list< pair<Double_t,Rvec_t> >& combos_found,
 				  Rset_t& unique_found )
@@ -993,9 +1044,12 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   //  - intersect first two proj in front and back
   //  - calc perp distances to 3rd, add in quadrature -> matchval
   // Requires exactly 3 projections
+  // Note that the elements of the Rvec_t in the output 'combos_found' are not
+  // necessarily in order of ascending projection type.
 
   vector<Rvec_t>::size_type nproj = roads.size();
-  assert( nproj == 3 && fProj.size() == 3 );
+  assert( nproj == 3 and fProj.size() == nproj );
+  assert( (Int_t)f3dIdx.size() > (Int_t)fProj.back()->GetType() );
 
 #ifdef VERBOSE
   cout << "fast algo):";
@@ -1005,23 +1059,30 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   // projection
   Rvec_t selected( nproj, 0 );
 
+  // Put the road lists in the order of the projection symmetry axes.
+  // After sorting, roads[0] and roads[1] correspond to the two projections
+  // with symmetric angles around the symmetry axis, represented by roads[2].
+  // In the comments below, indices 0, 1 and 2 are referred to as u, v and x,
+  // respectively, even though the actual projection types may be different.
+  sort( ALL(roads), ByProjTypeMap(f3dIdx) );
+
   // Fetch coefficients for coordinate transformations
-  vpiter_t ip = fProj.begin();
-  assert( (*ip)->GetType() == kUPlane );
-  Double_t su = (*ip)->GetSinAngle();
-  Double_t cu = (*ip)->GetCosAngle();
-  ++ip;
-  assert( (*ip)->GetType() == kVPlane );
-  Double_t sv = (*ip)->GetSinAngle();
-  Double_t cv = (*ip)->GetCosAngle();
+  const Projection* ip = roads[0].front()->GetProjection();
+  Double_t su = ip->GetSinAngle();
+  Double_t cu = ip->GetCosAngle();
+  assert( ip != roads[1].front()->GetProjection() );
+  ip = roads[1].front()->GetProjection();
+  Double_t sv = ip->GetSinAngle();
+  Double_t cv = ip->GetCosAngle();
   Double_t inv_denom = 1.0/(sv*cu-su*cv);
   // Only the scaled coefficients are needed (cf. Road::Intersect)
   su *= inv_denom; cu *= inv_denom; sv *= inv_denom; cv *= inv_denom;
+  assert( ip != roads[2].front()->GetProjection() );
+  ip = roads[2].front()->GetProjection();
+  assert( ip != roads[0].front()->GetProjection() );
   // Components of the 3rd projection's axis
-  ++ip;
-  assert( (*ip)->GetType() == kXPlane or (*ip)->GetType() == kYPlane );
-  Double_t xax_x = ((*ip)->GetAxis()).X();
-  Double_t xax_y = ((*ip)->GetAxis()).Y();
+  Double_t xax_x = ip->GetAxis().X();
+  Double_t xax_y = ip->GetAxis().Y();
 
   // The selected roads from each of the three projections
   Road* tuple[3];
@@ -1078,13 +1139,16 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 		cout << tuple[0]->GetProjection()->GetName()
 		     << tuple[1]->GetProjection()->GetName()
 		     << " front = " << "(" << xf << "," << yf << ")" << endl;
-		cout << "front x  = (" << tuple[2]->GetPos() * xax_x << ","
+		cout << "front " << tuple[2]->GetProjection()->GetName()
+		     << " = ("
+		     << tuple[2]->GetPos() * xax_x << ","
 		     << tuple[2]->GetPos() * xax_y << ")" << endl;
 		cout << "front dist = " << d1 << endl;
 		cout << tuple[0]->GetProjection()->GetName()
 		     << tuple[1]->GetProjection()->GetName()
 		     << " back = " << "(" << xb << "," << yb << ")" << endl;
-		cout << "back x =  ("
+		cout << "back " << tuple[2]->GetProjection()->GetName()
+		     << " =  ("
 		     << tuple[2]->GetPos(zback) * xax_x << ","
 		     << tuple[2]->GetPos(zback) * xax_y << ")" << endl;
 		cout << "back dist = " << d2 << endl;
@@ -1116,6 +1180,8 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
 			    Rset_t& unique_found )
 {
   // Match roads from different projections
+  // The input vector 'roads' may be altered unpredictably.
+  // Output in 'combos_found' and 'unique_found'
 
   // The number of projections that we work with
   vector<Rvec_t>::size_type nproj = roads.size();
@@ -1350,7 +1416,6 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
     else if( nfits > 0 ) {
       // For multiple road combinations, find the set of tracks with the
       // lowest chi2s that uses each road at most once
-      roads.clear();
       typedef map<Rset_t, FitRes_t> FitResMap_t;
       FitResMap_t fit_results;
       multimap< TrackFitWeight, Rset_t > fit_chi2;
@@ -1543,67 +1608,11 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   // Sort planes by increasing z-position
   sort( ALL(fPlanes), Plane::ZIsLess() );
 
-  //===> TODO: split MWDC and GEM versions
-
-  // // Associate planes and partners
-  // bool all_partnered = true;
-  // for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-  //   Plane* thePlane = fPlanes[iplane];
-  //   TString other( thePlane->GetPartnerName() );
-  //   if( other.IsNull() ) {
-  //     thePlane->SetPartner( 0 );
-  //     all_partnered = false;
-  //     continue;
-  //   }
-  //   vriter_t it = find_if( ALL(fPlanes), Plane::NameEquals(other) );
-  //   if( it != fPlanes.end() ) {
-  //     Plane* partner = *it;
-  //     // Sanity checks
-  //     if( thePlane == partner ) {
-  // 	Error( Here(here), "Plane %s: cannot partner a plane with itself. "
-  // 	       "Fix database.", other.Data() );
-  // 	return fStatus = kInitError;
-  //     }
-  //     // Partner planes must be of different types (multi-dimensional readout)
-  //     if( thePlane->GetType() == partner->GetType() ) {
-  // 	Error( Here(here), "Partner planes %s and %s have the same type!"
-  // 	       " Fix database.", thePlane->GetName(), partner->GetName() );
-  // 	return fStatus = kInitError;
-  //     }
-  //     // 2D readouts must have essentially the same z-position
-  //     if( TMath::Abs( thePlane->GetZ() - partner->GetZ() ) > 1e-3 ) {
-  // 	Error( Here(here), "Partner planes %s and %s must have the same "
-  // 	       "z-position within 1 mm. Fix database.", 
-  // 	       thePlane->GetName(), partner->GetName() );
-  // 	return fStatus = kInitError;
-  //     }
-  //     // Check for consistency
-  //     TString ppname( partner->GetPartnerName() );
-  //     if( ppname.IsNull() or ppname != thePlane->GetName() ) {
-  // 	Error( Here(here), "Inconsistent plane partnering. Partner(%s) "
-  // 	       "= %s, but partner(%s) = %s. Fix database.",
-  // 	       thePlane->GetName(), other.Data(), 
-  // 	       partner->GetName(), ppname.IsNull() ? "(none)":ppname.Data() );
-  // 	return fStatus = kInitError;
-  //     }
-  //     // Nothing to do if partner already set (prevents duplicate printouts)
-  //     if( thePlane->GetPartner() == partner ) {
-  // 	assert( partner->GetPartner() == thePlane );
-  // 	continue;
-  //     }
-  //     // Mutually associate thePlane and partner
-  //     if( fDebug > 0 )
-  // 	Info( Here(here), "Partnering plane %s with %s",
-  // 	      thePlane->GetName(), partner->GetName() );
-
-  //     partner->SetPartner( thePlane );
-
-  //   } else {
-  //     Error( Here(here), "Partner plane %s of %s is not defined!"
-  // 	     " Fix database.", other.Data(), thePlane->GetName() );
-  //     return fStatus = kInitError;
-  //   }
-  // }
+  // Find partners for the planes, if appropriate. Details depend on the type
+  // of detector.
+  status = PartnerPlanes();
+  if( status )
+    return fStatus = status;
 
   // Set up the projections based on which plane types are defined
   assert( fProj.empty() );
@@ -1647,156 +1656,110 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     }
     proj->AddPlane( thePlane );
   }
+  if( fDebug > 0 )
+    Info( Here(here), "Set up %u projections", (UInt_t)fProj.size() );
 
   // Sort projections by ascending EProjType
   sort( ALL(fProj), Projection::ByType() );
 
-  // // If exactly two projections are defined, switch on the 3D amplitude
-  // // correlation matching mode
-  // if( fProj.size() == 2 ) {
-  //   SetBit( k3dCorrAmpl );
-  //   if( fDebug > 0 )
-  //     Info( Here(here), "2 projections defined: Enabling amplitude "
-  // 	    "correlation matching.");
-
-  //   if( not all_partnered ) {
-  //     Error( Here(here), "Amplitude correlation mode enabled, but one or "
-  // 	     "more readout planes are 1D (=no partner). Fix database." );
-  //     return fStatus = kInitError;
-  //   }
-  // }
-
   // Initialize the projections. This will read the database and set
-  // the projections' angle and maxslope, which we need in the following
-  for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
-    status = (*it)->Init(date);
-    if( status )
-      return fStatus = status;
+  // the projections' angle, width and maxslope
+  try {
+    for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
+      status = (*it)->Init(date);
+      if( status )
+	return fStatus = status;
+    }
+  }
+  catch(...) {
+    Error( Here(here), "Failed to initialize projections. Call expert." );
+    return fStatus = kInitError;
   }
 
-  // // Sanity checks of U and V angles which the projections just read via Init
-  // vpiter_t iu = find_if( ALL(fProj), Projection::TypeEquals(kUPlane) );
-  // vpiter_t iv = find_if( ALL(fProj), Projection::TypeEquals(kVPlane) );
-  // if( iu != fProj.end() and iv != fProj.end() ) {
-  //   // Both u and v planes are defined
-  //   //TODO: isn't this an unnecessary limitation?
-  //   //TODO: instead, check if any projections have (nearly) identical angles
-  //   Double_t u_angle = (*iu)->GetAngle()*TMath::RadToDeg();
-  //   Double_t v_angle = (*iv)->GetAngle()*TMath::RadToDeg();
-  //   Int_t qu = TMath::FloorNint( u_angle/90.0 );
-  //   Int_t qv = TMath::FloorNint( v_angle/90.0 );
-  //   if( (qu&1) == (qv&1) ) {
-  //     Error( Here(here), "Plane misconfiguration: uangle (%6.2lf) and vangle "
-  // 	     "(%6.2lf) are in equivalent quadrants. Fix database.",
-  // 	     u_angle, v_angle );
-  //     return fStatus = kInitError;
-  //   }
-  //   //TODO: put this check into Projection::Init?
-  //   //FIXME: this does not require both u and v
-  //   Double_t du = u_angle - 90.0*qu;
-  //   Double_t dv = v_angle - 90.0*qv;
-  //   if( TMath::Abs(TMath::Abs(du)-45.0) > 44.0 or
-  // 	TMath::Abs(TMath::Abs(dv)-45.0) > 44.0 ) {
-  //     Error( Here(here), "uangle (%6.2lf) or vangle (%6.2lf) too close "
-  // 	     "to 0 or 90 degrees. Fix database.", u_angle, v_angle );
-  //     return fStatus = kInitError;
-  //   }
-
-  //   // Check if we can use the simplified 3D matching algorithm
-  //   //FIXME: fast_3d should work for x,y,u(45) and similar, too
-  //   //TODO: generalize to 4 projections with symmetry
-  //   if( fProj.size() == 3 ) {
-  //     assert( !TestBit(k3dCorrAmpl) );
-  //     // This assumes that u and v are the first two defined projections
-  //     assert( kUPlane < kVPlane && kVPlane < 2 );
-  //     // The abs(angle) of the two rotated planes must be (nearly) the same
-  //     Double_t uang = TMath::Abs( TVector2::Phi_mpi_pi( (*iu)->GetAngle() ));
-  //     if( (TMath::Abs( TVector2::Phi_mpi_pi( (*iv)->GetAngle() ))-uang )
-  // 	  <  0.5*TMath::DegToRad() ) {
-  // 	SetBit(k3dFastMatch);
-  // 	Double_t tan = TMath::Tan( 0.5*TMath::Pi()-uang );
-  // 	// The scale factor converts the fast_3d matchvalue to the one computed
-  // 	// by the general algorithm
-  // 	f3dMatchvalScalefact = 2.0 * (1.0/3.0 + tan*tan );
-  // 	// Avoid scaling for every event
-  // 	f3dMatchCut /= f3dMatchvalScalefact;
-  //     }
-  //   }
-  // }
-
-  // Determine width and maxslope of the projections
+  // Sanity check of the projection angles
   for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
     Projection* theProj = *it;
-    EProjType type = theProj->GetType();
-    Double_t width = 0.0;
-    //TODO: can this be part of Projection::Init?
-    for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
-      Plane* thePlane = fPlanes[iplane];
-      //FIXME: loop over the projection's planes only -> do in Projection::Init
-      if( thePlane->GetType() == type ) {
-  	// Determine the "width" of this projection plane (=width along the
-  	// projection coordinate).
-  	// The idea is that all possible hit positions in all planes of a 
-  	// given projection must fall within the range [-W/2,W/2]. It is normal
-  	// that some planes cover less than this width (e.g. because they are 
-  	// smaller or offset) - it is meant to be the enclosing range for all
-  	// planes. In this way, the tree search can use one fixed bin width.
-  	// The total width found here divided by the number of bins used in
-  	// tree search is the resolution of the roads.
-  	// Of course, this will become inefficient for grotesque geometries.
-  	Double_t s = thePlane->GetStart();
-  	Double_t d = thePlane->GetPitch();
-  	Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
-  	Double_t lo = s - 0.5*d;
-  	Double_t hi = s + (n-0.5)*d;
-  	Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
-  	if( w > width )
-  	  width = w;
+    // Ensure minimum angle differences
+    vpiter_t jt(it);
+    ++jt;
+    while( jt != fProj.end() ) {
+      Projection* otherProj = *jt;
+      Double_t dp = theProj->GetAxis().DeltaPhi( otherProj->GetAxis() );
+      if( TMath::Abs(dp) < fMinProjAngleDiff or
+	  TMath::Abs(dp-TMath::Pi()) < fMinProjAngleDiff ) {
+	Error( Here(here), "Projection misconfiguration: \"%s\"-angle (%6.2lf) "
+	       "and \"%s\"-angle (%6.2lf) are too colinear. Review geometry.",
+	       kProjParam[theProj->GetType()].name,
+	       theProj->GetAngle()*TMath::RadToDeg(),
+	       kProjParam[otherProj->GetType()].name,
+	       otherProj->GetAngle()*TMath::RadToDeg() );
+	return fStatus = kInitError;
+      }
+      ++jt;
+    }
+  }
+
+  // Check if we can use the simplified 3D matching algorithm
+  //TODO: generalize to 4 projections with symmetry?
+  vector<ProjAngle_t>::size_type nproj = fProj.size();
+  if( nproj == 3 ) {
+    // Algorithm:
+    // (1) Find the minimum angle spanned by the three axes. We need to
+    //     check which combination of axis flips by 180 degrees gives the
+    //     smallest value. (Remember, only the axis orientation matters, not
+    //     the sign, so axes at angle and angle+/-180 are equivalent.)
+    // (2) Sort the projections by (flipped) angle.
+    // (3) Check if the max/min angles are symmetric wrt the center one.
+    vector<ProjAngle_t> proj_angle( ALL(fProj) );
+    assert( proj_angle.size() == nproj );
+    Double_t smin = kBig;
+    UInt_t imin = kMaxUInt;
+    for( UInt_t ix = 0; ix < (1U<<(nproj-1)); ++ix ) {
+      Double_t amin = kBig, amax = -kBig;
+      for( vector<ProjAngle_t>::size_type j=0; j<nproj; ++j ) {
+	// The set bits in ix indicate a trial flip
+	amin = TMath::Min( amin, proj_angle[j].angle(TESTBIT(ix,j)) );
+	amax = TMath::Max( amax, proj_angle[j].angle(TESTBIT(ix,j)) );
+      }
+      assert( amin + 2.0*fMinProjAngleDiff <= amax );
+      Double_t span = amax - amin;
+      if( span < smin ) {
+	smin = span;
+	imin = ix;
       }
     }
-
-    //TODO: make this work if projection does not have enough planes (>=2)
-    // Set width of this projection
-    width *= 2.0;
-    if( width > 0.01 )
-      theProj->SetWidth( width );
-    else {
-      Error( Here(here), "Error calculating width of projection \"%s\". "
-  	     "Pitch too small? Fix database.", theProj->GetName() );
-      return fStatus = kInitError;
+    assert( imin < (1U<<(nproj-1)) );
+    // Actually flip the angles to the arrangement with smallest span
+    // so we can sort by angle. Note that the last element is never
+    // flipped, without loss of generality
+    assert( !TESTBIT(imin,nproj-1) );
+    for( vector<ProjAngle_t>::size_type j=0; j<nproj; ++j ) {
+      if( TESTBIT(imin,j) )
+	proj_angle[j].m_angle = proj_angle[j].angle(true);
     }
-    // maxslope is the maximum expected track slope in the projection.
-    // width/depth is the maximum geometrically possible slope. It may be
-    // further limited by the trigger acceptance, optics, etc.
-    Double_t dz = TMath::Abs(theProj->GetZsize());
-    if( dz > 0.01 ) {
-      Double_t maxslope = width/dz;
-      if( theProj->GetMaxSlope() < 0.01 ) {  // Consider unset
-  	theProj->SetMaxSlope( maxslope );
-      } else if( theProj->GetMaxSlope() > maxslope ) {
-  	if( fDebug > 0 ) {
-  	  Warning( Here(here), "For projection \"%s\", maxslope from "
-  		   "database = %lf exceeds geometric maximum = %lf. "
-  		   "Using smaller value.",
-  		   theProj->GetName(), theProj->GetMaxSlope(), maxslope );
-  	}
-  	theProj->SetMaxSlope( maxslope );
-      }
-    } else {
-      Error( Here(here), "Error calculating geometric maxslope for plane "
-  	     "type \"%s\". z-range of planes too small. Fix database.",
-  	     theProj->GetName() );
-  	return fStatus = kInitError;
+    sort( ALL(proj_angle) );    // Re-sort by (flipped) angle
+    // The abs(angle) of the min/max projection axes wrt to the center one
+    // must be (nearly) the same for the fast_3d algorithm to apply
+    Double_t d1 = proj_angle.back().m_angle - proj_angle[1].m_angle;
+    Double_t d2 = proj_angle[1].m_angle - proj_angle.front().m_angle;
+    assert( d1 > 0 and d2 > 0 ); // else not sorted correctly
+    if( TMath::Abs(d1-d2) < 0.5*TMath::DegToRad() ) {
+      SetBit(k3dFastMatch);
+      Double_t tan = TMath::Tan( 0.5 * (TMath::Pi()-(d1+d2)) );
+      // The scale factor converts the fast_3d matchvalue to the one computed
+      // by the general algorithm
+      f3dMatchvalScalefact = 2.0 * (1.0/3.0 + tan*tan);
+      // Avoid scaling for every event
+      f3dMatchCut /= f3dMatchvalScalefact;
+      // Keep a lookup table of the sorted projection order, with the
+      // symmetry axis last
+      f3dIdx.assign( kTypeEnd-kTypeBegin, kMaxUInt );
+      f3dIdx[proj_angle.front().m_proj->GetType()] = 0;
+      f3dIdx[proj_angle.back().m_proj->GetType()] = 1;
+      f3dIdx[proj_angle[1].m_proj->GetType()] = 2;
+      if( fDebug > 0 )
+	Info( Here(here), "Enabled fast 3D projection matching" );
     }
-
-    // Now that the projection's list of planes, width, and maxslope is known,
-    // do the level-2 initialization of the projections - load the pattern
-    // database and initialize the hitpattern
-    //FIXME: can we avoid this?
-    status = theProj->InitLevel2(date);
-    if( status )
-      return fStatus = status;
-
   }
 
   // If threading requested, load thread library and start up threads

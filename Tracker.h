@@ -37,6 +37,7 @@ namespace TreeSearch {
 
   typedef std::vector<Road*> Rvec_t;
   typedef std::set<Road*>    Rset_t;
+  typedef std::vector<UInt_t> vec_uint_t;
 
   extern const Double_t kBig;
 
@@ -91,32 +92,36 @@ namespace TreeSearch {
     typedef std::vector<Plane*>  Rpvec_t;
     typedef std::vector<Projection*> Prvec_t;
 
-    Rpvec_t        fPlanes;      // Readout planes
-    Prvec_t        fProj;        // Plane projections
-    Rpvec_t        fCalibPlanes; // Planes in calibration mode
+    // Planes and projections
+    Rpvec_t        fPlanes;           // Readout planes
+    Prvec_t        fProj;             // Plane projections
+    Rpvec_t        fCalibPlanes;      // Planes in calibration mode
 
-    THashTable*    fCrateMap;    // Map of DAQ modules
+    THashTable*    fCrateMap;         // Map of DAQ modules
+    Bool_t         fAllPartnered;     // All planes have partners
+    Double_t       fMinProjAngleDiff; // Min coord axis angle diff required
 
     // Multithread support
-    UInt_t         fMaxThreads;  // Maximum simultaneously active threads
-    ThreadCtrl*    fThreads;     //! Thread controller
+    UInt_t         fMaxThreads;       // Maximum simultaneously active threads
+    ThreadCtrl*    fThreads;          //! Thread controller
 
     // Parameters for 3D projection matching
     Double_t       f3dMatchvalScalefact; // Correction for fast 3D matchval
-    Double_t       f3dMatchCut;          // Maximum allowed 3D match error
+    Double_t       f3dMatchCut;  // Maximum allowed 3D match error
+    vec_uint_t     f3dIdx;       // Lookup table proj index -> fast 3d index
 
     // Track fit cut parameters
-    Int_t          fMinNdof;     // Minimum number of points in fit - 4
-    vec_pdbl_t     fChisqLimits; // lo/hi onfidence interval limits on Chi2
+    Int_t          fMinNdof;     // Minimum number of points in fit-4
+    vec_pdbl_t     fChisqLimits; // lo/hi confidence interval limits on Chi2
 
     // Event data
-    Int_t          fFailNhits; // Too many hits in wire plane(s)
-    Int_t          fFailNpat;  // Too many treesearch patterns found
+    Int_t          fFailNhits;   // Too many hits in wire plane(s)
+    Int_t          fFailNpat;    // Too many treesearch patterns found
 
     // Only needed for TESTCODE, but kept for binary compatibility
-    UInt_t         fNcombos;   // Number of road combinations tried
-    UInt_t         fN3dFits;   // Number of track fits done (=good road combos)
-    Int_t          fEvNum;     // Current event number
+    UInt_t         fNcombos;     // # of road combinations tried
+    UInt_t         fN3dFits;     // # of track fits done (=good road combos)
+    Int_t          fEvNum;       // Current event number
     Double_t       t_track, t_3dmatch, t_3dfit, t_coarse; // times in us
 
     void      Add3dMatch( const Rvec_t& selected, Double_t matchval,
@@ -159,6 +164,8 @@ namespace TreeSearch {
     virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
 				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 				   Rset_t& unique_found ) = 0;
+
+    virtual THaAnalysisObject::EStatus PartnerPlanes() = 0;
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
