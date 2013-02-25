@@ -7,7 +7,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "HitpatternLR.h"
-#include "Hit.h"
+#include "WireHit.h"
 #include "Plane.h"
 #include "TMath.h"
 #include "MWDC.h" // for MWDC bits test
@@ -135,8 +135,10 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
   while( it ) {
     // At least one hit found
     nhits++;
-    Hit* hitA = static_cast<Hit*>((*it).first);
-    Hit* hitB = static_cast<Hit*>((*it).second);
+    assert( !(*it).first  || dynamic_cast<WireHit*>((*it).first)  );
+    assert( !(*it).second || dynamic_cast<WireHit*>((*it).second) );
+    WireHit* hitA = static_cast<WireHit*>((*it).first);
+    WireHit* hitB = static_cast<WireHit*>((*it).second);
     assert( hitA || hitB );
     if( hitA && hitB ) {
       // A pair of hits registered in partner planes. One or more combinations
