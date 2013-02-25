@@ -1,14 +1,40 @@
 #------------------------------------------------------------------------------
+# Core library
 
 SRC  = Tracker.cxx Plane.cxx Hit.cxx Hitpattern.cxx \
 	Projection.cxx Pattern.cxx PatternTree.cxx PatternGenerator.cxx \
-	TreeWalk.cxx Node.cxx Road.cxx BigBite.cxx
+	TreeWalk.cxx Node.cxx Road.cxx
 
-EXTRAHDR = Helper.h Types.h
+EXTRAHDR = Helper.h Types.h EProjType.h
 
-PACKAGE = TreeSearch
+CORE = TreeSearch
+CORELIB  = lib$(CORE).so
+COREDICT = $(CORE)Dict
 
-LINKDEF = $(PACKAGE)_LinkDef.h
+LINKDEF = $(CORE)_LinkDef.h
+
+#------------------------------------------------------------------------------
+# MWDC library
+
+MWDCSRC  = MWDC.cxx WirePlane.cxx WireHit.cxx HitpatternLR.cxx \
+	ProjectionLR.cxx TimeToDistConv.cxx
+
+MWDC  = TreeSearch-MWDC
+MWDCLIB  = lib$(MWDC).so
+MWDCDICT = $(MWDC)Dict
+
+MWDCLINKDEF = $(MWDC)_LinkDef.h
+
+#------------------------------------------------------------------------------
+# GEM library
+
+GEMSRC  = GEMTracker.cxx GEMPlane.cxx GEMHit.cxx
+
+GEM  = TreeSearch-GEM
+GEMLIB  = lib$(GEM).so
+GEMDICT = $(GEM)Dict
+
+GEMLINKDEF = $(GEM)_LinkDef.h
 
 #------------------------------------------------------------------------------
 # Compile debug version (for gdb)
@@ -50,30 +76,8 @@ ROOTBIN      := $(shell root-config --bindir)
 
 INCLUDES      = $(ROOTCFLAGS) $(addprefix -I, $(INCDIRS) ) -I$(shell pwd)
 
-USERLIB       = lib$(PACKAGE).so
-USERDICT      = $(PACKAGE)Dict
-
 LIBS          = 
 GLIBS         = 
-
-ifeq ($(ARCH),solarisCC5)
-# Solaris CC 5.0
-CXX           = CC
-ifdef DEBUG
-  CXXFLAGS    = -g
-  LDFLAGS     = -g
-  DEFINES     =
-else
-  CXXFLAGS    = -O
-  LDFLAGS     = -O
-  DEFINES     = -DNDEBUG
-endif
-DEFINES      += -DSUNVERS -DHAS_SSTREAM
-CXXFLAGS     += -KPIC
-LD            = CC
-SOFLAGS       = -G
-DICTCXXFLG   :=
-endif
 
 ifeq ($(ARCH),linux)
 # Linux with gcc (RedHat)
@@ -107,6 +111,25 @@ CXXFLAGS     += -march=pentium4 -mfpmath=sse
 endif
 endif
 
+ifeq ($(ARCH),solarisCC5)
+# Solaris CC 5.0
+CXX           = CC
+ifdef DEBUG
+  CXXFLAGS    = -g
+  LDFLAGS     = -g
+  DEFINES     =
+else
+  CXXFLAGS    = -O
+  LDFLAGS     = -O
+  DEFINES     = -DNDEBUG
+endif
+DEFINES      += -DSUNVERS -DHAS_SSTREAM
+CXXFLAGS     += -KPIC
+LD            = CC
+SOFLAGS       = -G
+DICTCXXFLG   :=
+endif
+
 ifeq ($(CXX),)
 $(error $(ARCH) invalid architecture)
 endif
@@ -130,7 +153,7 @@ LDFLAGS      += -g -pg
 endif
 
 ifndef PKG
-PKG           = lib$(PACKAGE)
+PKG           = lib$(CORELIB)
 LOGMSG        = "$(PKG) source files"
 else
 LOGMSG        = "$(PKG) Software Development Kit"
@@ -138,24 +161,51 @@ endif
 DISTFILE      = $(PKG).tar.gz
 
 #------------------------------------------------------------------------------
-OBJ           = $(SRC:.cxx=.o)
+OBJ           = $(SRC:.cxx=.o) $(COREDICT).o
 HDR           = $(SRC:.cxx=.h) $(EXTRAHDR)
 DEP           = $(SRC:.cxx=.d)
-OBJS          = $(OBJ) $(USERDICT).o
 
-all:		$(USERLIB)
+MOBJ          = $(MWDCSRC:.cxx=.o) $(MWDCDICT).o
+MHDR          = $(MWDCSRC:.cxx=.h)
+MDEP          = $(MWDCSRC:.cxx=.d)
 
-$(USERLIB):	$(OBJS)
-		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $(OBJS)
+GOBJ          = $(GEMSRC:.cxx=.o) $(GEMDICT).o
+GHDR          = $(GEMSRC:.cxx=.h)
+GDEP          = $(GEMSRC:.cxx=.d)
+
+all:		$(CORELIB) $(MWDCLIB) $(GEMLIB)
+
+$(CORELIB):	$(OBJ)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
+		@echo "$@ done"
+
+$(MWDCLIB):	$(MOBJ)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
+		@echo "$@ done"
+
+$(GEMLIB):	$(GOBJ)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
 		@echo "$@ done"
 
 ifeq ($(ARCH),linux)
-$(USERDICT).o:	$(USERDICT).cxx
+$(COREDICT).o:	$(COREDICT).cxx
+	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
+$(MWDCDICT).o:	$(MWDCDICT).cxx
+	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
+$(GEMDICT).o:	$(GEMDICT).cxx
 	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
 endif
 
-$(USERDICT).cxx: $(HDR) $(LINKDEF)
-	@echo "Generating dictionary $(USERDICT)..."
+$(COREDICT).cxx: $(HDR) $(LINKDEF)
+	@echo "Generating dictionary $(COREDICT)..."
+	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
+
+$(MWDCDICT).cxx: $(MHDR) $(MWDCLINKDEF)
+	@echo "Generating dictionary $(MWDCDICT)..."
+	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
+
+$(GEMDICT).cxx: $(GHDR) $(GEMLINKDEF)
+	@echo "Generating dictionary $(GEMDICT)..."
 	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
 install:	all
@@ -164,7 +214,8 @@ install:	all
 #		cp $(USERLIB) $(LIBDIR)
 
 clean:
-		rm -f *.o *~ $(USERLIB) $(USERDICT).*
+		rm -f *.o *~ $(CORELIB) $(COREDICT).*
+		rm -f $(MWDCLIB) $(MWDCDICT).* $(GEMLIB) $(GEMDICT).*
 
 realclean:	clean
 		rm -f *.d
@@ -174,6 +225,7 @@ srcdist:
 		rm -rf $(PKG)
 		mkdir $(PKG)
 		cp -p $(SRC) $(HDR) $(LINKDEF) db*.dat Makefile $(PKG)
+		cp -p $(MWDCSRC) $(MHDR) $(GEMSRC) $(GHDR) $(PKG)
 		gtar czvf $(DISTFILE) --ignore-failed-read \
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)
@@ -197,4 +249,6 @@ srcdist:
 ###
 
 -include $(DEP)
+-include $(MDEP)
+-include $(GDEP)
 
