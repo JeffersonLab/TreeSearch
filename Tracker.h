@@ -106,6 +106,7 @@ namespace TreeSearch {
     ThreadCtrl*    fThreads;          //! Thread controller
 
     // Parameters for 3D projection matching
+    UInt_t         fMinReqProj;  // Minimum # proj required for 3D match
     Double_t       f3dMatchvalScalefact; // Correction for fast 3D matchval
     Double_t       f3dMatchCut;  // Maximum allowed 3D match error
     vec_uint_t     f3dIdx;       // Lookup table proj index -> fast 3d index

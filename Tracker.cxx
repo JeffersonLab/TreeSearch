@@ -350,7 +350,7 @@ private:
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0), fAllPartnered(false),
     fMinProjAngleDiff(kMinProjAngleDiff), fMaxThreads(1), fThreads(0),
-    f3dMatchvalScalefact(1), f3dMatchCut(0),
+    fMinReqProj(3), f3dMatchvalScalefact(1), f3dMatchCut(0),
     fMinNdof(1), fFailNhits(0), fFailNpat(0),
     fNcombos(0), fN3dFits(0), fEvNum(0),
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
@@ -1391,8 +1391,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 #endif
 
   // Combine track projections to 3D tracks
-  //===> TODO: parameterize minimum number of projections required
-  if( nproj >= 2 ) {
+  if( nproj >= fMinReqProj ) {
     // Vector holding the results (vectors of roads with good matchval)
     list< pair<Double_t,Rvec_t> > road_combos;
     // Set of the unique roads occurring in the road_combos elements

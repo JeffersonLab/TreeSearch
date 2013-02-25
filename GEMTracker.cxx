@@ -34,10 +34,13 @@ typedef vector<Plane*>::iterator  vriter_t;
 
 //_____________________________________________________________________________
 GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
-  : Tracker(name,desc,app),
-    fMaxCorrMismatches(0), fMaxCorrNsigma(1.0)
+  : Tracker(name,desc,app), fMaxCorrMismatches(0), fMaxCorrNsigma(1.0)
 { 
   // Constructor - nothing special for standard GEM trackers
+
+  // GEMs support matching 2 projections only (via amplitude correlations
+  // in MatchRoadsCorrAmpl). Override the default (3) from Tracker base class.
+  fMinReqProj = 2;
 }
 
 //_____________________________________________________________________________
@@ -381,14 +384,16 @@ UInt_t GEMTracker::MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
 
   vector<Rvec_t>::size_type nproj = roads.size();
 
+  assert( nproj >= 2 );
+
   bool fast_3d = TestBit(k3dFastMatch);
   bool correlate_amplitudes = TestBit(k3dCorrAmpl);
 
-  if( nproj < 2 or (nproj == 2 and not correlate_amplitudes) )
+  if( nproj == 2 and not correlate_amplitudes )
     return 0;
 
   // Limitation: amplitude correlation algo only implemented for 2 projections
-  assert( nproj == 2 or not correlate_amplitudes );
+  assert( nproj == 2 or not correlate_amplitudes ); // else bug in Init
 
   // Fast 3D matching and amplitude correlation are mutually exclusive
   assert( not (fast_3d and correlate_amplitudes) );
