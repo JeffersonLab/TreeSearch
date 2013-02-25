@@ -10,6 +10,7 @@
 #include "TError.h"
 #include <iostream>
 #include <stdexcept>
+#include <sstream>
 
 using namespace std;
 
@@ -89,8 +90,10 @@ Int_t TreeParam_t::Normalize()
     return -2;
   }
   if( fZpos.size() < 3 || fZpos.size() > 16 ) {
-    ::Error( here, "Illegal number of planes = %u. Must be between 3-16.",
-	     fZpos.size() );
+    stringstream s;
+    s << "Illegal number of planes = " << fZpos.size() << ". "
+      << "Must be between 3-16.";
+    ::Error( here, "%s", s.str().c_str() );
     return -3;
   }
   if( fMaxslope < 0.0 )
@@ -99,8 +102,10 @@ Int_t TreeParam_t::Normalize()
   // Check fZpos array for sorting and minimum spacing
   for( vector<Double_t>::size_type i = 1; i < fZpos.size(); ++i ) {
     if( fZpos[i] < fZpos[i-1] + 1e-3 ) {
-      ::Error( here, "Array of z-positions not sorted or planes not "
-	       "spaced by at least 0.001 at index = %u.", i );
+      stringstream s;
+      s << "Array of z-positions not sorted or planes not "
+	<< "spaced by at least 0.001 at index = " << i;
+      ::Error( here, "%s", s.str().c_str() );
       return -4;
     }
   }
@@ -275,9 +280,11 @@ try {
   }
 }
 catch ( out_of_range ) {
-  ::Error( "TreeSearch::CopyPattern", "Array index out of range at %u %u %u "
-	   "(internal logic error). Tree not copied. Call expert.",
-	   fTree->fNpat, fTree->fNlnk, fTree->fNbit );
+  stringstream s;
+  s << "Array index out of range at " << fTree->fNpat << " " 
+    << fTree->fNlnk << " " << fTree->fNbit
+    << "(internal logic error). Tree not copied. Call expert.";
+  ::Error( "TreeSearch::CopyPattern", "%s", s.str().c_str() );
   return kError;
 }
 

@@ -7,6 +7,7 @@
 #include "TreeWalk.h"
 #include "TError.h"
 #include <iomanip>
+#include <sstream>
 
 using namespace std;
 
@@ -89,7 +90,9 @@ WritePattern::WritePattern( const char* filename, size_t index_size )
     ::Error( here, "Invalid file name" );
   }
   if( (fIdxSiz & (fIdxSiz-1)) != 0 ) {
-    ::Warning( here, "Invalid index_size = %d. Must be a power of 2", fIdxSiz);
+    stringstream s;
+    s << "Invalid index_size = " << fIdxSiz << ". Must be a power of 2";
+    ::Warning( here, "%s", s.str().c_str());
     fIdxSiz = sizeof(Int_t);
   }    
 }
