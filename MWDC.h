@@ -19,7 +19,6 @@ namespace TreeSearch {
 
     virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
-    virtual Int_t   CoarseTrack( TClonesArray& tracks );
 
     Double_t        GetRefTime( UInt_t i ) const 
     { return (i<(UInt_t)fRefMap->GetSize()) ? fRefTime[i] : kBig; }
