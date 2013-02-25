@@ -1049,7 +1049,8 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 
   vector<Rvec_t>::size_type nproj = roads.size();
   assert( nproj == 3 and fProj.size() == nproj );
-  assert( (Int_t)f3dIdx.size() > (Int_t)fProj.back()->GetType() );
+  assert( f3dIdx.empty() or 
+	  (Int_t)f3dIdx.size() > (Int_t)fProj.back()->GetType() );
 
 #ifdef VERBOSE
   cout << "fast algo):";
@@ -1064,7 +1065,8 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   // with symmetric angles around the symmetry axis, represented by roads[2].
   // In the comments below, indices 0, 1 and 2 are referred to as u, v and x,
   // respectively, even though the actual projection types may be different.
-  sort( ALL(roads), ByProjTypeMap(f3dIdx) );
+  if( !f3dIdx.empty() )
+    sort( ALL(roads), ByProjTypeMap(f3dIdx) );
 
   // Fetch coefficients for coordinate transformations
   const Projection* ip = roads[0].front()->GetProjection();
@@ -1753,10 +1755,18 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       f3dMatchCut /= f3dMatchvalScalefact;
       // Keep a lookup table of the sorted projection order, with the
       // symmetry axis last
-      f3dIdx.assign( kTypeEnd-kTypeBegin, kMaxUInt );
-      f3dIdx[proj_angle.front().m_proj->GetType()] = 0;
-      f3dIdx[proj_angle.back().m_proj->GetType()] = 1;
-      f3dIdx[proj_angle[1].m_proj->GetType()] = 2;
+      EProjType
+	t0 = proj_angle.front().m_proj->GetType(),
+	t1 = proj_angle.back().m_proj->GetType(),
+	t2 = proj_angle[1].m_proj->GetType();
+      if( t0 < t1 and t1 < t2 ) { // already in the right order
+	f3dIdx.clear();
+      } else {
+	f3dIdx.assign( kTypeEnd-kTypeBegin, kMaxUInt );
+	f3dIdx[t0] = 0;
+	f3dIdx[t1] = 1;
+	f3dIdx[t2] = 2;
+      }
       if( fDebug > 0 )
 	Info( Here(here), "Enabled fast 3D projection matching" );
     }
