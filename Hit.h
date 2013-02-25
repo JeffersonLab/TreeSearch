@@ -40,7 +40,12 @@ namespace TreeSearch {
     virtual Int_t Compare( const Hit* rhs, Double_t maxdist ) const;
     virtual Bool_t IsSortable () const { return kTRUE; }
     virtual void Print( Option_t* opt="" ) const;
- 
+
+    // Abstraction of the GetPosL/R interface in WireHits, currently
+    // only used in Roads::CollectCoordinates
+    virtual UInt_t   GetNumPos()         const;
+    virtual Double_t GetPosI( UInt_t i ) const;
+
     Double_t GetPos()        const { return fPos; }
     Double_t GetResolution() const { return fResolution; }
     Double_t GetZ()          const { return fPlane->GetZ(); }

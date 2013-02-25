@@ -568,16 +568,15 @@ Bool_t Road::CollectCoordinates()
       continue;
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetPlaneNum();
-    // Prevent duplicate entries for hits with zero drift
-    //----> TODO: fix for GEMs
-    //    int i = (hit->GetDriftDist() == 0.0) ? 1 : 2;
-    int i = 1;
+    UInt_t i = hit->GetNumPos(); // Wire chamber hits may have 2 pos'ns (L/R)
+    assert( i>0 );
     do {
-      //      Double_t x = (--i != 0) ? hit->GetPosL() : hit->GetPosR();
-      Double_t x = (--i != 0) ? hit->GetPos() : hit->GetPos();
+      Double_t x = hit->GetPosI(--i);
       if( TMath::IsInside( x, z, kNcorner, &fCornerX[0], zp )) {
-	// The hits are sorted by ascending plane number
 	if( np != last_np ) {
+	  // The hits are sorted by ascending plane number, so fPoints gets
+	  // one element vector per plane
+	  assert( last_np == kMaxUInt or np > last_np );
 	  fPoints.push_back( Pvec_t() );
 	  planepattern.SetBitNumber(np);
 	  last_np = np;

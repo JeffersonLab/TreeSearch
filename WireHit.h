@@ -28,6 +28,9 @@ namespace TreeSearch {
     virtual Int_t Compare( const Hit* rhs, Double_t maxdist ) const;
     virtual void  Print( Option_t* opt="" ) const;
  
+    virtual UInt_t   GetNumPos()         const;
+    virtual Double_t GetPosI( UInt_t i ) const;
+
     Double_t ConvertTimeToDist( Double_t slope );
 
     Int_t    GetWireNum()    const { return fWireNum; }

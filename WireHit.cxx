@@ -37,6 +37,24 @@ void WireHit::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
+UInt_t WireHit::GetNumPos() const
+{
+  // Number of positions available from this hit. Normally 2 for wire hits,
+  // unless the drift time is zero.
+
+  return (GetDriftDist() == 0.0) ? 1 : 2;
+}
+
+//_____________________________________________________________________________
+Double_t WireHit::GetPosI( UInt_t i ) const
+{
+  // Get the i-th position. i can be 0 or 1, where 0 ==> fPosR, 1 == fPosL
+
+  assert( i<2 );
+  return (i != 0) ? GetPosL() : GetPosR();
+}
+
+//_____________________________________________________________________________
 Double_t WireHit::ConvertTimeToDist( Double_t slope )
 {
   // Convert drift time to drift distance. 'slope' is the approximate

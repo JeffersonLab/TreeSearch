@@ -37,6 +37,30 @@ void Hit::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
+UInt_t Hit::GetNumPos() const
+{
+  // Number of positions available from this hit. For generic hits, this is 1.
+  // Wire chamber hits may override this to provide 2 positions due to L/R
+  // ambiguity.
+
+  return 1;
+}
+
+//_____________________________________________________________________________
+#ifdef NDEBUG
+Double_t Hit::GetPosI( UInt_t ) const
+#else
+Double_t Hit::GetPosI( UInt_t i ) const
+#endif
+{
+  // Get the i-th position. For generic hits, i must be 0, and the function
+  // always returns GetPos()
+
+  assert( i<1 );
+  return GetPos();
+}
+
+//_____________________________________________________________________________
 void MCHitInfo::MCPrint() const
 {
   // Print hit info
