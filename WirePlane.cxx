@@ -58,8 +58,8 @@ WirePlane::WirePlane( const char* name, const char* description,
   fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );
 
   if( !fHits or !fFitCoords ) {
-    Fatal( Here(here), "Allocating hit array in wire plane %s failed. "
-	   "Call expert." );
+    Error( Here(here), "Allocating hit array in wire plane %s failed. "
+	   "Call expert.", name );
     MakeZombie();
     return;
   }
