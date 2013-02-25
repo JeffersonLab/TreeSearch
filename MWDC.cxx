@@ -112,8 +112,6 @@ const Double_t kBig = 1e38;
 
 #define ALL(c) (c).begin(), (c).end()
 
-static void DoTrack( void* ptr );
-
 //_____________________________________________________________________________
 // Support classes for data-processing threads
 
@@ -139,8 +137,6 @@ struct TrackThread {
 //_____________________________________________________________________________
 class ThreadCtrl {
 public:
-  static const UInt_t kThreadTerminateBit = 8*sizeof(UInt_t)-1; // = 31
-
   ThreadCtrl( const vector<Projection*>& vp )
     : fTrackStatus(0), fTrackToDo(0),
       fTrackStartM(new TMutex), fTrackDoneM(new TMutex),
@@ -157,7 +153,10 @@ public:
       fTrackStartM->UnLock();
     }
   }
-  ~ThreadCtrl() {
+
+  //___________________________________________________________________________
+  ~ThreadCtrl()
+  {
     // Terminate all running tracking threads
     if( !fTrack.empty() ) {
       fTrackDoneM->Lock();
@@ -188,7 +187,10 @@ public:
     delete fTrackDoneM;
     delete fTrackStartM;
   }
-  Int_t Run( UInt_t maxthreads ) {
+
+  //___________________________________________________________________________
+  Int_t Run( UInt_t maxthreads )
+  {
     // Run our threads, at most maxthreads at a time
     if( maxthreads == 0 or fTrack.empty() )
       return 0;
@@ -220,7 +222,61 @@ public:
     fTrackDoneM->UnLock();
     return fTrackStatus;
   }
+
+  //___________________________________________________________________________
+  static void DoTrack( void* ptr )
+  {
+    TrackThread* arg = reinterpret_cast<TrackThread*>(ptr);
+
+    //  TThread::SetCancelOn();
+    bool terminate = false;
+    arg->start_m->Lock();
+    while( !terminate ) {
+
+      // Wait for start condition
+      while( true ) {
+	Int_t ret = arg->start->Wait(); // unlocks arg->start_m
+	assert( ret == 0 );
+	terminate = TESTBIT(*arg->running, kThreadTerminateBit);
+	if( TESTBIT(*arg->running, arg->proj->GetType()) or terminate )
+	  break;
+      }
+      arg->start_m->UnLock();
+
+      Int_t nrd = 0;
+      if( !terminate )
+	// Process this event
+	nrd = arg->proj->Track();
+
+      // Ensure we're the only one modifying/testing thread
+      // control data (arg->running)
+      arg->done_m->Lock();
+      // Set error flag, if necessary
+      if( nrd < 0 ) {
+	*arg->status = 1;
+      }
+      // Clear the bit for this projection in the status bitfield
+      CLRBIT( *arg->running, arg->proj->GetType() );
+      // If all bits are zero, all threads have finished processing,
+      // in which case we wake up the main thread
+      if( (*arg->running & ~BIT(kThreadTerminateBit)) == 0 )
+	arg->done->Signal();
+
+      if( !terminate )
+	// Ensure that we enter Wait() before the main thread can send the
+	// next Broadcast(). This must come before unlocking arg->done_m,
+	// or else we have a race condition in the main thread.
+	arg->start_m->Lock();  
+
+      arg->done_m->UnLock();
+    }
+  }
+
+  static UInt_t GetMaxThreads() { return kThreadTerminateBit; }
+
 private:
+  static const UInt_t kThreadTerminateBit = 8*sizeof(UInt_t)-1; // = 31
+
   TThread* AddTrackThread( Projection* proj ) {
     assert( proj );
     fTrack.push_back( TrackThread() );
@@ -1160,55 +1216,6 @@ Bool_t MWDC::PassTrackCuts( const FitRes_t& fit_par ) const
 }
 
 //_____________________________________________________________________________
-static void DoTrack( void* ptr )
-{
-  TrackThread* arg = reinterpret_cast<TrackThread*>(ptr);
-
-  //  TThread::SetCancelOn();
-  bool terminate = false;
-  arg->start_m->Lock();
-  while( !terminate ) {
-
-    // Wait for start condition
-    while( true ) {
-      Int_t ret = arg->start->Wait(); // unlocks arg->start_m
-      assert( ret == 0 );
-      terminate = TESTBIT(*arg->running, ThreadCtrl::kThreadTerminateBit);
-      if( TESTBIT(*arg->running, arg->proj->GetType()) or terminate )
-	break;
-    }
-    arg->start_m->UnLock();
-
-    Int_t nrd = 0;
-    if( !terminate )
-      // Process this event
-      nrd = arg->proj->Track();
-
-    // Ensure we're the only one modifying/testing thread
-    // control data (arg->running)
-    arg->done_m->Lock();
-    // Set error flag, if necessary
-    if( nrd < 0 ) {
-      *arg->status = 1;
-    }
-    // Clear the bit for this projection in the status bitfield
-    CLRBIT( *arg->running, arg->proj->GetType() );
-    // If all bits are zero, all threads have finished processing,
-    // in which case we wake up the main thread
-    if( (*arg->running & ~BIT(ThreadCtrl::kThreadTerminateBit)) == 0 )
-      arg->done->Signal();
-
-    if( !terminate )
-      // Ensure that we enter Wait() before the main thread can send the
-      // next Broadcast(). This must come before unlocking arg->done_m,
-      // or else we have a race condition in the main thread.
-      arg->start_m->Lock();  
-
-    arg->done_m->UnLock();
-  }
-}
-
-//_____________________________________________________________________________
 Int_t MWDC::CoarseTrack( TClonesArray& tracks )
 {
   // Find tracks from the hitpatterns, using the coarse hit drift times
@@ -1897,8 +1904,8 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
       fMaxThreads = 1;
     }
   }
-  // Currently, ThreadCtrl supports at most kThreadTerminateBit (=31) threads
-  fMaxThreads = min(fMaxThreads, ThreadCtrl::kThreadTerminateBit);
+  // Limit number of threads to what ThreadCtrl can support (currently = 31)
+  fMaxThreads = min(fMaxThreads, ThreadCtrl::GetMaxThreads());
   if( warn )
     Warning( Here(here), "Cannot determine number of CPU cores. "
 	     "Falling back to single-threaded processing." );
