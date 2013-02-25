@@ -99,7 +99,7 @@ namespace TreeSearch {
     THashTable*    fCrateMap;    // Map of MWDC DAQ modules
 
     // Multithread support
-    Int_t          fMaxThreads;  // Maximum simultaneously active threads
+    UInt_t         fMaxThreads;  // Maximum simultaneously active threads
     ThreadCtrl*    fThreads;     //! Thread controller
 
     // Paremeters for 3D projection matching
