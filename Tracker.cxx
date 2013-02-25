@@ -89,8 +89,8 @@ public:
   virtual ~DAQmodule() {}
   virtual void Copy( TObject& obj ) const {
     TObject::Copy(obj);
-    DAQmodule* m = dynamic_cast<DAQmodule*>(&obj);
-    assert( m );
+    assert( dynamic_cast<DAQmodule*>(&obj) );
+    DAQmodule* m = static_cast<DAQmodule*>(&obj);
     m->fCrate = fCrate; m->fSlot = fSlot; m->fModel = fModel;
     m->fNchan = fNchan; m->fResolution = fResolution;
     m->fHasResolution = fHasResolution;

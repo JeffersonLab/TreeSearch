@@ -234,8 +234,8 @@ namespace TreeSearch {
     // A hit is "less than" another hit if its position is smaller.
     // Returns -1 if this is smaller than rhs, 0 if equal, +1 if greater.
 
-    const Hit* rhs = dynamic_cast<const Hit*>(obj);
-    assert( rhs );
+    assert( dynamic_cast<const Hit*>(obj) );
+    const Hit* rhs = static_cast<const Hit*>(obj);
     assert( fPlane == rhs->fPlane );
 
     if( fPos  < rhs->fPos )  return -1;

@@ -43,8 +43,8 @@ Plane::Plane( const char* name, const char* description,
 
   assert( name && parent );
 
-  fTracker = dynamic_cast<Tracker*>( GetMainDetector() );
-  assert( fTracker );
+  assert( dynamic_cast<Tracker*>(GetMainDetector()) );
+  fTracker = static_cast<Tracker*>( GetMainDetector() );
 
   try {
     fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );

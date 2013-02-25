@@ -126,12 +126,8 @@ namespace TreeSearch {
     // wire number and, for each wire, will be in the order in which they hit
     // the wire
 
-#ifdef NDEBUG
+    assert( dynamic_cast<const WireHit*>(obj) );
     const WireHit* rhs = static_cast<const WireHit*>(obj);
-#else
-    const WireHit* rhs = dynamic_cast<const WireHit*>(obj);
-    assert( rhs );
-#endif
     Int_t ret = Hit::Compare(obj);
     if( ret != 0 ) return ret;
 
@@ -146,12 +142,8 @@ namespace TreeSearch {
   {
     // Determine if two hits are within maxdist of each other.
     // Returns -1 if this<rhs, 0 if overlap, +1 if this>rhs.
-#ifdef NDEBUG
+    assert( dynamic_cast<const WireHit*>(hit) );
     const WireHit* rhs = static_cast<const WireHit*>(hit);
-#else
-    const WireHit* rhs = dynamic_cast<const WireHit*>(hit);
-    assert( rhs );
-#endif
     if( fPosR+maxdist < rhs->fPosL )
       // this hit is "smaller than" (to the left of) rhs
       return -1;

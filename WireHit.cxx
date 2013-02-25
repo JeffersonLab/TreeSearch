@@ -44,12 +44,8 @@ Double_t WireHit::ConvertTimeToDist( Double_t slope )
   // Updates the internal variables fPosL and fPosR.
   // Must be called before doing analysis of drift chamber hits.
 
-#ifdef NDEBUG
+  assert( dynamic_cast<WirePlane*>(fPlane) );
   WirePlane* wp = static_cast<WirePlane*>(fPlane);
-#else
-  WirePlane* wp = dynamic_cast<WirePlane*>(fPlane);
-  assert(wp);
-#endif
   Double_t dist = wp->GetTTDConv()->ConvertTimeToDist(fTime, slope);
   fPosL = fPos-dist;
   fPosR = fPos+dist;

@@ -138,12 +138,8 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 
   //  static const char* const here = "Decode";
 
-#ifdef NDEBUG
+  assert( dynamic_cast<MWDC*>(fTracker) );
   MWDC* mwdc = static_cast<MWDC*>( fTracker );
-#else
-  MWDC* mwdc = dynamic_cast<MWDC*>( fTracker );
-  assert( mwdc );
-#endif
 
   UInt_t nHits = 0;
   bool no_time_cut = !fTracker->TestBit(MWDC::kDoTimeCut);
