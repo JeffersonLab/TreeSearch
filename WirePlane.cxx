@@ -59,8 +59,9 @@ WirePlane::WirePlane( const char* name, const char* description,
     return;
   }
 
-  // Tell common code that our frontends are TDC based
+  // Tell common code that our frontends are TDCs with reference channels
   SetBit(kTDCReadout);
+  SetBit(kHaveRefChans);
 }
 
 //_____________________________________________________________________________
