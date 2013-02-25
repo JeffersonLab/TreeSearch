@@ -89,7 +89,8 @@ WritePattern::WritePattern( const char* filename, size_t index_size )
     ::Error( here, "Invalid file name" );
   }
   if( (fIdxSiz & (fIdxSiz-1)) != 0 ) {
-    ::Warning( here, "Invalid index_size = %d. Must be a power of 2", fIdxSiz);
+    ::Warning( here, "Invalid index_size = %u. Must be a power of 2",
+	       (UInt_t)fIdxSiz);
     fIdxSiz = sizeof(Int_t);
   }    
 }

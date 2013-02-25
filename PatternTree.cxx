@@ -90,7 +90,7 @@ Int_t TreeParam_t::Normalize()
   }
   if( fZpos.size() < 3 || fZpos.size() > 16 ) {
     ::Error( here, "Illegal number of planes = %u. Must be between 3-16.",
-	     fZpos.size() );
+	     (UInt_t)fZpos.size() );
     return -3;
   }
   if( fMaxslope < 0.0 )
@@ -100,7 +100,7 @@ Int_t TreeParam_t::Normalize()
   for( vector<Double_t>::size_type i = 1; i < fZpos.size(); ++i ) {
     if( fZpos[i] < fZpos[i-1] + 1e-3 ) {
       ::Error( here, "Array of z-positions not sorted or planes not "
-	       "spaced by at least 0.001 at index = %u.", i );
+	       "spaced by at least 0.001 at index = %u.", (UInt_t)i );
       return -4;
     }
   }
@@ -277,7 +277,7 @@ try {
 catch ( out_of_range ) {
   ::Error( "TreeSearch::CopyPattern", "Array index out of range at %u %u %u "
 	   "(internal logic error). Tree not copied. Call expert.",
-	   fTree->fNpat, fTree->fNlnk, fTree->fNbit );
+	   (UInt_t)fTree->fNpat, (UInt_t)fTree->fNlnk, (UInt_t)fTree->fNbit );
   return kError;
 }
 
