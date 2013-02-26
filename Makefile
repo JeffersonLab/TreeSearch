@@ -175,15 +175,19 @@ GDEP          = $(GEMSRC:.cxx=.d)
 
 all:		$(CORELIB) $(MWDCLIB) $(GEMLIB)
 
+mwdc:		$(MWDCLIB)
+
+gem:		$(GEMLIB)
+
 $(CORELIB):	$(OBJ)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
 		@echo "$@ done"
 
-$(MWDCLIB):	$(MOBJ)
+$(MWDCLIB):	$(MOBJ) $(CORELIB)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
 		@echo "$@ done"
 
-$(GEMLIB):	$(GOBJ)
+$(GEMLIB):	$(GOBJ) $(CORELIB)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
 		@echo "$@ done"
 
