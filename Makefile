@@ -37,6 +37,17 @@ GEMDICT = $(GEM)Dict
 GEMLINKDEF = $(GEM)_LinkDef.h
 
 #------------------------------------------------------------------------------
+# SoLID GEM library
+
+SOLIDSRC  = SolSpec.cxx SoLIDGEMTracker.cxx SoLIDGEMPlane.cxx
+
+SOLID  = TreeSearch-SoLID
+SOLIDLIB  = lib$(SOLID).so
+SOLIDDICT = $(SOLID)Dict
+
+SOLIDLINKDEF = $(SOLID)_LinkDef.h
+
+#------------------------------------------------------------------------------
 # Compile debug version (for gdb)
 export DEBUG = 1
 #export PROFILE = 1
@@ -173,18 +184,32 @@ GOBJ          = $(GEMSRC:.cxx=.o) $(GEMDICT).o
 GHDR          = $(GEMSRC:.cxx=.h)
 GDEP          = $(GEMSRC:.cxx=.d)
 
-all:		$(CORELIB) $(MWDCLIB) $(GEMLIB)
+SOBJ          = $(SOLIDSRC:.cxx=.o) $(SOLIDDICT).o
+SHDR          = $(SOLIDSRC:.cxx=.h)
+SDEP          = $(SOLIDSRC:.cxx=.d)
+
+all:		$(CORELIB) $(MWDCLIB) $(GEMLIB) $(SOLIDLIB)
+
+mwdc:		$(MWDCLIB)
+
+gem:		$(GEMLIB)
+
+solid:		$(SOLIDLIB)
 
 $(CORELIB):	$(OBJ)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
 		@echo "$@ done"
 
-$(MWDCLIB):	$(MOBJ)
+$(MWDCLIB):	$(MOBJ) $(CORELIB)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
 		@echo "$@ done"
 
-$(GEMLIB):	$(GOBJ)
+$(GEMLIB):	$(GOBJ) $(CORELIB)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
+		@echo "$@ done"
+
+$(SOLIDLIB):	$(SOBJ) $(CORELIB) $(GEMLIB)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^  $(GEMLIB) $(CORELIB)
 		@echo "$@ done"
 
 ifeq ($(ARCH),linux)
@@ -193,6 +218,8 @@ $(COREDICT).o:	$(COREDICT).cxx
 $(MWDCDICT).o:	$(MWDCDICT).cxx
 	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
 $(GEMDICT).o:	$(GEMDICT).cxx
+	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
+$(SOLIDDICT).o:	$(SOLIDDICT).cxx
 	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
 endif
 
@@ -208,6 +235,10 @@ $(GEMDICT).cxx: $(GHDR) $(GEMLINKDEF)
 	@echo "Generating dictionary $(GEMDICT)..."
 	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
+$(SOLIDDICT).cxx: $(SHDR) $(SOLIDLINKDEF)
+	@echo "Generating dictionary $(SOLIDDICT)..."
+	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
+
 install:	all
 		$(error Please define install yourself)
 # for example:
@@ -216,6 +247,7 @@ install:	all
 clean:
 		rm -f *.o *~ $(CORELIB) $(COREDICT).*
 		rm -f $(MWDCLIB) $(MWDCDICT).* $(GEMLIB) $(GEMDICT).*
+		rm -f $(SOLIDLIB) $(SOLIDDICT).*
 
 realclean:	clean
 		rm -f *.d
@@ -226,6 +258,7 @@ srcdist:
 		mkdir $(PKG)
 		cp -p $(SRC) $(HDR) $(LINKDEF) db*.dat Makefile $(PKG)
 		cp -p $(MWDCSRC) $(MHDR) $(GEMSRC) $(GHDR) $(PKG)
+		cp -p $(SOLIDSRC) $(SHDR) $(PKG)
 		gtar czvf $(DISTFILE) --ignore-failed-read \
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)
@@ -251,4 +284,5 @@ srcdist:
 -include $(DEP)
 -include $(MDEP)
 -include $(GDEP)
+-include $(SDEP)
 
