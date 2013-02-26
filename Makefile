@@ -180,11 +180,11 @@ $(CORELIB):	$(OBJ)
 		@echo "$@ done"
 
 $(MWDCLIB):	$(MOBJ)
-		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
 		@echo "$@ done"
 
 $(GEMLIB):	$(GOBJ)
-		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
 		@echo "$@ done"
 
 ifeq ($(ARCH),linux)
