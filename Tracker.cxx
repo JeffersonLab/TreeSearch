@@ -1144,10 +1144,6 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 
   // The selected roads from each of the three projections
   Road* tuple[3];
-  // Number of roads in u/v projections
-  UInt_t nrd[2] = { roads[0].size(), roads[1].size() };
-  // Indices of currently selected u/v pair
-  UInt_t ird[2];
   Plane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
 
   // For fast access to the relevant position range, sort the 3rd projection
@@ -1158,19 +1154,22 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   UInt_t nfound = 0;
   Double_t zback = fPlanes.back()->GetZ();
   Double_t matchval = 0.0;
+  // Number of roads in u/v projections
+  UInt_t nrd0 = roads[0].size(), nrd1 = roads[1].size();
+  // ird0 and ird1 (below) are the indices of the currently selected u/v pair
+  UInt_t ird0 = 0;
   // Time-critical loop, may run O(1e5) times per event with noisy input
-  ird[0] = 0;
-  while( ird[0] != nrd[0] ) {
-    tuple[0] = roads[0][ird[0]];
+  while( ird0 != nrd0 ) {
+    tuple[0] = roads[0][ird0];
     Double_t uf = tuple[0]->GetPos();
     Double_t ub = tuple[0]->GetPos(zback);
     Double_t usf = uf * sv;
     Double_t ucf = uf * cv;
     Double_t usb = ub * sv;
     Double_t ucb = ub * cv;
-    ird[1] = 0;
-    while( ird[1] != nrd[1] ) {
-      tuple[1] = roads[1][ird[1]];
+    UInt_t ird1 = 0;
+    while( ird1 != nrd1 ) {
+      tuple[1] = roads[1][ird1];
       Double_t v = tuple[1]->GetPos();
       Double_t xf = usf - v * su;
       Double_t yf = v * cu - ucf;
@@ -1224,9 +1223,9 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 	  }
 	}
       }
-      ++ird[1];
+      ++ird1;
     }
-    ++ird[0];
+    ++ird0;
   }
 
   return nfound;
