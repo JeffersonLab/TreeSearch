@@ -113,6 +113,25 @@ void Plane::Clear( Option_t* opt )
   fFitCoords->Clear(opt);
 }
 
+//___________________________________________________________________________
+Bool_t Plane::Contains( Double_t x, Double_t y ) const
+{
+  // Check if the given point is within the active area of this wire plane.
+  // Coordinates are relative to the Tracker origin.
+  //
+  // This version assumes a rectangular active area whose size is given by
+  // fSize[0] and fSize[1] (half-widths), with fOrigin at the center of the
+  // area.
+  //
+  // This routine is called multiple times per event by the MatchRoads
+  // algorithms, and so it is time-critical.
+
+  //TODO: allow for (small) rotation due to misalignment?
+
+  return ( TMath::Abs( x-fOrigin.X() ) < fSize[0] and
+	   TMath::Abs( y-fOrigin.Y() ) < fSize[1] );
+}
+
 //_____________________________________________________________________________
 Int_t Plane::End( THaRunBase* /* run */ )
 {

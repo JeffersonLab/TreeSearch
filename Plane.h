@@ -49,13 +49,13 @@ namespace TreeSearch {
     virtual Int_t   Begin( THaRunBase* r=0 );
     virtual Int_t   End( THaRunBase* r=0 );
 
+    virtual Bool_t  Contains( Double_t x, Double_t y ) const;
     virtual Double_t GetMaxLRdist() const { return 0; }
 
 //     virtual Int_t   Compare ( const TObject* obj ) const;
 //     virtual Bool_t  IsSortable () const { return kTRUE; }
 
     FitCoord*       AddFitCoord( const FitCoord& coord );
-    Bool_t          Contains( Double_t x, Double_t y ) const;
     Bool_t          Contains( const TVector2& point ) const;
     void            EnableCalibration( Bool_t enable = true );
     EProjType       GetType()        const { return fType; }
@@ -157,20 +157,6 @@ namespace TreeSearch {
     
     ClassDef(Plane,0)  // One Tracker plane coordinate direction
   };
-
-  //___________________________________________________________________________
-  inline
-  Bool_t Plane::Contains( Double_t x, Double_t y ) const
-  {
-    // Check if the given point is within the active area of this wire plane.
-    // Coordinates are relative to the Tracker origin. Time-critical, may be
-    // be called O(1e5) per event
-
-    //TODO: allow for (small) rotation due to misalignment?
-
-    return ( TMath::Abs( x-fOrigin.X() ) < fSize[0] and
-	     TMath::Abs( y-fOrigin.Y() ) < fSize[1] );
-  }
 
   //___________________________________________________________________________
   inline
