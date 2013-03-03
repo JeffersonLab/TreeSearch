@@ -117,7 +117,7 @@ void Plane::Clear( Option_t* opt )
 Bool_t Plane::Contains( Double_t x, Double_t y ) const
 {
   // Check if the given point is within the active area of this wire plane.
-  // Coordinates are relative to the Tracker origin.
+  // Coordinates are relative to the Plane origin.
   //
   // This version assumes a rectangular active area whose size is given by
   // fSize[0] and fSize[1] (half-widths), with fOrigin at the center of the
@@ -167,7 +167,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
   // position relative to the Tracker reference frame - which in turn can be
   // offset as a whole. Thus, with respect to some absolute frame
   // (whatever it may be), each Plane is positioned at 
-  // fOrigin(Tracker) + fOrigin(plane)
+  // fOrigin(Tracker) + fOrigin(Plane)
   Int_t status = ReadGeometry( file, date, kTRUE );
 
   if( status == kOK ) {
