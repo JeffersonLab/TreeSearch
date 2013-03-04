@@ -173,11 +173,11 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
   ResetBit( k3dFastMatch );
 
   Int_t do_adc_cut = 1;
-  Int_t ampcorr_maxmiss = -1;
+  fMaxCorrMismatches = 0;
   fMaxCorrNsigma = 1.0;
   DBRequest request[] = {
-    { "3d_ampcorr_maxmiss", &ampcorr_maxmiss, kInt,    0, 1 },
-    { "3d_ampcorr_nsigma",  &fMaxCorrNsigma,  kDouble, 0, 1 },
+    { "3d_ampcorr_maxmiss", &fMaxCorrMismatches, kUInt,   0, 1 },
+    { "3d_ampcorr_nsigma",  &fMaxCorrNsigma,     kDouble, 0, 1 },
     { 0 }
   };
 
