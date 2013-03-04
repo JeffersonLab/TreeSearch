@@ -30,6 +30,7 @@ namespace TreeSearch {
   protected:
 
     // Parameters for 3D projection matching
+    UInt_t         fNPlanePartnerPairs;  // Number of plane pairs available for matching
     UInt_t         fMaxCorrMismatches;   // Max # planes w/o amplitude match
     Double_t       fMaxCorrNsigma;       // Amplitude correlation cutoff (#sig)
 

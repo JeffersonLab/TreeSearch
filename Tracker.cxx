@@ -1796,7 +1796,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 //_____________________________________________________________________________
 Int_t Tracker::ReadDatabase( const TDatime& date )
 {
-  // Read GEM database
+  // Read generic Tracker keys from database
 
   static const char* const here = "ReadDatabase";
 
@@ -1945,13 +1945,19 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   }
 
   UInt_t nplanes = fPlanes.size();
-  if( fDebug > 0 )
+  if( fDebug > 0 and not (doing_tracking and nplanes < 5) )
     Info( Here(here), "Loaded %u planes", nplanes );
 
   if( doing_tracking ) {
     if( nplanes < 5 ) {
       Error( Here(here), "Insufficient number of planes = %u. Need at least 5. "
 	     "Fix database.", nplanes );
+      return kInitError;
+    }
+    if( maxmiss+5 > static_cast<Int_t>(nplanes) ) {
+      Error( Here(here), "3d_maxmiss = %d (number of allowed planes with "
+	     "missing hits) too large. Must be %u or less. Fix database.",
+	     maxmiss, nplanes-5 );
       return kInitError;
     }
     // Convert maximum number of missing hits to ndof of fits

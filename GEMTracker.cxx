@@ -34,9 +34,10 @@ typedef vector<Plane*>::iterator  vriter_t;
 
 //_____________________________________________________________________________
 GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
-  : Tracker(name,desc,app), fMaxCorrMismatches(0), fMaxCorrNsigma(1.0)
+  : Tracker(name,desc,app), fNPlanePartnerPairs(0), fMaxCorrMismatches(0),
+    fMaxCorrNsigma(1.0)
 { 
-  // Constructor - nothing special for standard GEM trackers
+  // Constructor
 
   // GEMs support matching 2 projections only (via amplitude correlations
   // in MatchRoadsCorrAmpl). Override the default (3) from Tracker base class.
@@ -91,14 +92,13 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 
   static const char* const here = "PartnerPlanes";
 
-  fAllPartnered = true;
+  fNPlanePartnerPairs = 0;
   for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
     Plane* thePlane = fPlanes[iplane];
     assert( thePlane->IsInit() );
     TString other( thePlane->GetPartnerName() );
     if( other.IsNull() ) {
       thePlane->SetPartner( 0 );
-      fAllPartnered = false;
       continue;
     }
     vriter_t it = find_if( ALL(fPlanes), Plane::NameEquals(other) );
@@ -144,6 +144,7 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 	      thePlane->GetName(), partner->GetName() );
 
       partner->SetPartner( thePlane );
+      ++fNPlanePartnerPairs;
 
     } else {
       Error( Here(here), "Partner plane %s of %s is not defined!"
@@ -151,6 +152,28 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
       return kInitError;
     }
   }
+  if( fDebug > 0 )
+    Info( Here(here), "Found %u partnered readout plane pairs",
+	  fNPlanePartnerPairs );
+
+  if( 2*fMaxCorrMismatches > fNPlanePartnerPairs ) {
+    TString desc("(number of allowed amplitude correlation mismatches)");
+    if( fMaxCorrMismatches >= fNPlanePartnerPairs ) {
+      TString text = (fMaxCorrMismatches == fNPlanePartnerPairs) ?
+	"equal to" : "larger than";
+      Error( Here("Init"), "3d_ampcorr_maxmiss = %u %s %s number "
+	     "of plane partner pairs = %u. Fix database.",
+	     fMaxCorrMismatches, desc.Data(), text.Data(),
+	     fNPlanePartnerPairs );
+      return kInitError;
+    }
+    Warning( Here("Init"), "3d_ampcorr_maxmiss = %u %s larger than "
+	     "half of available plane pairs = %u. May yield poor "
+	     "matching results.",
+	     fMaxCorrMismatches, desc.Data(), fNPlanePartnerPairs );
+  }
+
+  fAllPartnered = ( 2*fNPlanePartnerPairs == fPlanes.size() );
   return kOK;
 }
 
@@ -158,6 +181,8 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 Int_t GEMTracker::ReadDatabase( const TDatime& date )
 {
   // Read GEM database
+
+  static const char* const here = "ReadDatabase";
 
   // Read common database info
   Int_t err = Tracker::ReadDatabase( date );
@@ -188,6 +213,13 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
 
   // Set analysis control flags
   SetBit( kDoADCCut, do_adc_cut );
+
+  if( fMaxCorrNsigma <= 0.0 ) {
+    Error( Here(here), "3d_ampcorr_nsigma = %.2lf must be positive. "
+	   "Fix database.", fMaxCorrNsigma );
+    return kInitError;
+  }
+  // fMaxCorrMismatches is checked in PartnerPlanes
 
   fIsInit = kTRUE;
   return kOK;
