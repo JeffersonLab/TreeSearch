@@ -18,6 +18,7 @@
 #include <list>
 #include <cassert>
 #include "TMatrixDSym.h"
+#include "TRotation.h"
 
 class THaTrack;
 class THaBenchmark;
@@ -61,6 +62,7 @@ namespace TreeSearch {
 
     void            EnableEventDisplay( Bool_t enable = true );
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
+    const TRotation& GetRotation() const { return fRotation; }
 
     // Analysis control flags. Set via database.
     enum {
@@ -97,9 +99,12 @@ namespace TreeSearch {
     Prvec_t        fProj;             // Plane projections
     Rpvec_t        fCalibPlanes;      // Planes in calibration mode
 
+    // Configuration and parameters
     THashTable*    fCrateMap;         // Map of DAQ modules
-    Bool_t         fAllPartnered;     // All planes have partners
     Double_t       fMinProjAngleDiff; // Min coord axis angle diff required
+    TRotation      fRotation;         // Rotation Tracker -> lab frame
+    Bool_t         fIsRotated;        // Tracker frame is rotated
+    Bool_t         fAllPartnered;     // All planes have partners
 
     // Multithread support
     UInt_t         fMaxThreads;       // Maximum simultaneously active threads

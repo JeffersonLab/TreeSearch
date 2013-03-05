@@ -348,8 +348,9 @@ private:
 
 //_____________________________________________________________________________
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
-  : THaTrackingDetector(name,desc,app), fCrateMap(0), fAllPartnered(false),
-    fMinProjAngleDiff(kMinProjAngleDiff), fMaxThreads(1), fThreads(0),
+  : THaTrackingDetector(name,desc,app), fCrateMap(0),
+    fMinProjAngleDiff(kMinProjAngleDiff), fIsRotated(false),
+    fAllPartnered(false), fMaxThreads(1), fThreads(0),
     fMinReqProj(3), f3dMatchvalScalefact(1), f3dMatchCut(0),
     fMinNdof(1), fFailNhits(0), fFailNpat(0),
     fNcombos(0), fN3dFits(0), fEvNum(0),
@@ -776,29 +777,67 @@ void Tracker::FindNearestHitsImpl( const TSeqCollection* hits,
 //_____________________________________________________________________________
 THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 {
-  // Make new track with given parameters. Used by CoarseTrack to generate
-  // all GEM tracks
+  // Make new track with given parameters. Correct for coordinate offset
+  // and rotation of this detector. Used by CoarseTrack to generate all tracks.
+
+  // The following coordinates ("detector" coordinates, e.g. "tr.d_x") are
+  // in the Tracker frame. fOrigin of the planes is already being taken into
+  // account when fitting tracks since the hit positions are corrected for it
+  // (see Plane::GetStart() and Plane::GetZ())
 
   Double_t d_x  = fit_par.coef[0];
   Double_t d_xp = fit_par.coef[1];
   Double_t d_y  = fit_par.coef[2];
   Double_t d_yp = fit_par.coef[3];
 
-  // Correct the track coordinates for the position offset of the detector
-  // system. The track's coordinates are given in reference to the following
-  // coordinate systems:
+  // Correct the track coordinates for the position offset and rotation of the
+  // Tracker system, resulting in "global" reference coordinates, e.g. "tr.x".
+  // For a focusing spectrometer, the "global" system usually is the "focal
+  // plane" system, e.g. the detector stack frame.
+  // fOrigin is specified in the global frame. It is never rotated.
   //
-  // "fp" coordinates ("tr.x" etc.): Tracker system
-  // "detector" coordinates ("tr.d_x" etc.): Plane system
+  // NB: The track origin is projected to z=0 of the "global" system, i.e. the
+  // one enclosing the tracker
   //
-  // NB: The track origin is always given at z=0 of the Tracker system.
-  //
-  // Currently assumes that the Plane and Tracker systems have parallel
-  // axes, i.e. there is no rotation.
-  Double_t xp = d_xp;
-  Double_t yp = d_yp;
-  Double_t x  = d_x + fOrigin.X() - d_xp*fOrigin.Z();
-  Double_t y  = d_y + fOrigin.Y() - d_yp*fOrigin.Z();
+  // Target/vertex coordinate reconstruction is done by the parent spectrometer
+  // apparatus.
+
+  assert( fIsRotated == !fRotation.IsIdentity() );
+  Double_t xp, yp, x, y;
+  if( fIsRotated ) {
+    // Rotate the TRANSPORT direction vector to global frame
+    TVector3 v( d_xp, d_yp, 1.0 );
+    v *= fRotation;
+    // TODO: use different type of track without this limitation
+    if( TMath::Abs(v.Theta()-TMath::PiOver2()) < 1e-2 ) {
+      Error( Here("NewTrack"), "Limitation: Track (nearly) perpendicular "
+	     "to z-axis not supported by TRANSPORT formalism in THaTrack "
+	     "class. Skipping this track." );
+      v.Print();
+      return 0;
+    }
+    // Normalize to z=1 to get new TRANSPORT direction vector
+    v *= 1.0/v.Z();
+    xp = v.X();
+    yp = v.Y();
+    assert( TMath::Abs(v.Z()-1.0) < 1e-6 );
+    // Rotate track origin to global frame
+    TVector3 v0( d_x, d_y, 0.0 );
+    v0 *= fRotation;
+    v0 += fOrigin;
+    // Project along the track direction to z=0 in global frame
+    v0 += -v0.Z() * v;
+    x = v0.X();
+    y = v0.Y();
+    assert( TMath::Abs(v0.Z()) < 1e-6 );
+  }
+  else {
+    // More efficient code in case of no rotation
+    xp = d_xp;
+    yp = d_yp;
+    x  = d_x + fOrigin.X() - d_xp*fOrigin.Z();
+    y  = d_y + fOrigin.Y() - d_yp*fOrigin.Z();
+  }
 
   THaTrack* newTrack = AddTrack( tracks, x, y, xp, yp );
   assert( newTrack );
@@ -1801,6 +1840,9 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     }
   }
 
+  // Keep a simple flag for the rotation status for efficiency.
+  fIsRotated = !fRotation.IsIdentity();
+
   return fStatus = kOK;
 }
 
@@ -1826,6 +1868,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   // fOrigin will be added to all tracks generated; if fOrigin.Z() is not
   // zero, tracks will be projected into the z=0 plane.
   fOrigin.SetXYZ(0,0,0);
+  fRotation.SetToIdentity();
   Int_t err = ReadGeometry( file, date );
   if( err ) {
     fclose(file);
