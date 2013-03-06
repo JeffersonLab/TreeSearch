@@ -1770,8 +1770,8 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     vector<ProjAngle_t> proj_angle( ALL(fProj) );
     assert( proj_angle.size() == nproj );
     Double_t smin = kBig;
-    UInt_t imin = kMaxUInt;
-    for( UInt_t ix = 0; ix < (1U<<(nproj-1)); ++ix ) {
+    UInt_t imin = kMaxUInt, ncombos = 1U<<(nproj-1);
+    for( UInt_t ix = 0; ix < ncombos; ++ix ) {
       Double_t amin = kBig, amax = -kBig;
       for( vector<ProjAngle_t>::size_type j=0; j<nproj; ++j ) {
 	// The set bits in ix indicate a trial flip
@@ -1785,12 +1785,12 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 	imin = ix;
       }
     }
-    assert( imin < (1U<<(nproj-1)) );
+    assert( imin < ncombos );
     // Actually flip the angles to the arrangement with smallest span
     // so we can sort by angle. Note that the last element is never
     // flipped, without loss of generality
     assert( !TESTBIT(imin,nproj-1) );
-    for( vector<ProjAngle_t>::size_type j=0; j<nproj; ++j ) {
+    for( vector<ProjAngle_t>::size_type j=0; j<nproj-1; ++j ) {
       if( TESTBIT(imin,j) )
 	proj_angle[j].m_angle = proj_angle[j].angle(true);
     }
