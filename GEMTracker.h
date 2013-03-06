@@ -42,9 +42,6 @@ namespace TreeSearch {
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
-    virtual Projection* MakeProjection( EProjType type, const char* name,
-					Double_t angle,
-					THaDetectorBase* parent ) const = 0;
     virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
 				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 				   Rset_t& unique_found );

@@ -1580,6 +1580,18 @@ Int_t Tracker::DefineVariables( EMode mode )
 }
 
 //_____________________________________________________________________________
+Projection* Tracker::MakeProjection( EProjType type, const char* name,
+				     Double_t angle, 
+				     THaDetectorBase* parent ) const
+{
+  // Create an object of the projection class used by this implementation.
+  // The type of projection determines basically the method with which the
+  // Hitpattern will be filled.
+
+  return new Projection( type, name, angle, parent );
+}
+
+//_____________________________________________________________________________
 THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 {
   // Initialize GEM. Calls standard Init(), then initializes subdetectors.

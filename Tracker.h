@@ -150,7 +150,7 @@ namespace TreeSearch {
 			      THaDetectorBase* parent = 0 ) const = 0;
     virtual Projection* MakeProjection( EProjType type, const char* name,
 					Double_t angle,
-					THaDetectorBase* parent ) const = 0;
+					THaDetectorBase* parent ) const;
     virtual UInt_t GetCrateMapDBcols() const = 0;
 
     virtual void   FindNearestHits( Plane* pl, const THaTrack* track,
