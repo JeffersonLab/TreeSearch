@@ -17,14 +17,14 @@ namespace SoLID {
   class SolSpec : public THaSpectrometer {
   
   public:
-    SolSpec( const char* name, const char* description );
+    SolSpec( const char* name, const char* description, UInt_t nsectors );
     virtual ~SolSpec();
 
     virtual Int_t   FindVertices( TClonesArray& tracks );
     virtual Int_t   TrackCalc();
   
   protected:
-    
+
     ClassDef(SolSpec,0) // SoLID spectrometer
   };
 
