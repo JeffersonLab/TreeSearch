@@ -29,6 +29,43 @@ GEMTracker::~GEMTracker()
 }
 
 //_____________________________________________________________________________
+const char* GEMTracker::GetDBFileName() const
+{
+  // Return database file name prefix. For SoLID trackers, this is the detector
+  // name with any trailing sector number removed. In this way, all trackers
+  // use the same database file.
+
+  // fDBPrefix is set in MakePrefix()
+  return fDBPrefix.Data();
+}
+
+//_____________________________________________________________________________
+void GEMTracker::MakePrefix()
+{
+  // Set up name prefixes for global variables and database.
+  // Global variables and database keys get the standard prefix, 
+  // e.g. "solid.tracker.3."
+  // The database file name gets a different, shorter prefix, allowing
+  // the trackers to share a single database file. For the example above,
+  // "solid.tracker."
+
+  TreeSearch::GEMTracker::MakePrefix();
+
+  TString prefix( GetPrefix() );
+  assert( prefix.EndsWith(".") );
+  Int_t ndot = prefix.CountChar('.');
+  if( ndot > 1 ) {
+    prefix.Chop();
+    if( !prefix.EndsWith(".") )
+      prefix.Remove( prefix.Last('.')+1 );
+    else
+      Warning( Here("MakePrefix"), "Double dot in detector prefix = "
+	       "\"%s\"?", GetPrefix() );
+  }
+  fDBPrefix = prefix;
+}
+
+//_____________________________________________________________________________
 Plane* GEMTracker::MakePlane( const char* name, const char* description, 
 			      THaDetectorBase* parent ) const
 {

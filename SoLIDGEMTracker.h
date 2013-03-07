@@ -10,6 +10,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "GEMTracker.h"
+#include "TString.h"
 
 namespace SoLID {
 
@@ -29,11 +30,16 @@ namespace SoLID {
     virtual THaAnalysisObject::EStatus PartnerPlanes();
 
      // Podd interface
+    virtual const char* GetDBFileName() const;
+    virtual void  MakePrefix();
     virtual Int_t ReadGeometry( FILE* file, const TDatime& date,
 				Bool_t required = kTRUE );
 
     // Geometry
     Double_t  fPhi;          // Phi rotation of this sector (rad)
+
+    // Configuration
+    TString   fDBPrefix;     // Safe storage for database file name prefix
 
     ClassDef(GEMTracker,0)   // Collection of GEM trackers in one SoLID sector
   };
