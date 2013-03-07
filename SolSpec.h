@@ -20,8 +20,9 @@ namespace SoLID {
     SolSpec( const char* name, const char* description, UInt_t nsectors );
     virtual ~SolSpec();
 
-    virtual Int_t   FindVertices( TClonesArray& tracks );
-    virtual Int_t   TrackCalc();
+    virtual EStatus   Init( const TDatime& run_time );
+    virtual Int_t     FindVertices( TClonesArray& tracks );
+    virtual Int_t     TrackCalc();
   
   protected:
 

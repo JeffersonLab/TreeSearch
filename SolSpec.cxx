@@ -12,6 +12,10 @@
 #include "SolSpec.h"
 #include "SoLIDGEMTracker.h"
 
+#include "TList.h"
+#include "THaGlobals.h"
+#include "THaTextvars.h"
+
 #include <string>
 #include <sstream>
 #include <exception>
@@ -56,12 +60,69 @@ SolSpec::SolSpec( const char* name, const char* description,
       throw logic_error(s.str());
     }
   }
+
+  // For now, don't require run database
+  // We might need it later to read things like the field setting
+  fProperties &= ~kNeedsRunDB;
 }
 
 //_____________________________________________________________________________
 SolSpec::~SolSpec()
 {
   // Destructor
+}
+
+//_____________________________________________________________________________
+THaAnalysisObject::EStatus SolSpec::Init( const TDatime& run_time )
+{
+  // Extra initialization for the SoLID spectrometer.
+  //
+  // To simplify database access, automatically define the following
+  // gHaTextvars macros:
+  // "allsectors": all sector numbers
+  // "plane0": all supported projection types suffixed by "0"
+  // "plane1"..."plane5": dto. with suffixes "1"..."5"
+
+  Int_t nsect = fDetectors->GetSize();
+  if( gHaTextvars != 0 ) {
+    if( nsect > 0 ) {
+      stringstream s;
+      for( Int_t i = 0; i < nsect; ++i ) {
+	s << i;
+	if( i != nsect-1 )
+	  s << ",";
+      }
+      assert( s && !s.str().empty() );
+      gHaTextvars->Set( "allsectors", s.str() );
+    }
+
+    for( Int_t i = 0; i <= 5; ++i ) {
+      stringstream s, p;
+      Int_t ntypes = TreeSearch::kTypeEnd-TreeSearch::kTypeBegin;
+      assert( ntypes > 0 );
+      for( Int_t j = 0; j < ntypes; ++j ) {
+	s << TreeSearch::kProjParam[j].name << i;
+	if( j != ntypes-1 )
+	  s << ",";
+      }
+      p << "plane" << i;
+      assert( s && !s.str().empty() );
+      assert( p && !p.str().empty() );
+      gHaTextvars->Set( p.str(), s.str() );
+    }
+  }
+
+  // Proceed with normal spectrometer initialization
+  // EStatus ret = THaSpectrometer::Init( run_time );
+  // if( ret != kOK )
+  //   return ret;
+
+  // TODO: set up text variables like "plane1" etc. for output 
+  // definitions & cuts, using actual plane names defined
+  // (quite a job)
+
+  // return kOK;
+  return THaSpectrometer::Init( run_time );
 }
 
 //_____________________________________________________________________________
