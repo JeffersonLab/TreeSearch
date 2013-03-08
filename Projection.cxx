@@ -457,15 +457,17 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   fMaxPat  = kMaxUInt;
   fConfLevel = 1e-3;
   Int_t req1of2 = 0;
+
+  Int_t gbl = Plane::GetDBSearchLevel(fPrefix);
   const DBRequest request[] = {
     { "angle",           &angle,         kDouble, 0, 1 },
-    { "maxslope",        &fMaxSlope,     kDouble, 0, 1, -1 },
-    { "search_depth",    &fNlevels,      kUInt,   0, 0, -1 },
-    { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, -1 },
-    { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, -1 },
-    { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, -1 },
-    { "req1of2",         &req1of2,       kInt,    0, 1, -1 },
-    { "maxpat",          &fMaxPat,       kUInt,   0, 1, -1 },
+    { "maxslope",        &fMaxSlope,     kDouble, 0, 1, gbl },
+    { "search_depth",    &fNlevels,      kUInt,   0, 0, gbl },
+    { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, gbl },
+    { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, gbl },
+    { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, gbl },
+    { "req1of2",         &req1of2,       kInt,    0, 1, gbl },
+    { "maxpat",          &fMaxPat,       kUInt,   0, 1, gbl },
     { 0 }
   };
 

@@ -60,6 +60,7 @@ namespace TreeSearch {
     void            EnableCalibration( Bool_t enable = true );
     EProjType       GetType()        const { return fType; }
     Double_t        GetZ()           const { return fOrigin.Z(); }
+    static Int_t    GetDBSearchLevel( const char* prefix );
     Projection*     GetProjection()  const { return fProjection; }
     Plane*          GetPartner()     const { return fPartner; }
     void            SetPartner( Plane* p );
