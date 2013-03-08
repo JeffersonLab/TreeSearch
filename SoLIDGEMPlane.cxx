@@ -144,6 +144,7 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   static const char* const here = "ReadGeometry";
 
   Double_t dphi, phioff, z, dz = 1e-3;
+  Int_t gbl = GetDBSearchLevel(fPrefix);
   DBRequest request[] = {
     // "position"-like parameters
     { "rmin",   &fRmin,      kDouble, 0, 0, 0, "inner radius [m]" },
@@ -151,11 +152,11 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
     { "z",      &z,          kDouble, 0, 0, 0,
                                            "z-position of readout plane [m]" },
     // "size"-like parameters
-    { "dphi",   &dphi,       kDouble, 0, 0, -1,
+    { "dphi",   &dphi,       kDouble, 0, 0, gbl,
                                    "full angular width of active area [deg]" },
     { "phioff", &phioff,     kDouble, 0, 1, 0,
       "offset rotation of sector wrt central phi of sector (optional) [deg]" },
-    { "dz",     &dz,         kDouble, 0, 1, 0, "thickness in z (unused) [m]" },
+    { "dz",     &dz,         kDouble, 0, 1, gbl,  "extent in z (unused) [m]" },
     { 0 }
   };
   Int_t err = LoadDB( file, date, request, fPrefix );

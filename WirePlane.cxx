@@ -18,11 +18,10 @@
 #include "THaEvData.h"
 #include "TClonesArray.h"
 #include "TError.h"
-
 #include "TClass.h"
+#include "TString.h"
 
 #include <iostream>
-#include <string>
 #include <stdexcept>
 
 using namespace std;
@@ -366,15 +365,16 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
     // Putting this container on the stack may cause a stack overflow
     ttd_param = new vector<double>;
 
+    Int_t gbl = GetDBSearchLevel(fPrefix);
     const DBRequest request[] = {
-      { "nwires",        &fNelem,       kInt,     0, 0, -1 },
+      { "nwires",        &fNelem,       kInt,     0, 0, gbl },
       { "wire.pos",      &fStart },
-      { "wire.spacing",  &fPitch,       kDouble,  0, 0, -1 },
-      { "ttd.converter", &ttd_conv,     kTString, 0, 0, -1 },
-      { "ttd.param",     ttd_param,     kDoubleV, 0, 0, -1 },
+      { "wire.spacing",  &fPitch,       kDouble,  0, 0, gbl },
+      { "ttd.converter", &ttd_conv,     kTString, 0, 0, gbl },
+      { "ttd.param",     ttd_param,     kDoubleV, 0, 0, gbl },
       { "tdc.offsets",   &fTDCOffset,   kFloatV,  0, 0 },
-      { "drift.min",     &fMinTime,     kDouble,  0, 1, -1 },
-      { "drift.max",     &fMaxTime,     kDouble,  0, 1, -1 },
+      { "drift.min",     &fMinTime,     kDouble,  0, 1, gbl },
+      { "drift.max",     &fMaxTime,     kDouble,  0, 1, gbl },
       { 0 }
     };
     status = LoadDB( file, date, request, fPrefix );

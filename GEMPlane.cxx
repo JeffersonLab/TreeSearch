@@ -19,6 +19,7 @@
 #include "TClonesArray.h"
 #include "TH1.h"
 #include "TError.h"
+#include "TString.h"
 
 #include <iostream>
 #include <string>
@@ -657,20 +658,21 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   fADCsamp.clear();
   fAmplSigma = 0.36; // default, an educated guess
 
+  Int_t gbl = GetDBSearchLevel(fPrefix);
   try {
     const DBRequest request[] = {
-      { "nstrips",        &fNelem,          kInt,     0, 0, -1 },
+      { "nstrips",        &fNelem,          kInt,     0, 0, gbl },
       { "strip.pos",      &fStart },
-      { "strip.pitch",    &fPitch,          kDouble,  0, 0, -1 },
-      { "maxclustsiz",    &fMaxClusterSize, kUInt,    0, 1, -1 },
-      { "maxsamp",        &fMaxSamp,        kUInt,    0, 1, -1 },
-      { "adc.min",        &fMinAmpl,        kDouble,  0, 1, -1 },
-      { "split.frac",     &fSplitFrac,      kDouble,  0, 1, -1 },
-      { "mapping",        &mapping,         kTString, 0, 1, -1 },
-      { "chanmap",        &fChanMap,        kIntV,    0, 1, -1 },
+      { "strip.pitch",    &fPitch,          kDouble,  0, 0, gbl },
+      { "maxclustsiz",    &fMaxClusterSize, kUInt,    0, 1, gbl },
+      { "maxsamp",        &fMaxSamp,        kUInt,    0, 1, gbl },
+      { "adc.min",        &fMinAmpl,        kDouble,  0, 1, gbl },
+      { "split.frac",     &fSplitFrac,      kDouble,  0, 1, gbl },
+      { "mapping",        &mapping,         kTString, 0, 1, gbl },
+      { "chanmap",        &fChanMap,        kIntV,    0, 1, gbl },
       { "pedestal",       &fPed,            kFloatV,  0, 1 },
-      { "do_noise",       &do_noise,        kInt,     0, 1, -1 },
-      { "adc.sigma",      &fAmplSigma,      kDouble,  0, 1, -1 },
+      { "do_noise",       &do_noise,        kInt,     0, 1, gbl },
+      { "adc.sigma",      &fAmplSigma,      kDouble,  0, 1, gbl },
       { 0 }
     };
     status = LoadDB( file, date, request, fPrefix );

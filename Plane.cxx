@@ -13,12 +13,13 @@
 #include "Tracker.h"
 #include "Projection.h"
 
+#include "ha_compiledata.h"  // for ANALYZER_VERSION
 #include "THaDetMap.h"
 #include "THaEvData.h"
 #include "TClonesArray.h"
 #include "TH1.h"
-
 #include "TClass.h"
+#include "TString.h"
 
 #include <iostream>
 #include <string>
@@ -149,6 +150,21 @@ Int_t Plane::End( THaRunBase* /* run */ )
 }
 
 //_____________________________________________________________________________
+Int_t Plane::GetDBSearchLevel( const char* prefix )
+{
+  // Return the "search level" for database lookups of sharable keys.
+  // The search level specifies how far in a key name hierarchy to search
+  // for global/shared values. See THaAnalysisObject::LoadDB.
+
+  Int_t gbl = ( TString(prefix).CountChar('.') > 3 ) ? 3 : -1;
+#if ANALYZER_VERSION_CODE <= ANALYZER_VERSION(1,5,24)
+  // Work around an off-by-one bug in THaAnalysisObject
+  if( gbl > 0 ) gbl--;
+#endif
+  return gbl;
+}
+
+//_____________________________________________________________________________
 Int_t Plane::ReadDatabaseCommon( const TDatime& date )
 {
   // Read database
@@ -176,15 +192,16 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
       // Oddly, putting this container on the stack may cause a stack overflow
       detmap = new vector<Int_t>;
 
+      Int_t gbl = GetDBSearchLevel(fPrefix);
       const DBRequest request[] = {
 	{ "detmap",         detmap,           kIntV },
-	{ "xp.res",         &fResolution,     kDouble,  0, 0, -1 },
-	{ "maxhits",        &fMaxHits,        kUInt,    0, 1, -1 },
+	{ "xp.res",         &fResolution,     kDouble,  0, 0, gbl },
+	{ "maxhits",        &fMaxHits,        kUInt,    0, 1, gbl },
 	{ "required",       &required,        kInt,     0, 1 },
 	{ "type",           &plane_type,      kTString, 0, 1 },
 	{ "description",    &fTitle,          kTString, 0, 1 },
 	{ "partner",        &fPartnerName,    kTString, 0, 1 },
-	{ "do_histos",      &do_histos,       kInt,     0, 1, -1 },
+	{ "do_histos",      &do_histos,       kInt,     0, 1, gbl },
 	{ 0 }
       };
 
