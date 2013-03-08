@@ -1,6 +1,7 @@
 # Compiled stuff
 *.[od]
 lib*.so*
+dbconvert
 
 # Generated files
 *Dict.h
