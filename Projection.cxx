@@ -247,7 +247,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   // Determine maxslope, the maximum expected track slope in the projection.
   // width/depth is the maximum geometrically possible slope. It may be
   // further limited by the trigger acceptance, optics, etc.
-  Double_t dz = TMath::Abs(GetZsize());
+  Double_t dz = GetZsize();
+  assert( dz >= 0.0 );  // else planes not sorted
   if( dz >= 0.01 ) {
     Double_t maxslope = fWidth/dz;
     if( fMaxSlope < 0.01 ) {
@@ -264,8 +265,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     }
   } else {
     Error( Here(here), "Error calculating geometric maxslope for plane "
-	   "type \"%s\". z-range of planes too small. Fix database.",
-	   GetName() );
+	   "type \"%s\". z-range of planes = %lf too small. Fix database.",
+	   GetName(), dz );
     return fStatus = kInitError;
   }
 
