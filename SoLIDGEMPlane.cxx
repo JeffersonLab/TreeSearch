@@ -95,9 +95,12 @@ Bool_t GEMPlane::Contains( Double_t x, Double_t y ) const
   //
   // The active area of this type of GEM plane is a section of a ring.
 
-  // Convert the point to lab coordinates
-  Double_t xs = x + 0.5*(fRmin+fRmax);
-  Double_t r2 = xs*xs + y*y;
+  // Convert the point to lab coordinates (without the sector's phi rotation)
+  // NB: x/y are in the Tracker frame, so they already include fOrigin
+  const TVector3& tracker_origin = fTracker->GetOrigin();
+  Double_t xs = x + tracker_origin.X();
+  Double_t ys = y + tracker_origin.Y();
+  Double_t r2 = xs*xs + ys*ys;
   if( r2 <= fRmin2 or r2 >= fRmax2 ){
     return false;
   }
@@ -105,8 +108,8 @@ Bool_t GEMPlane::Contains( Double_t x, Double_t y ) const
   // in the angular range of this ring segment. Recall:
   // - By definition, the x-axis of the plane frame has phi = 0
   // - Phi angles have already been normalized to the range -pi to pi
-  // - fPhimin < fPhimax is assured by construction
-  Double_t phi = TMath::ATan2( y, xs );
+  // - fPhiMin < fPhiMax is assured by construction
+  Double_t phi = TMath::ATan2( ys, xs );
   return ( fPhiMin < phi and phi < fPhiMax );
 }
 
@@ -200,37 +203,54 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   phioff *= TMath::DegToRad();
 
   // Compute derived quantities
+  Double_t phi2 = 0.5*dphi;
   fRmin2  = fRmin*fRmin;
   fRmax2  = fRmax*fRmax;
-  fPhiMin = -0.5 * dphi + phioff;
-  fPhiMax =  0.5 * dphi + phioff;
+  fPhiMin = -phi2 + phioff;
+  fPhiMax =  phi2 + phioff;
   assert( fPhiMin < fPhiMax );
   assert( fPhiMin > -TMath::PiOver2() );
   assert( fPhiMax < TMath::PiOver2() );
 
-  // The origin of the plane is on the r-axis halfway between rmin and rmax.
-  // GEMTracker::Init later subtracts the origin of the tracker coordinate
-  // system from all the planes, such that the first plane (smallest z)
-  // ends up with origin zero.
-  fOrigin.SetXYZ( 0.5*(fRmin+fRmax), 0.0, z );
+  // Define the origin of the plane in the same way as in libsolgem: It is
+  // the center of the bounding box of the ring segment, calculated WITHOUT
+  // any phi offset rotation.
+  Double_t xmin = fRmin * TMath::Cos(phi2), xmax = fRmax;
+  fOrigin.SetXYZ( 0.5*(xmin+xmax), 0.0, z );
 
-  // fSize represents an upper limit on the size of the actual active area,
-  // including any rotation due to phioff. It is the smallest rectangle
-  // that is symmetric around the x and y axes and includes the bounding box
-  // proper of the active area. The axes are those of the Plane reference
-  // frame, with origin at fOrigin.
-  //
-  // We don't need the actual corner coordinates, but the symmetric size is
-  // needed for the calculation of the width and maxslope of the projection
-  // associated with this plane.
+  // If there is a phi offset, rotate the origin by the offset angle, so it
+  // stays in the center of the actual (rotated) active area.
+  // This origin is still in the lab frame. SoLID::GEMTracker::Init later
+  // subtracts the origin of the first plane (smallest z) from all the planes.
+  Double_t xs = -kBig, ys = -kBig;
+  if( phioff != 0.0 ) {
+    TRotation phioff_rot;
+    phioff_rot.RotateZ(phioff);
+    fOrigin *= phioff_rot;
 
-  // These relations hold so long as fPhiMin and fPhiMax are less than 90 deg
-  // Using fRmin for fSize[0] is intended - for phi < 90 deg, the inner arc is
-  // always further away from the plane origin in x than the outer one.
-  fSize[0] = TMath::Max( fOrigin.X()-fRmin*TMath::Cos(fPhiMin),
-			 fOrigin.X()-fRmin*TMath::Cos(fPhiMax) );
-  fSize[1] = fRmax * TMath::Max( TMath::Abs(TMath::Sin(fPhiMin)),
-				 TMath::Abs(TMath::Sin(fPhiMax)) );
+    // fSize is not used by SoLID::GEMTrackers; Contains(x,y) uses the actual
+    // shape of the active area since it is not rectangular.
+    // Calculate fSize anyway for completeness, defined as the smallest symmetric
+    // bounding box of the ring section around fOrigin AFTER rotation by phioff.
+    TVector2 L( TMath::Cos(fPhiMin), TMath::Sin(fPhiMin) );
+    TVector2 R( TMath::Cos(fPhiMax), TMath::Sin(fPhiMax) );
+    TVector2 C[4] = { L, L, R, R };  // = TL, BL, TR, BR
+    TVector2 org = fOrigin.XYvector();
+    for( Int_t i = 0; i < 4; ++i ) {
+      C[i] *= ( (i>>1) == 0 ) ? fRmax : fRmin;
+      C[i] -= org;
+      Double_t xa = TMath::Abs(C[i].X()); 
+      Double_t ya = TMath::Abs(C[i].Y()); 
+      if( xa > xs ) xs = xa;
+      if( ya > ys ) ys = ya;
+    }
+  } else {
+    // Simplified case of no phi offset where everything is symmetrical
+    xs = 0.5 * (xmax-xmin);
+    ys = fRmax * TMath::Sin(phi2);
+  }
+  fSize[0] = xs;  // Note: defined as half-width
+  fSize[1] = ys;
   fSize[2] = dz;
 
   return kOK;
