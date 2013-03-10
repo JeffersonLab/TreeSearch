@@ -96,7 +96,7 @@ CXX           = g++
 ifdef DEBUG
   CXXFLAGS    = -g -O0
   LDFLAGS     = -g -O0
-  DEFINES     =
+  DEFINES     = -DDEBUG
 else
   CXXFLAGS    = -O2 -march=pentium4
   LDFLAGS     = -O
@@ -128,7 +128,7 @@ CXX           = CC
 ifdef DEBUG
   CXXFLAGS    = -g
   LDFLAGS     = -g
-  DEFINES     =
+  DEFINES     = -DDEBUG
 else
   CXXFLAGS    = -O
   LDFLAGS     = -O

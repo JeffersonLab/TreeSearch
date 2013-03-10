@@ -46,7 +46,7 @@ SolSpec::SolSpec( const char* name, const char* description,
     Warning( Here(here), "Creating SoLID spectrometer with zero sectors" );
   }
 
-  for( UInt_t i = 0; i < nsectors; ++i ) {
+  for( UInt_t i = 1; i <= nsectors; ++i ) {
     stringstream sn, sd;
     sn << "tracker." << i;
     sd << "SoLID tracker in sector " << i;
@@ -80,23 +80,23 @@ THaAnalysisObject::EStatus SolSpec::Init( const TDatime& run_time )
   // To simplify database access, automatically define the following
   // gHaTextvars macros:
   // "allsectors": all sector numbers
-  // "plane0": all supported projection types suffixed by "0"
-  // "plane1"..."plane5": dto. with suffixes "1"..."5"
+  // "plane1": all supported projection types suffixed by "1"
+  // "plane2"..."plane5": dto. with suffixes "2"..."5"
 
   Int_t nsect = fDetectors->GetSize();
   if( gHaTextvars != 0 ) {
     if( nsect > 0 ) {
       stringstream s;
-      for( Int_t i = 0; i < nsect; ++i ) {
+      for( Int_t i = 1; i <= nsect; ++i ) {
 	s << i;
-	if( i != nsect-1 )
+	if( i+1 <= nsect )
 	  s << ",";
       }
       assert( s && !s.str().empty() );
       gHaTextvars->Set( "allsectors", s.str() );
     }
 
-    for( Int_t i = 0; i <= 5; ++i ) {
+    for( Int_t i = 1; i <= 5; ++i ) {
       stringstream s, p;
       Int_t ntypes = TreeSearch::kTypeEnd-TreeSearch::kTypeBegin;
       assert( ntypes > 0 );
@@ -138,7 +138,7 @@ Int_t SolSpec::FindVertices( TClonesArray& /* tracks */ )
 //_____________________________________________________________________________
 Int_t SolSpec::TrackCalc()
 {
-  // Additioal track calculations
+  // Additional track calculations
 
   // TODO
 
