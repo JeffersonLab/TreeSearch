@@ -143,7 +143,7 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
 
   static const char* const here = "ReadGeometry";
 
-  Double_t dphi, phioff, z, dz = 1e-3;
+  Double_t dphi, phioff = 0.0, z, dz = 1e-3;
   Int_t gbl = GetDBSearchLevel(fPrefix);
   DBRequest request[] = {
     // "position"-like parameters
