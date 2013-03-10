@@ -213,7 +213,7 @@ $(SOLIDLIB):	$(SOBJ) $(CORELIB) $(GEMLIB)
 		@echo "$@ done"
 
 dbconvert:	dbconvert.o
-		$(LD) $(LDFLAGS) -o $@ $^
+		$(LD) $(LDFLAGS) $(LIBS) -o $@ $^
 
 ifeq ($(ARCH),linux)
 $(COREDICT).o:	$(COREDICT).cxx
