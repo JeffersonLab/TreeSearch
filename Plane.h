@@ -94,9 +94,8 @@ namespace TreeSearch {
       { 
 	assert( a && b );
 	assert( a->GetDefinedNum() != b->GetDefinedNum() );
-	if( a->GetZ() < b->GetZ() ) return true;
-	if( b->GetZ() < a->GetZ() ) return false;
-	return( a->GetDefinedNum() < b->GetDefinedNum() );
+	return ( a->GetZ() != b->GetZ() ) ?
+	  (a->GetZ() < b->GetZ()) : (a->GetDefinedNum() < b->GetDefinedNum());
       }
     };
 

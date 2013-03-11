@@ -878,9 +878,8 @@ public:
   {
     // The "best" tracks have the largest number of hits and the smallest chi2
     //TODO: devalue tracks with very large chi2?
-    if( fNdof > rhs.fNdof ) return true;
-    if( fNdof < rhs.fNdof ) return false;
-    return ( fChi2 < rhs.fChi2 );
+    return (fNdof != rhs.fNdof) ?
+      (fNdof > rhs.fNdof) : (fChi2 < rhs.fChi2);
   }
   operator double() const { return fChi2/(double)fNdof; }
 private:

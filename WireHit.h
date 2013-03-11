@@ -49,11 +49,12 @@ namespace TreeSearch {
 	assert( a && b );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() )
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
-	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
-	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
-	if( a->GetWireNum()  < b->GetWireNum()  ) return true;
-	if( a->GetWireNum()  > b->GetWireNum()  ) return false;
-	return ( a->GetDriftTime() < b->GetDriftTime() );
+	if( a->GetPlaneNum() != b->GetPlaneNum() ) {
+	  return (a->GetPlaneNum() < b->GetPlaneNum());
+	}
+	return ( a->GetWireNum() != b->GetWireNum() ) ?
+	  (a->GetWireNum()   < b->GetWireNum()) :
+	  (a->GetDriftTime() < b->GetDriftTime());
       }
     };
 
@@ -68,8 +69,9 @@ namespace TreeSearch {
 	assert( a && b );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() )
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
-	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
-	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
+	if( a->GetPlaneNum() != b->GetPlaneNum() ) {
+	  return (a->GetPlaneNum() < b->GetPlaneNum());
+	}
 	if( a->GetWireNum() + fMaxDist < b->GetWireNum()  ) return true;
 	if( fMaxDist > 0 ) return false;
 	if( a->GetWireNum()  > b->GetWireNum()  ) return false;

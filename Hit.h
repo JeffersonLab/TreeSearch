@@ -60,12 +60,10 @@ namespace TreeSearch {
       { 
 	assert( a && b );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() ) {
-	  return ( a->GetPlane()->GetType() < b->GetPlane()->GetType() );
+	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
 	}
-	if( a->GetPlaneNum() < b->GetPlaneNum() ) return true;
-	if( a->GetPlaneNum() > b->GetPlaneNum() ) return false;
-	if( a->GetPos()      < b->GetPos()  ) return true;
-	return false;
+	return ( a->GetPlaneNum() != b->GetPlaneNum() ) ?
+	  (a->GetPlaneNum() < b->GetPlaneNum()) : (a->GetPos() < b->GetPos());
       }
     };
 

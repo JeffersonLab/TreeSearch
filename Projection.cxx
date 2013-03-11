@@ -772,11 +772,11 @@ struct MostPlanes : public binary_function< Node_t*, Node_t*, bool >
   {
     // Order patterns by decreasing number of active planes, then
     // decreasing number of hits, then ascending bin numbers
-    if( a->second.nplanes > b->second.nplanes ) return true;
-    if( a->second.nplanes < b->second.nplanes ) return false;
-    if( a->second.hits.size() > b->second.hits.size() ) return true;
-    if( a->second.hits.size() < b->second.hits.size() ) return false;
-    return ( a->first < b->first );
+    if( a->second.nplanes != b->second.nplanes )
+      return (a->second.nplanes > b->second.nplanes);
+    return (a->second.hits.size() != b->second.hits.size()) ?
+      (a->second.hits.size() > b->second.hits.size()) :
+      (a->first < b->first);
   }
 };
 
