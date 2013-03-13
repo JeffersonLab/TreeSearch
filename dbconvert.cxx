@@ -22,11 +22,20 @@
 #include <utility>
 
 //#include "TDatime.h"
-//#include <unistd.h>    // for basename()
+#include <unistd.h>    // for basename()
 
 using namespace std;
 
 #define ALL(c) (c).begin(), (c).end()
+
+#define INFILE_DEFAULT "/data/data/SoLID/tracking_1/db_gemc.dat"
+#define OUTFILE_DEFAULT "db_solid.tracker.dat"
+
+// Command line parameters
+static bool do_debug = false;
+static string infile = INFILE_DEFAULT;
+static string outfile = OUTFILE_DEFAULT;
+static const char* prgname = "";
 
 //-----------------------------------------------------------------------------
 static string find_key( ifstream& inp, const string& key )
@@ -66,9 +75,8 @@ static int load_db( ifstream& inp, DBRequest* request, const string& prefix )
 	cerr << "Error converting key/value = " << key << "/" << val << endl;
 	return 1;
       }
-#ifdef DEBUG
-      cout << "Read: " << key << " = " << *((double*)item->var) << endl;
-#endif
+      if( do_debug )
+	cout << "Read: " << key << " = " << *((double*)item->var) << endl;
     } else {
       cerr << "key \"" << key << "\" not found" << endl;
       return 2;
@@ -79,7 +87,6 @@ static int load_db( ifstream& inp, DBRequest* request, const string& prefix )
 }
 
 //-----------------------------------------------------------------------------
-#ifdef DEBUG
 static
 void print_req( const DBRequest* req )
 {
@@ -89,7 +96,6 @@ void print_req( const DBRequest* req )
     ++item;
   }
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Parameters for one GEM chamber (two readout coordinates)
@@ -117,13 +123,62 @@ struct BySectorThenPlane
 };
 
 //-----------------------------------------------------------------------------
-int main( int /*argc*/, char** /*argv*/ )
+void usage()
+{
+  // Print usage message and exit
+  cerr << "Usage: " << prgname << "[-hd] [-o outfile] [infile]" << endl;
+  cerr << " Convert libsolgem database <infile> to TreeSearch-SoLID database"
+       << " <outfile>" << endl;
+  cerr << " -h: Print this help message" << endl;
+  cerr << " -d: Output extensive debug information" << endl;
+  cerr << " -o <outfile>: Write output to <outfile>. Default: "
+       << OUTFILE_DEFAULT << endl;
+  cerr << " <infile>: Read input from <infile>. Default: "
+       << INFILE_DEFAULT << endl;
+  exit(255);
+}
+
+//-----------------------------------------------------------------------------
+void getargs( int argc, const char** argv )
+{
+  // Get command line parameters
+
+  while (argc-- > 1) {
+    const char *opt = *++argv;
+    if (*opt == '-') {
+      while (*++opt != '\0') {
+	switch (*opt) {
+	case 'h':
+	  usage();
+	  break;
+	case 'd':
+	  do_debug = true;
+	  break;
+	case 'o':
+	  if (!*++opt) {
+	    if (argc-- < 1)
+	      usage();
+	    opt = *++argv;
+	  }
+	  outfile = opt;
+	  opt = "?";
+	  break;
+	default:
+	  usage();
+	}
+      }
+    } else {
+      infile = *argv;
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+int main( int argc, const char** argv )
 {
   const int nsect = 30;
   const int nplanes = 4, nproj = 2;
   const double phi_offset[4] = { 2.0, 4.0, 0.0, 0.0 };
-  const string infile  = "/data/data/SoLID/tracking_1/db_gemc.dat";
-  const string outfile = "db_solid.tracker.dat";
   const string prefix = "gemc.";
   const string out_prefix = "solid.tracker.";
   //  const string out_prefix = "${DET}.";
@@ -131,6 +186,11 @@ int main( int /*argc*/, char** /*argv*/ )
   const char* proj_name[2] = { "u", "v" };
   const string dashes =
     "#-----------------------------------------------------------------";
+
+  // Parse command line
+  prgname = basename(argv[0]);
+  getargs(argc,argv);
+
 
   vector<ValueSet_t> values;
 
@@ -239,9 +299,8 @@ int main( int /*argc*/, char** /*argv*/ )
       double torad = TMath::DegToRad(), phi2rad = phi2 * torad;
       double xs = 0.5 * ( vals.rmax - vals.rmin * TMath::Cos(phi2rad) );
       double ys = vals.rmax * TMath::Sin(phi2rad);
-#ifdef DEBUG
-      cout << " xs/ys = " << xs << "/" << ys << endl;
-#endif      
+      if( do_debug )
+	cout << " xs/ys = " << xs << "/" << ys << endl;
       TRotation plane_to_xstrip, plane_to_ystrip;
       plane_to_xstrip.RotateZ(-vals.xangle*torad);
       plane_to_ystrip.RotateZ(-vals.yangle*torad);
@@ -249,9 +308,10 @@ int main( int /*argc*/, char** /*argv*/ )
       TVector3 C[4] = { TR, BR, TL, BL };
       int sminx = 1e9, sminy = 1e9, smaxx = -1e9, smaxy = -1e9;
       for( int i = 0; i < 4; ++i ) {
-#ifdef DEBUG
-	cout << " i = " <<  i << " "; C[i].Print();
-#endif
+	if( do_debug ) {
+	  cout << " i = " <<  i << " ";
+	  C[i].Print();
+	}
 	TVector3 vx = plane_to_xstrip * C[i];
 	TVector3 vy = plane_to_ystrip * C[i];
 	int sx = (int) (vx.X() / vals.xpitch);
@@ -295,25 +355,26 @@ int main( int /*argc*/, char** /*argv*/ )
       // Save results
       values.push_back( vals );
 
-#ifdef DEBUG
-      // Display results for debugging
-      //      cout << sector_prefix.str() << endl;
-      print_req( request );
-      print_req( plane_request );
-      cout << " phi/offset = " << vals.phi << "/" << vals.phioff << endl;
+      if( do_debug ) {
+	// Display results for debugging
+	//      cout << sector_prefix.str() << endl;
+	print_req( request );
+	print_req( plane_request );
+	cout << " phi/offset = " << vals.phi << "/" << vals.phioff << endl;
 
-      cout << " " << proj_name[0] << "/" << proj_name[1] << " n/ang/start/pitch = ";
-      for( int i=0; i < 2; ++i ) {
-	cout << vals.nstrips[i] << "/" << vals.angle[i] << "/" << vals.start[i]
-	     << "/" << vals.pitch[i];
-	if( i == 0 )
-	  cout << "  ";
-      }
-      cout << endl;
-#endif
+	cout << " " << proj_name[0] << "/" << proj_name[1] << " n/ang/start/pitch = ";
+	for( int i=0; i < 2; ++i ) {
+	  cout << vals.nstrips[i] << "/" << vals.angle[i] << "/" << vals.start[i]
+	       << "/" << vals.pitch[i];
+	  if( i == 0 )
+	    cout << "  ";
+	}
+	cout << endl;
+      } // do_debug
 
-    }
-  }
+    } // all sectors
+  }   // all planes
+
   inp.close();
 
   // Find common values
@@ -398,12 +459,13 @@ int main( int /*argc*/, char** /*argv*/ )
   int modules_per_chamber = 2*modules_per_readout; // Modules needed per chamber
   int chambers_per_crate = (MAXSLOT/modules_per_chamber/nplanes)*nplanes;
   int slot_hi = chambers_per_crate*modules_per_chamber-1;
-#ifdef DEBUG
-  cout << "Crate map: modules_per_readout = " << modules_per_readout << endl;
-  cout << "           modules_per_chamber = " << modules_per_chamber << endl;
-  cout << "           chambers_per_crate  = " << chambers_per_crate << endl;
-  cout << "           sectors_per_crate   = " << chambers_per_crate/nplanes << endl;
-#endif
+  if( do_debug ) {
+    cout << "Crate map: modules_per_readout = " << modules_per_readout << endl;
+    cout << "           modules_per_chamber = " << modules_per_chamber << endl;
+    cout << "           chambers_per_crate  = " << chambers_per_crate << endl;
+    cout << "           sectors_per_crate   = " << chambers_per_crate/nplanes
+	 << endl;
+  }
   const string spc = "                   ";
   outp << "# \"Crate map\". Specifies the overall DAQ module configuration." << endl;
   outp << "# The map can be common to all sectors. It's just a lookup table" << endl;
