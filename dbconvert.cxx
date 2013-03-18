@@ -325,8 +325,12 @@ int main( int argc, const char** argv )
       vals.nstrips[1] = smaxy - sminy + 1;
       vals.pitch[0] = vals.xpitch;
       vals.pitch[1] = vals.ypitch;
-      vals.start[0] = -vals.nstrips[0] * vals.pitch[0] * 0.5;
-      vals.start[1] = -vals.nstrips[1] * vals.pitch[1] * 0.5;
+      for( int ij = 0; ij < nproj; ij++ ) {
+	vals.start[ij] = -vals.nstrips[ij] * vals.pitch[ij] * 0.5;
+	// For the tracking code, the strip positions should be the _center_
+	// of the strips, not the lower edge
+	vals.start[ij] += 0.5 * vals.pitch[ij];
+      }
       // Correct angles for offset. The results are the projection axis angles.
       // For a given projection, they must be the same for all planes.
       vals.angle[0] = vals.xangle + vals.phioff;
