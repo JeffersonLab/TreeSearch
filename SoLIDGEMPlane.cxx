@@ -224,9 +224,7 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   // subtracts the origin of the first plane (smallest z) from all the planes.
   Double_t xs = -kBig, ys = -kBig;
   if( phioff != 0.0 ) {
-    TRotation phioff_rot;
-    phioff_rot.RotateZ(phioff);
-    fOrigin *= phioff_rot;
+    fOrigin.RotateZ(phioff);
 
     // fSize is not used by SoLID::GEMTrackers; Contains(x,y) uses the actual
     // shape of the active area since it is not rectangular.
