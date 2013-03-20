@@ -571,8 +571,6 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << allsect_prefix << "do_adc_cut = " << 1 << endl;
-  outp << allsect_prefix << "do_noise = " << 0 << endl;
   outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 1 << endl;
   outp << allsect_prefix << "3d_ampcorr_nsigma = " << 0.18 << endl;
   outp << allsect_prefix << "3d_chi2_conflevel = " << 1e-6 << endl;
@@ -603,6 +601,8 @@ int main( int argc, const char** argv )
   outp << out_prefix << "maxhits = " << 1000 << endl;  
   outp << out_prefix << "maxsamp = " << 3 << endl;  
   outp << out_prefix << "adc.sigma = " << 0.2 << endl;  
+  outp << out_prefix << "do_noise = " << 0 << endl;
+  outp << out_prefix << "check_pulse_shape = " << 0 << endl;
   outp << endl;
 
   // Per-plane parameters
