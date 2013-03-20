@@ -85,10 +85,9 @@ Int_t GEMPlane::Begin( THaRunBase* run )
 #ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
     //TODO: check if exist
-    string hname, htitle;
-    hname   = fName + "_adcmap";
-    htitle  = fName + " adcmap";
-    fADCMap = new TH1F( hname.c_str(), htitle.c_str(), fNelem, 0, fNelem );
+    string hname(fPrefix);
+    hname.append("adcmap");
+    fADCMap = new TH1F( hname.c_str(), hname.c_str(), fNelem, 0, fNelem );
   }
 #endif
   return 0;
