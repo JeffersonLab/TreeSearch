@@ -26,6 +26,8 @@ namespace SoLID {
   
   protected:
 
+    virtual Int_t     ReadRunDatabase( const TDatime& date );
+
     ClassDef(SolSpec,0) // SoLID spectrometer
   };
 

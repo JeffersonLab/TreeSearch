@@ -116,13 +116,25 @@ THaAnalysisObject::EStatus SolSpec::Init( const TDatime& run_time )
   // EStatus ret = THaSpectrometer::Init( run_time );
   // if( ret != kOK )
   //   return ret;
+  return THaSpectrometer::Init( run_time );
 
   // TODO: set up text variables like "plane1" etc. for output 
   // definitions & cuts, using actual plane names defined
   // (quite a job)
 
   // return kOK;
-  return THaSpectrometer::Init( run_time );
+}
+
+//_____________________________________________________________________________
+Int_t SolSpec::ReadRunDatabase( const TDatime& date )
+{
+  // Dummy run database reader to override the THaSpectrometer function.
+
+  // This is a bit of a kludge. SolSpec actually shouldn't inherit from
+  // THaSpectrometer, but from a different spectrometer base class that
+  // doesn't assume small-angle focusing optics.
+
+  return THaApparatus::ReadRunDatabase( date );
 }
 
 //_____________________________________________________________________________
