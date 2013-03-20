@@ -190,7 +190,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   Reset();
 
   // Set up the event display support if requested
-  if( fDetector->TestBit(Tracker::kEventDisplay) ) {
+  // Set local bit for efficiency
+  SetBit( kEventDisplay, fDetector->TestBit(Tracker::kEventDisplay) );
+  if( TestBit(kEventDisplay) ) {
     // Create fRoadCorners array needed for event display
     assert( fRoadCorners == 0 );
     try {
@@ -203,8 +205,6 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
       delete fRoadCorners; fRoadCorners = 0;
       return fStatus = kInitError;
     }
-    // Set local bit for efficiency
-    SetBit(kEventDisplay);
   }
 
   // Standard initialization. This calls ReadDatabase() and DefineVariables()
