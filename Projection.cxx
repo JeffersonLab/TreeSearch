@@ -164,7 +164,6 @@ void Projection::Reset( Option_t* opt )
   // If opt="FULL", reset everything, including the list of planes.
   
   fIsInit = kFALSE;
-  fPlanes.clear();
   fMaxSlope = fWidth = 0.0;
   delete fHitpattern; fHitpattern = 0;
   delete fPatternTree; fPatternTree = 0;
