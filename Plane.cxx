@@ -262,12 +262,9 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
     return kInitError;
   }
 
-  if( required )
-    SetBit( kIsRequired );
-
+  SetBit( kIsRequired, required );
 #ifdef TESTCODE
-  if( do_histos )
-    SetBit( kDoHistos );
+  SetBit( kDoHistos, do_histos );
 #endif
 
   // Update fCoordOffset based on the orientation of fProjection (if defined)
