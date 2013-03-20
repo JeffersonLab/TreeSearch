@@ -166,27 +166,36 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
 }
 
 //_____________________________________________________________________________
-static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid )
+  static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
+			    bool check_shape )
 {
   // Deconvolute signal given by samples in 'amp', return approximate integral.
   // Currently analyzes exactly 3 samples.
   // From Kalyan Allada
   // NIM A326, 112 (1993)
 
-  Float_t delta_t=25; //time interval between samples (ns)
-  Float_t Tp=50; // time constant (ns)
-  Float_t sig[3];
-  Float_t w1, w2, w3, x, sum, r1, r2;
+  const Float_t delta_t = 25.0; // time interval between samples (ns)
+  const Float_t Tp      = 50.0; // time constant (ns)
   
   assert( amp.size() >= 3 );
 
-  if(amp[0]==0 || amp[1] == 0 ) {
+  if( amp[0] == 0 || amp[1] == 0 ) {
     centroid = 0.0;    
     return 0.0;
   }
   
+  if( check_shape ) {
+    // Calculate ratios for 3 samples and check for bad signals
+    Float_t r1 = Float_t(amp[0])/amp[2];
+    Float_t r2 = Float_t(amp[1])/amp[2];
+    if(r1>1.0 || r2>1.0 || r1 > r2) {
+      centroid = 0.0;
+      return 0.0;
+    }
+  }
+
   // TODO: calculate centroid
-  centroid = 0;
+  centroid = 0.0;
   
   // Weight factors calculated based on the response of the silicon microstrip 
   // detector:
@@ -196,42 +205,22 @@ static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid )
   // where A is the amplitude, t0 the begin of the rise, tau1 the time
   // parameter for the rising edge and tau2 the for the falling edge. 
 
-  x = delta_t/Tp;
+  Float_t x = delta_t/Tp;
 
-  w1 = TMath::Exp(x-1)/x;
-  w2 = -2*TMath::Exp(-1)/x;
-  w3 = TMath::Exp(-x-1)/x;
+  Float_t w1 = TMath::Exp(x-1)/x;
+  Float_t w2 = -2*TMath::Exp(-1)/x;
+  Float_t w3 = TMath::Exp(-x-1)/x;
 
   //deconvoluted signal samples
+  Float_t sig[3];
   sig[0] = amp[0]*w1;
   sig[1] = amp[1]*w1+amp[0]*w2;
   sig[2] = amp[2]*w1+amp[1]*w2+amp[0]*w3;
 
-  sum = delta_t*(sig[0]+sig[1]+sig[2]);
-  
- // Calculate ratios for 3 samples and check for bad signals
-  r1 = Float_t(amp[0])/amp[2];
-  r2 = Float_t(amp[1])/amp[2];
-  if(r1>1.0 || r2>1.0 || r1 > r2){
-    sum = 0.0;
-    centroid =0;
-    return 0.0;
-  }
+  Float_t sum = delta_t*(sig[0]+sig[1]+sig[2]);
   
   return sum;
 }
-
-//_____________________________________________________________________________
-#if 0
-Float_t ChargeDep( const vector<Float_t>& amp )
-{
-  // Deconvolute signal given by samples in 'amp', return approximate integral.
-  
-  Float_t dummy;
-
-  return ChargeDep( amp, dummy );
-}
-#endif
 
 //_____________________________________________________________________________
 Int_t GEMPlane::Decode( const THaEvData& evData )
@@ -298,18 +287,12 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 	Vflt_t& samples = fADCsamp[istrip];
 	assert( samples.empty() );
 	for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
-	  if( evData.GetData(d->crate, d->slot, chan, isamp) > 0 ) {
-	    break;
-	  }
-	  continue;  // Next ichan if all requested samples are zero
-	}
-	for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
 	  Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
 	  samples.push_back( fsamp );
 	}
  
-	adc = ChargeDep( samples, centroid );
+	adc = ChargeDep( samples, centroid, TestBit(kCheckPulseShape) );
 
       } else {
 	adc = static_cast<Float_t>
@@ -647,7 +630,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
 
   // Set defaults
   TString mapping;
-  Int_t do_noise = 1;
+  Int_t do_noise = 1, check_pulse_shape = 1;
   fMaxClusterSize = kMaxUInt;
   fMinAmpl   = 0.0;
   fSplitFrac = 0.0;
@@ -673,6 +656,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
       { "pedestal",       &fPed,            kFloatV,  0, 1 },
       { "do_noise",       &do_noise,        kInt,     0, 1, gbl },
       { "adc.sigma",      &fAmplSigma,      kDouble,  0, 1, gbl },
+      { "check_pulse_shape",&check_pulse_shape, kInt, 0, 1, gbl },
       { 0 }
     };
     status = LoadDB( file, date, request, fPrefix );
@@ -701,8 +685,8 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     return kInitError;
   }
 
-  if( do_noise )
-    SetBit( kDoNoise );
+  SetBit( kDoNoise, do_noise );
+  SetBit( kCheckPulseShape, check_pulse_shape );
 
   delete fADC; fADC = 0;
   delete fADCped; fADCped = 0;

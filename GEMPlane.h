@@ -81,7 +81,8 @@ namespace TreeSearch {
 
     // Bits for GEMPlanes
     enum {
-      kDoNoise     = BIT(16)  // Correct data for common-mode noise
+      kDoNoise         = BIT(16), // Correct data for common-mode noise
+      kCheckPulseShape = BIT(17)  // Reject malformed ADC pulse shapes
     };
 
     ClassDef(GEMPlane,0)  // ADC-based readout plane coordinate direction
