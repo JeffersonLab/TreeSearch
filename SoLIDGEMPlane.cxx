@@ -232,10 +232,11 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
     // bounding box of the ring section around fOrigin AFTER rotation by phioff.
     TVector2 L( TMath::Cos(fPhiMin), TMath::Sin(fPhiMin) );
     TVector2 R( TMath::Cos(fPhiMax), TMath::Sin(fPhiMax) );
-    TVector2 C[4] = { L, L, R, R };  // = TL, BL, TR, BR
+    TVector2 C[4] = { L, R, L, R };  // = TL, TR, BL, BR
     TVector2 org = fOrigin.XYvector();
+    if ( fPhiMin < 0 && fPhiMax > 0 ) C[0].Set( 1.0, C[0].Y() );
     for( Int_t i = 0; i < 4; ++i ) {
-      C[i] *= ( (i>>1) == 0 ) ? fRmax : fRmin;
+      C[i] *= ( i<2 ) ? fRmax : fRmin;
       C[i] -= org;
       Double_t xa = TMath::Abs(C[i].X()); 
       Double_t ya = TMath::Abs(C[i].Y()); 
