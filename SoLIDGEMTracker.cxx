@@ -91,8 +91,8 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
     for( vrsiz_t iplane = 1; iplane < fPlanes.size(); ++iplane ) {
       Plane* thePlane = fPlanes[iplane];
       assert( thePlane->GetZ() >= fOrigin.Z() ); // else not sorted
-      org = const_cast<TVector3&>( thePlane->GetOrigin() );
-      org -= fOrigin;
+      TVector3& other_org = const_cast<TVector3&>( thePlane->GetOrigin() );
+      other_org -= fOrigin;
     }
     // fOrigin needs to be given in the global (lab) reference frame
     fOrigin *= fRotation;
