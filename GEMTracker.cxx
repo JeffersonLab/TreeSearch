@@ -198,10 +198,11 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
   ResetBit( k3dFastMatch );
 
   Int_t do_adc_cut = 1;
-  fMaxCorrMismatches = 0;
+  Int_t ampcorr_maxmiss = -1;
   fMaxCorrNsigma = 1.0;
   DBRequest request[] = {
-    { "3d_ampcorr_maxmiss", &fMaxCorrMismatches, kUInt,   0, 1 },
+    { "do_adc_cut",         &do_adc_cut,         kInt,    0, 1 },
+    { "3d_ampcorr_maxmiss", &ampcorr_maxmiss,    kInt,    0, 1 },
     { "3d_ampcorr_nsigma",  &fMaxCorrNsigma,     kDouble, 0, 1 },
     { 0 }
   };
@@ -214,12 +215,15 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
   // Set analysis control flags
   SetBit( kDoADCCut, do_adc_cut );
 
-  if( fMaxCorrNsigma <= 0.0 ) {
-    Error( Here(here), "3d_ampcorr_nsigma = %.2lf must be positive. "
-	   "Fix database.", fMaxCorrNsigma );
-    return kInitError;
-  }
+  // Set parameter for maximum number of amplitude correlation mismatches
   // fMaxCorrMismatches is checked in PartnerPlanes
+  fMaxCorrMismatches = ( ampcorr_maxmiss >= 0 ) ? ampcorr_maxmiss : 0;
+
+  if( fMaxCorrNsigma < 0.0 ) {
+    Warning( Here("ReadDatabase"), "Negative 3d_ampcorr_nsigma = %lf "
+	     "is nonsense. Flipping sign. Check database.", fMaxCorrNsigma );
+    fMaxCorrNsigma = -fMaxCorrNsigma;
+  }
 
   fIsInit = kTRUE;
   return kOK;
