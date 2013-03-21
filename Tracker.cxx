@@ -1028,7 +1028,8 @@ UInt_t Tracker::MatchRoadsGeneric( vector<Rvec_t>& roads, const UInt_t ncombos,
   assert( nproj >= 3 );
 
 #ifdef VERBOSE
-  cout << "generic algo):";
+  if( fDebug > 0 )
+    cout << "generic algo):";
 #endif
 
   // Vector holding a combination of roads to test. One road from each
@@ -1147,7 +1148,8 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 	  (Int_t)f3dIdx.size() > (Int_t)fProj.back()->GetType() );
 
 #ifdef VERBOSE
-  cout << "fast algo):";
+  if( fDebug > 0 )
+    cout << "fast algo):";
 #endif
 
   // Vector holding a combination of roads to test. One road from each
