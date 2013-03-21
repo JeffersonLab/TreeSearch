@@ -81,6 +81,8 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
   // calculations. This is done here because the planes need to have read
   // their database and be sorted by z.
 
+  // TODO: protect against repeated calls? (Don't keep subtracting vectors)
+
   // Take the origin of the first plane as the origin of this Tracker and
   // make all the plane coordinates relative to the Tracker origin
   if( !fPlanes.empty() ) {
@@ -94,9 +96,9 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
       TVector3& other_org = const_cast<TVector3&>( thePlane->GetOrigin() );
       other_org -= fOrigin;
     }
-    // fOrigin needs to be given in the global (lab) reference frame
-    fOrigin *= fRotation;
   }
+  // fOrigin needs to be given in the global (lab) reference frame
+  fOrigin *= fRotation;
 
   // Now continue with standard PartnerPlanes() of the base class
   return TreeSearch::GEMTracker::PartnerPlanes();
