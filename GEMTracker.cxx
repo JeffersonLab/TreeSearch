@@ -260,7 +260,8 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
   assert( not (roads[0].empty() or roads[1].empty()) );
 
 #ifdef VERBOSE
-  cout << "amplitude correlation algo):";
+  if( fDebug > 0 )
+    cout << "amplitude correlation algo):";
 #endif
 
   // Vector holding a combination of roads to test. One road from each
