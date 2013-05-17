@@ -49,14 +49,13 @@ SOLIDLINKDEF = $(SOLID)_LinkDef.h
 
 #------------------------------------------------------------------------------
 # Compile debug version (for gdb)
-export DEBUG = 1
-#export PROFILE = 1
+#export DEBUG = 1
 # Compile extra code for printing verbose messages (enabled with fDebug)
 export VERBOSE = 1
 # Compile extra diagnostic code (extra computations and global variables)
 export TESTCODE = 1
 
-export I387MATH = 1
+#export I387MATH = 1
 export EXTRAWARN = 1
 
 # Architecture to compile for
@@ -98,8 +97,8 @@ ifdef DEBUG
   LDFLAGS     = -g -O0
   DEFINES     =
 else
-  CXXFLAGS    = -O2 -march=pentium4
-  LDFLAGS     = -O
+  CXXFLAGS    = -O2 -g #-march=pentium4
+  LDFLAGS     = -O -g
   DEFINES     = -DNDEBUG
 endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
@@ -118,7 +117,7 @@ SOFLAGS       = -shared
 ifdef I387MATH
 CXXFLAGS     += -mfpmath=387
 else
-CXXFLAGS     += -march=pentium4 -mfpmath=sse
+CXXFLAGS     += -march=core2 -mfpmath=sse
 endif
 endif
 
@@ -157,11 +156,6 @@ LIBS         += $(ROOTLIBS) $(SYSLIBS)
 GLIBS        += $(ROOTGLIBS) $(SYSLIBS)
 
 MAKEDEPEND    = gcc
-
-ifdef PROFILE
-CXXFLAGS     += -g -pg
-LDFLAGS      += -g -pg
-endif
 
 ifndef PKG
 PKG           = lib$(CORELIB)
