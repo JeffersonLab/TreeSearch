@@ -216,7 +216,10 @@ public:
       fTrackStart->Broadcast();
       fTrackStartM->UnLock();
       while( true ) {
-	Int_t ret = fTrackDone->Wait();
+#ifndef NDEBUG
+	Int_t ret =
+#endif
+	  fTrackDone->Wait();
 	assert( ret == 0 );
 	if( fTrackToDo == BIT(kThreadTerminateBit) )
 	  break;
@@ -256,7 +259,10 @@ public:
       fTrackStartM->UnLock();
       while( true ) {
 	// Wait for end of processing
-	Int_t ret = fTrackDone->Wait();
+#ifndef NDEBUG
+	Int_t ret =
+#endif
+	  fTrackDone->Wait();
 	assert( ret == 0 );
 	if( fTrackToDo == 0 )
 	  break;
@@ -278,7 +284,10 @@ public:
 
       // Wait for start condition
       while( true ) {
-	Int_t ret = arg->start->Wait(); // unlocks arg->start_m
+#ifndef NDEBUG
+	Int_t ret =
+#endif
+	  arg->start->Wait(); // unlocks arg->start_m
 	assert( ret == 0 );
 	terminate = TESTBIT(*arg->running, kThreadTerminateBit);
 	if( TESTBIT(*arg->running, arg->proj->GetType()) or terminate )

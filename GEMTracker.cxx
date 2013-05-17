@@ -220,7 +220,7 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
   fMaxCorrMismatches = ( ampcorr_maxmiss >= 0 ) ? ampcorr_maxmiss : 0;
 
   if( fMaxCorrNsigma < 0.0 ) {
-    Warning( Here("ReadDatabase"), "Negative 3d_ampcorr_nsigma = %lf "
+    Warning( Here(here), "Negative 3d_ampcorr_nsigma = %lf "
 	     "is nonsense. Flipping sign. Check database.", fMaxCorrNsigma );
     fMaxCorrNsigma = -fMaxCorrNsigma;
   }
@@ -276,9 +276,10 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 
   const Rpvec_t& xplanes =
     roads[0].front()->GetProjection()->GetListOfPlanes();
+#ifndef NDEBUG
   const Rpvec_t& yplanes =
     roads[1].front()->GetProjection()->GetListOfPlanes();
-
+#endif
   assert( not xplanes.empty() and (xplanes.size() == yplanes.size()) );
   assert( xplanes.front()->GetType() != yplanes.front()->GetType() );
 
