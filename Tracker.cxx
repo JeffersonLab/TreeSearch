@@ -993,7 +993,6 @@ OptimalN( const Container& choices, const multimap<Weight,Container>& weights,
 }
 
 //_____________________________________________________________________________
-inline
 void Tracker::Add3dMatch( const Rvec_t& selected, Double_t matchval,
 			  list< pair<Double_t,Rvec_t> >& combos_found,
 			  Rset_t& unique_found ) const
