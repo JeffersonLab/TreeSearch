@@ -366,6 +366,8 @@ Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
 { 
   // Constructor
+
+  SetBit(kProjTrackToZ0);
 }
 
 //_____________________________________________________________________________
@@ -834,18 +836,24 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
     TVector3 v0( d_x, d_y, 0.0 );
     v0 *= fRotation;
     v0 += fOrigin;
-    // Project along the track direction to z=0 in global frame
-    v0 += -v0.Z() * v;
+    if( TestBit(kProjTrackToZ0) ) {
+      // Project along the track direction to z=0 in global frame
+      v0 += -v0.Z() * v;
+    }
     x = v0.X();
     y = v0.Y();
-    assert( TMath::Abs(v0.Z()) < 1e-6 );
+    assert( !TestBit(kProjTrackToZ0) || TMath::Abs(v0.Z()) < 1e-6 );
   }
   else {
     // More efficient code in case of no rotation
     xp = d_xp;
     yp = d_yp;
-    x  = d_x + fOrigin.X() - d_xp*fOrigin.Z();
-    y  = d_y + fOrigin.Y() - d_yp*fOrigin.Z();
+    x  = d_x + fOrigin.X();
+    y  = d_y + fOrigin.Y();
+    if( TestBit(kProjTrackToZ0) ) {
+      x -= d_xp*fOrigin.Z();
+      y -= d_yp*fOrigin.Z();
+    }
   }
 
   THaTrack* newTrack = AddTrack( tracks, x, y, xp, yp );
@@ -1891,7 +1899,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   string planeconfig, calibconfig;
   f3dMatchCut = 1e-4;
   Int_t mc_data = 0, event_display = 0, disable_tracking = 0,
-    disable_finetrack = 0;
+    disable_finetrack = 0, proj_to_z0 = 1;
   Int_t maxmiss = -1, maxthreads = -1;
   Double_t conf_level = 1e-9;
   ResetBit( k3dFastMatch ); // Set in Init()
@@ -1904,6 +1912,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     { "event_display",     &event_display,     kInt,    0, 1 },
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
     { "disable_finetrack", &disable_finetrack, kInt,    0, 1 },
+    { "proj_to_z0",        &proj_to_z0,        kInt,    0, 1 },
     { "calibrate",         &calibconfig,       kString, 0, 1 },
     { "3d_maxmiss",        &maxmiss,           kInt,    0, 1 },
     { "3d_chi2_conflevel", &conf_level,        kDouble, 0, 1 },
@@ -1950,6 +1959,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   SetBit( kEventDisplay,  event_display );
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
+  SetBit( kProjTrackToZ0, proj_to_z0 );
   bool doing_tracking = TestBit(kDoCoarse);
 
   vector<string> planes = vsplit(planeconfig);

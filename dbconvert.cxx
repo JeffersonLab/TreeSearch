@@ -563,7 +563,8 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "search_depth = " << 10 << endl;
   // For decoder checkout/debugging
   outp << allsect_prefix << "maxthreads = " << 1 << endl;
-  outp << allsect_prefix << "disable_tracking = " << 1 << endl;
+  outp << allsect_prefix << "disable_tracking = " << 0 << endl;
+  outp << allsect_prefix << "disable_finetrack = " << 1 << endl;
   outp << endl;
 
   outp << dashes << endl;
@@ -575,6 +576,7 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "3d_ampcorr_nsigma = " << 0.18 << endl;
   outp << allsect_prefix << "3d_chi2_conflevel = " << 1e-6 << endl;
   outp << allsect_prefix << "3d_maxmiss = " << 2 << endl;
+  outp << allsect_prefix << "proj_to_z0 = " << 0 << endl;
   outp << endl;
 
   // Projection parameters
@@ -603,6 +605,7 @@ int main( int argc, const char** argv )
   outp << out_prefix << "adc.sigma = " << 0.2 << endl;  
   outp << out_prefix << "do_noise = " << 0 << endl;
   outp << out_prefix << "check_pulse_shape = " << 0 << endl;
+  outp << out_prefix << "do_histos = " << 0 << endl;
   outp << endl;
 
   // Per-plane parameters
