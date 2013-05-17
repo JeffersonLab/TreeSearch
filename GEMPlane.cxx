@@ -124,7 +124,7 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
 
   assert( idx >= 0 and idx < fNelem );
 
-  Int_t ret;
+  Int_t ret = 0;
   switch( fMapType ) {
   case kOneToOne:
     ret = idx;
@@ -465,7 +465,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     assert( adcsum > 0.0 );
     // Make a new hit
     //
-    // The "type" parameter indicates the result of the custer analysis:
+    // The "type" parameter indicates the result of the cluster analysis:
     // 0: clean (i.e. smaller than fMaxClusterSize, no further analysis)
     // 1: large, maximum at right edge, not split
     // 2: large, no clear minimum on the right side found, not split
