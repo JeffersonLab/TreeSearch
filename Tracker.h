@@ -66,11 +66,12 @@ namespace TreeSearch {
 
     // Analysis control flags. Set via database.
     enum {
-      kMCdata     = BIT(16), // Assume input is Monte Carlo data
-      k3dFastMatch= BIT(18), // Use fast 3D matching algorithm (auto detected)
-      kEventDisplay=BIT(19), // Support event display
-      kDoCoarse   = BIT(20), // Do coarse tracking (if disabled, decode only)
-      kDoFine     = BIT(21)  // Do fine tracking (implies kDoCoarse)
+      kMCdata        = BIT(16), // Assume input is Monte Carlo data
+      k3dFastMatch   = BIT(18), // Use fast 3D matching algo (auto detected)
+      kEventDisplay  = BIT(19), // Support event display
+      kDoCoarse      = BIT(20), // Do coarse tracking (if unset, decode only)
+      kDoFine        = BIT(21), // Do fine tracking (implies kDoCoarse)
+      kProjTrackToZ0 = BIT(22)  // Project tracks to global z = 0
     };
 
 #ifdef TESTCODE
