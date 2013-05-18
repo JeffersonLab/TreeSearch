@@ -553,6 +553,22 @@ private:
 };
 
 //_____________________________________________________________________________
+// Set bit for the unique number (fDefinedNum) of the plane of the given point
+class SetPlaneBit
+{
+public:
+  SetPlaneBit() : fBits(0) {}
+  void operator() ( Road*, Road::Point* p, const vector<Double_t>& )
+  {
+    fBits |= 1U << p->hit->GetPlane()->GetDefinedNum();
+  }
+  void     Clear() { fBits = 0; }
+  Double_t GetBits() const { return fBits; }
+private:
+  UInt_t fBits;
+};
+
+//_____________________________________________________________________________
 template< typename Action >
 Action Tracker::ForAllTrackPoints( const Rvec_t& roads, 
 				   const vector<Double_t>& coef, Action action )
@@ -861,6 +877,11 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   newTrack->SetD( d_x, d_y, d_xp, d_yp );
   newTrack->SetChi2( fit_par.chi2, fit_par.ndof );
   //TODO: make a TrackID?
+
+  // Save the bitpattern of planes whose hits were used in the track fit
+  UInt_t hitbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef, 
+				      SetPlaneBit() ).GetBits();
+  newTrack->SetFlag( hitbits );
 
   ForAllTrackPoints( *fit_par.roads, fit_par.coef, AddFitCoord() );
   for( Rpvec_t::const_iterator it = fCalibPlanes.begin(); it !=
