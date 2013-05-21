@@ -617,6 +617,10 @@ int main( int argc, const char** argv )
 
   sort( ALL(values), BySectorThenPlane() );
 
+  // Actual z value of the planes as relevant for tracking
+  // (incorrect in input database)
+  double plane_z[] = { 1.536914, 1.836906, 2.946907, 3.096907 };
+
   for( vector<ValueSet_t>::size_type i = 0; i < values.size(); ++i ) {
     ValueSet_t& v = values[i];
     for( int ij = 0; ij < nproj; ++ij ) {
@@ -635,7 +639,8 @@ int main( int argc, const char** argv )
       // TODO: these may be redundant - test for defaults per plane or tracker
       outp << pfx << "rmin = " << v.rmin << endl;
       outp << pfx << "rmax = " << v.rmax << endl;
-      outp << pfx << "z = " << v.z << endl;
+      //      outp << pfx << "z = " << v.z << endl;
+      outp << pfx << "z = " << plane_z[v.iplane-1] << endl;
       outp << pfx << "dz = " << v.dz << endl;
       outp << pfx << "dphi = " << v.dphi << endl;
       if( v.phioff != 0.0 )
