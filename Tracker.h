@@ -174,6 +174,9 @@ namespace TreeSearch {
 
     virtual THaAnalysisObject::EStatus PartnerPlanes() = 0;
 
+    virtual Int_t NewTrackCalc( THaTrack* newTrack, const TVector3& pos,
+				const TVector3& dir );
+
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
     Double_t  LoadDAQresolution( THaDetMap::Module* m ) const;

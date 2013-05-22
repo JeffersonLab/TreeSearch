@@ -9,6 +9,7 @@
 #pragma link C++ namespace SoLID;
 
 #pragma link C++ class SoLID::SolSpec+;
+#pragma link C++ class SoLID::SolTrackCoords+;
 #pragma link C++ class SoLID::GEMTracker+;
 #pragma link C++ class SoLID::GEMPlane+;
 

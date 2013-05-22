@@ -22,12 +22,16 @@ namespace SoLID {
 		THaApparatus* app = 0 );
     virtual ~GEMTracker();
 
+    void SetSectorNumber( Int_t i ) { fSector = i; }
+
   protected:
 
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const;
 
     virtual THaAnalysisObject::EStatus PartnerPlanes();
+    virtual Int_t NewTrackCalc( THaTrack* newTrack, const TVector3& pos,
+				const TVector3& dir );
 
      // Podd interface
     virtual const char* GetDBFileName() const;
@@ -36,6 +40,7 @@ namespace SoLID {
 				Bool_t required = kTRUE );
 
     // Geometry
+    Int_t     fSector;       // Sector number (for analysis convenience)
     Double_t  fPhi;          // Phi rotation of this sector (rad)
 
     // Configuration

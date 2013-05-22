@@ -50,8 +50,10 @@ SolSpec::SolSpec( const char* name, const char* description,
     stringstream sn, sd;
     sn << "tracker." << i;
     sd << "SoLID tracker in sector " << i;
-    Int_t ret = AddDetector( new GEMTracker( sn.str().c_str(), 
-					     sd.str().c_str()) );
+    GEMTracker* theTracker = new GEMTracker( sn.str().c_str(), 
+					     sd.str().c_str() );
+    theTracker->SetSectorNumber(i-1);
+    Int_t ret = AddDetector( theTracker );
     if( ret != 0 ) {
       stringstream s;
       s << "Error adding GEM tracker \"" << sn.str() << "\" "
@@ -60,6 +62,8 @@ SolSpec::SolSpec( const char* name, const char* description,
       throw logic_error(s.str());
     }
   }
+
+  fTrackCoord = new TClonesArray( "SoLID::SolTrackCoords", kInitTrackMultiplicity );
 
   // For now, don't require run database
   // We might need it later to read things like the field setting
@@ -70,6 +74,19 @@ SolSpec::SolSpec( const char* name, const char* description,
 SolSpec::~SolSpec()
 {
   // Destructor
+
+  delete fTrackCoord; fTrackCoord = 0;
+
+  DefineVariables( kDelete );
+}
+
+//_____________________________________________________________________________
+void SolSpec::Clear( Option_t* opt )
+{
+  // Clear event-by-event data
+
+  THaSpectrometer::Clear(opt);
+  fTrackCoord->Clear();
 }
 
 //_____________________________________________________________________________
@@ -126,6 +143,41 @@ THaAnalysisObject::EStatus SolSpec::Init( const TDatime& run_time )
 }
 
 //_____________________________________________________________________________
+Int_t SolSpec::DefineVariables( EMode mode )
+{
+  // Define/delete standard variables for a spectrometer (tracks etc.)
+  // Can be overridden or extended by derived (actual) apparatuses
+
+  if( mode == kDefine && fIsSetup ) return kOK;
+
+  // Define standard spectrometer variables (track array)
+  if( mode == kDefine )
+    THaSpectrometer::DefineVariables(mode);
+
+  RVarDef vars[] = {
+    { "tr.sect",      "Sector number",
+      "fTrackCoord.SoLID::SolTrackCoords.fSector" },
+    { "tr.r",         "Transv dist (m)",
+      "fTrackCoord.SoLID::SolTrackCoords.fRtransv" },
+    { "tr.theta",     "Polar angle (rad)",
+      "fTrackCoord.SoLID::SolTrackCoords.fTheta" },
+    { "tr.phi",       "Azimuth (rad)",
+      "fTrackCoord.SoLID::SolTrackCoords.fPhi" },
+    { "tr.phi_rot",   "Azimuth in sector (rad)",
+      "fTrackCoord.SoLID::SolTrackCoords.fPhiRot" },
+    { "tr.thdir",     "Direction polar angle (rad)",
+      "fTrackCoord.SoLID::SolTrackCoords.fThetaDir" },
+    { "tr.phdir",     "Direction azimuth (rad)",
+      "fTrackCoord.SoLID::SolTrackCoords.fPhiDir" },
+    { "tr.phdir_rot", "Direction azimuth in sector (rad)",
+      "fTrackCoord.SoLID::SolTrackCoords.fPhiDirRot" },
+    { 0 }
+  };
+
+  return DefineVarsFromList( vars, mode );
+}
+
+//_____________________________________________________________________________
 Int_t SolSpec::ReadRunDatabase( const TDatime& date )
 {
   // Dummy run database reader to override the THaSpectrometer function.
@@ -138,11 +190,17 @@ Int_t SolSpec::ReadRunDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-Int_t SolSpec::FindVertices( TClonesArray& /* tracks */ )
+#ifdef NDEBUG
+Int_t SolSpec::FindVertices( TClonesArray& /* tracks */)
+#else
+Int_t SolSpec::FindVertices( TClonesArray& tracks )
+#endif
 {
   // Reconstruct target coordinates for all tracks found.
 
   // TODO
+
+  assert( tracks.GetLast() == fTrackCoord->GetLast() );
 
   return 0;
 }

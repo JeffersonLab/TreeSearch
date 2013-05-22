@@ -8,6 +8,8 @@
 
 #include "SoLIDGEMTracker.h"
 #include "SoLIDGEMPlane.h"
+#include "SolSpec.h"
+#include "TClonesArray.h"
 
 using namespace std;
 
@@ -17,7 +19,7 @@ typedef vector<Plane*>::size_type vrsiz_t;
 
 //_____________________________________________________________________________
 GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
-  : TreeSearch::GEMTracker(name,desc,app)
+  : TreeSearch::GEMTracker(name,desc,app), fSector(-1), fPhi(0)
 { 
   // Constructor
 }
@@ -144,6 +146,25 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
   fRotation.RotateZ( fPhi );
 
   return kOK;
+}
+
+//_____________________________________________________________________________
+Int_t GEMTracker::NewTrackCalc( THaTrack*, const TVector3& pos,
+				const TVector3& dir )
+{
+  // For every new track, convert track coordinates to the cylindrical system
+  // appropriate for SoLID. This is a temporary solution; the right way to do
+  // this is to have the SoLID spectrometer use its own track class.
+
+  assert( dynamic_cast<SolSpec*>(GetApparatus()) );
+  SolSpec* solid = static_cast<SolSpec*>(GetApparatus());
+
+  TClonesArray* trackCoord = solid->GetTrackCoord();
+  Int_t i = trackCoord->GetLast()+1;
+
+  new( (*trackCoord)[i] ) SolTrackCoords( fSector, pos, dir, fPhi );
+
+  return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
