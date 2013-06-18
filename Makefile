@@ -17,7 +17,7 @@ LINKDEF = $(CORE)_LinkDef.h
 # MWDC library
 
 MWDCSRC  = MWDC.cxx WirePlane.cxx WireHit.cxx HitpatternLR.cxx \
-	ProjectionLR.cxx TimeToDistConv.cxx
+	ProjectionLR.cxx TimeToDistConv.cxx BigBite.cxx
 
 MWDC  = TreeSearch-MWDC
 MWDCLIB  = lib$(MWDC).so
@@ -147,12 +147,12 @@ GLIBS        += $(ROOTGLIBS) $(SYSLIBS)
 MAKEDEPEND    = gcc
 
 ifndef PKG
-PKG           = lib$(CORELIB)
+PKG           = lib$(CORE)
 LOGMSG        = "$(PKG) source files"
 else
 LOGMSG        = "$(PKG) Software Development Kit"
 endif
-DISTFILE      = $(PKG).tar.gz
+DISTFILE      = $(PKG).tar
 
 #------------------------------------------------------------------------------
 OBJ           = $(SRC:.cxx=.o) $(COREDICT).o
@@ -219,13 +219,23 @@ realclean:	clean
 		rm -f *.d
 
 srcdist:
-		rm -f $(DISTFILE)
+		rm -f $(DISTFILE).gz
 		rm -rf $(PKG)
 		mkdir $(PKG)
 		cp -p $(SRC) $(HDR) $(LINKDEF) db*.dat Makefile $(PKG)
+		cp -p $(MWDCLINKDEF) $(GEMLINKDEF) $(SOLIDLINKDEF) $(PKG)
 		cp -p $(MWDCSRC) $(MHDR) $(GEMSRC) $(GHDR) $(PKG)
 		gtar czvf $(DISTFILE) --ignore-failed-read \
 		 -V $(LOGMSG)" `date -I`" $(PKG)
+		rm -rf $(PKG)
+
+develdist:	srcdist
+		mkdir $(PKG)
+		ln -s ../.git $(PKG)
+		cp -p .gitignore $(PKG)
+		gunzip -f $(DISTFILE).gz
+		gtar rhvf $(DISTFILE) --exclude=*~ $(PKG)
+		xz -f $(DISTFILE)
 		rm -rf $(PKG)
 
 .PHONY: all clean realclean srcdist
