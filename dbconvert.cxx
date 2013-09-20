@@ -604,7 +604,7 @@ int main( int argc, const char** argv )
   outp << out_prefix << "maxsamp = " << 3 << endl;  
   outp << out_prefix << "adc.sigma = " << 0.2 << endl;  
   outp << out_prefix << "do_noise = " << 0 << endl;
-  outp << out_prefix << "check_pulse_shape = " << 0 << endl;
+  outp << out_prefix << "check_pulse_shape = " << 1 << endl;
   outp << out_prefix << "do_histos = " << 0 << endl;
   outp << endl;
 
