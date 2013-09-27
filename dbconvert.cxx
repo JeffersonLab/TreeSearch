@@ -107,7 +107,7 @@ struct ValueSet_t {
   double phi, phioff;
   double angle[2], start[2], pitch[2];  // angle is that of the axis!
   int nstrips[2];                       // number of u/v strips
-  int iplane, isector;                  // plane index (1-4), sector number
+  int iplane, isector;                  // plane index (1-5), sector number
 };
 
 //-----------------------------------------------------------------------------
@@ -176,9 +176,14 @@ void getargs( int argc, const char** argv )
 //-----------------------------------------------------------------------------
 int main( int argc, const char** argv )
 {
+  // Important parameters
   const int nsect = 30;
-  const int nplanes = 4, nproj = 2;
-  const double phi_offset[4] = { 2.0, 4.0, 0.0, 0.0 };
+  const int nplanes = 5, nproj = 2;
+  // Angular offsets of the sectors in each plane
+  const double phi_offset[nplanes] = { 2.0, 4.0, 4.0, 0.0, 0.0 };
+  // Actual z value of the planes as relevant for tracking (incorrect in input database)
+  //  const double plane_z[nplanes] = { 1.536914, 1.836906, 2.946907, 3.096907 };
+  const double plane_z[nplanes] = { 1.571913, 1.851912, 1.896912, 3.056912, 3.146912 };
   const string prefix = "gemc.";
   const string out_prefix = "solid.tracker.";
   //  const string out_prefix = "${DET}.";
@@ -288,7 +293,6 @@ int main( int argc, const char** argv )
 	     << ", ypitch = " << vals.ypitch << endl;
 	exit(3);
       }
-
       // Convert parameters from libsolgem conventions to ours
       double phi2 = 0.5*vals.dphi;  // half opening angle
       vals.phioff = phi_offset[ip];
@@ -457,10 +461,10 @@ int main( int argc, const char** argv )
 
   // Crate map. Lots of modules here
   int model = 6425;    // Dummy model for virtual APV25
-  int nchan = 1280;    // Number of channels per module (arbitrary)
+  int nchan = 1500;    // Number of channels per module (arbitrary)
   int MAXSLOT = 27;    // Max slots per crate (from THaCrateMap.h)
   int modules_per_readout = max_nstrips/nchan+1;
-  int modules_per_chamber = 2*modules_per_readout; // Modules needed per chamber
+  int modules_per_chamber = nproj*modules_per_readout; // Modules needed per chamber
   int chambers_per_crate = (MAXSLOT/modules_per_chamber/nplanes)*nplanes;
   int slot_hi = chambers_per_crate*modules_per_chamber-1;
   if( do_debug ) {
@@ -616,10 +620,6 @@ int main( int argc, const char** argv )
   outp << endl;
 
   sort( ALL(values), BySectorThenPlane() );
-
-  // Actual z value of the planes as relevant for tracking
-  // (incorrect in input database)
-  double plane_z[] = { 1.536914, 1.836906, 2.946907, 3.096907 };
 
   for( vector<ValueSet_t>::size_type i = 0; i < values.size(); ++i ) {
     ValueSet_t& v = values[i];
