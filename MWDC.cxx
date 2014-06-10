@@ -35,8 +35,8 @@ typedef vector<Plane*>::iterator  vwiter_t;
 //_____________________________________________________________________________
 MWDC::MWDC( const char* name, const char* desc, THaApparatus* app )
   : Tracker(name,desc,app)
-    
-{ 
+
+{
   // Constructor
 
   fRefMap = new THaDetMap;
@@ -54,7 +54,7 @@ MWDC::~MWDC()
 Int_t MWDC::Decode( const THaEvData& evdata )
 {
   // Decode all planes and fill hitpatterns per projection
-  
+
   static const char* const here = "Decode";
 
   // Decode reference channels of the VME readout (if any)
@@ -66,7 +66,7 @@ Int_t MWDC::Decode( const THaEvData& evdata )
     if( nhits > 0 ) {
       Int_t data = evdata.GetData( d->crate, d->slot, chan, nhits-1 );
       if( nhits > 1 ) {
-	Warning( Here(here), "%d hits on reference channel %d module %d", 
+	Warning( Here(here), "%d hits on reference channel %d module %d",
 		 nhits, chan, imod );
       }
       fRefTime[imod] = d->resolution * data;
@@ -214,7 +214,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
 	d->refindex = refmod->first;
       }	else {
 	d->refindex = fRefMap->GetSize();
-	fRefMap->AddModule( d->crate, d->slot, d->refchan, 
+	fRefMap->AddModule( d->crate, d->slot, d->refchan,
 			    d->refchan, d->refindex, d->model );
 	refmod = fRefMap->GetModule(d->refindex);
 	if( !refmod ) {
@@ -237,7 +237,7 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
       THaDetMap* planeMap = fPlanes[iplane]->GetDetMap();
       if( planeMap->Find( r->crate, r->slot, r->lo ) ) {
 	Error( Here(here), "Reference channel cr/sl/ch=%u/%u/%u also defined "
-	       "as data channel in plane \"%s\". Fix database.", 
+	       "as data channel in plane \"%s\". Fix database.",
 	       r->crate, r->slot, r->lo, fPlanes[iplane]->GetName() );
 	return fStatus = kInitError;
       }
@@ -357,7 +357,7 @@ Int_t MWDC::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-Plane* MWDC::MakePlane( const char* name, const char* description, 
+Plane* MWDC::MakePlane( const char* name, const char* description,
 			THaDetectorBase* parent ) const
 {
   // Create an object of the plane class used by this implementation
@@ -367,7 +367,7 @@ Plane* MWDC::MakePlane( const char* name, const char* description,
 
 //_____________________________________________________________________________
 Projection* MWDC::MakeProjection( EProjType type, const char* name,
-				  Double_t angle, 
+				  Double_t angle,
 				  THaDetectorBase* parent ) const
 {
   // Create an object of the projection class used by this implementation.
@@ -381,7 +381,7 @@ Projection* MWDC::MakeProjection( EProjType type, const char* name,
 UInt_t MWDC::GetCrateMapDBcols() const
 {
   // Return number of columns for the detector crate map in the database.
-  // 6 columns means that a 6-th column is present, indicating the resolution 
+  // 6 columns means that a 6-th column is present, indicating the resolution
   // of the module, typically a TDC
 
   return 6;

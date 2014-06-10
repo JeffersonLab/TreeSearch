@@ -16,7 +16,7 @@ namespace SoLID {
   class GEMPlane : public TreeSearch::GEMPlane {
 
   public:
-    GEMPlane( const char* name, const char* description = "", 
+    GEMPlane( const char* name, const char* description = "",
 	      THaDetectorBase* parent = 0 );
     GEMPlane() {} // For ROOT RTTI
     virtual ~GEMPlane();

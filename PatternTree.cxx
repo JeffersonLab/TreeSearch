@@ -24,7 +24,7 @@ PatternTree::PatternTree( const TreeParam_t& param, UInt_t nPatterns,
 try
   : fParameters(param), fParamOK(false), fNpat(0), fNlnk(0), fNbit(0)
 {
-  // Constructor. 
+  // Constructor.
 
   if( fParameters.Normalize() != 0 )
     return;
@@ -85,7 +85,7 @@ Int_t TreeParam_t::Normalize()
     return -1;
   }
   if( fWidth < 1e-2 ) {
-    ::Error( here, "Illegal detector width %lf. Must be >= 0.01.", 
+    ::Error( here, "Illegal detector width %lf. Must be >= 0.01.",
 	     fWidth );
     return -2;
   }
@@ -194,7 +194,7 @@ Int_t PatternTree::Write( const char* filename )
 }
 
 //_____________________________________________________________________________
-void 
+void
 PatternTree::CopyPattern::AddChild( Pattern* node, Pattern* child, Int_t type )
 {
   // Add child to node's child pattern list
@@ -228,7 +228,7 @@ try {
   Pattern* node = nd.link->GetPattern();
   idx = fMap.find(node);
   if( idx == fMap.end() ) {
-    // New pattern: add pattern to pattern and bits arrays, and add its 
+    // New pattern: add pattern to pattern and bits arrays, and add its
     // child links to links array
     map< Pattern*,Int_t>::size_type np = fMap.size();
     fMap[node] = np;
@@ -237,7 +237,7 @@ try {
     // Copy the pattern to the array element via its assignment operator,
     // which sets the fChild pointer to zero and copies the bits
     *cur_pat = *node;
-    // Per 2003 C++ Standard TC, std::vector is guaranteed to store its 
+    // Per 2003 C++ Standard TC, std::vector is guaranteed to store its
     // elements in contiguous memory, so this is safe:
     UShort_t* bitloc = &(fTree->fBits.at(fTree->fNbit));
     // Tell the pattern to store its bits at address bitloc. This copies the
@@ -260,7 +260,7 @@ try {
       // Link the child node list (not really needed, but we don't want the
       // fNext pointers to dangle)
       for( Int_t i = nchild-2; i >= 0; --i )
-	SetLinkNext( &(fTree->fLinks.at(lpos+i)), 
+	SetLinkNext( &(fTree->fLinks.at(lpos+i)),
 		     &(fTree->fLinks.at(lpos+i+1)) );
     }
     // Update cursors
@@ -269,7 +269,7 @@ try {
     fTree->fNbit += cur_pat->GetNbits();
     // Proceed with this pattern's child nodes
     return kRecurseUncond;
-  } 
+  }
   else {
     // Existing pattern: add link to the parent pattern's child node list,
     // pointing to the referenced pattern
@@ -281,7 +281,7 @@ try {
 }
 catch ( out_of_range ) {
   stringstream s;
-  s << "Array index out of range at " << fTree->fNpat << " " 
+  s << "Array index out of range at " << fTree->fNpat << " "
     << fTree->fNlnk << " " << fTree->fNbit
     << "(internal logic error). Tree not copied. Call expert.";
   ::Error( "TreeSearch::CopyPattern", "%s", s.str().c_str() );

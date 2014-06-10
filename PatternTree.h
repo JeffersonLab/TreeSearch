@@ -21,7 +21,7 @@ namespace TreeSearch {
   class TreeParam_t {
   public:
     TreeParam_t( UInt_t maxdepth, Double_t width, Double_t maxslope,
-		 const vector<Double_t>& zpos ) 
+		 const vector<Double_t>& zpos )
       : fMaxdepth(maxdepth), fNormalized(false), fWidth(width),
 	fMaxslope(maxslope), fZpos(zpos) {}
     Int_t Normalize();
@@ -29,7 +29,7 @@ namespace TreeSearch {
     Double_t width()    const { return fWidth; }
     Double_t maxslope() const { return fMaxslope; }
     const vector<Double_t>& zpos() const { return fZpos; }
-  private: 
+  private:
     UInt_t    fMaxdepth;    // Depth of tree
     Bool_t    fNormalized;  // maxslope and zpos are normalized
     Double_t  fWidth;       // Physical detector width (needed in Hitpattern)
@@ -65,13 +65,13 @@ namespace TreeSearch {
 
     private:
       PatternTree* fTree;    // Tree object to fill
-      std::map<Pattern*,Int_t> fMap;   // Index map for serializing 
+      std::map<Pattern*,Int_t> fMap;   // Index map for serializing
       void AddChild( Pattern* parent, Pattern* child, Int_t type );
     };
     friend class CopyPattern;
 
   private:
-    
+
     typedef vector<Pattern>::size_type vpsz_t;
     typedef vector<Link>::size_type vlsz_t;
     typedef vector<UShort_t>::size_type vsiz_t;
@@ -82,14 +82,14 @@ namespace TreeSearch {
     vector<Pattern>  fPatterns;   // Array of all patterns
     vector<Link>     fLinks;      // Array of all links
     vector<UShort_t> fBits;       // Array of all pattern bits
- 
+
     // Variables for unserializing the tree
 
-    vpsz_t           fNpat;       // Current pattern count 
+    vpsz_t           fNpat;       // Current pattern count
     vlsz_t           fNlnk;       // Current link count
     vsiz_t           fNbit;       // Current bit count
 
-    // Disallow copying and assignment for now. The vectors can NOT be copied 
+    // Disallow copying and assignment for now. The vectors can NOT be copied
     // directly since they contain pointers to the other vectors' elements!
     PatternTree( const PatternTree& orig );
     const PatternTree& operator=( const PatternTree& rhs );

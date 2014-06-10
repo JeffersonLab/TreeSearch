@@ -35,7 +35,7 @@ namespace TreeSearch {
   class Plane : public THaSubDetector {
 
   public:
-    Plane( const char* name, const char* description = "", 
+    Plane( const char* name, const char* description = "",
 	   THaDetectorBase* parent = 0 );
     // For ROOT RTTI
     Plane() : fPartner(0), fProjection(0), fHits(0), fFitCoords(0),
@@ -67,7 +67,7 @@ namespace TreeSearch {
     const char*     GetPartnerName() const { return fPartnerName.Data(); }
     Tracker*        GetTracker()     const { return fTracker; }
     Double_t        GetResolution()  const { return fResolution; }
-    Double_t        GetMaxSlope()    const; 
+    Double_t        GetMaxSlope()    const;
     Double_t        GetStart()       const { return fStart+fCoordOffset; }
     Double_t        GetPitch()       const { return fPitch; }
 
@@ -92,7 +92,7 @@ namespace TreeSearch {
       : public std::binary_function< Plane*, Plane*, bool >
     {
       bool operator() ( const Plane* a, const Plane* b ) const
-      { 
+      {
 	assert( a && b );
 	assert( a->GetDefinedNum() != b->GetDefinedNum() );
 	return ( a->GetZ() != b->GetZ() ) ?
@@ -154,7 +154,7 @@ namespace TreeSearch {
 #ifndef NDEBUG
     Tracker* GetTrackerSafe()  const;
 #endif
-    
+
     ClassDef(Plane,0)  // One Tracker plane coordinate direction
   };
 
@@ -175,11 +175,11 @@ namespace TreeSearch {
 
     SetBit( kCalibrating, enable );
   }
-  
+
   //___________________________________________________________________________
   inline
   Bool_t Plane::IsRequired() const
-  { 
+  {
     return ( not IsCalibrating() and TestBit(kIsRequired) );
   }
 
@@ -191,7 +191,7 @@ namespace TreeSearch {
 
     SetBit( kIsRequired, enable );
   }
-  
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch

@@ -89,7 +89,7 @@ Projection::~Projection()
 //_____________________________________________________________________________
 void Projection::AddPlane( Plane* pl, Plane* partner )
 {
-  // Add plane pl (and optional partner plane) to this projection. 
+  // Add plane pl (and optional partner plane) to this projection.
   // Sets plane numbers.
 
   assert(pl);
@@ -107,7 +107,7 @@ void Projection::AddPlane( Plane* pl, Plane* partner )
 
 //_____________________________________________________________________________
 void Projection::Clear( Option_t* )
-{    
+{
   // Clear event-by-event data
 
   if( fHitpattern )
@@ -162,7 +162,7 @@ void Projection::Reset( Option_t* opt )
 {
   // Reset parameters, delete dynamically allocated objects.
   // If opt="FULL", reset everything, including the list of planes.
-  
+
   fIsInit = kFALSE;
   fMaxSlope = fWidth = 0.0;
   delete fHitpattern; fHitpattern = 0;
@@ -180,9 +180,9 @@ void Projection::Reset( Option_t* opt )
 //_____________________________________________________________________________
 THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 {
-  // Initialize the Projection object. Called after basic Tracker 
+  // Initialize the Projection object. Called after basic Tracker
   // initialization.
-  // Sets up event display support, then continues with standard 
+  // Sets up event display support, then continues with standard
   // initialization.
 
   static const char* const here = "Init";
@@ -219,9 +219,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     assert( thePlane->IsInit() );
     // Determine the "width" of this projection plane (=width along the
     // projection coordinate).
-    // The idea is that all possible hit positions in all planes of a 
+    // The idea is that all possible hit positions in all planes of a
     // given projection must fall within the range [-W/2,W/2]. It is normal
-    // that some planes cover less than this width (e.g. because they are 
+    // that some planes cover less than this width (e.g. because they are
     // smaller or offset) - it is meant to be the enclosing range for all
     // planes. In this way, the tree search can use one fixed bin width.
     // The total width found here divided by the number of bins used in
@@ -301,7 +301,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     for( UInt_t i = 0; i < GetNplanes(); ++i )
       zpos.push_back( GetPlaneZ(i) );
     TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
-		  
+
     if( tp.Normalize() != 0 )
       return fStatus = kInitError;
 
@@ -310,7 +310,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     //TODO: Make the file name
     // const char* filename = "test.tree";
     // fPatternTree = PatternTree::Read( filename, tp );
-  
+
     // If the tree cannot not be read (or the parameters mismatch), then
     // create it from scratch (takes a few seconds)
     // if( !fPatternTree ) {
@@ -320,9 +320,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 	// Write the freshly-generated tree to file
 	// FIXME: hmmm... we don't necesarily have write permission to DB_DIR
 	//       fPatternTree->Write( filename );
-      } else 
+      } else
 	return fStatus = kInitError;
-    // } 
+    // }
 
     // Set up a hitpattern object with the parameters of this projection
     assert( fHitpattern == 0 );
@@ -335,7 +335,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     // Determine maximum search distance (in bins) for combining patterns,
     // separately for front and back planes since they can have different
     // parameters.
-    // This is the max distance of bins that can belong to the same hit 
+    // This is the max distance of bins that can belong to the same hit
     // plus an allowance for extra slope of a pattern if a front/back hit
     // is missing
     Plane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
@@ -347,7 +347,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   } // doing_tracking
 
   // Special handling of calibration mode: Allow missing hits in calibration
-  // planes, and require hits in all other planes 
+  // planes, and require hits in all other planes
   UInt_t ncalib = 0;
   for( UInt_t k = 0; k < GetNplanes(); ++k ) {
     if( fPlanes[k]->IsCalibrating() )
@@ -392,9 +392,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   fMinFitPlanes = GetNplanes()-fMaxMiss;
   assert( fMinFitPlanes >= kMinFitPlanes );
 
-  // Set up the lookup bitpattern indicating which planes are allowed to have 
+  // Set up the lookup bitpattern indicating which planes are allowed to have
   // missing hits. The value of the bit pattern of plane hits is used as an
-  // index into this table; if the corresponding bit is set, the plane 
+  // index into this table; if the corresponding bit is set, the plane
   // combination is allowed.
   assert( fPlaneCombos == 0 );
   UInt_t np = 1U<<GetNplanes();
@@ -425,7 +425,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
       ++c;
     }
   }
-  
+
   // Determine Chi2 confidence interval limits for the selected CL and the
   // possible degrees of freedom (minfit-2...nplanes-2) of the projection fit
   fChisqLimits.clear();
@@ -435,7 +435,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     fChisqLimits[dof].first = TMath::ChisquareQuantile( fConfLevel, dof );
     fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
   }
-  
+
   fPatternsFound.reserve( 200 );
 
   return fStatus = kOK;
@@ -549,7 +549,7 @@ Int_t Projection::DefineVariables( EMode mode )
                                            "fRoads.TreeSearch::Road.fPos" },
     { "rd.slope", "Slope (dx/dz) of best track",
                                          "fRoads.TreeSearch::Road.fSlope" },
-    { "rd.chi2",  "Chi2 of best fit", 
+    { "rd.chi2",  "Chi2 of best fit",
                                           "fRoads.TreeSearch::Road.fChi2" },
     { "rd.dof",   "Degrees of freedom of best fit",
                                            "fRoads.TreeSearch::Road.fDof" },
@@ -558,7 +558,7 @@ Int_t Projection::DefineVariables( EMode mode )
     { 0 }
   };
   DefineVarsFromList( vars, mode );
- 
+
   // Additional information about the roads found, for event display
   if( TestBit(kEventDisplay) ) {
     RVarDef vars_evtdisp[] = {
@@ -578,7 +578,7 @@ Int_t Projection::DefineVariables( EMode mode )
     };
     DefineVarsFromList( vars_evtdisp, mode );
   }
- 
+
   return 0;
 }
 
@@ -801,7 +801,7 @@ Int_t Projection::MakeRoads()
   // Sort patterns according to MostPlanes (see above)
   sort( ALL(fPatternsFound), MostPlanes() );
 
-  // Copy patterns to secondary key sorted by bin number only. This key 
+  // Copy patterns to secondary key sorted by bin number only. This key
   // greatly improves lookup speed of potential similar patterns
   typedef set<const Node_t*,BinIsLess> BinOrdNodes_t;
   BinOrdNodes_t nodelookup;
@@ -843,12 +843,12 @@ Int_t Projection::MakeRoads()
     assert( jt != nodelookup.end() );
     assert( (*jt)->first == nd1.first );
 
-    // Test patterns in direction of decreasing front bin number index, 
+    // Test patterns in direction of decreasing front bin number index,
     // beginning with the road start pattern, until they are too far away.
 
     // need to rescan if fHitMaxDist > 0 because IsInFrontRange may catch
     // more patterns after patterns with new hits have been added
-    while( rd->HasGrown() ) { 
+    while( rd->HasGrown() ) {
       rd->ClearGrow();
       // The following runs much slower with a reverse_iterator
       BinOrdNodes_t::iterator jr(jt);
@@ -955,7 +955,7 @@ Bool_t Projection::RemoveDuplicateRoads()
 //_____________________________________________________________________________
 Bool_t Projection::FitRoads()
 {
-  // Fit hits within each road. Store fit parameters with Road. 
+  // Fit hits within each road. Store fit parameters with Road.
   // Also, store the hits & positions used by the best fit with Road.
   bool changed = false;
 
@@ -982,7 +982,7 @@ Bool_t Projection::FitRoads()
 //_____________________________________________________________________________
 void Projection::MakePrefix()
 {
-  // Set up name prefix for global variables. 
+  // Set up name prefix for global variables.
 
   TString basename;
   if( fDetector ) {
@@ -1008,7 +1008,7 @@ const char* Projection::GetDBFileName() const
 Double_t Projection::GetZsize() const
 {
   // Get z_max - z_min of the planes.
-  
+
   assert( !fPlanes.empty() );
 
   return fPlanes.back()->GetZ() - fPlanes.front()->GetZ();
@@ -1018,13 +1018,13 @@ Double_t Projection::GetZsize() const
 void Projection::SetAngle( Double_t angle )
 {
   // Set angle of the axis perpendicular to the wires/strips (rad)
-  
+
   // Ensure that the angle is consistent with the plane type:
   // x and y planes must have angles close to zero or 90 degrees.
-  // All other plane types must NOT be close to zero or 90 degrees. 
+  // All other plane types must NOT be close to zero or 90 degrees.
   // Here, "close" means "within kAngleTolerance".
   // Throws bad_angle exception if the restrictions are violated.
-  
+
   Double_t d = angle -
     TMath::FloorNint( angle/TMath::PiOver2() ) * TMath::PiOver2();
   Bool_t near_zero_or_90 =
@@ -1034,7 +1034,7 @@ void Projection::SetAngle( Double_t angle )
     stringstream msg("Angle = ");
     msg << angle*TMath::RadToDeg()
 	<< " too " << (( x_or_y ) ? "far off from" : "close to")
-	<< "0 or 90 degrees for projection type \"" 
+	<< "0 or 90 degrees for projection type \""
 	<< kProjParam[fType].name << "\". Fix database.";
     Error( Here("SetAngle"), "%s", msg.str().c_str() );
     throw bad_angle(msg.str());
@@ -1048,7 +1048,7 @@ void Projection::SetAngle( Double_t angle )
 
 //_____________________________________________________________________________
 void Projection::Print( Option_t* opt ) const
-{    
+{
   // Print plane type info
 
   Int_t verbose = 0;
@@ -1058,7 +1058,7 @@ void Projection::Print( Option_t* opt ) const
     verbose = opt_s.CountChar('v');
   }
 
-  cout << "Projection:  " 
+  cout << "Projection:  "
        << GetName()
        << " type="  << (GetType() == kUndefinedType
 			? "(undef)" : kProjParam[GetType()].name)
@@ -1109,7 +1109,7 @@ EProjType Projection::NameToType( const char* name )
 
 
 //_____________________________________________________________________________
-NodeVisitor::ETreeOp 
+NodeVisitor::ETreeOp
 Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
 {
   // Test if the pattern from the database that is given by NodeDescriptor

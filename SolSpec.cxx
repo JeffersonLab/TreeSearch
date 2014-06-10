@@ -50,7 +50,7 @@ SolSpec::SolSpec( const char* name, const char* description,
     stringstream sn, sd;
     sn << "tracker." << i;
     sd << "SoLID tracker in sector " << i;
-    GEMTracker* theTracker = new GEMTracker( sn.str().c_str(), 
+    GEMTracker* theTracker = new GEMTracker( sn.str().c_str(),
 					     sd.str().c_str() );
     theTracker->SetSectorNumber(i-1);
     Int_t ret = AddDetector( theTracker );
@@ -135,7 +135,7 @@ THaAnalysisObject::EStatus SolSpec::Init( const TDatime& run_time )
   //   return ret;
   return THaSpectrometer::Init( run_time );
 
-  // TODO: set up text variables like "plane1" etc. for output 
+  // TODO: set up text variables like "plane1" etc. for output
   // definitions & cuts, using actual plane names defined
   // (quite a job)
 

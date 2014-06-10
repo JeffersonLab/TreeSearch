@@ -19,7 +19,7 @@ namespace TreeSearch {
   class WirePlane : public Plane {
 
   public:
-    WirePlane( const char* name, const char* description = "", 
+    WirePlane( const char* name, const char* description = "",
 	       THaDetectorBase* parent = 0 );
     WirePlane() {} // For ROOT RTTI
     virtual ~WirePlane();

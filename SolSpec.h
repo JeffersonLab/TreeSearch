@@ -47,7 +47,7 @@ namespace SoLID {
   };
 
   class SolSpec : public THaSpectrometer {
-  
+
   public:
     SolSpec( const char* name, const char* description, UInt_t nsectors );
     virtual ~SolSpec();
@@ -58,7 +58,7 @@ namespace SoLID {
     virtual Int_t     TrackCalc();
 
     TClonesArray*     GetTrackCoord() { return fTrackCoord; }
-  
+
   protected:
 
     TClonesArray*     fTrackCoord;   // Track coordinates in cylindrical system

@@ -100,7 +100,7 @@ Int_t Pattern::GetNchildren() const
 }
 
 //_____________________________________________________________________________
-void Pattern::Print( bool print_links, ostream& os, bool end_line ) const 
+void Pattern::Print( bool print_links, ostream& os, bool end_line ) const
 {
   // Print this pattern and, if requested, its child patterns
 
@@ -128,7 +128,7 @@ void Pattern::Print( bool print_links, ostream& os, bool end_line ) const
 void Pattern::SetBitloc( UShort_t* bitloc )
 {
   // Tell the pattern to store its bits at the externally-managed location
-  // bitloc. The current fBits[fNbits] will be copied to bitloc. 
+  // bitloc. The current fBits[fNbits] will be copied to bitloc.
   // If bitloc is NULL, revert to internally-managed bits.
 
   UShort_t* oldbits = fBits;

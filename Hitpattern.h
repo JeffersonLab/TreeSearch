@@ -94,7 +94,7 @@ namespace TreeSearch {
 
   protected:
 
-    UInt_t   fNlevels;  // Number of levels in the pattern tree 
+    UInt_t   fNlevels;  // Number of levels in the pattern tree
     UInt_t   fNplanes;  // Number of planes contained in the pattern
     Double_t fScale;    // 1/(bin resolution) = 2^(fNlevels-1)/width (1/m)
     Double_t fBinWidth; // 1/fScale (meters per bin)
@@ -103,12 +103,12 @@ namespace TreeSearch {
 
     // Storage for saving pointers to the hits that set each active bin at
     // max level in each plane. Since each plane has the same number of
-    // levels, each plane/bin combination can be represented with a 
+    // levels, each plane/bin combination can be represented with a
     // single index (see MakeIdx below).
     std::vector< std::vector<Hit*> > fHits;
     // The plane/bin indices set in fHits. Used for fast clearing
     std::vector<UInt_t> fHitList;
-    
+
     UInt_t MakeIdx( UInt_t plane, UInt_t bin ) const {
       // Return index into fHits corresponding to the given plane and bin
       assert( plane<fNplanes && bin<GetNbins() );
@@ -131,7 +131,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
 //   inline
-//   Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane, 
+//   Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane,
 // 					  UInt_t depth ) const
 //   {
 //     // Test if point is set at the given depth and plane.
@@ -144,7 +144,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
 //   inline
-//   Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane, 
+//   Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane,
 // 				   UInt_t depth ) const
 //   {
 //     // Test if position 'pos' (in m) is marked in the hit pattern.
@@ -154,20 +154,20 @@ namespace TreeSearch {
 //     UInt_t bin = TMath::FloorNint( fScale*pos );
 //     if( bin < 0 || bin >= GetNbins() )
 //       return kFALSE;
-//     return 
+//     return
 //   fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
 //   }
 
   //___________________________________________________________________________
-  inline std::pair<UInt_t,UInt_t> 
+  inline std::pair<UInt_t,UInt_t>
   Hitpattern::ContainsPattern( const NodeDescriptor& nd ) const
   {
     // Check if the hitpattern contains the pattern specified by the
-    // NodeDescriptor. Returns the plane occupancy bitpattern and the 
+    // NodeDescriptor. Returns the plane occupancy bitpattern and the
     // count of planes where the pattern's bit was found set in the hitpattern.
     //
     // Used to compare with the patterns stored in the PatternTree class.
-      
+
     assert( nd.depth < fNlevels );
     // The offset of the hitpattern bits at this depth
     UInt_t offs = 1U<<nd.depth;

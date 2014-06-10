@@ -25,7 +25,7 @@ namespace TreeSearch {
     virtual ~GEMHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
- 
+
     Double_t GetADCsum()     const { return fADCsum; }
     UInt_t   GetSize()       const { return fSize; }
     Int_t    GetType()       const { return fType; }

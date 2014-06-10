@@ -32,8 +32,8 @@ namespace TreeSearch {
 //_____________________________________________________________________________
 GEMPlane::GEMPlane( const char* name, const char* description,
 		    THaDetectorBase* parent )
-  : Plane(name,description,parent), 
-    fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0), 
+  : Plane(name,description,parent),
+    fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
     fMaxSamp(1), fAmplSigma(0), fADC(0), fADCped(0), fTimeCentroid(0),
     fDnoise(0), fNhitStrips(0), fNsigStrips(0), fNRawHits(0), fRawOcc(0),
     fOccupancy(0), fADCMap(0)
@@ -63,7 +63,7 @@ GEMPlane::~GEMPlane()
 {
   // Destructor.
 
-  // Histograms in fHist should be automatically deleted by ROOT when 
+  // Histograms in fHist should be automatically deleted by ROOT when
   // the output file is closed
 
   if( fIsSetup )
@@ -95,7 +95,7 @@ Int_t GEMPlane::Begin( THaRunBase* run )
 
 //_____________________________________________________________________________
 void GEMPlane::Clear( Option_t* opt )
-{    
+{
   // Clear event-by-event data (hits)
 
   Plane::Clear(opt);
@@ -175,14 +175,14 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
 
   const Float_t delta_t = 25.0; // time interval between samples (ns)
   const Float_t Tp      = 50.0; // time constant (ns)
-  
+
   assert( amp.size() >= 3 );
 
   if( amp[0] == 0 || amp[1] == 0 ) {
-    centroid = 0.0;    
+    centroid = 0.0;
     return 0.0;
   }
-  
+
   if( check_shape ) {
     // Calculate ratios for 3 samples and check for bad signals
     Float_t r1 = Float_t(amp[0])/amp[2];
@@ -195,14 +195,14 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
 
   // TODO: calculate centroid
   centroid = 0.0;
-  
-  // Weight factors calculated based on the response of the silicon microstrip 
+
+  // Weight factors calculated based on the response of the silicon microstrip
   // detector:
-  // v(t) = (delta_t/Tp)*exp(-delta_t/Tp) 
+  // v(t) = (delta_t/Tp)*exp(-delta_t/Tp)
   // Need to update this for GEM detector response(?):
   // v(t) = A*(1-exp(-(t-t0)/tau1))*exp(-(t-t0)/tau2)
   // where A is the amplitude, t0 the begin of the rise, tau1 the time
-  // parameter for the rising edge and tau2 the for the falling edge. 
+  // parameter for the rising edge and tau2 the for the falling edge.
 
   Float_t x = delta_t/Tp;
 
@@ -217,13 +217,13 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
   sig[2] = amp[2]*w1+amp[1]*w2+amp[0]*w3;
 
   Float_t sum = delta_t*(sig[0]+sig[1]+sig[2]);
-  
+
   return sum;
 }
 
 //_____________________________________________________________________________
 Int_t GEMPlane::Decode( const THaEvData& evData )
-{    
+{
   // Extract this plane's hit data from the raw evData.
   //
   // This routine decodes the Gassiplex analog multiplexer readout data.
@@ -270,7 +270,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
 
       // Map channel number to strip number
-      Int_t istrip = 
+      Int_t istrip =
 	MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
 
       // For the APV25 analog pipeline, multiple "hits" on a decoder channel
@@ -290,7 +290,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
 	  samples.push_back( fsamp );
 	}
- 
+
 	adc = ChargeDep( samples, centroid, TestBit(kCheckPulseShape) );
 
       } else {
@@ -324,7 +324,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 
   fRawOcc = static_cast<Double_t>(fNsigStrips)/static_cast<Double_t>(fNelem);
 
-  // Calculate average common-mode noise and subtract it from corrected 
+  // Calculate average common-mode noise and subtract it from corrected
   // ADC values, if requested
   if( do_noise_subtraction and n_noise > 0 ) {
     fDnoise = noisesum/static_cast<Double_t>(n_noise);
@@ -344,7 +344,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       // Sort the ADC data into a map, with the strip number as index
       ++fNRawHits;
       rawhits[i] = fADCped[i];
-    } 
+    }
 #ifdef TESTCODE
     if( TestBit(kDoHistos) ) {
       fHitMap->Fill(i);
@@ -359,19 +359,19 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   // a "Hit".
   //
   // The cluster analysis is a critical part of the GEM analysis. Various
-  // things can and probably need to be done right here already: splitting 
+  // things can and probably need to be done right here already: splitting
   // oversized clusters, detecting noise hits/bogus clusters, detecting and
-  // fitting overlapping clusters etc. 
+  // fitting overlapping clusters etc.
   //
   // This analysis may even need to be re-done after preliminary tracking to
   // see if the clustering can be improved using candidate tracks.
   // Additionally, correlated amplitude information from a second readout
   // direction in the same readout plane could be used here. These advanced
-  // procedures would require significant redesign of the code: 
+  // procedures would require significant redesign of the code:
   // all raw strip info will have to be saved and prcessed at a later point,
   // similar to the finding of hit pairs in like-oriented planes of the MWDC.
   //
-  // For the moment, we implement a very simple algorithm: any cluster of 
+  // For the moment, we implement a very simple algorithm: any cluster of
   // strips larger than what a single cluster should be is assumed to be two or
   // more overlapping hits, and the cluster will be split as follows: anything
   // that looks like a local peak followed by a valley will be considered an
@@ -445,7 +445,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
         next = minpos;
         // In order not to double-count amplitude, we split the signal height
         // of that strip evenly between the two clusters. This is a very
-        // crude way of doing what we really should be doing: "fitting" a peak 
+        // crude way of doing what we really should be doing: "fitting" a peak
         // shape and using the area and centroid of the curve
         (*minpos).second /= 2.0;
       }
@@ -458,7 +458,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     Double_t xsum = 0.0, adcsum = 0.0;
     for( ; start != next; ++start ) {
       Double_t pos = GetStart() + (*start).first * GetPitch();
-      Double_t adc = (*start).second; 
+      Double_t adc = (*start).second;
       xsum   += pos * adc;
       adcsum += adc;
     }
@@ -471,7 +471,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     // 2: large, no clear minimum on the right side found, not split
     // 3: split, well-defined peak found (may still be larger than maxsize)
     //
-    // The resolution (sigma) of the position measurement depends on the 
+    // The resolution (sigma) of the position measurement depends on the
     // cluster size. In particular, if the cluster consists of only a single
     // hit, the resolution is much reduced
     Double_t resolution = fResolution;
@@ -577,7 +577,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
       { 0 }
     };
     ret = DefineVarsFromList( nonmcvars, mode );
-  } else { 
+  } else {
     // Monte Carlo hit data includes the truth information
     // For safety, we make sure that all hit variables are referenced with
     // respect to the MCGEMHit class and not just GEMHit - the memory layout
@@ -729,7 +729,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
       }
       if( fChanMap.size() != static_cast<UInt_t>(fNelem) ) {
         Error( Here(here), "Number of channel map entries (%u) msut equal "
-            "number of strips (%d). Fix database.", 
+            "number of strips (%d). Fix database.",
 	       static_cast<unsigned int>(fChanMap.size()), fNelem );
         return kInitError;
       }
@@ -763,7 +763,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   static const UInt_t max_maxsamp = 32; // arbitrary sanity limit
   if( fMaxSamp == 0 )
     fMaxSamp = 1;
-  else if( fMaxSamp > max_maxsamp ) {  
+  else if( fMaxSamp > max_maxsamp ) {
     Warning( Here(here), "Illegal maximum number of samples: %u. "
 	     "Adjusted to maximum allowed = %u.", fMaxSamp, max_maxsamp );
     fMaxSamp = max_maxsamp;
@@ -793,13 +793,13 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     Warning( Here(here), "adc.sigma = %lf is extremely small. "
 	     "Double-check database.", fAmplSigma );
   }
-	       
+
   fIsInit = true;
   return kOK;
 }
 //_____________________________________________________________________________
 void GEMPlane::Print( Option_t* opt ) const
-{    
+{
   // Print plane info
 
   Plane::Print( opt );
@@ -808,7 +808,7 @@ void GEMPlane::Print( Option_t* opt ) const
 
 //_____________________________________________________________________________
 Double_t GEMPlane::GetAmplSigma( Double_t ampl ) const
-{ 
+{
   // Return expected sigma of the hit amplitude distribution at the given
   // amplitude 'ampl'.
   // For starters, calculate a constant relative uncertainty

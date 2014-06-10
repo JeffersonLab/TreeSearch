@@ -44,7 +44,7 @@ namespace TreeSearch {
 
   class Tracker : public THaTrackingDetector {
   public:
-    Tracker( const char* name, const char* description = "", 
+    Tracker( const char* name, const char* description = "",
 	     THaApparatus* app = 0 );
     virtual ~Tracker();
 
@@ -138,7 +138,7 @@ namespace TreeSearch {
     Int_t     FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 			Double_t& chi2, TMatrixDSym* coef_covar = 0 ) const;
     template< typename Action > static
-    Action    ForAllTrackPoints( const Rvec_t& roads, 
+    Action    ForAllTrackPoints( const Rvec_t& roads,
 				 const vector<Double_t>& coef, Action action );
     THaTrack* NewTrack( TClonesArray& tracks, const FitRes_t& fit_par );
     Bool_t    PassTrackCuts( const FitRes_t& fit_par ) const;
@@ -190,7 +190,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline const pdbl_t& Tracker::GetChisqLimits( UInt_t i ) const
-  { 
+  {
     assert( i < fChisqLimits.size() );
     return fChisqLimits[i];
   }

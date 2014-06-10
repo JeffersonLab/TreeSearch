@@ -14,7 +14,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   // Structure to describe a tree node (an actual pattern, including shifts
-  // and mirroring) 
+  // and mirroring)
   struct NodeDescriptor {
     Link*    link;     // Linked-list node pointing to a base pattern
     Pattern* parent;   // Parent node
@@ -22,7 +22,7 @@ namespace TreeSearch {
     Bool_t   mirrored; // Pattern is mirrored
     UChar_t  depth;    // Current recursion depth
 
-    NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir, 
+    NodeDescriptor( Link* ln, Pattern* p, UShort_t shft, Bool_t mir,
 		    UChar_t dep )
       : link(ln), parent(p), shift(shft), mirrored(mir), depth(dep)
     { assert(ln && ln->GetPattern()); }
@@ -74,7 +74,7 @@ namespace TreeSearch {
     bool operator!=( const NodeDescriptor& rhs ) const {
       return !operator==(rhs);
     }
-  };    
+  };
 
   class HitSet;
   typedef std::pair<NodeDescriptor,HitSet> Node_t;

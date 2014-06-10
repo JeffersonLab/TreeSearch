@@ -116,7 +116,7 @@ struct BySectorThenPlane
   : public std::binary_function< const ValueSet_t&, const ValueSet_t&, bool >
 {
   bool operator() ( const ValueSet_t& L, const ValueSet_t& R ) const
-  { 
+  {
     return (L.isector != R.isector) ?
       (L.isector < R.isector) : (L.iplane < R.iplane);
   }
@@ -414,7 +414,7 @@ int main( int argc, const char** argv )
 	   << endl
 	   << "Expected " << sect_phi[is] << endl;
       exit(4);
-    }      
+    }
   }
 
   //==== Write output ====
@@ -487,7 +487,7 @@ int main( int argc, const char** argv )
   // However, all sectors can share the same crate map - it's just a catalog
   // of which modules are in which slot, regardless of whether or not we use
   // the slot.
-  int maxcrates = TMath::CeilNint( (double)nplanes*nsect / 
+  int maxcrates = TMath::CeilNint( (double)nplanes*nsect /
 				   (double)chambers_per_crate );
   for( int ic = 0; ic < maxcrates; ++ ic ) {
     outp << spc << ic << "    ";
@@ -589,9 +589,9 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << allsect_prefix << "maxmiss = " << 1 << endl;  
-  outp << allsect_prefix << "maxpat = " << 1000 << endl;  
-  outp << allsect_prefix << "chi2_conflevel = " << 1e-6 << endl;  
+  outp << allsect_prefix << "maxmiss = " << 1 << endl;
+  outp << allsect_prefix << "maxpat = " << 1000 << endl;
+  outp << allsect_prefix << "chi2_conflevel = " << 1e-6 << endl;
   outp << endl;
 
   // Default plane parameters
@@ -600,13 +600,13 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << out_prefix << "xp.res = " << 4e-5 << endl;  
-  outp << out_prefix << "maxclustsiz = " << 4 << endl;  
-  outp << out_prefix << "adc.min = " << 500 << endl;  
-  outp << out_prefix << "split.frac = " << 0.1 << endl;  
-  outp << out_prefix << "maxhits = " << 1000 << endl;  
-  outp << out_prefix << "maxsamp = " << 3 << endl;  
-  outp << out_prefix << "adc.sigma = " << 0.2 << endl;  
+  outp << out_prefix << "xp.res = " << 4e-5 << endl;
+  outp << out_prefix << "maxclustsiz = " << 4 << endl;
+  outp << out_prefix << "adc.min = " << 500 << endl;
+  outp << out_prefix << "split.frac = " << 0.1 << endl;
+  outp << out_prefix << "maxhits = " << 1000 << endl;
+  outp << out_prefix << "maxsamp = " << 3 << endl;
+  outp << out_prefix << "adc.sigma = " << 0.2 << endl;
   outp << out_prefix << "do_noise = " << 0 << endl;
   outp << out_prefix << "check_pulse_shape = " << 1 << endl;
   outp << out_prefix << "do_histos = " << 0 << endl;
@@ -625,7 +625,7 @@ int main( int argc, const char** argv )
     ValueSet_t& v = values[i];
     for( int ij = 0; ij < nproj; ++ij ) {
       ostringstream the_plane_prefix( out_prefix, ios_base::ate );
-      the_plane_prefix << v.isector << "." 
+      the_plane_prefix << v.isector << "."
 		       << proj_name[ij] << v.iplane << ".";
       const string& pfx = the_plane_prefix.str();
 

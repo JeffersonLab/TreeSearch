@@ -20,7 +20,7 @@ typedef vector<Plane*>::size_type vrsiz_t;
 //_____________________________________________________________________________
 GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
   : TreeSearch::GEMTracker(name,desc,app), fSector(-1), fPhi(0)
-{ 
+{
   // Constructor
 }
 
@@ -45,7 +45,7 @@ const char* GEMTracker::GetDBFileName() const
 void GEMTracker::MakePrefix()
 {
   // Set up name prefixes for global variables and database.
-  // Global variables and database keys get the standard prefix, 
+  // Global variables and database keys get the standard prefix,
   // e.g. "solid.tracker.3."
   // The database file name gets a different, shorter prefix, allowing
   // the trackers to share a single database file. For the example above,
@@ -68,7 +68,7 @@ void GEMTracker::MakePrefix()
 }
 
 //_____________________________________________________________________________
-Plane* GEMTracker::MakePlane( const char* name, const char* description, 
+Plane* GEMTracker::MakePlane( const char* name, const char* description,
 			      THaDetectorBase* parent ) const
 {
   // Create an object of the plane class used by this implementation
@@ -108,7 +108,7 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 
 //_____________________________________________________________________________
 Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
-				Bool_t /* required */ ) 
+				Bool_t /* required */ )
 {
   // Read basic geometry for a GEM tracker sector
   //
@@ -132,7 +132,7 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 
   // Keep phi in rad and normalize to -pi..pi
   fPhi = TVector2::Phi_mpi_pi( fPhi*TMath::DegToRad() );
-  
+
   // fOrigin will be set later PartnerPlanes (after Plane init)
 
   // Define this detector's rotation wrt the global coordinate system.

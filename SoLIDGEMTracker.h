@@ -18,7 +18,7 @@ namespace SoLID {
 
   class GEMTracker : public TreeSearch::GEMTracker {
   public:
-    GEMTracker( const char* name, const char* description = "", 
+    GEMTracker( const char* name, const char* description = "",
 		THaApparatus* app = 0 );
     virtual ~GEMTracker();
 

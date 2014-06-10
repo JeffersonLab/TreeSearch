@@ -17,10 +17,10 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 NodeVisitor::ETreeOp
-TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent, 
+TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent,
 		      UInt_t depth, UInt_t shift, Bool_t mirrored ) const
 {
-  // Traverse the tree and call function object "action" for each link. 
+  // Traverse the tree and call function object "action" for each link.
   // The return value from action determines the behavior:
   //  kRecurse: process child nodes until reaching maxdepth
   //  kRecurseUncond: process child nodes (regardless of depth)
@@ -28,21 +28,21 @@ TreeWalk::operator()( Link* link, NodeVisitor& action, Pattern* parent,
   //  kError: error, return immediately
 
   if( !link ) return NodeVisitor::kError;
-  NodeVisitor::ETreeOp ret = 
+  NodeVisitor::ETreeOp ret =
     action(NodeDescriptor(link, parent, shift, mirrored, depth));
-  if( ret == NodeVisitor::kRecurseUncond or 
+  if( ret == NodeVisitor::kRecurseUncond or
       ( ret == NodeVisitor::kRecurse and depth+1 < fNlevels ) ) {
     Pattern* pat = link->GetPattern();
     Link* ln = pat->GetChild();
     while( ln ) {
       // Set up parameters of child pattern based on current position in the
       // tree. The mirroring flag for the child pattern is the pattern's
-      // mirroring flag xor the mirror state of the parent (so that 
+      // mirroring flag xor the mirror state of the parent (so that
       // mirrored+mirrored = unmirrored). The shift corresponds either
       // to the pattern's left or right edge for unmirrored or mirrored
       // patterns, respectively.
       Bool_t new_mir = mirrored xor ln->Mirrored();
-      ret = (*this)( ln, action, pat, depth+1, 
+      ret = (*this)( ln, action, pat, depth+1,
 		     (shift << 1) + (new_mir xor ln->Shift()), new_mir );
       if( ret == NodeVisitor::kError ) return ret;
       // Continue along the linked list of child nodes
@@ -71,7 +71,7 @@ void NodeVisitor::SetPatternChild( Pattern* pat, Link* link ) {
   // Explicitly set pointer is managed externally
   pat->fDelChld = false;
 }
- 
+
 //_____________________________________________________________________________
 WritePattern::WritePattern( const char* filename, size_t index_size )
   : os(0), fIdxSiz(index_size)
@@ -94,13 +94,13 @@ WritePattern::WritePattern( const char* filename, size_t index_size )
     s << "Invalid index_size = " << fIdxSiz << ". Must be a power of 2";
     ::Warning( here, "%s", s.str().c_str());
     fIdxSiz = sizeof(Int_t);
-  }    
+  }
 }
 
 //_____________________________________________________________________________
 template< typename T>
 static inline
-void swapped_binary_write( ostream& os, const T& data, size_t n = 1, 
+void swapped_binary_write( ostream& os, const T& data, size_t n = 1,
 			   size_t start = 0 )
 {
   // Write "n" elements of "data" to "os" in binary big-endian (MSB) format.

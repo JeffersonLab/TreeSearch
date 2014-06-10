@@ -42,7 +42,7 @@ GEMPlane::~GEMPlane()
 
 //_____________________________________________________________________________
 // void GEMPlane::Clear( Option_t* opt )
-// {    
+// {
 //   // Clear event-by-event data (hits)
 
 //   TreeSearch::GEMPlane::Clear(opt);
@@ -51,10 +51,10 @@ GEMPlane::~GEMPlane()
 
 // //_____________________________________________________________________________
 // Int_t GEMPlane::Decode( const THaEvData& evData )
-// {    
+// {
 //   // Decode and pre-process raw data.
 //   //
-//   // This routine determines hit positions and integrated ADC amplitudes from 
+//   // This routine determines hit positions and integrated ADC amplitudes from
 //   // the raw GEM strip ADC data
 
 //   return TreeSearch::GEMPlane::Decode( evData );
@@ -115,7 +115,7 @@ Bool_t GEMPlane::Contains( Double_t x, Double_t y ) const
 
 //_____________________________________________________________________________
 Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
-			      Bool_t /* required */ ) 
+			      Bool_t /* required */ )
 {
   // Read basic geometry for a SoLID GEM readout plane defined in cylindrical
   // coordinates.
@@ -125,7 +125,7 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   //
   // rmin and rmax are the inner and outer radii of the ring delimiting the
   // plane.
-  // 
+  //
   // dphi is the full angular width of the active area.
   // The central phi of the plane is defined by the enclosing Tracker detector.
   // The plane does not need to know it and can assume phi = 0 without loss
@@ -238,8 +238,8 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
     for( Int_t i = 0; i < 4; ++i ) {
       C[i] *= ( i<2 ) ? fRmax : fRmin;
       C[i] -= org;
-      Double_t xa = TMath::Abs(C[i].X()); 
-      Double_t ya = TMath::Abs(C[i].Y()); 
+      Double_t xa = TMath::Abs(C[i].X());
+      Double_t ya = TMath::Abs(C[i].Y());
       if( xa > xs ) xs = xa;
       if( ya > ys ) ys = ya;
     }

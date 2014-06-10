@@ -18,7 +18,7 @@
 namespace TreeSearch {
 
   //___________________________________________________________________________
-  template< typename VectorElem > inline void 
+  template< typename VectorElem > inline void
   NthCombination( UInt_t n, const std::vector<std::vector<VectorElem> >& vec,
 		  std::vector<VectorElem>& selected )
   {
@@ -58,7 +58,7 @@ namespace TreeSearch {
     public std::binary_function< typename Container::size_type, Container,
 				 typename Container::size_type >
   {
-    // Function object to get the product of the sizes of the containers in a 
+    // Function object to get the product of the sizes of the containers in a
     // container, ignoring empty ones
     typedef typename Container::size_type csiz_t;
     csiz_t operator() ( csiz_t val, const Container& c ) const
@@ -66,7 +66,7 @@ namespace TreeSearch {
   };
 
   //___________________________________________________________________________
-  // Iterator over unique combinations of k out of N elements. The element 
+  // Iterator over unique combinations of k out of N elements. The element
   // numbers are accessible in a vector<int> of size k.
   class UniqueCombo {
     typedef std::vector<int> vint_t;
@@ -92,7 +92,7 @@ namespace TreeSearch {
     bool operator!=( const UniqueCombo& rhs ) const { return !(*this==rhs); }
     operator bool() const  { return fGood; }
     bool operator!() const { return !((bool)*this); }
-    
+
   private:
     bool recursive_plus( vint_t::size_type pos ) {
       if( fCurrent[pos] < fN+int(pos-fCurrent.size()) ) {
@@ -132,11 +132,11 @@ namespace TreeSearch {
   inline void DeleteContainerOfContainers( ContainerOfContainers& cc )
   {
     // Delete all elements of given container of containers of pointers
-    for_each( cc.begin(), cc.end(), 
+    for_each( cc.begin(), cc.end(),
 	      DeleteContainer<typename ContainerOfContainers::value_type> );
     cc.clear();
   }
-  
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch
