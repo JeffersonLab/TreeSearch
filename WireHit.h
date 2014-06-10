@@ -27,7 +27,7 @@ namespace TreeSearch {
     virtual Int_t Compare( const TObject* obj ) const;
     virtual Int_t Compare( const Hit* rhs, Double_t maxdist ) const;
     virtual void  Print( Option_t* opt="" ) const;
- 
+
     virtual UInt_t   GetNumPos()         const;
     virtual Double_t GetPosI( UInt_t i ) const;
 
@@ -45,7 +45,7 @@ namespace TreeSearch {
     struct WireNumLess : public std::binary_function< WireHit*, WireHit*, bool >
     {
       bool operator() ( const WireHit* a, const WireHit* b ) const
-      { 
+      {
 	assert( a && b );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() )
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
@@ -65,7 +65,7 @@ namespace TreeSearch {
     {
       WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) { assert(maxdist>=0); }
       bool operator() ( const WireHit* a, const WireHit* b ) const
-      { 
+      {
 	assert( a && b );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() )
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
@@ -120,7 +120,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Int_t WireHit::Compare( const TObject* obj ) const 
+  Int_t WireHit::Compare( const TObject* obj ) const
   {
     // Used for sorting hits in a TSeqCollection (e.g. TList, TClonesArray).
     // A hit is "less than" another hit if its position is smaller.

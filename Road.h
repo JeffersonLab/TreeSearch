@@ -34,7 +34,7 @@ namespace TreeSearch {
     // Coordinates of hit positions, for track fitting
     struct Point {
       Point() : x(0), hit(0) {}
-      Point( Double_t _x, Double_t _z, Hit* _hit ) 
+      Point( Double_t _x, Double_t _z, Hit* _hit )
 	: x(_x), z(_z), hit(_hit) { assert(hit); }
       virtual ~Point() {}
       Double_t res() const { return hit->GetResolution(); }
@@ -52,9 +52,9 @@ namespace TreeSearch {
     friend class Corners;
     class Corners : public TObject {
     public:
-      explicit Corners( Road* rd ) 
-	: fXLL(rd->fCornerX[0]), fXLR(rd->fCornerX[1]), fZL(rd->fZL), 
-	  fXUL(rd->fCornerX[3]), fXUR(rd->fCornerX[2]), fZU(rd->fZU) {} 
+      explicit Corners( Road* rd )
+	: fXLL(rd->fCornerX[0]), fXLR(rd->fCornerX[1]), fZL(rd->fZL),
+	  fXUL(rd->fCornerX[3]), fXUR(rd->fCornerX[2]), fZU(rd->fZU) {}
       Corners() {}  // For ROOT RTTI
       virtual ~Corners() {}
     private:
@@ -137,9 +137,9 @@ namespace TreeSearch {
 
     Double_t       fCornerX[5]; // x positions of corners
     Double_t       fZL;         // z-eps of first plane
-    Double_t       fZU;         // z+eps of last plane 
+    Double_t       fZU;         // z+eps of last plane
 
-    // Best fit results 
+    // Best fit results
     Double_t       fPos;        // Track origin
     Double_t       fSlope;      // Track slope
     Double_t       fChi2;       // Chi2 of fit
@@ -168,7 +168,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Int_t Road::Compare( const TObject* obj ) const 
+  Int_t Road::Compare( const TObject* obj ) const
   {
     // Used for sorting Roads in a TClonesArray or similar.
     // A Road is "less than" another if the chi2 of its best fit is smaller.
@@ -188,7 +188,7 @@ namespace TreeSearch {
   Double_t Road::GetPosErrsq( Double_t z ) const
   {
     // Return square of uncertainty in x = a1+z2*z for best fit (in m^2)
-    
+
     return fV[0] + 2.0*fV[1]*z + fV[2]*z*z;
   }
 

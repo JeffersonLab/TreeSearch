@@ -39,7 +39,7 @@ HitpatternLR::HitpatternLR( UInt_t nlevels, UInt_t nplanes, Double_t width )
 }
 
 //_____________________________________________________________________________
-HitpatternLR::HitpatternLR( const Hitpattern& orig ) 
+HitpatternLR::HitpatternLR( const Hitpattern& orig )
   : Hitpattern(orig)
 {
   // Copy ctor
@@ -97,7 +97,7 @@ Int_t HitpatternLR::Fill( const vector<Plane*>& planes )
       proj = plane->GetProjection();
       assert( proj );
     }
-#endif	
+#endif
   }
 
   return ntot;
@@ -109,7 +109,7 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
   // Set the points at all depths of the hit pattern that correspond to
   // the hits in plane A. The plane number is extracted from A.
   // The second, optional plane B represents an optional partner
-  // plane of A, i.e. a nearby plane with (usually) staggered wires. 
+  // plane of A, i.e. a nearby plane with (usually) staggered wires.
   // If B is present, test for pairs of hits in A and B.
   // Naturally, the two planes and their wires must be parallel.
   //

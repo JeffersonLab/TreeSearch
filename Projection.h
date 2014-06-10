@@ -81,7 +81,7 @@ namespace TreeSearch {
     Double_t        GetZsize()        const;
 
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
-    
+
     const std::vector<TreeSearch::Plane*>&
                     GetListOfPlanes() const { return fPlanes; }
 
@@ -95,7 +95,7 @@ namespace TreeSearch {
       : public std::binary_function< Projection*, Projection*, bool >
     {
       bool operator() ( const Projection* a, const Projection* b ) const
-      { 
+      {
 	assert( a && b );
 	return( a->GetType() < b->GetType() );
       }
@@ -209,13 +209,13 @@ namespace TreeSearch {
   Double_t Projection::GetAngle() const
   {
     // Return axis angle in rad, normalized to [-pi,pi]
-    
+
     return TMath::ATan2( fAxis.Y(), fAxis.X() );
   }
 
   //___________________________________________________________________________
   inline const pdbl_t& Projection::GetChisqLimits( UInt_t i ) const
-  { 
+  {
     assert( i < fChisqLimits.size() );
     return fChisqLimits[i];
   }
@@ -230,7 +230,7 @@ namespace TreeSearch {
   //___________________________________________________________________________
   inline
   UInt_t Projection::GetNroads() const
-  { 
+  {
     // Return total number of roads found (including voided ones)
     assert( fRoads && fRoads->GetLast()+1 >= 0  );
     return static_cast<UInt_t>( fRoads->GetLast()+1 );

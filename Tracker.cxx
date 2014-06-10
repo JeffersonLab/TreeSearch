@@ -83,7 +83,7 @@ public:
       fHasResolution(false) {}
   DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan,
 	     Double_t res )
-    : CSpair(crate, slot), fModel(model), fNchan(nchan), 
+    : CSpair(crate, slot), fModel(model), fNchan(nchan),
       fResolution(res*1e-12) /* NB: resolution in ps! */,
       fHasResolution(true) {}
   virtual ~DAQmodule() {}
@@ -134,7 +134,7 @@ static const Double_t kMinProjAngleDiff = 5.0 * TMath::DegToRad();
 //_____________________________________________________________________________
 // Structures we want to put into STL containers
 
-// A projection angle along with a pointer to the corresponding projection, 
+// A projection angle along with a pointer to the corresponding projection,
 // sortable by angle
 struct ProjAngle_t {
   ProjAngle_t( const Projection* p ) : m_proj(p) {
@@ -169,14 +169,14 @@ struct TrackThread {
   TThread*     thread;  // The actual thread running with these arguments
   TrackThread()
     : proj(0), status(0), running(0), start(0), done(0), thread(0) {}
-  ~TrackThread() { 
+  ~TrackThread() {
     if( thread ) {
       TThread::Delete(thread);
       delete thread;
     }
   }
 };
-  
+
 //_____________________________________________________________________________
 class ThreadCtrl {
 public:
@@ -267,7 +267,7 @@ public:
 	if( fTrackToDo == 0 )
 	  break;
       }
-    }    
+    }
     fTrackDoneM->UnLock();
     return fTrackStatus;
   }
@@ -318,7 +318,7 @@ public:
 	// Ensure that we enter Wait() before the main thread can send the
 	// next Broadcast(). This must come before unlocking arg->done_m,
 	// or else we have a race condition in the main thread.
-	arg->start_m->Lock();  
+	arg->start_m->Lock();
 
       arg->done_m->UnLock();
     }
@@ -364,7 +364,7 @@ Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
     fMinNdof(1), fFailNhits(0), fFailNpat(0),
     fNcombos(0), fN3dFits(0), fEvNum(0),
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
-{ 
+{
   // Constructor
 
   SetBit(kProjTrackToZ0);
@@ -376,7 +376,7 @@ Tracker::~Tracker()
   // Destructor. Delete objects & subdetectors and unregister variables
   if (fIsSetup)
     RemoveVariables();
-  
+
   delete fThreads;
   if( fMaxThreads > 1 )
     gSystem->Unload("libThread");
@@ -400,7 +400,7 @@ void Tracker::Clear( Option_t* opt )
 {
   // Clear event-by-event data, including those of the planes and projections
   THaTrackingDetector::Clear(opt);
-  
+
   // Clear the planes and projections, but only if we're not called from Init()
   if( !opt or *opt != 'I' ) {
     for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane )
@@ -420,7 +420,7 @@ void Tracker::Clear( Option_t* opt )
 Int_t Tracker::Decode( const THaEvData& evdata )
 {
   // Decode all planes and fill hitpatterns per projection
-  
+
   //  static const char* const here = "Decode";
 
 #ifdef TESTCODE
@@ -493,7 +493,7 @@ public:
   PrintFitPoint() {}
   void operator() ( Road*, Road::Point* p, const vector<Double_t>& )
   {
-    cout << p->hit->GetPlane()->GetName() << " " 
+    cout << p->hit->GetPlane()->GetName() << " "
 	 << "z = " << p->z << " x = " << p->x << endl;
   }
 };
@@ -503,8 +503,8 @@ public:
 class FillFitMatrix
 {
 public:
-  FillFitMatrix( TMatrixDSym& AtA, TVectorD& Aty ) 
-    : fAtA(AtA), fAty(Aty), fNpoints(0) 
+  FillFitMatrix( TMatrixDSym& AtA, TVectorD& Aty )
+    : fAtA(AtA), fAty(Aty), fNpoints(0)
   {
     assert( fAtA.GetNrows() == 4 && fAty.GetNrows() == 4 );
   }
@@ -570,7 +570,7 @@ private:
 
 //_____________________________________________________________________________
 template< typename Action >
-Action Tracker::ForAllTrackPoints( const Rvec_t& roads, 
+Action Tracker::ForAllTrackPoints( const Rvec_t& roads,
 				   const vector<Double_t>& coef, Action action )
 {
   // Apply action to all points from roads and the track given by coef
@@ -620,7 +620,7 @@ Int_t Tracker::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   //   a_i is the angle of the coordinate axis of the i-th plane w.r.t. x
   //   x,mx,y,my are the track parameters to be fitted, origin x,y and
   //       slopes mx,my.
-  //   
+  //
   // "roads" contains a set of Roads that successfully combine in 3-d, one
   // Road* per projection. Each road, in turn, contains a set of (y_i,z_i)
   // coordinates, at most one per plane of the projection type, that
@@ -685,13 +685,13 @@ Int_t Tracker::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   }
 
 #ifdef VERBOSE
-  if( fDebug > 1 ) 
+  if( fDebug > 1 )
     cout << "3D fit:  x/y = " << coef[0] << "/" << coef[2] << " "
 	 << "mx/my = " << coef[1] << "/" << coef[3] << " "
 	 << "ndof = " << npoints-4 << " rchi2 = " << chi2/(double)(npoints-4)
 	 << endl;
 #endif
-  
+
   return npoints-4;
 }
 
@@ -877,7 +877,7 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   //TODO: make a TrackID?
 
   // Save the bitpattern of planes whose hits were used in the track fit
-  UInt_t hitbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef, 
+  UInt_t hitbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef,
 				      SetPlaneBit() ).GetBits();
   newTrack->SetFlag( hitbits );
 
@@ -984,11 +984,11 @@ OptimalN( const Container& choices, const multimap<Weight,Container>& weights,
   //               must support:
   //                  operator() (const Element&): test this element,
   //                                         eliminate if true
-  //                  use(const Container&): test against elements in this 
+  //                  use(const Container&): test against elements in this
   //                                         container
   //               (use() is in lieu of a constructor because the object
   //                is constructed by the caller (possibly with parameters)).
-  //  "QuitF":     Functor for terminating search early. Applied to all 
+  //  "QuitF":     Functor for terminating search early. Applied to all
   //               leftover elements. Must support
   //                  operator() (const Element&)
   //                  operator bool(): End search if false after running on
@@ -1155,7 +1155,7 @@ class ByProjTypeMap
 public:
   ByProjTypeMap( const vec_uint_t& lookup_table ) : fLookup(lookup_table) {}
   bool operator() ( const Rvec_t& a, const Rvec_t& b ) const
-  { 
+  {
     assert( !a.empty() and !b.empty() );
     EProjType ta = a.front()->GetProjection()->GetType();
     EProjType tb = b.front()->GetProjection()->GetType();
@@ -1182,7 +1182,7 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
 
   vector<Rvec_t>::size_type nproj = roads.size();
   assert( nproj == 3 and fProj.size() == nproj );
-  assert( f3dIdx.empty() or 
+  assert( f3dIdx.empty() or
 	  (Int_t)f3dIdx.size() > (Int_t)fProj.back()->GetType() );
 
 #ifdef VERBOSE
@@ -1435,7 +1435,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
   // Copy pointers to roads from each projection into local 2D vector
   // (projections, roads).
   // NB: subsequent code assumes that the first index runs in order
-  // of ascending projection type, so this can't easily be done in the 
+  // of ascending projection type, so this can't easily be done in the
   // tracking threads.
   vector<Rvec_t>::size_type nproj = 0;
   vector<Rvec_t> roads;
@@ -1481,7 +1481,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
     t_3dmatch = 1e6*timer.RealTime();
     timer.Start();
 #endif
-    // Fit each set of matched roads using linear least squares, yielding 
+    // Fit each set of matched roads using linear least squares, yielding
     // the 3D track parameters, x, x'(=mx), y, y'(=my)
     FitRes_t fit_par;
     fit_par.coef.reserve(4);
@@ -1540,7 +1540,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 #endif
       // Select "optimal" set of roads, minimizing sum of chi2s
       vector<Rset_t> best_roads;
-      OptimalN( unique_found, fit_chi2, best_roads, 
+      OptimalN( unique_found, fit_chi2, best_roads,
 		AnySharedHits(), CheckTypes(found_types) );
 
       // Now each selected road tuple corresponds to a new track
@@ -1566,7 +1566,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	cout << ":" << endl;
 	for( Int_t i = 0; i < ntr; ++i ) {
 	  THaTrack* tr = (THaTrack*)tracks.UncheckedAt(i);
-	  cout << "3D track:  x/y = " << tr->GetX() << "/" << tr->GetY() 
+	  cout << "3D track:  x/y = " << tr->GetX() << "/" << tr->GetY()
 	       << " mx/my = " << tr->GetTheta() << "/" << tr->GetPhi()
 	       << " ndof = "  << tr->GetNDoF()
 	       << " rchi2 = " << tr->GetChi2()/(double)tr->GetNDoF()
@@ -1631,7 +1631,7 @@ Int_t Tracker::DefineVariables( EMode mode )
   fIsSetup = ( mode == kDefine );
 
   // Register variables in global list
-  
+
   RVarDef vars[] = {
     { "fail.nhits", "Too many hits in plane(s)",  "fFailNhits" },
     { 0 },
@@ -1659,7 +1659,7 @@ Int_t Tracker::DefineVariables( EMode mode )
 
 //_____________________________________________________________________________
 Projection* Tracker::MakeProjection( EProjType type, const char* name,
-				     Double_t angle, 
+				     Double_t angle,
 				     THaDetectorBase* parent ) const
 {
   // Create an object of the projection class used by this implementation.
@@ -1904,7 +1904,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 
   // Read fOrigin (detector position) and fSize. fOrigin is the position of
   // the Tracker relative to some superior coordinate system
-  // (typically the spectrometer detector stack reference frame). 
+  // (typically the spectrometer detector stack reference frame).
   // fOrigin will be added to all tracks generated; if fOrigin.Z() is not
   // zero, tracks will be projected into the z=0 plane.
   fOrigin.SetXYZ(0,0,0);
@@ -1961,7 +1961,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 	  else
 	    m = new DAQmodule( row[0], slot, row[3], row[4], row[5] );
 	  DAQmodule* found = static_cast<DAQmodule*>(fCrateMap->FindObject(m));
-	  if( found ) { 
+	  if( found ) {
 	    m->Copy(*found);  // Later entries override earlier ones
 	    delete m;
 	  }
@@ -2071,7 +2071,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     for( vec_pdbl_t::size_type dof = fMinNdof; dof < fChisqLimits.size();
 	 ++dof ) {
       fChisqLimits[dof].first  = TMath::ChisquareQuantile( conf_level, dof );
-      fChisqLimits[dof].second = 
+      fChisqLimits[dof].second =
 	TMath::ChisquareQuantile( 1.0-conf_level, dof );
     }
   }
@@ -2103,7 +2103,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 	     "Falling back to single-threaded processing." );
   else if( fDebug > 0 )
     Info( Here(here), "Enabled up to %u threads", fMaxThreads );
-  
+
   fIsInit = kTRUE;
   return kOK;
 }
@@ -2166,7 +2166,7 @@ void Tracker::EnableEventDisplay( Bool_t b )
 
 //_____________________________________________________________________________
 inline
-static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot, 
+static DAQmodule* FindDAQmodule( UShort_t crate, UShort_t slot,
 				 const THashTable* table )
 {
   assert(table);

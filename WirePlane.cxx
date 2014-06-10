@@ -34,7 +34,7 @@ namespace TreeSearch {
 //_____________________________________________________________________________
 WirePlane::WirePlane( const char* name, const char* description,
 		      THaDetectorBase* parent )
-  : Plane(name,description,parent), 
+  : Plane(name,description,parent),
     fMinTime(-kBig), fMaxTime(kBig), fTTDConv(0)
   , fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
     fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0)
@@ -74,7 +74,7 @@ WirePlane::~WirePlane()
 
 //_____________________________________________________________________________
 void WirePlane::Clear( Option_t* opt )
-{    
+{
   // Clear event-by-event data (hits)
 
   Plane::Clear(opt);
@@ -128,7 +128,7 @@ void WirePlane::CheckCrosstalk()
 
 //_____________________________________________________________________________
 Int_t WirePlane::Decode( const THaEvData& evData )
-{    
+{
   // Extract this plane's hit data from the raw evData.
   //
   // This routine can handle both the old Fastbus readout and the new CAEN
@@ -145,8 +145,8 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   bool no_time_cut = !fTracker->TestBit(MWDC::kDoTimeCut);
   bool mc_data     = fTracker->TestBit(Tracker::kMCdata);
 
-  // Decode data. This is done fairly efficiently by looping over only the 
-  // channels with hits on each module. 
+  // Decode data. This is done fairly efficiently by looping over only the
+  // channels with hits on each module.
   // FIXME: If a module is shared with another plane (common here), we waste
   // time skipping hits that don't belong to us.
   // NB: certain indices below are guaranteed to be in range by construction
@@ -160,7 +160,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 
     // Get number of channels with hits and loop over them, skipping channels
     // that are not part of this module
-    // FIXME: this becomes very inefficient if several modules with the 
+    // FIXME: this becomes very inefficient if several modules with the
     // same crate/slot are defined - e.g. one "module" per channel...ouch
     Int_t nchan = evData.GetNumChan( d->crate, d->slot );
     // For "reversed" detector map modules, loop backwards over the channels
@@ -190,7 +190,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
       Int_t nhits = evData.GetNumHits( d->crate, d->slot, chan );
 #ifdef TESTCODE
       if( nhits > 0 ) {
-	++fNhitwires; 
+	++fNhitwires;
 	if( nhits > 1 )
 	  ++fNmultihit;
 	if( (UInt_t)nhits > fNmaxmul )
@@ -198,18 +198,18 @@ Int_t WirePlane::Decode( const THaEvData& evData )
       }
 #endif
       for( Int_t hit = 0; hit < nhits; hit++ ) {
-	
+
 	// Get the TDC data for this hit
 	Int_t data = evData.GetData( d->crate, d->slot, chan, hit );
-	
+
 	// Convert the TDC value to the drift time. The readout is assumed to
 	// use common-stop TDCs, so t_drift = t_tdc(drift=0)-t_tdc(data).
 	Double_t time = tdc_offset+ref_time - d->resolution*(data+0.5);
 	if( no_time_cut || (fMinTime < time && time < fMaxTime) ) {
 	  WireHit* theHit;
 	  if( mc_data ) {
-	    theHit = new( (*fHits)[nHits++] ) 
-	      MCWireHit( iw, 
+	    theHit = new( (*fHits)[nHits++] )
+	      MCWireHit( iw,
 			 GetStart() + iw * GetPitch(),
 			 data,
 			 time,
@@ -220,7 +220,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 			 );
 	  } else
 	    theHit = new( (*fHits)[nHits++] )
-	      WireHit( iw, 
+	      WireHit( iw,
 		       GetStart() + iw * GetPitch(),
 		       data,
 		       time,
@@ -233,7 +233,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 
 	  // We can test the ordering of the hits on the fly - they should
 	  // come in sorted if the lowest logical channel corresponds to
-	  // the smallest wire positiion. If they do, we can skip 
+	  // the smallest wire positiion. If they do, we can skip
 	  // quicksorting an already-sorted array ;)
 	  if( sorted && prevHit && theHit->Compare(prevHit) < 0 )
 	    sorted = false;
@@ -246,7 +246,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
       } // hits
     }   // chans
   }     // modules
-   
+
   // If necessary, sort the hits by wire position
   if( !sorted )
     fHits->Sort();
@@ -262,7 +262,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 
   return nHits;
 }
-  
+
 //_____________________________________________________________________________
 Int_t WirePlane::DefineVariables( EMode mode )
 {
@@ -320,7 +320,7 @@ Int_t WirePlane::DefineVariables( EMode mode )
       { 0 }
     };
     ret = DefineVarsFromList( nonmcvars, mode );
-  } else { 
+  } else {
     // Monte Carlo hit data includes the truth information
     RVarDef mcvars[] = {
       { "hit.wire",    "Hit wire number",    "fHits.TreeSearch::MCWireHit.fWireNum" },
@@ -414,7 +414,7 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
 	     "converter object \"%s\". Call expert.", s );
       status = kInitError;
       goto ttderr;
-    } 
+    }
     if( fTTDConv->SetParameters( *ttd_param ) != 0 ) {
       Error( Here(here), "Error initializing drift time-to-distance converter "
 	     "\"%s\". Check ttd.param in database.", s );
@@ -457,7 +457,7 @@ ttderr:
 
 //_____________________________________________________________________________
 void WirePlane::Print( Option_t* opt ) const
-{    
+{
   // Print plane info
 
   Plane::Print(opt);

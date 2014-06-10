@@ -36,7 +36,7 @@ typedef vector<Plane*>::iterator  vriter_t;
 GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
   : Tracker(name,desc,app), fNPlanePartnerPairs(0), fMaxCorrMismatches(0),
     fMaxCorrNsigma(1.0)
-{ 
+{
   // Constructor
 
   // GEMs support matching 2 projections only (via amplitude correlations
@@ -120,7 +120,7 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
       // 2D readouts must have essentially the same z-position
       if( TMath::Abs( thePlane->GetZ() - partner->GetZ() ) > 1e-3 ) {
 	Error( Here(here), "Partner planes %s and %s must have the same "
-	       "z-position within 1 mm. Fix database.", 
+	       "z-position within 1 mm. Fix database.",
 	       thePlane->GetName(), partner->GetName() );
 	return kInitError;
       }
@@ -129,7 +129,7 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
       if( ppname.IsNull() or ppname != thePlane->GetName() ) {
 	Error( Here(here), "Inconsistent plane partnering. Partner(%s) "
 	       "= %s, but partner(%s) = %s. Fix database.",
-	       thePlane->GetName(), other.Data(), 
+	       thePlane->GetName(), other.Data(),
 	       partner->GetName(), ppname.IsNull() ? "(none)":ppname.Data() );
 	return kInitError;
       }
@@ -230,7 +230,7 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-Plane* GEMTracker::MakePlane( const char* name, const char* description, 
+Plane* GEMTracker::MakePlane( const char* name, const char* description,
 			      THaDetectorBase* parent ) const
 {
   // Create an object of the plane class used by this implementation
@@ -284,11 +284,11 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
   assert( xplanes.front()->GetType() != yplanes.front()->GetType() );
 
   UInt_t nplanes = xplanes.size();
-  TBits xybits(nplanes), ybits(nplanes); 
+  TBits xybits(nplanes), ybits(nplanes);
   // Look at all possible combinations of x-roads and y-roads.
   // Try to match them via the ADC amplitudes of the hits in the shared
   // readout planes. Amplitudes should correlate well in the absence
-  // of pileup. 
+  // of pileup.
   for( Rvec_t::iterator itx = roads[0].begin(); itx != roads[0].end();
        ++itx ) {
     Road* xroad = *itx;
@@ -311,7 +311,7 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
       if( xybits.CountBits() + fMaxCorrMismatches < nplanes )
 	continue;
 
-      // For all points (=hits that yield the best fit) of this xroad, 
+      // For all points (=hits that yield the best fit) of this xroad,
       // get the yroad point in the same plane (if available), then check
       // if their ADC amplitudes approximately match (within a hard cut)
       const Road::Pvec_t& ypoints = yroad->GetPoints();
@@ -376,10 +376,10 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	  ++nmatches;
 	}
       } //xpoints
-	  
+
 #ifdef VERBOSE
       if( fDebug > 3 ) {
-	cout <<   "nmatches = " << nmatches 
+	cout <<   "nmatches = " << nmatches
 	     << ", matchval = " << matchval << "   ";
       }
 #endif

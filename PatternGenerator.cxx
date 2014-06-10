@@ -34,18 +34,18 @@ private:
   Int_t     fCount;       // trial iterations left to do
   Int_t     fType;        // current pattern type (normal/shifted/mirrored)
 public:
-  ChildIter( const Pattern& parent ) 
+  ChildIter( const Pattern& parent )
     : fParent(parent), fChild(parent), fType(0) { reset(); }
   ChildIter&      operator++();
-  const ChildIter operator++(int) { 
+  const ChildIter operator++(int) {
     ChildIter clone(*this);
-    ++(*this); 
+    ++(*this);
     return clone;
   }
   Pattern& operator*()            { return fChild; }
            operator bool()  const { return (fCount >= 0); }
   Int_t    type()           const { return fType; }
-  void     reset() { 
+  void     reset() {
     fCount = 1<<fParent.GetNbits();
     ++(*this);
   }
@@ -54,7 +54,7 @@ public:
 //_____________________________________________________________________________
 inline
 ChildIter& ChildIter::operator++()
-{ 
+{
   // Iterator over all suitable child patterns of a given parent pattern
   // that occur when the bin resolution is doubled.
   // Child pattern bits are either 2*bit or 2*bit+1 of the parent bits,
@@ -63,7 +63,7 @@ ChildIter& ChildIter::operator++()
   // bit[0] is always zero (otherwise the pattern could be shifted).
   // Note that type() is an important part of the result.
   // type & 1 indicates a pattern shifted by one to the right
-  // type & 2 indicates a mirrored pattern 
+  // type & 2 indicates a mirrored pattern
   // To recover the actual pattern, mirror first, then shift, as appropriate.
   // With the self-referential tree structure used here, mirrored patterns
   // only ever occur as children of the root of the tree. Simultaneously
@@ -147,7 +147,7 @@ void PatternGenerator::DeleteTree()
 void PatternGenerator::CalcStatistics()
 {
   // Collect statistics on the build tree. This is best done separately here
-  // because some things (averages, memory requirements) can only be 
+  // because some things (averages, memory requirements) can only be
   // calculated once the tree is complete.
 
   ClearStatistics();
@@ -175,7 +175,7 @@ void PatternGenerator::CalcStatistics()
   // Count the root node's link, too
   fStats.nLinks++;
 
-  fStats.nBytes = 
+  fStats.nBytes =
     fStats.nPatterns * sizeof(Pattern)
     + fStats.nPatterns * fNplanes * sizeof(UShort_t)
     + fStats.nLinks * sizeof(Link);
@@ -248,13 +248,13 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   // Benchmark the build
   clock_t cpu_ticks = clock();
 
-  // Start with the trivial all-zero root node at depth 0. 
+  // Start with the trivial all-zero root node at depth 0.
   Pattern* root = new Pattern( fNplanes );
   HashNode* hroot = AddHash( root );
 
   // Generate the tree recursively
   MakeChildNodes( hroot, 1 );
-  
+
   // Calculate tree statistics (number of patterns, links etc.)
   cpu_ticks = clock() - cpu_ticks;
   CalcStatistics();
@@ -298,8 +298,8 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
 }
 
 //_____________________________________________________________________________
-PatternTree* PatternGenerator::Generate( UInt_t maxdepth, 
-					 Double_t detector_width, 
+PatternTree* PatternGenerator::Generate( UInt_t maxdepth,
+					 Double_t detector_width,
 					 const char* zpos,
 					 Double_t maxslope )
 {
@@ -319,7 +319,7 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth,
 #endif
     zvec.push_back( val );
   }
-  
+
   return Generate( TreeParam_t( maxdepth, detector_width, maxslope, zvec ));
 }
 
@@ -327,8 +327,8 @@ PatternTree* PatternGenerator::Generate( UInt_t maxdepth,
 UInt_t PatternGenerator::Hash( const Pattern& pat ) const
 {
   // Calculate unique a hash value for the given pattern. The maximum value is
-  // 2^(fNlevels-1 + fNplanes-2) - 1. With the hash computed here, collisions 
-  // never occur for patterns that pass LineTest(). 
+  // 2^(fNlevels-1 + fNplanes-2) - 1. With the hash computed here, collisions
+  // never occur for patterns that pass LineTest().
 
   UInt_t hash = pat[fNplanes-1] * (1U << (fNplanes-2));
   const Double_t x = pat[fNplanes-1];
@@ -355,7 +355,7 @@ PatternGenerator::HashNode* PatternGenerator::AddHash( Pattern* pat )
   // Add given pattern to the hash table
 
   // This implements a perfect hash table (no collisions), the fastest way to
-  // do the pattern lookup during build. 
+  // do the pattern lookup during build.
   assert(pat);
   if( fHashTable.empty() )
     fHashTable.resize( (1U << (fNlevels-1)) * (1U << (fNplanes-2)) );
@@ -397,7 +397,7 @@ bool PatternGenerator::LineTest( const Pattern& pat ) const
   // Check if the given bit pattern is consistent with a straight line.
   // The intersection plane positions are given by fZ[]. Assumes fZ[0]=0.
   // The other z values must increase strictly monotonically, fZ{i] > fZ[i-1].
-  // In the parent class, the z-values are normalized so that 
+  // In the parent class, the z-values are normalized so that
   // fZ[fNplanes-1] = 1.0, but that is not required.
   // Assumes a normalized pattern, for which pat[0] is always zero.
   // Assumes identical bin sizes and bin boundaries in each plane.
@@ -416,7 +416,7 @@ bool PatternGenerator::LineTest( const Pattern& pat ) const
   // Algorithm originally developed by Brandon Belew, SULI summer intern,
   // Jefferson Lab, 2007.
 
-  // FIXME: for certain z-values, the following can be _very_ sensitive 
+  // FIXME: for certain z-values, the following can be _very_ sensitive
   // to the floating point rounding behavior! (Can this be fixed?)
 
   struct Point {
@@ -431,7 +431,7 @@ bool PatternGenerator::LineTest( const Pattern& pat ) const
   // mL and mR are the current slopes of the left and right boundaries, resp.
   Double_t mL  = SL.x/SL.z;
   Double_t mR  = mL;
-  
+
   for( Int_t j = fNplanes-2; j > 0; --j ) {
     // xL and xR are the edges of the active bin in the current plane
     // The bin width is assumed to be unity in all planes
@@ -444,7 +444,7 @@ bool PatternGenerator::LineTest( const Pattern& pat ) const
     Double_t jL = z*mL + xBL;
     Double_t jR = z*mR + xBR;
 
-    // If the current bin is outside of the boundaries, we're done. 
+    // If the current bin is outside of the boundaries, we're done.
     // The test fails.
     if( xL >= jR or xR <= jL )
       return false;
@@ -472,7 +472,7 @@ bool PatternGenerator::LineTest( const Pattern& pat ) const
       SR.x = xR;
       SR.z = z;
     }
-    // By construction (though not totally obvious), we always have 
+    // By construction (though not totally obvious), we always have
     // jR <= jL+1. Also, we are guaranteed xR = xL+1 (with bin width = 1).
     // Thus, if the above test, xR < jR, is true, then also xL < jL,
     // and the following can always be skipped. Hence the "else" here:
@@ -500,7 +500,7 @@ void PatternGenerator::MakeChildNodes( HashNode* pnode, UInt_t depth )
 {
   // Generate child nodes for the given parent pattern
 
-  // Requesting child nodes for the parent at this depth implies that the 
+  // Requesting child nodes for the parent at this depth implies that the
   // parent is being used at the level above
   if( depth > 0 )
     pnode->UsedAtDepth( depth-1 );
@@ -529,7 +529,7 @@ void PatternGenerator::MakeChildNodes( HashNode* pnode, UInt_t depth )
 	  parent->AddChild( pat, it.type() );
 	}
       } else if( SlopeTest(child, depth) and LineTest(child) ) {
-	// If the pattern is new, check it for consistency with maxslope and 
+	// If the pattern is new, check it for consistency with maxslope and
 	// the straight line condition.
 	Pattern* pat = new Pattern( child );
 	AddHash( pat );

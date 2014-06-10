@@ -80,7 +80,7 @@ Double_t FitCoord::GetChi2() const
 //_____________________________________________________________________________
 HitPairIter::HitPairIter( const TSeqCollection* collA,
 			  const TSeqCollection* collB,
-			  Double_t maxdist ) 
+			  Double_t maxdist )
   : fCollA(collA), fCollB(collB), fIterA(0), fIterB(0),
     fSaveIter(0), fSaveHit(0), fMaxDist(maxdist), fStarted(kFALSE),
     fScanning(kFALSE)
@@ -184,7 +184,7 @@ HitPairIter& HitPairIter::Next()
   // hits returned are zero, then there are no more hits in either plane.
 
   if( !fStarted ) {
-    fNext = make_pair( fIterA ? fIterA->Next() : 0, 
+    fNext = make_pair( fIterA ? fIterA->Next() : 0,
 		       fIterB ? fIterB->Next() : 0 );
     fStarted = kTRUE;
   }
@@ -195,7 +195,7 @@ HitPairIter& HitPairIter::Next()
 
   if( hitA && hitB ) {
     switch( hitA->Compare(hitB,fMaxDist) ) {
-    case -1: // A<B 
+    case -1: // A<B
       fNext.first  = fIterA->Next();
       fCurrent.second = 0;
       break;
@@ -218,28 +218,28 @@ HitPairIter& HitPairIter::Next()
 	    hitA = static_cast<Hit*>( fIterA->Next() );
 	    // Advance B until either B >= A or B == nextB (the hit in B that
 	    // ended the prior scan), whichever comes first.
-	    // The Bs for which saveB <= B < nextB have been paired with the 
+	    // The Bs for which saveB <= B < nextB have been paired with the
 	    // prior A in the prior scan and so can't be considered unpaired,
 	    // but they might pair with the new A, still.
 	    if( hitA ) {
 	      while( hitB != nextB && hitB->Compare(hitA,fMaxDist) < 0 )
 		hitB = static_cast<Hit*>( fIterB->Next() );
 	    } else {
-	      // Of course, if there are no more hits in A, we only have to 
+	      // Of course, if there are no more hits in A, we only have to
 	      // scan the rest of the Bs.
 	      hitB = nextB;
 	    }
 	    fNext = make_pair( hitA, hitB );
 
 	  } else {
-	    // This is the normal case: nextB > hitA (usually true for 
+	    // This is the normal case: nextB > hitA (usually true for
 	    // small maxdist). So hitA/hitB are a pair, and
 	    // the next hits to consider are the next ones in each plane.
 	    fNext = make_pair( fIterA->Next(), nextB );
 	  }
 	} else {
 	  // A==B and A==nextB, so more than one B matches this A.
-	  // Start scanning mode where we keep hitA fixed and walk along 
+	  // Start scanning mode where we keep hitA fixed and walk along
 	  // B as long as B==A.
 	  if( !fScanning ) {
 	    fScanning = kTRUE;
@@ -288,7 +288,7 @@ Bool_t HitSet::IsSimilarTo( const HitSet& tryset, Int_t /* maxdist */ ) const
   // Example: the following matches, despite the extra hit in "try":
   //   this:  30/   32/40/50/51
   //   try:   --/31 32/40/50/51
-  // 
+  //
   // Standard includes() implies intersection == set2.
   // This algorithm tests planepattern(intersection) == planepattern(set2)
   //

@@ -13,14 +13,14 @@ namespace TreeSearch {
 
   class MWDC : public Tracker {
   public:
-    MWDC( const char* name, const char* description = "", 
+    MWDC( const char* name, const char* description = "",
 	  THaApparatus* app = 0 );
     virtual ~MWDC();
 
     virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
 
-    Double_t        GetRefTime( UInt_t i ) const 
+    Double_t        GetRefTime( UInt_t i ) const
     { return (i<(UInt_t)fRefMap->GetSize()) ? fRefTime[i] : kBig; }
 
     // Analysis control flags. Set via database.

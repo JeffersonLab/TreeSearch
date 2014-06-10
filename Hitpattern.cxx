@@ -28,7 +28,7 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const PatternTree& pt )
-  : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0), 
+  : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0),
     fOffset(0.5*pt.GetWidth()), fPattern(0)
   , fMaxhitBin(0)
 {
@@ -45,7 +45,7 @@ Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
   // Constructor
 
   static const char* const here = "TreeSearch::Hitpattern";
-  
+
   if( nplanes == 0 || nplanes > 16 || fNlevels == 0 || fNlevels > 16 ) {
     ::Error( here, "Illegal number of planes or tree levels: %d %d.\n"
 	     "Both must be 0 < n <= 16.", nplanes, nlevels );
@@ -82,7 +82,7 @@ void Hitpattern::Init( Double_t width )
 }
 
 //_____________________________________________________________________________
-Hitpattern::Hitpattern( const Hitpattern& orig ) 
+Hitpattern::Hitpattern( const Hitpattern& orig )
 try
   : fNlevels(orig.fNlevels), fNplanes(orig.fNplanes),
     fScale(orig.fScale), fBinWidth(orig.fBinWidth), fOffset(orig.fOffset),
@@ -205,7 +205,7 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
       proj = plane->GetProjection();
       assert( proj );
     }
-#endif	
+#endif
   }
 
   return ntot;
@@ -229,7 +229,7 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
 				   UInt_t plane, Hit* hit )
 {
   // Set pattern bins corresponding to the exact physical positions
-  // between start and end (in m) in the given plane. 
+  // between start and end (in m) in the given plane.
   // Positions may range from 0.0 to width.
   // Associate these bins with given hit
 

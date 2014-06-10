@@ -51,14 +51,14 @@ Double_t LinearTTD::ConvertTimeToDist( Double_t time, Double_t slope ) const
 {
   // Time in s. Return distance in m. slope is used to project the distance
   // of closest approach onto the wire plane (1/cos correction).
-  
+
   if( time <= 0.0 )
     return 0.0;
 
   // Don't bother with very small slopes
   if( TMath::Abs(slope) < 1e-2 )
     return fDriftVel * time;
-  
+
   // NB: 1/cos = sqrt(1+tan^2)
   return fDriftVel * time *  TMath::Sqrt( 1.0 + slope*slope );
 }
@@ -75,9 +75,9 @@ Double_t LinearTTD::ConvertTimeToDist( Double_t time, Double_t slope ) const
 
 //_____________________________________________________________________________
 TanhFitTTD::TanhFitTTD()
-  : TimeToDistConv(4), 
+  : TimeToDistConv(4),
     fDriftVel(kBig), fC0(kBig), fC2(kBig), fT0(kBig), fInvC0(0)
-			   
+
 {
   // Constructor.
 }

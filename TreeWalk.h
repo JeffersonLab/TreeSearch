@@ -49,8 +49,8 @@ namespace TreeSearch {
     TreeWalk( UInt_t nlevels = 0 ) : fNlevels(nlevels) {}
     virtual ~TreeWalk() {}
     void SetNlevels( UInt_t n ) { fNlevels = n; }
-    
-    NodeVisitor::ETreeOp 
+
+    NodeVisitor::ETreeOp
     operator() ( Link* link, NodeVisitor& op, Pattern* parent = 0,
 		 UInt_t depth = 0, UInt_t shift = 0,
 		 Bool_t mirrored = false ) const;
@@ -78,7 +78,7 @@ namespace TreeSearch {
   private:
     std::ofstream* os;        // Output file stream
     size_t    fIdxSiz;        // Byte size of the pattern count (1, 2, or 4)
-    std::map<Pattern*,Int_t> fMap; // Index map for serializing 
+    std::map<Pattern*,Int_t> fMap; // Index map for serializing
 
     // Because of the pointer member, disallow copying and assignment
     WritePattern( const WritePattern& orig );
@@ -102,7 +102,7 @@ namespace TreeSearch {
   // Pretty print to output stream (and count) all actual patterns
   class PrintPattern : public NodeVisitor {
   public:
-    PrintPattern( std::ostream& ostr = std::cout, bool dump = false ) 
+    PrintPattern( std::ostream& ostr = std::cout, bool dump = false )
       : os(ostr), fCount(0), fDump(dump) {}
     virtual ETreeOp operator() ( const NodeDescriptor& nd );
     ULong64_t GetCount() const { return fCount; }

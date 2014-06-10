@@ -22,7 +22,7 @@ namespace TreeSearch {
     virtual ~PatternGenerator();
 
     PatternTree* Generate( TreeParam_t parameters );
-    PatternTree* Generate( UInt_t maxdepth, Double_t detector_width, 
+    PatternTree* Generate( UInt_t maxdepth, Double_t detector_width,
 			   const char* zpos, Double_t maxslope );
 
     struct Statistics_t {

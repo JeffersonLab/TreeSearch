@@ -56,14 +56,14 @@ namespace TreeSearch {
       assert( fNbits == rhs.fNbits );
       return (0 == memcmp( fBits, rhs.fBits, fNbits*sizeof(UShort_t)));
     }
-    bool operator!=( const Pattern& rhs ) const { 
+    bool operator!=( const Pattern& rhs ) const {
       return !(*this == rhs );
     }
-    UShort_t&  operator[](UInt_t i) { 
+    UShort_t&  operator[](UInt_t i) {
       assert(i<fNbits);
       return fBits[i];
     }
-    UShort_t   operator[](UInt_t i) const { 
+    UShort_t   operator[](UInt_t i) const {
       assert(i<fNbits);
       return fBits[i];
     }

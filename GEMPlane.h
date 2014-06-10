@@ -19,7 +19,7 @@ namespace TreeSearch {
     typedef vector<Float_t> Vflt_t;
 
   public:
-    GEMPlane( const char* name, const char* description = "", 
+    GEMPlane( const char* name, const char* description = "",
 	      THaDetectorBase* parent = 0 );
     GEMPlane() : fADC(0), fADCped(0), fTimeCentroid(0) {} // For ROOT RTTI
     virtual ~GEMPlane();
@@ -74,7 +74,7 @@ namespace TreeSearch {
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
-    
+
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );

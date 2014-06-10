@@ -33,7 +33,7 @@ namespace TreeSearch {
 Plane::Plane( const char* name, const char* description,
 	      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
-    fDefinedNum(kMaxUInt), fType(kUndefinedType), fStart(0), 
+    fDefinedNum(kMaxUInt), fType(kUndefinedType), fStart(0),
     fPitch(0), fCoordOffset(0), fPartner(0), fProjection(0),
     fResolution(0), fMaxHits(kMaxUInt), fHits(0), fFitCoords(0),
     fHitMap(0)
@@ -68,7 +68,7 @@ Plane::~Plane()
 {
   // Destructor.
 
-  // Histograms in fHist should be automatically deleted by ROOT when 
+  // Histograms in fHist should be automatically deleted by ROOT when
   // the output file is closed
 
   delete fFitCoords;
@@ -77,7 +77,7 @@ Plane::~Plane()
 
 //_____________________________________________________________________________
 FitCoord* Plane::AddFitCoord( const FitCoord& coord )
-{ 
+{
   // Add given fit coordinate data to this plane's array of fit coordinates
 
   return
@@ -104,7 +104,7 @@ Int_t Plane::Begin( THaRunBase* /* run */ )
 
 //_____________________________________________________________________________
 void Plane::Clear( Option_t* opt )
-{    
+{
   // Clear event-by-event data (hits)
 
   assert( fIsInit );
@@ -181,7 +181,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
   // Read fOrigin (plane position) and fSize. fOrigin is the chamber
   // position relative to the Tracker reference frame - which in turn can be
   // offset as a whole. Thus, with respect to some absolute frame
-  // (whatever it may be), each Plane is positioned at 
+  // (whatever it may be), each Plane is positioned at
   // fOrigin(Tracker) + fOrigin(Plane)
   Int_t status = ReadGeometry( file, date, kTRUE );
 
@@ -253,7 +253,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
     TString names;
     for( EProjType i = kTypeBegin; i < kTypeEnd; ++i ) {
       names += kProjParam[i].name;
-      if( i+1 != kTypeEnd ) 
+      if( i+1 != kTypeEnd )
         names += " ";
     }
     Error( Here(here), "Unsupported plane type \"%s\". Must be one of "
@@ -273,7 +273,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
 }
 //_____________________________________________________________________________
 void Plane::SetPartner( Plane* p )
-{    
+{
   // Partner this plane with plane 'p'. The meaning of "partner" depends on the
   // type of detector:
   // For wire chambers:
@@ -310,7 +310,7 @@ void Plane::UpdateOffset()
 
 //_____________________________________________________________________________
 void Plane::Print( Option_t* ) const
-{    
+{
   // Print plane info
 
   cout << IsA()->GetName() << ":  #" << GetPlaneNum() << " "
@@ -318,7 +318,7 @@ void Plane::Print( Option_t* ) const
        << fNelem << " channels\t"
        << "z = " << GetZ();
   if( fPartner ) {
-    cout << "\t partner = " 
+    cout << "\t partner = "
 	 << fPartner->GetName();
     //	 << fPartner->GetTitle();
   }
@@ -326,7 +326,7 @@ void Plane::Print( Option_t* ) const
 }
 
 //_____________________________________________________________________________
-// Int_t Plane::Compare( const TObject* obj ) const 
+// Int_t Plane::Compare( const TObject* obj ) const
 // {
 //   // Used to sort planes in a TCollection/TList by z-position
 
@@ -344,7 +344,7 @@ void Plane::Print( Option_t* ) const
 
 //_____________________________________________________________________________
 Double_t Plane::GetMaxSlope() const
-{ 
+{
   return fProjection ? fProjection->GetMaxSlope() : kBig;
 }
 

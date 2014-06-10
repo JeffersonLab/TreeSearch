@@ -23,7 +23,7 @@ namespace TreeSearch {
   public:
     virtual ~TimeToDistConv() {}
 
-    virtual Double_t ConvertTimeToDist( Double_t time, 
+    virtual Double_t ConvertTimeToDist( Double_t time,
 					Double_t slope ) const = 0;
             UInt_t   GetNparam() const { return fNparam; }
     virtual Double_t GetParameter( UInt_t ) const { return kBig; }
@@ -51,7 +51,7 @@ namespace TreeSearch {
   // LinearTTD
   //
   // Simple linear conversion of drift time (s) and drift distance (m).
-  
+
   class LinearTTD : public TimeToDistConv {
 
   public:
@@ -75,7 +75,7 @@ protected:
   // TanhFitTTD
   //
   // Conversion of drift time (s) to distance using fit to tanh function
-  
+
   class TanhFitTTD : public TimeToDistConv {
 
   public:

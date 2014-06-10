@@ -21,14 +21,14 @@ namespace TreeSearch {
   // Overloaded prefix operator++ allows us to iterate over the EProjType enum.
   inline
   EProjType& operator++( EProjType& e )
-  { 
-    switch(e) { 
+  {
+    switch(e) {
     case kUndefinedType: return e=kUPlane;
     case kUPlane: return e=kVPlane;
     case kVPlane: return e=kXPlane;
     case kXPlane: return e=kYPlane;
     case kYPlane: return e=kTypeEnd;
-    case kTypeEnd: default: 
+    case kTypeEnd: default:
       throw std::range_error("EProjType out of range trying to increment "
 			     "kTypeEnd");
     }

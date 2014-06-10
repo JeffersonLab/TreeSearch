@@ -68,7 +68,7 @@ UInt_t GetOuterBits( UInt_t p )
     register UInt_t t, tt;
     if( (tt = p >> 16) )
       ret = 1U << ((t = tt >> 8) ? 24 + LogTable256[t] : 16 + LogTable256[tt]);
-    else 
+    else
       ret = 1U << ((t = p >> 8) ? 8 + LogTable256[t] : LogTable256[p]);
 
     t = 1;
@@ -83,13 +83,13 @@ UInt_t GetOuterBits( UInt_t p )
 // Private class for building a cluster of patterns
 struct BuildInfo_t {
   HitSet            fCluster;      // Copy of start HitSet of the cluster
-  vector< pair<UShort_t,UShort_t> > 
+  vector< pair<UShort_t,UShort_t> >
                     fLimits; // [nplanes] Min/max bin numbers in each plane
   UInt_t            fOuterBits;
 
   BuildInfo_t() : fOuterBits(0) {}
   BuildInfo_t( const Node_t& node )
-    : fCluster(node.second), 
+    : fCluster(node.second),
       fOuterBits(GetOuterBits(node.second.plane_pattern))
   {
     // Construct from given start pattern/hitset
@@ -119,7 +119,7 @@ struct BuildInfo_t {
 
 //_____________________________________________________________________________
 // Helper functor for coordinate conversions
-class GetBinX 
+class GetBinX
   : public unary_function< pair<Double_t,Double_t>, pair<UInt_t,UInt_t> >
 {
 private:
@@ -129,17 +129,17 @@ public:
   pair<Double_t,Double_t> operator() ( const pair<UInt_t,UInt_t>& bin ) const
   {
     // Get X coordinate of left edge of given bin
-    Double_t lo = static_cast<Double_t>(bin.first) * fHpat->GetBinWidth() 
+    Double_t lo = static_cast<Double_t>(bin.first) * fHpat->GetBinWidth()
       - fHpat->GetOffset();
-    Double_t hi = static_cast<Double_t>(bin.second) * fHpat->GetBinWidth() 
+    Double_t hi = static_cast<Double_t>(bin.second) * fHpat->GetBinWidth()
       - fHpat->GetOffset();
     return make_pair(lo,hi);
   }
 };
 
 //_____________________________________________________________________________
-Road::Road( const Projection* proj ) 
-  : TObject(), fPlanePattern(0), fProjection(proj), fZL(kBig), fZU(kBig), 
+Road::Road( const Projection* proj )
+  : TObject(), fPlanePattern(0), fProjection(proj), fZL(kBig), fZU(kBig),
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
     fTrack(0), fBuild(0), fGrown(false)
 #ifdef TESTCODE
@@ -185,7 +185,7 @@ Road::Road( const Node_t& nd, const Projection* proj )
 }
 
 //_____________________________________________________________________________
-Road::Road( const Road& orig ) : 
+Road::Road( const Road& orig ) :
   TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits),
   fPlanePattern(orig.fPlanePattern), fGrown(orig.fGrown)
 #ifdef TESTCODE
@@ -196,7 +196,7 @@ Road::Road( const Road& orig ) :
 
   size_t nbytes = (char*)&fTrack - (char*)&fProjection + sizeof(fTrack);
   memcpy( &fProjection, &orig.fProjection, nbytes );
-  
+
   CopyPointData( orig );
 
   if( orig.fBuild )
@@ -269,9 +269,9 @@ void Road::CopyPointData( const Road& orig )
 	Point* new_point = new Point( *old_point );
 	fPoints[i].push_back( new_point );
 	// It gets a bit tricky here: To be able to copy the fFitCoord, which
-	// contain pointers to some of the Points in fPoints, we need to keep 
+	// contain pointers to some of the Points in fPoints, we need to keep
 	// track of which old point was copied to which new point.
-	pair<Pmap_t::iterator,bool> 
+	pair<Pmap_t::iterator,bool>
 	  ins = xref.insert( make_pair(old_point,new_point) );
 	assert( ins.second );  // Duplicate points should never occur
       }
@@ -289,7 +289,7 @@ void Road::CopyPointData( const Road& orig )
     }
   }
 }
-  
+
 //_____________________________________________________________________________
 inline
 Bool_t Road::CheckMatch( const Hset_t& hits ) const
@@ -320,11 +320,11 @@ Bool_t Road::IsInFrontRange( const NodeDescriptor& nd ) const
   assert( fBuild && !fBuild->fLimits.empty() );
 
   UInt_t fdist = fProjection->GetBinMaxDistF();
-  
+
   return ( nd.Start() + fdist >= fBuild->fLimits.front().first and
 	   nd.Start()         <  fBuild->fLimits.front().second + fdist );
 }
-  
+
 //_____________________________________________________________________________
 Bool_t Road::Add( const Node_t& nd )
 {
@@ -367,8 +367,8 @@ Bool_t Road::Add( const Node_t& nd )
       PrintHits( new_hits );
     }
 #endif
-  } 
-  else if( IsInBackRange(nd.first) and 
+  }
+  else if( IsInBackRange(nd.first) and
 	   fBuild->fCluster.IsSimilarTo(new_set,hitdist) ) {
     // Accept this pattern if and only if it is a subset of the cluster
     // NB: IsSimilarTo() is a looser match than std::includes(). The new
@@ -406,7 +406,7 @@ Bool_t Road::Add( const Node_t& nd )
   fPatterns.push_back(&nd);
 
 #ifdef VERBOSE
-  if( fProjection->GetDebug() > 3 ) 
+  if( fProjection->GetDebug() > 3 )
     cout << "new npat = " << fPatterns.size() << endl;
 #endif
 
@@ -423,9 +423,9 @@ void Road::Finish()
 	 fPatterns.end(); ++it ) {
     (**it).second.used = 1;
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 3 ) { 
+    if( fProjection->GetDebug() > 3 ) {
       cout << "used pat = ";
-      (**it).first.Print(); 
+      (**it).first.Print();
     }
 #endif
   }
@@ -444,7 +444,7 @@ void Road::Finish()
   edgpos.reserve( npl );
   GetBinX binx( fProjection->GetHitpattern() ); // bin# -> position
   transform( ALL(fBuild->fLimits), back_inserter(edgpos), binx );
-  
+
   // Define the road boundaries as the lines with the slope between the
   // front and back bins, shifted to the left/right to include fully the
   // left/rightmost bin. This may not be optimal, but it is fast, unambiguous,
@@ -467,17 +467,17 @@ void Road::Finish()
     if( dL < maxdL ) {
       UL.Set( lpt, z );
       maxdL = dL;
-    } 
+    }
     if( dR > maxdR ) {
       UR.Set( rpt, z );
       maxdR = dR;
-    } 
+    }
   }
-  // Now UL and UR are points on the left and right road boundary, 
+  // Now UL and UR are points on the left and right road boundary,
   // respectively. The boundaries share the common slope calculated above.
-  
+
   // To compute the corners of the polygon, shift the z-positions of the first
-  // and last planes down and up, respectively, by eps, so that the points 
+  // and last planes down and up, respectively, by eps, so that the points
   // on the planes are guaranteed to be included
   const Double_t eps = 1e-3;
   fZL = fProjection->GetPlaneZ(0) - eps;
@@ -540,7 +540,7 @@ Bool_t Road::Include( const Road* other )
 Bool_t Road::CollectCoordinates()
 {
   // Gather hit positions that lie within the Road area.
-  // Return true if the plane occupancy pattern of the selected points 
+  // Return true if the plane occupancy pattern of the selected points
   // is allowed by Projection::fPlaneCombos, otherwise false.
   // Results are in fPoints.
 
@@ -548,7 +548,7 @@ Bool_t Road::CollectCoordinates()
 
 #ifdef VERBOSE
   if( fProjection->GetDebug() > 3 ) {
-    cout << "Collecting coordinates from: (" << fPatterns.size() 
+    cout << "Collecting coordinates from: (" << fPatterns.size()
 	 << " patterns)" << endl;
     PrintHits( fHits );
     cout << "Seed pattern: " << endl;
@@ -592,7 +592,7 @@ Bool_t Road::CollectCoordinates()
   good = fProjection->GetPlaneCombos()->TestBitNumber(patternvalue)
     // Need at least MinFitPlanes planes for fitting
     and planepattern.CountBits() >= fProjection->GetMinFitPlanes();
-  
+
 #ifdef VERBOSE
   if( fProjection->GetDebug() > 3 ) {
     cout << "Collected:" << endl;
@@ -600,7 +600,7 @@ Bool_t Road::CollectCoordinates()
     for( UInt_t i = fProjection->GetNplanes(); i--; ) {
       cout << " pl= " << i;
       assert( ipl == fPoints.rend() or !(*ipl).empty() );
-      if( ipl == fPoints.rend() 
+      if( ipl == fPoints.rend()
 	  or i != (*ipl).front()->hit->GetPlaneNum() ) {
 	if( fProjection->GetPlane(i)->IsCalibrating() )
 	  cout << " calibrating";
@@ -712,7 +712,7 @@ Bool_t Road::Fit()
     }
 
 #ifdef VERBOSE
-    if( fProjection->GetDebug() > 3 ) 
+    if( fProjection->GetDebug() > 3 )
       cout << "Fit:"
 	   << " a1 = " << a1 << " (" << TMath::Sqrt(V[0]) << ")"
 	   << " a2 = " << a2

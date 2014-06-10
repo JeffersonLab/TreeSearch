@@ -57,7 +57,7 @@ namespace TreeSearch {
     struct PosIsLess : public std::binary_function< Hit*, Hit*, bool >
     {
       bool operator() ( const Hit* a, const Hit* b ) const
-      { 
+      {
 	assert( a && b );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() ) {
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
@@ -104,7 +104,7 @@ namespace TreeSearch {
   //___________________________________________________________________________
   // Utility class for iterating over one or two collections of hits.
   // Used for generating hit patterns. If two collections are given, they
-  // are assumed to contain hits from adjacent planes with parallel 
+  // are assumed to contain hits from adjacent planes with parallel
   // (and usually staggered) wires, and hit pairs are returned for hits
   // whose positions are within 'maxdist' of each other.
 
@@ -119,26 +119,26 @@ namespace TreeSearch {
     HitPairIter& operator=( const HitPairIter& rhs );
     virtual ~HitPairIter();
 
-    const TSeqCollection* GetCollection( Int_t n=0 ) const 
+    const TSeqCollection* GetCollection( Int_t n=0 ) const
     { return (n==0) ? fCollA : fCollB; }
     void Reset();
 
-    // Iterator functions. 
+    // Iterator functions.
     HitPairIter& Next();
     HitPairIter& operator++() { return Next(); }
     const HitPairIter operator++(int) {
       HitPairIter clone(*this);  Next();  return clone;
     }
-    // Current value. 
+    // Current value.
     ObjPair_t  operator()() const  { return fCurrent; }
     ObjPair_t& operator* ()        { return fCurrent; }
     // Comparisons
-    bool operator==( const HitPairIter& rhs ) const { 
-      return( fCollA == rhs.fCollA && fCollB == rhs.fCollB && 
+    bool operator==( const HitPairIter& rhs ) const {
+      return( fCollA == rhs.fCollA && fCollB == rhs.fCollB &&
 	      fCurrent == rhs.fCurrent );
     }
     bool operator!=( const HitPairIter& rhs ) const { return !(*this==rhs); }
-    operator bool() const 
+    operator bool() const
     { return (fCurrent.first != 0 || fCurrent.second != 0); }
     bool operator!() const { return !((bool)*this); }
 
@@ -170,7 +170,7 @@ namespace TreeSearch {
     FitCoord( Hit* hit, Road* road, Double_t pos,
 	      Double_t trkpos2d, Double_t trkslope2d,
 	      Double_t trkpos, Double_t trkslope )
-      : fHit(hit), fRoad(road), fPos(pos), fTrackPos(trkpos2d), 
+      : fHit(hit), fRoad(road), fPos(pos), fTrackPos(trkpos2d),
 	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope),
 	fFitRank(0) {}
     FitCoord() : fHit(0), fRoad(0) {} // For ROOT RTTI
@@ -184,16 +184,16 @@ namespace TreeSearch {
     // Double_t  GetDriftDist()  const { return fHit ? fHit->GetDriftDist():kBig;}
     Double_t  GetTrackPos()   const { return fTrackPos; }
     Double_t  GetTrackSlope() const { return fTrackSlope; }
-    Double_t  GetTrackDist()  const 
+    Double_t  GetTrackDist()  const
     { return fHit ? fTrackPos-fHit->GetPos() : kBig; }
     Double_t  GetResidual()   const { return fHit ? fTrackPos-fPos : kBig; }
     Double_t  Get3DTrkPos()   const { return f3DTrkPos; }
     Double_t  Get3DTrkSlope() const { return f3DTrkSlope; }
-    Double_t  Get3DTrkDist()  const 
+    Double_t  Get3DTrkDist()  const
     { return fHit ? f3DTrkPos-fHit->GetPos() : kBig; }
     Double_t  Get3DTrkResid() const { return fHit ? f3DTrkPos-fPos : kBig; }
     // Int_t     GetWireNum()    const { return fHit ? fHit->GetWireNum() : -1; }
-    
+
   private:
     Hit*      fHit;        // Decoded raw hit data
     Road*     fRoad;       // Road that created this fit
@@ -231,7 +231,7 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
-  Int_t Hit::Compare( const TObject* obj ) const 
+  Int_t Hit::Compare( const TObject* obj ) const
   {
     // Used for sorting hits in a TSeqCollection (e.g. TList, TClonesArray).
     // A hit is "less than" another hit if its position is smaller.
@@ -266,7 +266,7 @@ namespace TreeSearch {
   inline
   Bool_t HitSet::CheckMatch( const Hset_t& hits, const TBits* bits )
   {
-    // Check if the plane occupancy pattern of the given hits is marked as 
+    // Check if the plane occupancy pattern of the given hits is marked as
     // allowed in the given bitfield
 
     return bits->TestBitNumber( GetMatchValue(hits) );
