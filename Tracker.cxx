@@ -802,6 +802,14 @@ void Tracker::FindNearestHitsImpl( const TSeqCollection* hits,
 }
 
 //_____________________________________________________________________________
+Int_t Tracker::NewTrackCalc( THaTrack*, const TVector3&, const TVector3& )
+{
+  // Hook for additional calculations for a newly generated track
+
+  return 0;
+}
+
+//_____________________________________________________________________________
 THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 {
   // Make new track with given parameters. Correct for coordinate offset
@@ -831,46 +839,36 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 
   assert( fIsRotated == !fRotation.IsIdentity() );
   Double_t xp, yp, x, y;
+  TVector3 pos( d_x, d_y, 0.0 );
+  TVector3 dir( d_xp, d_yp, 1.0 );
   if( fIsRotated ) {
     // Rotate the TRANSPORT direction vector to global frame
-    TVector3 v( d_xp, d_yp, 1.0 );
-    v *= fRotation;
+    dir *= fRotation;
     // TODO: use different type of track without this limitation
-    if( TMath::Abs(v.Theta()-TMath::PiOver2()) < 1e-2 ) {
+    if( TMath::Abs(dir.Theta()-TMath::PiOver2()) < 1e-2 ) {
       Error( Here("NewTrack"), "Limitation: Track (nearly) perpendicular "
 	     "to z-axis not supported by TRANSPORT formalism in THaTrack "
 	     "class. Skipping this track." );
-      v.Print();
+      pos.Print();
+      dir.Print();
       return 0;
     }
     // Normalize to z=1 to get new TRANSPORT direction vector
-    v *= 1.0/v.Z();
-    xp = v.X();
-    yp = v.Y();
-    assert( TMath::Abs(v.Z()-1.0) < 1e-6 );
+    dir *= 1.0/dir.Z();
+    assert( TMath::Abs(dir.Z()-1.0) < 1e-6 );
     // Rotate track origin to global frame
-    TVector3 v0( d_x, d_y, 0.0 );
-    v0 *= fRotation;
-    v0 += fOrigin;
-    if( TestBit(kProjTrackToZ0) ) {
-      // Project along the track direction to z=0 in global frame
-      v0 += -v0.Z() * v;
-    }
-    x = v0.X();
-    y = v0.Y();
-    assert( !TestBit(kProjTrackToZ0) || TMath::Abs(v0.Z()) < 1e-6 );
+    pos *= fRotation;
   }
-  else {
-    // More efficient code in case of no rotation
-    xp = d_xp;
-    yp = d_yp;
-    x  = d_x + fOrigin.X();
-    y  = d_y + fOrigin.Y();
-    if( TestBit(kProjTrackToZ0) ) {
-      x -= d_xp*fOrigin.Z();
-      y -= d_yp*fOrigin.Z();
-    }
+  xp = dir.X();
+  yp = dir.Y();
+  pos += fOrigin;
+  if( TestBit(kProjTrackToZ0) ) {
+    // If configured, project along the track direction to z=0 in global frame
+    pos -= pos.Z() * dir;
+    assert( TMath::Abs(pos.Z()) < 1e-6 );
   }
+  x = pos.X();
+  y = pos.Y();
 
   THaTrack* newTrack = AddTrack( tracks, x, y, xp, yp );
   assert( newTrack );
@@ -888,6 +886,9 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 	 fCalibPlanes.end(); ++it ) {
     FindNearestHits( (*it), newTrack, *fit_par.roads );
   }
+
+  // Do additional calculations for the new track (used by derived classes)
+  NewTrackCalc( newTrack, pos, dir );
 
   return newTrack;
 }
