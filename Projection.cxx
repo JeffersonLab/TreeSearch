@@ -68,8 +68,10 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
   fRoads = new TClonesArray("TreeSearch::Road", 3);
   R__ASSERT(fRoads);
 
+#ifdef TESTCODE
   size_t nbytes = (char*)&t_track - (char*)&n_hits + sizeof(t_track);
   memset( &n_hits, 0, nbytes );
+#endif
 }
 
 //_____________________________________________________________________________
