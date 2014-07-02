@@ -152,12 +152,10 @@ namespace TreeSearch {
     UInt_t           fNgoodRoads;    // Good roads in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
 
-#ifdef TESTCODE
-    // Statistics
+    // Statistics (only needed for TESTCODE, but kept for binary compatibility)
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;
     UInt_t n_test, n_pat, n_roads, n_dupl, n_badfits;
     Double_t t_treesearch, t_roads, t_fit, t_track;
-#endif
 
     Bool_t  FitRoads();
     Bool_t  RemoveDuplicateRoads();
