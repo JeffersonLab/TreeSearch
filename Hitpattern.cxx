@@ -291,6 +291,7 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
     prevHit = phit;
 #endif
   }
+  delete it;
   return nhits;
 }
 
