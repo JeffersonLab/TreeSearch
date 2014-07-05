@@ -15,7 +15,7 @@
 #include "Projection.h"
 
 #include "THaDetMap.h"
-#include "THaEvData.h"
+#include "SimDecoder.h"
 #include "TClonesArray.h"
 #include "TH1.h"
 #include "TError.h"
@@ -26,6 +26,7 @@
 #include <stdexcept>
 
 using namespace std;
+using namespace Podd;
 
 namespace TreeSearch {
 
@@ -232,10 +233,11 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 
   typedef map<Int_t,Float_t> Hitmap_t;
 
-  //  static const char* const here = "Decode";
+  // const char* const here = "GEMPlane::Decode";
 
   bool mc_data = fTracker->TestBit(Tracker::kMCdata);
 
+  assert( !mc_data || dynamic_cast<const SimDecoder*>(&evData) != 0 );
   assert( fADC );
   assert( fADCped );
   assert( fTimeCentroid );
@@ -513,9 +515,10 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 					   type,
 					   resolution,
 					   this,
-					   //TODO:
 					   0,  // MCtrack
-					   0   // MCpos
+					   0,  // MCpos
+					   0,  // MCtime
+					   0   // num_bg
 					   );
     }
 #ifndef NDEBUG

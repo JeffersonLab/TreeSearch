@@ -17,7 +17,6 @@ using std::endl;
 using std::make_pair;
 
 ClassImp(TreeSearch::Hit)
-ClassImp(TreeSearch::MCHitInfo)
 ClassImp(TreeSearch::HitPairIter)
 ClassImp(TreeSearch::HitSet)
 
@@ -58,15 +57,6 @@ Double_t Hit::GetPosI( UInt_t i ) const
 
   assert( i<1 );
   return GetPos();
-}
-
-//_____________________________________________________________________________
-void MCHitInfo::MCPrint() const
-{
-  // Print hit info
-
-  cout << " MCpos=" << GetMCPos()
-       << endl;
 }
 
 //_____________________________________________________________________________

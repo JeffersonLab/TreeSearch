@@ -11,7 +11,6 @@
 #pragma link C++ class TreeSearch::Tracker+;
 #pragma link C++ class TreeSearch::Plane+;
 #pragma link C++ class TreeSearch::Hit+;
-#pragma link C++ class TreeSearch::MCHitInfo+;
 #pragma link C++ class TreeSearch::HitPairIter+;
 #pragma link C++ class TreeSearch::HitSet+;
 #pragma link C++ class TreeSearch::Bits+;

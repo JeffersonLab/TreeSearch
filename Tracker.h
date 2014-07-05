@@ -17,6 +17,7 @@
 #include <set>
 #include <list>
 #include <cassert>
+#include <exception>
 #include "TMatrixDSym.h"
 #include "TRotation.h"
 
@@ -97,6 +98,13 @@ namespace TreeSearch {
     };
     ETrackingStatus GetTrackingStatus() const { return fTrkStat; }
 
+    // Bad configuration exception, may be thrown by Decode
+    class bad_config : public std::runtime_error {
+    public:
+      bad_config( const std::string& what_arg )
+	: std::runtime_error(what_arg) {}
+    };
+
   protected:
     friend class Plane;
     class TrackFitWeight;
@@ -123,6 +131,7 @@ namespace TreeSearch {
     TRotation      fRotation;         // Rotation Tracker -> lab frame
     Bool_t         fIsRotated;        // Tracker frame is rotated
     Bool_t         fAllPartnered;     // All planes have partners
+    Bool_t         fChecked;          // Configuration checked to be good
 
     // Multithread support
     UInt_t         fMaxThreads;       // Maximum simultaneously active threads

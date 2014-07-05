@@ -15,7 +15,7 @@
 #include "Projection.h"
 
 #include "THaDetMap.h"
-#include "THaEvData.h"
+#include "SimDecoder.h"
 #include "TClonesArray.h"
 #include "TError.h"
 #include "TClass.h"
@@ -25,6 +25,7 @@
 #include <stdexcept>
 
 using namespace std;
+using namespace Podd;
 
 // Database uses ns for TDC offsets
 static const float kTDCscale = 1e-9;
@@ -136,7 +137,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   // cross-references to reference channels in the regular detector map
   // of the plane.
 
-  //  static const char* const here = "Decode";
+  // const char* const here = "WirePlane::Decode";
 
   assert( dynamic_cast<MWDC*>(fTracker) );
   MWDC* mwdc = static_cast<MWDC*>( fTracker );
@@ -144,6 +145,8 @@ Int_t WirePlane::Decode( const THaEvData& evData )
   UInt_t nHits = 0;
   bool no_time_cut = !fTracker->TestBit(MWDC::kDoTimeCut);
   bool mc_data     = fTracker->TestBit(Tracker::kMCdata);
+
+  assert( !mc_data || dynamic_cast<const SimDecoder*>(&evData) != 0 );
 
   // Decode data. This is done fairly efficiently by looping over only the
   // channels with hits on each module.
@@ -216,7 +219,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 			 fResolution,
 			 this,
 			 // TODO: fill MC info here
-			 0, 0.0
+			 0, 0.0, 0.0
 			 );
 	  } else
 	    theHit = new( (*fHits)[nHits++] )
