@@ -124,6 +124,13 @@ namespace TreeSearch {
       Double_t fTol;
     };
 
+    enum ETrackingStatus {
+      kTrackOK              = 0,
+      kTooFewPlanesWithHits = 1, // Bad planepattern of hits
+      kTooManyHitCombos     = 2,// Too many hit combinations to fit
+      kNoGoodFit            = 3, // No fit with good chi2
+    };
+    ETrackingStatus GetTrackingStatus() const { return fTrkStat; }
 
   protected:
 
@@ -146,11 +153,12 @@ namespace TreeSearch {
     Double_t       fV[3];       // Covar matrix of param (V11, V12=V21, V22)
     UInt_t         fDof;        // Degrees of freedom of fit (nhits-2)
 
-    Bool_t         fGood;       // Road successfully built and fit
+    Bool_t         fGood;       // Road successfully fit
     THaTrack*      fTrack;      // The lowest-chi2 3D track using this road
 
     BuildInfo_t*   fBuild;      //! Working data for building
     Bool_t         fGrown;      //! Add() added hits in front or back plane
+    ETrackingStatus fTrkStat;   // Reconstruction status
 
     // Only needed for TESTCODE
     UInt_t         fNfits;      // Statistics: num fits with acceptable chi2
@@ -163,7 +171,7 @@ namespace TreeSearch {
   private:
     void     CopyPointData( const Road& orig );
 
-    ClassDef(Road,1)  // Region containing track candidate hits and fit results
+    ClassDef(Road,0)  // Region containing track candidate hits and fit results
   };
 
   //___________________________________________________________________________

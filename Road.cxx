@@ -140,8 +140,8 @@ public:
 //_____________________________________________________________________________
 Road::Road( const Projection* proj )
   : TObject(), fPlanePattern(0), fProjection(proj), fZL(kBig), fZU(kBig),
-    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(true),
-    fTrack(0), fBuild(0), fGrown(false)
+    fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(false),
+    fTrack(0), fBuild(0), fGrown(false), fTrkStat(kTrackOK)
 #ifdef TESTCODE
   , fNfits(0)
 #endif
@@ -160,7 +160,8 @@ Road::Road( const Projection* proj )
 Road::Road( const Node_t& nd, const Projection* proj )
   : TObject(), fPatterns(1,&nd), fPlanePattern(0), fProjection(proj),
     fZL(kBig), fZU(kBig), fPos(kBig), fSlope(kBig), fChi2(kBig),
-    fDof(kMaxUInt), fGood(true), fTrack(0), fBuild(0), fGrown(true)
+    fDof(kMaxUInt), fGood(false), fTrack(0), fBuild(0), fGrown(true),
+    fTrkStat(kTrackOK)
 #ifdef TESTCODE
   , fNfits(0)
 #endif
@@ -187,7 +188,8 @@ Road::Road( const Node_t& nd, const Projection* proj )
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) :
   TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits),
-  fPlanePattern(orig.fPlanePattern), fGrown(orig.fGrown)
+  fPlanePattern(orig.fPlanePattern), fGrown(orig.fGrown),
+  fTrkStat(orig.fTrkStat)
 #ifdef TESTCODE
   , fNfits(orig.fNfits)
 #endif
@@ -230,9 +232,10 @@ Road& Road::operator=( const Road& rhs )
     else
       fBuild = 0;
 
-    fGrown = rhs.fGrown;
+    fGrown   = rhs.fGrown;
+    fTrkStat = rhs.fTrkStat;
 #ifdef TESTCODE
-    fNfits = rhs.fNfits;
+    fNfits   = rhs.fNfits;
 #endif
   }
   return *this;
@@ -636,9 +639,6 @@ Bool_t Road::Fit()
   // Results of the best fit with acceptable chi2 (Projection::fChisqLimits)
   // are stored in the member variables
 
-  if( !fGood )
-    return false;
-
   if( fFitCoord.empty() )
     assert( fChi2 == kBig );
   else {
@@ -648,14 +648,17 @@ Bool_t Road::Fit()
     fDof = kMaxUInt;
   }
   fGood = false;
+  fTrkStat = kTrackOK;
 #ifdef TESTCODE
   fNfits = 0;
 #endif
 
   // Collect coordinates of hits that are within the width of the road
-  if( !CollectCoordinates() )
+  if( !CollectCoordinates() ) {
+    fTrkStat = kTooFewPlanesWithHits;
     // TODO: keep statistics
     return false;
+  }
 
   // Determine number of permutations
   UInt_t n_combinations;
@@ -664,9 +667,11 @@ Bool_t Road::Fit()
 				 (UInt_t)1, SizeMul<Pvec_t>() );
   }
   catch( overflow_error ) {
+    fTrkStat = kTooManyHitCombos;
     return false;
   }
   if( n_combinations > kMaxNhitCombos ) {
+    fTrkStat = kTooManyHitCombos;
     return false;
   }
 
@@ -720,19 +725,8 @@ Bool_t Road::Fit()
 	   << " ndof = " << fDof
 	   << endl;
 #endif
-    // Throw out Chi2's outside of selected confidence interval
-    // NB: Obviously, this requires accurate hit resolutions
-    //TODO: keep statistics
-    //TODO: allow disabling of low cutoff via database switch
-    if( chi2 < chi2_interval.first )
-      continue;
-    if( chi2 > chi2_interval.second )
-      continue;
-#ifdef TESTCODE
-    ++fNfits;
-#endif
 
-    // Save the best fit results
+    // Save the fit results (good or bad)
     if( chi2 < fChi2 ) {
       fPos   = a1;
       fSlope = a2;
@@ -741,13 +735,27 @@ Bool_t Road::Fit()
       // Save points used for this fit
       fFitCoord.swap( selected );
       fPlanePattern = pat;
+      // Throw out Chi2's outside of selected confidence interval
+      // NB: Obviously, this requires accurate hit resolutions
+      //TODO: keep statistics
+      //TODO: allow disabling of low cutoff via database switch
+      if( chi2 < chi2_interval.first )
+	continue;
+      if( chi2 > chi2_interval.second )
+	continue;
       fGood = true;
+#ifdef TESTCODE
+    ++fNfits;
+#endif
 #ifdef VERBOSE
       if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;
 #endif
     }
 
   }// for n_combinations
+
+  if( !fGood )
+    fTrkStat = kNoGoodFit;
 
   return fGood;
 }
@@ -803,6 +811,9 @@ void Road::Print( Option_t* ) const
 	 << " chi2 = " << fChi2
 	 << " ndof = " << fDof
 	 << endl;
+  }
+  else {
+    cout << " trkstat = " << fTrkStat << endl;
   }
 }
 
