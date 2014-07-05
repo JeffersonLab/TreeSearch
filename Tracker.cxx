@@ -1423,9 +1423,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 #endif
 
   Int_t err = 0;
-
-  bool do_thread = (fMaxThreads > 1);
-  if( do_thread ) {
+  if( fMaxThreads > 1 ) {
     err = fThreads->Run( fMaxThreads );
   } else {
     // Single-threaded execution: Track() each projection in turn
