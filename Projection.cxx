@@ -557,6 +557,8 @@ Int_t Projection::DefineVariables( EMode mode )
                                           "fRoads.TreeSearch::Road.fChi2" },
     { "rd.dof",   "Degrees of freedom of best fit",
                                            "fRoads.TreeSearch::Road.fDof" },
+    { "rd.pat",   "Bit pattern of plane numbers of hits",
+                                  "fRoads.TreeSearch::Road.fPlanePattern" },
     { "rd.good",  "Road has valid data",
                                           "fRoads.TreeSearch::Road.fGood" },
     { "rd.trkstat", "Road reconstruction status",
