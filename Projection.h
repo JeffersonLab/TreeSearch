@@ -110,9 +110,10 @@ namespace TreeSearch {
     };
 
     // Bad angle exception, may be thrown by SetAngle and constructors
-    class bad_angle : public std::range_error {
+    class bad_angle : public std::invalid_argument {
     public:
-      bad_angle( const std::string& what_arg ) : std::range_error(what_arg) {}
+      bad_angle( const std::string& what_arg )
+	: std::invalid_argument(what_arg) {}
     };
 
     enum ETrackingStatus {
