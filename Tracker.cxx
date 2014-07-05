@@ -2011,6 +2011,11 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   SetBit( kProjTrackToZ0, proj_to_z0 );
   bool doing_tracking = TestBit(kDoCoarse);
 
+  cout << endl;
+  Info( Here(here), "Tracker flags mcdata/evdisp/coarse/fine/projz0 = "
+	"%d/%d/%d/%d/%d", TestBit(kMCdata), TestBit(kEventDisplay),
+	TestBit(kDoCoarse), TestBit(kDoFine), TestBit(kProjTrackToZ0) );
+
   vector<string> planes = vsplit(planeconfig);
   if( planes.empty() ) {
     Error( Here(here), "No planes defined. Set \"planeconfig\" in database." );
