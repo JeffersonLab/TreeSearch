@@ -361,7 +361,7 @@ Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
     fMinProjAngleDiff(kMinProjAngleDiff), fIsRotated(false),
     fAllPartnered(false), fMaxThreads(1), fThreads(0),
     fMinReqProj(3), f3dMatchvalScalefact(1), f3dMatchCut(0),
-    fMinNdof(1), fFailNhits(0), fFailNpat(0),
+    fMinNdof(1), fTrkStat(kTrackOK),
     fNcombos(0), fN3dFits(0), fEvNum(0),
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
 {
@@ -409,11 +409,13 @@ void Tracker::Clear( Option_t* opt )
     for( vpsiz_t k = 0; k < fProj.size(); ++k )
       fProj[k]->Clear(opt);
   }
-  fFailNpat = fFailNhits = 0;
 #ifdef TESTCODE
   size_t nbytes = (char*)&t_coarse - (char*)&fNcombos + sizeof(t_coarse);
   memset( &fNcombos, 0, nbytes );
 #endif
+
+  // Clear tracking status
+  fTrkStat = kTrackOK;
 }
 
 //_____________________________________________________________________________
@@ -445,7 +447,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
     Int_t nhits = theProj->Decode( evdata );
     // Sanity cut on overfull planes. nhits < 0 indicates overflow
     if( nhits < 0 ) {
-      fFailNhits = 1;
+      fTrkStat = kTooManyRawHits;
       continue;
     }
     // No need to fill the hitpattern if no tracking requested
@@ -1361,8 +1363,13 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
   fNcombos = ncombos;
 #endif
 
-  if( ncombos == 0 )
+  if( ncombos == 0 ) {
+    if( inrange )
+      fTrkStat = kNoRoadCombos;   // bug?
+    else
+      fTrkStat = kTooManyRoadCombos;
     return 0;
+  }
 
   UInt_t nfound = MatchRoadsImpl( roads, ncombos, combos_found, unique_found );
 
@@ -1403,11 +1410,13 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 
   //  static const char* const here = "CoarseTrack";
 
-  if( fFailNhits )
+  if( fTrkStat != 0 )
     return -1;
 
-  if( !TestBit(kDoCoarse) )
+  if( !TestBit(kDoCoarse) ) {
+    fTrkStat = kNoTrackingRequested;
     return 0;
+  }
 
 #ifdef TESTCODE
   TStopwatch timer, timer_tot;
@@ -1426,10 +1435,9 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	err = 1;
     }
   }
-
   // Abort on error (e.g. too many patterns)
   if( err != 0 ) {
-    fFailNpat = 1;
+    fTrkStat = kProjTrackError;
     return -1;
   }
   // Copy pointers to roads from each projection into local 2D vector
@@ -1494,11 +1502,13 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
       if( fit_par.ndof > 0 ) {
 	if( PassTrackCuts(fit_par) )
 	  NewTrack( tracks, fit_par );
+	else
+	  fTrkStat = kFailedTrackCuts;
       }
       else
 	FitErrPrint( fit_par.ndof );
     }
-    else if( nfits > 0 ) {
+    else if( nfits > 1 ) {
       // For multiple road combinations, find the set of tracks with the
       // lowest chi2s that uses each road at most once
       typedef map<Rset_t, FitRes_t> FitResMap_t;
@@ -1538,20 +1548,32 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	}
       }
 #endif
-      // Select "optimal" set of roads, minimizing sum of chi2s
-      vector<Rset_t> best_roads;
-      OptimalN( unique_found, fit_chi2, best_roads,
-		AnySharedHits(), CheckTypes(found_types) );
+      if( !fit_chi2.empty() ) {
+	// Select "optimal" set of roads, minimizing sum of chi2s
+	vector<Rset_t> best_roads;
+	OptimalN( unique_found, fit_chi2, best_roads,
+		  AnySharedHits(), CheckTypes(found_types) );
 
-      // Now each selected road tuple corresponds to a new track
-      for( vector<Rset_t>::iterator it = best_roads.begin(); it !=
-	     best_roads.end(); ++it ) {
-	// Retrieve the fit results for this tuple
-	FitResMap_t::iterator found = fit_results.find(*it);
-	assert( found != fit_results.end() );
-	NewTrack( tracks, (*found).second );
+	if( best_roads.empty() )
+	  fTrkStat = kFailedOptimalN;
+
+	// Now each selected road tuple corresponds to a new track
+	for( vector<Rset_t>::iterator it = best_roads.begin(); it !=
+	       best_roads.end(); ++it ) {
+	  // Retrieve the fit results for this tuple
+	  FitResMap_t::iterator found = fit_results.find(*it);
+	  assert( found != fit_results.end() );
+	  NewTrack( tracks, (*found).second );
+	}
       }
+      else {
+	fTrkStat = kFailedTrackCuts;
+      }
+    }
+    else {
+      fTrkStat = kFailed3DMatch;
     } //if(nfits)
+
 #ifdef TESTCODE
     fN3dFits = nfits;
     t_3dfit = 1e6*timer.RealTime();
@@ -1575,25 +1597,30 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
       } else
 	cout << endl;
     }
-  }
-  else if( fDebug > 0 ) {
-    cout << "No tracks, number of projections with roads = " << nproj;
-    if( nproj > 0 ) {
-      // Write out the names of the active projections
-      cout << " (";
-      UInt_t ndone = 0;
-      for( EProjType k = kTypeBegin; k < kTypeEnd; ++k ) {
-	if( TESTBIT(found_types,k) ) {
-	  cout << kProjParam[k].name;
-	  if( ++ndone != nproj ) cout << ",";
-	}
-      }
-      assert( ndone == nproj );
-      cout << ")";
-    }
-    cout << ", >=2 required" << endl;
 #endif
-  } //if(nproj>=2)
+  }
+  else {
+    fTrkStat = kTooFewProj;
+#ifdef VERBOSE
+    if( fDebug > 0 ) {
+      cout << "No tracks, number of projections with roads = " << nproj;
+      if( nproj > 0 ) {
+	// Write out the names of the active projections
+	cout << " (";
+	UInt_t ndone = 0;
+	for( EProjType k = kTypeBegin; k < kTypeEnd; ++k ) {
+	  if( TESTBIT(found_types,k) ) {
+	    cout << kProjParam[k].name;
+	    if( ++ndone != nproj ) cout << ",";
+	  }
+	}
+	assert( ndone == nproj );
+	cout << ")";
+      }
+      cout << ", >=" << fMinReqProj << " required" << endl;
+    }
+#endif
+  } //if(nproj>=fMinReqProj)
 
 #ifdef TESTCODE
     t_coarse = 1e6*timer_tot.RealTime();
@@ -1617,6 +1644,9 @@ Int_t Tracker::FineTrack( TClonesArray& /* tracks */ )
   if( !TestBit(kDoFine) )
     return 0;
 
+  if( fTrkStat != 0 )
+    return -1;
+
   // TODO
 
   return 0;;
@@ -1633,7 +1663,7 @@ Int_t Tracker::DefineVariables( EMode mode )
   // Register variables in global list
 
   RVarDef vars[] = {
-    { "fail.nhits", "Too many hits in plane(s)",  "fFailNhits" },
+    { "trkstat", "Track reconstruction status",  "fTrkStat" },
     { 0 },
   };
   DefineVarsFromList( vars, mode );
@@ -1641,7 +1671,6 @@ Int_t Tracker::DefineVariables( EMode mode )
   // Define tracking-related variables only if doing tracking
   if( TestBit(kDoCoarse) ) {
     RVarDef vars_tracking[] = {
-      { "fail.npat",  "Too many treesearch patterns",       "fFailNpat" },
 #ifdef TESTCODE
       { "ncombos",    "Number of road combinations",        "fNcombos" },
       { "nfits",      "Number of 3D track fits done",       "fN3dFits" },

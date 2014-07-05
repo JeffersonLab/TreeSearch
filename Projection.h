@@ -115,6 +115,16 @@ namespace TreeSearch {
       bad_angle( const std::string& what_arg ) : std::range_error(what_arg) {}
     };
 
+    enum ETrackingStatus {
+      kTrackOK             = 0,
+      // Track
+      kNoPatterns          = 1, // TreeSearch found no patterns
+      kTooManyPatterns     = 2, // TreeSearch found too many patterns
+      // FitRoads
+      kFailed2DFits        = 3, // No roads with good fits
+    };
+    ETrackingStatus GetTrackingStatus() const { return fTrkStat; }
+
   protected:
     typedef std::vector<Node_t*> NodeVec_t;
 
@@ -151,6 +161,7 @@ namespace TreeSearch {
     TClonesArray*    fRoads;         // Roads found by MakeRoads
     UInt_t           fNgoodRoads;    // Good roads in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
+    ETrackingStatus  fTrkStat;       // Reconstruction status
 
     // Statistics (only needed for TESTCODE, but kept for binary compatibility)
     UInt_t n_hits, n_bins, n_binhits, maxhits_bin;

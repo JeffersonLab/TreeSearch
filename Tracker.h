@@ -80,6 +80,23 @@ namespace TreeSearch {
     vector<TreeSearch::Projection*>& GetListOfProjections() { return fProj; }
 #endif
 
+    enum ETrackingStatus {
+      kTrackOK             = 0,
+      // Decode
+      kTooManyRawHits      = 1, // Raw occupancy too high
+      // Coarse Track
+      kNoTrackingRequested = 2, // CoarseTracking turned off
+      kProjTrackError      = 3, // Failure in Projection::Track()
+      kTooFewProj          = 4, // Not enough projections with tracks
+      kFailed3DMatch       = 5, // No roads matched in 3D
+      kFailedTrackCuts     = 6, // All road combos failed ndof & chi2 cuts
+      kFailedOptimalN      = 7, // Failed 3D de-ghosting algorithm
+      // MatchRoads
+      kTooManyRoadCombos   = 8, // Overflow in MatchRoads
+      kNoRoadCombos        = 9  // Product of road vector sizes = 0 (bug?)
+    };
+    ETrackingStatus GetTrackingStatus() const { return fTrkStat; }
+
   protected:
     friend class Plane;
     class TrackFitWeight;
@@ -121,9 +138,8 @@ namespace TreeSearch {
     Int_t          fMinNdof;     // Minimum number of points in fit-4
     vec_pdbl_t     fChisqLimits; // lo/hi confidence interval limits on Chi2
 
-    // Event data
-    Int_t          fFailNhits;   // Too many hits in wire plane(s)
-    Int_t          fFailNpat;    // Too many treesearch patterns found
+    // Event-by-event data
+    ETrackingStatus fTrkStat;    // Reconstruction status
 
     // Only needed for TESTCODE, but kept for binary compatibility
     UInt_t         fNcombos;     // # of road combinations tried

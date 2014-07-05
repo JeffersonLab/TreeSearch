@@ -55,7 +55,8 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
     fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
     fPlaneCombos(0), fMaxPat(kMaxUInt), fFrontMaxBinDist(kMaxUInt),
     fBackMaxBinDist(kMaxUInt), fHitMaxDist(0), fConfLevel(1e-3),
-    fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0)
+    fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0),
+    fTrkStat(kTrackOK)
 {
   // Constructor
 
@@ -118,6 +119,7 @@ void Projection::Clear( Option_t* )
   fRoads->Delete();
   DeleteContainer( fPatternsFound );
   fNgoodRoads = 0;
+  fTrkStat = kTrackOK;
 
   if( TestBit(kEventDisplay) )
     fRoadCorners->Clear();
@@ -557,6 +559,10 @@ Int_t Projection::DefineVariables( EMode mode )
                                            "fRoads.TreeSearch::Road.fDof" },
     { "rd.good",  "Road has valid data",
                                           "fRoads.TreeSearch::Road.fGood" },
+    { "rd.trkstat", "Road reconstruction status",
+                                       "fRoads.TreeSearch::Road.fTrkStat" },
+
+    { "trkstat", "2D track reconstruction status",  "fTrkStat" },
     { 0 }
   };
   DefineVarsFromList( vars, mode );
@@ -620,6 +626,7 @@ Int_t Projection::Track()
   // database. Results in fPatternsFound.
 
   assert( fPatternsFound.empty() );
+  assert( GetTrackingStatus() == kTrackOK );
 
 #ifdef TESTCODE
   TStopwatch timer, timer_tot;
@@ -648,11 +655,14 @@ Int_t Projection::Track()
   timer.Start();
 #endif
 
-  if( fPatternsFound.empty() )
+  if( fPatternsFound.empty() ) {
+    fTrkStat = kNoPatterns;
     goto quit;
+  }
   // Die if too many patterns - noisy event
   if( (UInt_t)fPatternsFound.size() > fMaxPat ) {
     // TODO: keep statistics
+    fTrkStat = kTooManyPatterns;
     ret = -1;
     goto quit;
   }
@@ -964,20 +974,19 @@ Bool_t Projection::FitRoads()
   for( UInt_t i = 0; i < GetNroads(); ++i ) {
     Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
     assert(rd);
-    if( rd->IsGood() ) {
-      if( rd->Fit() )
-	// Count good roads (not void and good fit)
-	++fNgoodRoads;
-      else {
-	// Void roads with bad fits
-	rd->Void();
-	changed = true;
+    if( rd->Fit() )
+      // Count good roads (not void and good fit)
+      ++fNgoodRoads;
+    else {
+      changed = true;
 #ifdef TESTCODE
-	++n_badfits;
+      ++n_badfits;
 #endif
-      }
     }
   }
+  if( GetNroads() > 0 && fNgoodRoads == 0 )
+    fTrkStat = kFailed2DFits;
+
   return changed;
 }
 
