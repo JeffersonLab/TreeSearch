@@ -68,37 +68,11 @@ namespace TreeSearch {
     };
 
   protected:
-    Double_t fPos;         // Wire position along plane axis (m)
-    Double_t fResolution;  // Resolution of fPosR/fPosL (m)
+    Double_t fPos;         // Hit position along plane coordinate axis (m)
+    Double_t fResolution;  // Resolution of fPos (sigma, m)
     Plane*   fPlane;       //! Pointer to the plane obj where this hit occurred
 
     ClassDef(Hit,1)        // Generic tracker plane hit
-  };
-
-
-  //___________________________________________________________________________
-  // Monte Carlo truth info for a hit.
-  //TODO: Skeleton version - to be fleshed out
-
-  class MCTrack;
-  class MCHitInfo {
-
-  public:
-    MCHitInfo() : fMCTrack(0) {}
-    MCHitInfo( MCTrack* mctrk, Double_t mcpos )
-      : fMCTrack(mctrk), fMCPos(mcpos) {}
-    virtual ~MCHitInfo() {}
-
-    virtual void MCPrint() const;
-
-    MCTrack* GetMCTrack() const { return fMCTrack; }
-    Double_t GetMCPos()   const { return fMCPos; }
-
-  protected:
-    MCTrack* fMCTrack;     // MC track generating this hit (0=noise hit)
-    Double_t fMCPos;       // Exact MC track crossing position (m)
-
-    ClassDef(MCHitInfo,1)  // Generic Monte Carlo hit info
   };
 
   //___________________________________________________________________________

@@ -22,7 +22,7 @@
 #include "Helper.h"
 
 #include "THaDetMap.h"
-#include "THaEvData.h"
+#include "SimDecoder.h"
 #include "THaTrack.h"
 
 #include "TString.h"
@@ -359,7 +359,7 @@ private:
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
     fMinProjAngleDiff(kMinProjAngleDiff), fIsRotated(false),
-    fAllPartnered(false), fMaxThreads(1), fThreads(0),
+    fAllPartnered(false), fChecked(false), fMaxThreads(1), fThreads(0),
     fMinReqProj(3), f3dMatchvalScalefact(1), f3dMatchCut(0),
     fMinNdof(1), fTrkStat(kTrackOK),
     fNcombos(0), fN3dFits(0), fEvNum(0),
@@ -423,7 +423,17 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 {
   // Decode all planes and fill hitpatterns per projection
 
-  //  static const char* const here = "Decode";
+  static const char* const here = "Tracker::Decode";
+
+  if( !fChecked ) {
+    if( TestBit(kMCdata) &&
+	dynamic_cast<const Podd::SimDecoder*>(&evdata) == 0 ) {
+      Error( Here(here), "MCdata flag set, but decoder is not a SimDecoder. "
+	     "Fix database or replay configuration." );
+      throw bad_config("Attempt to decode MCdata without a SimDecoder");
+    }
+    fChecked = true;
+  }
 
 #ifdef TESTCODE
   // Save current event number for diagnostics

@@ -11,6 +11,7 @@
 
 #include "Hit.h"
 #include "WirePlane.h"
+#include "SimDecoder.h"  // for MC data support
 
 namespace TreeSearch {
 
@@ -104,18 +105,18 @@ namespace TreeSearch {
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
 
-  class MCWireHit : public WireHit, public MCHitInfo {
+  class MCWireHit : public WireHit, public Podd::MCHitInfo {
 
   public:
     MCWireHit() {}
     MCWireHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
-	       WirePlane* wp, MCTrack* mctrk, Double_t mcpos )
-      : WireHit(wnum, pos, tdc, time, res, wp), MCHitInfo(mctrk, mcpos) {}
+	       WirePlane* wp, Int_t mctrk, Double_t mcpos, Double_t mctime )
+      : WireHit(wnum, pos, tdc, time, res, wp), MCHitInfo(mctrk, mcpos, mctime) {}
     virtual ~MCWireHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
 
-    ClassDef(MCWireHit,1)  // Monte Carlo hit in horizontal drift chamber
+    ClassDef(MCWireHit,2)  // Monte Carlo hit in horizontal drift chamber
   };
 
   //___________________________________________________________________________

@@ -11,6 +11,7 @@
 
 #include "Hit.h"
 #include "GEMPlane.h"
+#include "SimDecoder.h"  // for MC data support
 
 namespace TreeSearch {
 
@@ -41,19 +42,20 @@ namespace TreeSearch {
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
 
-  class MCGEMHit : public GEMHit, public MCHitInfo {
+  class MCGEMHit : public GEMHit, public Podd::MCHitInfo {
 
   public:
     MCGEMHit() {}
     MCGEMHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
-	      Double_t res, GEMPlane* pl, MCTrack* mctrk, Double_t mcpos )
+	      Double_t res, GEMPlane* pl, Int_t mctrk, Double_t mcpos,
+	      Double_t mctime, Int_t num_bg_strips )
       : GEMHit(pos, adc_sum, num_strips, type, res, pl),
-	MCHitInfo(mctrk, mcpos) {}
+	MCHitInfo(mctrk, mcpos, mctime, num_bg_strips) {}
     virtual ~MCGEMHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
 
-    ClassDef(MCGEMHit,1)   // Monte Carlo hit in ADC-based readout plane
+    ClassDef(MCGEMHit,2)   // Monte Carlo hit in ADC-based readout plane
   };
 
 ///////////////////////////////////////////////////////////////////////////////
