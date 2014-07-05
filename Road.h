@@ -138,7 +138,7 @@ namespace TreeSearch {
     Hset_t         fHits;       // All hits linked to the patterns
     vector<Pvec_t> fPoints;     // All hit coordinates within road [nplanes][]
     Pvec_t         fFitCoord;   // fPoints used in best fit [nplanes]
-    UInt_t         fPlanePattern; // Bitpattern of active planes
+    UInt_t         fPlanePattern; // Bitpattern of planes in best fit
 
     const Projection* fProjection; //! Projection that this Road belongs to
 
