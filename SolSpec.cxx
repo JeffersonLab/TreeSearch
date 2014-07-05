@@ -50,8 +50,8 @@ SolSpec::SolSpec( const char* name, const char* description,
     stringstream sn, sd;
     sn << "tracker." << i;
     sd << "SoLID tracker in sector " << i;
-    GEMTracker* theTracker = new GEMTracker( sn.str().c_str(),
-					     sd.str().c_str() );
+    SoLID::GEMTracker* theTracker = new SoLID::GEMTracker( sn.str().c_str(),
+							   sd.str().c_str() );
     theTracker->SetSectorNumber(i-1);
     Int_t ret = AddDetector( theTracker );
     if( ret != 0 ) {
@@ -210,7 +210,8 @@ Int_t SolSpec::TrackCalc()
 {
   // Additional track calculations
 
-  // TODO
+
+  // TODO: Vertex reconstruction
 
   return 0;
 }
