@@ -261,6 +261,10 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   bool do_pedestal_subtraction = !fPed.empty();
   bool do_noise_subtraction    = TestBit(kDoNoise);
 
+  vector<MCHitInfo> mcinfo;
+  if( mc_data )
+    mcinfo.resize(fNelem);   // this can be fairly big, ~500 kB
+
   // Decode data
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
     THaDetMap::Module * d = fDetMap->GetModule(imod);
@@ -321,6 +325,12 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       }
       fADCped[istrip] = adc;
 
+      // If doing MC data, save the truth information for each strip
+      if( mc_data ) {
+	assert( dynamic_cast<const SimDecoder*>(&evData) );
+	const SimDecoder& simdata = static_cast<const SimDecoder&>(evData);
+	mcinfo[istrip] = simdata.GetMCHitInfo(d->crate,d->slot,chan);
+      }
     }  // chans
   }    // modules
 
@@ -336,6 +346,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   }
 
   // Put corrected ADC data into sorted map. Fill histograms.
+  // FIXME: using a map here is overkill, a vector of strip numbers will do
   Hitmap_t rawhits;
   for( Int_t i = 0; i < fNelem; i++ ) {
     if( do_noise_subtraction )
@@ -399,6 +410,11 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     }
     // Now the cluster candidate is between start and cur
     assert( (*cur).first >= (*start).first );
+    // The "type" parameter indicates the result of the cluster analysis:
+    // 0: clean (i.e. smaller than fMaxClusterSize, no further analysis)
+    // 1: large, maximum at right edge, not split
+    // 2: large, no clear minimum on the right side found, not split
+    // 3: split, well-defined peak found (may still be larger than maxsize)
     Int_t  type = 0;
     UInt_t size = (*cur).first - (*start).first + 1;
     if( size > fMaxClusterSize ) {
@@ -455,24 +471,48 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       size = (*cur).first - (*start).first + 1;
       assert( (*cur).first >= (*start).first );
     }
+    assert( size > 0 );
     // Compute weighted position average. Again, a crude (but fast) substitute
     // for fitting the centroid of the peak.
-    Double_t xsum = 0.0, adcsum = 0.0;
+    Double_t xsum = 0.0, adcsum = 0.0, mcpos = 0.0, mctime = kBig;
+    Int_t mctrack = 0, num_bg = 0;
     for( ; start != next; ++start ) {
-      Double_t pos = GetStart() + (*start).first * GetPitch();
+      Int_t istrip = (*start).first;
+      Double_t pos = GetStart() + istrip * GetPitch();
       Double_t adc = (*start).second;
       xsum   += pos * adc;
       adcsum += adc;
+      // If doing MC data, analyze the strip truth information
+      if( mc_data ) {
+	MCHitInfo& mc = mcinfo[istrip];
+	// This may be smaller than the actual total number of background hits
+	// contributing to the entire cluster, but counting them would involve
+	// lists of secondary particle numbers ... overkill for now
+	num_bg = TMath::Max( num_bg, mc.fContam );
+	// All primary particle hits in the cluster are from the same track
+	assert( mctrack == 0 || mc.fMCTrack == 0 || mctrack == mc.fMCTrack );
+	if( mctrack == 0 ) {
+	  if( mc.fMCTrack > 0 ) {
+	    // If the cluster contains a signal hit, save its info and be done
+	    mctrack = mc.fMCTrack;
+	    mcpos   = mc.fMCPos;
+	    mctime  = mc.fMCTime;
+	  }
+	  else {
+	    // If background hits only, compute position average
+	    mcpos  += mc.fMCPos;
+	    mctime  = TMath::Min( mctime, mc.fMCTime );
+	  }
+	}
+      }
     }
     assert( adcsum > 0.0 );
-    // Make a new hit
-    //
-    // The "type" parameter indicates the result of the cluster analysis:
-    // 0: clean (i.e. smaller than fMaxClusterSize, no further analysis)
-    // 1: large, maximum at right edge, not split
-    // 2: large, no clear minimum on the right side found, not split
-    // 3: split, well-defined peak found (may still be larger than maxsize)
-    //
+    Double_t pos = xsum/adcsum;
+
+    if( mc_data && mctrack == 0 ) {
+      mcpos /= static_cast<Double_t>(size);
+    }
+
     // The resolution (sigma) of the position measurement depends on the
     // cluster size. In particular, if the cluster consists of only a single
     // hit, the resolution is much reduced
@@ -489,7 +529,8 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 //       // Again, this is a guess, to be quantified with Monte Carlo
 //       resolution = 1.2*fResolution;
     }
-    Double_t pos = xsum/adcsum;
+
+    // Make a new hit
 #ifndef NDEBUG
     GEMHit* theHit = 0;
 #endif
@@ -515,10 +556,10 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 					   type,
 					   resolution,
 					   this,
-					   0,  // MCtrack
-					   0,  // MCpos
-					   0,  // MCtime
-					   0   // num_bg
+					   mctrack,
+					   mcpos,
+					   mctime,
+					   num_bg
 					   );
     }
 #ifndef NDEBUG
@@ -586,11 +627,14 @@ Int_t GEMPlane::DefineVariables( EMode mode )
     // respect to the MCGEMHit class and not just GEMHit - the memory layout
     // of classes under multiple inheritance might be implemetation-dependent
     RVarDef mcvars[] = {
-      { "hit.pos",  "Hit centroid (m)",      "fHits.TreeSearch::MCGEMHit.fPos" },
-      { "hit.adc",  "Hit ADC sum",           "fHits.TreeSearch::MCGEMHit.fADCsum" },
-      { "hit.size", "Num strips ",           "fHits.TreeSearch::MCGEMHit.fSize" },
-      { "hit.type", "Hit analysis result",   "fHits.TreeSearch::MCGEMHit.fType" },
-      { "mcpos",    "MC track position (m)", "fHits.TreeSearch::MCGEMHit.fMCPos" },
+      { "hit.pos",   "Hit centroid (m)",      "fHits.TreeSearch::MCGEMHit.fPos" },
+      { "hit.adc",   "Hit ADC sum",           "fHits.TreeSearch::MCGEMHit.fADCsum" },
+      { "hit.size",  "Num strips ",           "fHits.TreeSearch::MCGEMHit.fSize" },
+      { "hit.type",  "Hit analysis result",   "fHits.TreeSearch::MCGEMHit.fType" },
+      { "hit.mctrk", "MC track number",       "fHits.TreeSearch::MCGEMHit.fMCTrack" },
+      { "hit.mcpos", "MC track position (m)", "fHits.TreeSearch::MCGEMHit.fMCPos" },
+      { "hit.mctime","MC track time (s)",     "fHits.TreeSearch::MCGEMHit.fMCTime" },
+      { "hit.numbg", "MC num backgr hits",    "fHits.TreeSearch::MCGEMHit.fContam" },
       { 0 }
     };
     ret = DefineVarsFromList( mcvars, mode );
