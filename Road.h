@@ -8,7 +8,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Hit.h"
-#include "Node.h"
 #include "TVector2.h"
 #include <set>
 #include <utility>

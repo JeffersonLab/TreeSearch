@@ -8,7 +8,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Pattern.h"
-#include <utility>
 
 namespace TreeSearch {
 
@@ -75,9 +74,6 @@ namespace TreeSearch {
       return !operator==(rhs);
     }
   };
-
-  class HitSet;
-  typedef std::pair<NodeDescriptor,HitSet> Node_t;
 
   /////////////////////////////////////////////////////////////////////////////
 

@@ -8,7 +8,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "THaAnalysisObject.h"
-#include "TreeWalk.h"  // for NodeVisitor, Node_t
+#include "TreeWalk.h"   // for NodeVisitor
+#include "Hit.h"        // for Node_t
 #include "Types.h"
 #include "TMath.h"
 #include "TClonesArray.h"
@@ -28,7 +29,6 @@ namespace TreeSearch {
 
   class Hitpattern;
   class PatternTree;
-  class Plane;
   class Road;
 
   class Projection : public THaAnalysisObject {

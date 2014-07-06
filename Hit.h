@@ -11,6 +11,7 @@
 
 #include "Plane.h"
 #include "TBits.h"
+#include "Node.h"  // for NodeDescriptor
 #include <utility>
 #include <set>
 #include <cassert>
@@ -202,6 +203,8 @@ namespace TreeSearch {
 
     ClassDef(HitSet, 0)  // A set of hits associated with a pattern
   };
+
+  typedef std::pair<NodeDescriptor,HitSet> Node_t;
 
   //___________________________________________________________________________
   inline
