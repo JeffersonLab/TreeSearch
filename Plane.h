@@ -150,11 +150,6 @@ namespace TreeSearch {
 #endif
     };
 
-  private:
-#ifndef NDEBUG
-    Tracker* GetTrackerSafe()  const;
-#endif
-
     ClassDef(Plane,0)  // One Tracker plane coordinate direction
   };
 
