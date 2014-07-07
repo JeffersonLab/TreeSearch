@@ -2044,7 +2044,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     }
     Plane* newplane = 0;
     try { newplane = MakePlane( name, name, this ); }
-    catch( bad_alloc ) { newplane = 0; }
+    catch( ... ) { newplane = 0; }
     if( !newplane or newplane->IsZombie() ) {
       // Urgh. Something is very bad
       Error( Here(here), "Error creating readout plane %s. Call expert.",
