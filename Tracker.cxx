@@ -22,7 +22,6 @@
 #include "Helper.h"
 
 #include "THaDetMap.h"
-#include "SimDecoder.h"
 #include "THaTrack.h"
 
 #include "TString.h"
@@ -49,6 +48,8 @@
 #endif
 
 using namespace std;
+using namespace Podd;
+
 typedef string::size_type ssiz_t;
 
 namespace {
@@ -361,7 +362,7 @@ Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
     fMinProjAngleDiff(kMinProjAngleDiff), fIsRotated(false),
     fAllPartnered(false), fChecked(false), fMaxThreads(1), fThreads(0),
     fMinReqProj(3), f3dMatchvalScalefact(1), f3dMatchCut(0),
-    fMinNdof(1), fTrkStat(kTrackOK),
+    fMinNdof(1), fTrkStat(kTrackOK), fMCDecoder(0), fMCPointUpdater(0),
     fNcombos(0), fN3dFits(0), fEvNum(0),
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
 {
@@ -383,6 +384,8 @@ Tracker::~Tracker()
 
   DeleteContainer( fPlanes );
   DeleteContainer( fProj );
+
+  delete fMCPointUpdater;
 }
 
 //_____________________________________________________________________________
@@ -426,11 +429,13 @@ Int_t Tracker::Decode( const THaEvData& evdata )
   static const char* const here = "Tracker::Decode";
 
   if( !fChecked ) {
-    if( TestBit(kMCdata) &&
-	dynamic_cast<const Podd::SimDecoder*>(&evdata) == 0 ) {
-      Error( Here(here), "MCdata flag set, but decoder is not a SimDecoder. "
-	     "Fix database or replay configuration." );
-      throw bad_config("Attempt to decode MCdata without a SimDecoder");
+    if( TestBit(kMCdata) ) {
+      fMCDecoder = dynamic_cast<const Podd::SimDecoder*>(&evdata);
+      if( fMCDecoder == 0 ) {
+	Error( Here(here), "MCdata flag set, but decoder is not a SimDecoder. "
+	       "Fix database or replay configuration." );
+	throw bad_config("Attempt to decode MCdata without a SimDecoder");
+      }
     }
     fChecked = true;
   }
@@ -465,6 +470,133 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       theProj->FillHitpattern();
   }
 
+  // For MCdata, check which MC track points were detected
+  if( TestBit(kMCdata) ) {
+    for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
+      FindHitForMCPoint( fMCDecoder->GetMCPoint(i), fMCPointUpdater );
+    }
+  }
+
+  return 0;
+}
+
+//_____________________________________________________________________________
+void Tracker::MCPointUpdater::UpdateHit( MCTrackPoint* pt, Hit* hit,
+					 Double_t x ) const
+{
+  // Standard updater of MCTrackPoint hit residual. x is the track point
+  // position converted to the coordinate system of the plane that the hit
+  // belongs to.
+
+  assert( pt );
+  if( hit ) {
+    pt->fStatus = 0;
+    pt->fHitResid = hit->GetPos() - x;
+  }
+  else
+    pt->fStatus = 1;
+};
+
+//_____________________________________________________________________________
+void Tracker::MCPointUpdater::UpdateTrack( MCTrackPoint* pt, Plane* pl,
+					   THaTrack* trk, Double_t x ) const
+{
+  // Standard updater of MCTrackPoint tracks residual. x is the track point
+  // position converted to the coordinate system of the plane that the hit
+  // belongs to.
+
+  assert( pt );
+  if( trk ) {
+    Double_t cosa   = pl->GetProjection()->GetCosAngle();
+    Double_t sina   = pl->GetProjection()->GetSinAngle();
+    Double_t slope  = trk->GetDTheta()*cosa + trk->GetDPhi()*sina;
+    Double_t trkpos = trk->GetDX()*cosa + trk->GetDY()*sina + slope*pl->GetZ();
+    pt->fTrackResid = trkpos - x;
+  }
+  else
+    pt->fStatus = 2; // FIXME: set bits?
+};
+
+//_____________________________________________________________________________
+Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
+				 MCPointUpdater* Updater ) const
+{
+  // Find the best-matching hit for the given MC track point
+
+  typedef Rpvec_t::const_iterator citer_t;
+  assert( pt );
+  assert( pt->fMCTrack > 0 );
+
+  // Convert the MC point to the tracker frame
+  TVector3 point = pt->fMCPoint - fOrigin;
+  // Find plane(s) for this point. Since the plane numbering can be ambiguous,
+  // we search by z-position. Certain trackers have more than one plane with the
+  // same z, which are then distinguished by the plane type (u,v,x etc.)
+  pair<citer_t,citer_t> range =
+    equal_range( ALL(fPlanes), point.Z(), Plane::ZIsNear(0.001) );
+
+  Hit* hit = 0;
+  Double_t x = kBig;
+  for( citer_t it = range.first; it != range.second; ++it ) {
+    const Plane* pl = *it;
+    if( pl->GetType() != pt->fType )
+      continue;
+
+    const TSeqCollection* hits = pl->GetHits();
+    Int_t end = hits->GetLast()+1;
+    if( end > 0 ) {
+      // NB: the plane hit coordinates are given in the tracker frame
+      Double_t cosa = pl->GetProjection()->GetCosAngle();
+      Double_t sina = pl->GetProjection()->GetSinAngle();
+      x = point.X()*cosa + point.Y()*sina;
+
+      Int_t pos = FindHitWithLowerBound( hits, x );
+      if( pos == end ) --pos;
+      hit = static_cast<Hit*>(hits->At(pos));
+
+      // We need the dynamic_cast here because Hits use multiple inheritance
+      // to bring in the MCHitInfo
+      MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(hit);
+      assert( mcinfo );
+      if( mcinfo->fMCTrack != pt->fMCTrack ) {
+	// We have a hit, but it's not from our track. Check nearby hits.
+	hit = 0;
+	Int_t down = pos, up = pos;
+	while( --down >= 0 or ++up < end ) {
+	  if( down >= 0 ) {
+	    Hit* hcur = static_cast<Hit*>( hits->At(down) );
+	    mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
+	    if( mcinfo->fMCTrack == pt->fMCTrack ) {
+	      hit = hcur;
+	      break;
+	    }
+	  }
+	  if( up < end ) {
+	    Hit* hcur = static_cast<Hit*>( hits->At(up) );
+	    mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
+	    if( mcinfo->fMCTrack == pt->fMCTrack ) {
+	      hit = hcur;
+	      break;
+	    }
+	  }
+	}
+      }
+      if( hit )
+	break;
+    }
+  }
+  if( Updater )
+    Updater->UpdateHit( pt, hit, x );
+  return hit;
+}
+
+//_____________________________________________________________________________
+THaTrack* Tracker::FindTrackForMCPoint( MCTrackPoint* pt, TClonesArray& tracks,
+					MCPointUpdater* Updater ) const
+{
+  // Find the best-matching track for the given MC track point
+
+  //TODO
   return 0;
 }
 
@@ -727,31 +859,19 @@ void Tracker::FindNearestHits( Plane* pl, const THaTrack* track,
   Double_t slope = track->GetDTheta()*cosa + track->GetDPhi()*sina;
   Double_t x     = track->GetDX()*cosa + track->GetDY()*sina + slope*z;
   Double_t pmin  = kBig;
-  Hit* hmin = 0;
+  Hit*     hmin  = 0;
 
   const TSeqCollection* hits = pl->GetHits();
-  Int_t last = hits->GetSize();
+  // Int_t last = hits->GetSize();
   // If "hits" is a TObjArray or TClonesArray, we must get the size using
   // GetLast() instead of GetSize() (a ROOT quirk)
-  const TObjArray* arr = dynamic_cast<const TObjArray*>(hits);
-  if( arr )
-    last = arr->GetLast()+1;
-
+  // const TObjArray* arr = dynamic_cast<const TObjArray*>(hits);
+  // if( arr )
+  //   last = arr->GetLast()+1;
+  assert( dynamic_cast<const TObjArray*>(hits) );
+  Int_t last = hits->GetLast()+1;
   if( last > 0 ) {
-    // Binary search the hits array for the track crossing position x, similar
-    // to std::lower_bound(). This finds the first hit with position >= x.
-    Int_t first = 0, len = last - first;
-    while( len > 0 ) {
-      Int_t half = len >> 1;
-      Int_t middle = first + half;
-      if( static_cast<Hit*>(hits->At(middle))->GetPos() < x ) {
-	first = middle + 1;
-	len -= half + 1;
-      } else
-	len = half;
-    }
-    assert( first <= last );
-
+    Int_t first = FindHitWithLowerBound( hits, x );
     // Find the hit (hmin) and its coordinate of closest approach (pmin).
     // Details depend on the type of detector technology (wires, strips).
     FindNearestHitsImpl( hits, first, last, x, hmin, pmin );
@@ -776,6 +896,32 @@ void Tracker::FindNearestHits( Plane* pl, const THaTrack* track,
 
   // Finally, record the hit info in the readout plane
   pl->AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
+}
+
+//_____________________________________________________________________________
+Int_t Tracker::FindHitWithLowerBound( const TSeqCollection* hits,
+				      Double_t x ) const
+{
+  // Binary search of the sorted hits array for the track crossing position x,
+  // similar to std::lower_bound(). This finds the first hit with position >= x.
+
+  Int_t last = hits->GetLast()+1;
+  Int_t first = 0;
+
+  if( last > 0 ) {
+    Int_t len = last - first;
+    while( len > 0 ) {
+      Int_t half = len >> 1;
+      Int_t middle = first + half;
+      if( static_cast<Hit*>(hits->At(middle))->GetPos() < x ) {
+	first = middle + 1;
+	len -= half + 1;
+      } else
+	len = half;
+    }
+    assert( first <= last );
+  }
+  return first;
 }
 
 //_____________________________________________________________________________
@@ -1061,7 +1207,7 @@ void Tracker::Add3dMatch( const Rvec_t& selected, Double_t matchval,
   if( fDebug > 3 )
     cout << "ACCEPTED" << endl;
 #endif
-}
+};
 
 //_____________________________________________________________________________
 UInt_t Tracker::MatchRoadsGeneric( vector<Rvec_t>& roads, const UInt_t ncombos,
@@ -1319,7 +1465,7 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   }
 
   return nfound;
-}
+};
 
 //_____________________________________________________________________________
 UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
@@ -1920,6 +2066,12 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   // Keep a simple flag for the rotation status for efficiency.
   fIsRotated = !fRotation.IsIdentity();
 
+  // Set up handler for MC data
+  if( TestBit(kMCdata) ) {
+    delete fMCPointUpdater;
+    fMCPointUpdater = new MCPointUpdater;
+  }
+
   return fStatus = kOK;
 }
 
@@ -2022,9 +2174,11 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   bool doing_tracking = TestBit(kDoCoarse);
 
   cout << endl;
-  Info( Here(here), "Tracker flags mcdata/evdisp/coarse/fine/projz0 = "
-	"%d/%d/%d/%d/%d", TestBit(kMCdata), TestBit(kEventDisplay),
-	TestBit(kDoCoarse), TestBit(kDoFine), TestBit(kProjTrackToZ0) );
+  if( fDebug > 0 ) {
+    Info( Here(here), "Tracker flags mcdata/evdisp/coarse/fine/projz0 = "
+	  "%d/%d/%d/%d/%d", TestBit(kMCdata), TestBit(kEventDisplay),
+	  TestBit(kDoCoarse), TestBit(kDoFine), TestBit(kProjTrackToZ0) );
+  }
 
   vector<string> planes = vsplit(planeconfig);
   if( planes.empty() ) {
@@ -2249,4 +2403,3 @@ UInt_t Tracker::GetDAQnchan( THaDetMap::Module* mod ) const
 } // end namespace TreeSearch
 
 ClassImp(TreeSearch::Tracker)
-

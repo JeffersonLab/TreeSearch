@@ -55,6 +55,13 @@ namespace TreeSearch {
     // Podd interface
     virtual Int_t  ReadDatabase( const TDatime& date );
 
+    // Helper class to use with FindHitForMCPoint & FindTrackForMCPoint
+    class LRPointUpdater : public MCPointUpdater {
+    public:
+      virtual void UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
+			      Double_t x ) const;
+    };
+
     ClassDef(MWDC,0)   // TreeSearch reconstruction of a horizontal drift chamber system
   };
 

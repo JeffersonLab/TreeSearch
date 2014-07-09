@@ -246,6 +246,12 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   // Reference map set up correctly and without conflicts
   fRefTime.assign( fRefMap->GetSize(), kBig );
 
+  // Set up handler for MC data aware of LR hits
+  if( TestBit(kMCdata) ) {
+    delete fMCPointUpdater;
+    fMCPointUpdater = new LRPointUpdater;
+  }
+
   return fStatus = kOK;
 }
 
@@ -387,9 +393,26 @@ UInt_t MWDC::GetCrateMapDBcols() const
   return 6;
 }
 
+//_____________________________________________________________________________
+void MWDC::LRPointUpdater::UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
+				      Double_t x ) const
+{
+  // Updater for MCTrackPoint hit residual aware of LR hits
+
+  assert( pt );
+
+  if( !hit )
+    return MCPointUpdater::UpdateHit(pt,hit,x);
+  pt->fStatus = 0;
+  assert( dynamic_cast<WireHit*>(hit) );
+  WireHit* wirehit = static_cast<WireHit*>(hit);
+  Double_t dx1 = wirehit->GetPosR() - x;
+  Double_t dx2 = wirehit->GetPosL() - x;
+  pt->fHitResid = TMath::Min(dx1,dx2);
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace TreeSearch
 
 ClassImp(TreeSearch::MWDC)
-

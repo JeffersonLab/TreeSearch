@@ -99,6 +99,16 @@ namespace TreeSearch {
 	  (a->GetZ() < b->GetZ()) : (a->GetDefinedNum() < b->GetDefinedNum());
       }
     };
+    class ZIsNear {
+    public:
+      ZIsNear( Double_t tolerance ) : fTol(tolerance) {}
+      bool operator() ( const Plane* pl, Double_t z ) const
+      {	assert(pl); return ( pl->GetZ() + fTol < z ); }
+      bool operator() ( Double_t z, const Plane* pl ) const
+      {	assert(pl); return ( z + fTol < pl->GetZ() ); }
+    private:
+      Double_t fTol;
+    };
 
     class NameEquals : public std::unary_function< Plane*, bool > {
     public:

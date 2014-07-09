@@ -11,6 +11,7 @@
 
 #include "THaTrackingDetector.h"
 #include "THaDetMap.h"
+#include "SimDecoder.h"
 #include "Types.h"
 #include <vector>
 #include <utility>
@@ -120,6 +121,8 @@ namespace TreeSearch {
     typedef std::vector<Plane*>  Rpvec_t;
     typedef std::vector<Projection*> Prvec_t;
 
+    class MCPointUpdater;
+
     // Planes and projections
     Rpvec_t        fPlanes;           // Readout planes
     Prvec_t        fProj;             // Plane projections
@@ -150,6 +153,9 @@ namespace TreeSearch {
     // Event-by-event data
     ETrackingStatus fTrkStat;    // Reconstruction status
 
+    const Podd::SimDecoder* fMCDecoder; //! MC data decoder (if kMCdata)
+    MCPointUpdater* fMCPointUpdater;    //! MC track point update (if kMCdata)
+
     // Only needed for TESTCODE, but kept for binary compatibility
     UInt_t         fNcombos;     // # of road combinations tried
     UInt_t         fN3dFits;     // # of track fits done (=good road combos)
@@ -169,14 +175,18 @@ namespace TreeSearch {
     Bool_t    PassTrackCuts( const FitRes_t& fit_par ) const;
 
     UInt_t MatchRoadsGeneric( vector<Rvec_t>& roads, UInt_t ncombos,
-			      std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-			      Rset_t& unique_found );
+             std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+	     Rset_t& unique_found );
 
     UInt_t MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t ncombos,
-			     std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-			     Rset_t& unique_found );
+	     std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+	     Rset_t& unique_found );
 
-    // Virtualization of the tracker class, specialized Trackers may/must override
+    Int_t FindHitWithLowerBound( const TSeqCollection* hits,
+				 Double_t x ) const;
+
+    // Virtualization of the tracker class, specialized Trackers may/must
+    // override
     virtual Plane* MakePlane( const char* name, const char* description = "",
 			      THaDetectorBase* parent = 0 ) const = 0;
     virtual Projection* MakeProjection( EProjType type, const char* name,
@@ -191,16 +201,22 @@ namespace TreeSearch {
 					Hit*& hmin, Double_t& pmin ) const;
 
     virtual UInt_t MatchRoads( vector<Rvec_t>& roads,
-			       std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-			       Rset_t& unique_found );
+	         std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+		 Rset_t& unique_found );
     virtual UInt_t MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
-				   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-				   Rset_t& unique_found ) = 0;
+                 std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+                 Rset_t& unique_found ) = 0;
 
     virtual THaAnalysisObject::EStatus PartnerPlanes() = 0;
 
     virtual Int_t NewTrackCalc( THaTrack* newTrack, const TVector3& pos,
 				const TVector3& dir );
+
+    virtual Hit* FindHitForMCPoint( Podd::MCTrackPoint* pt,
+				    MCPointUpdater* updater ) const;
+    virtual THaTrack* FindTrackForMCPoint( Podd::MCTrackPoint* pt,
+					   TClonesArray& tracks,
+					   MCPointUpdater* updater ) const;
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
@@ -209,6 +225,15 @@ namespace TreeSearch {
 
     // Podd interface
     virtual Int_t  ReadDatabase( const TDatime& date );
+
+    // Helper class to use with FindHitForMCPoint & FindTrackForMCPoint
+    class MCPointUpdater {
+    public:
+      virtual void UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
+			      Double_t x ) const;
+      virtual void UpdateTrack( Podd::MCTrackPoint* pt, Plane* pl,
+				THaTrack* track, Double_t x ) const;
+    };
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };
