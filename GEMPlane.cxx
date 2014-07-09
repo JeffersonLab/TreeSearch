@@ -174,28 +174,26 @@ static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
   // From Kalyan Allada
   // NIM A326, 112 (1993)
 
+  //FIXME: from database, proper value for Tp
   const Float_t delta_t = 25.0; // time interval between samples (ns)
   const Float_t Tp      = 50.0; // RC filter time constant (ns)
 
   assert( amp.size() >= 3 );
 
-  if( amp[0] == 0 || amp[1] == 0 ) {
-    centroid = 0.0;
-    return 0.0;
-  }
+  centroid = 0;
 
   if( check_shape ) {
     // Calculate ratios for 3 samples and check for bad signals
+    if( amp[2] == 0 )
+      return 0;
     Float_t r1 = Float_t(amp[0])/amp[2];
     Float_t r2 = Float_t(amp[1])/amp[2];
     if(r1>1.0 || r2>1.0 || r1 > r2) {
-      centroid = 0.0;
-      return 0.0;
+      return 0;
     }
   }
 
   // TODO: calculate centroid
-  centroid = 0.0;
 
   // Weight factors calculated based on the response of the silicon microstrip
   // detector:
