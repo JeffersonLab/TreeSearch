@@ -166,8 +166,8 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
 }
 
 //_____________________________________________________________________________
-  static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
-			    bool check_shape )
+static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
+			  bool check_shape )
 {
   // Deconvolute signal given by samples in 'amp', return approximate integral.
   // Currently analyzes exactly 3 samples.
@@ -175,7 +175,7 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
   // NIM A326, 112 (1993)
 
   const Float_t delta_t = 25.0; // time interval between samples (ns)
-  const Float_t Tp      = 50.0; // time constant (ns)
+  const Float_t Tp      = 50.0; // RC filter time constant (ns)
 
   assert( amp.size() >= 3 );
 
@@ -211,7 +211,8 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
   Float_t w2 = -2*TMath::Exp(-1)/x;
   Float_t w3 = TMath::Exp(-x-1)/x;
 
-  //deconvoluted signal samples
+  // Deconvoluted signal samples, assuming measurements of zero before the
+  // leading edge
   Float_t sig[3];
   sig[0] = amp[0]*w1;
   sig[1] = amp[1]*w1+amp[0]*w2;
