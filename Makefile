@@ -61,6 +61,12 @@ endif
 
 INCDIRS  = $(wildcard $(addprefix $(ANALYZER)/, include src hana_decode hana_scaler))
 
+ifdef EVIO_INCDIR
+  INCDIRS += ${EVIO_INCDIR}
+else ifdef EVIO
+  INCDIRS += ${EVIO}/include
+endif
+
 #------------------------------------------------------------------------------
 # Do not change anything  below here unless you know what you are doing
 
