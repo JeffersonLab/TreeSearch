@@ -36,7 +36,7 @@ GEMPlane::GEMPlane( const char* name, const char* description,
   : Plane(name,description,parent),
     fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
     fMaxSamp(1), fAmplSigma(0), fADC(0), fADCped(0), fTimeCentroid(0),
-    fDnoise(0), fNhitStrips(0), fNsigStrips(0), fRawOcc(0),
+    fDnoise(0), fNhitStrips(0), fNrawStrips(0), fRawOcc(0),
     fOccupancy(0), fADCMap(0)
 {
   // Constructor
@@ -108,7 +108,7 @@ void GEMPlane::Clear( Option_t* opt )
   assert( fTimeCentroid );
   memset( fTimeCentroid, 0, fNelem*sizeof(Float_t) );
 
-  fNhitStrips = fNsigStrips = 0;
+  fNhitStrips = fNrawStrips = 0;
   fRawOcc = fOccupancy = 0.0;
   // FIXME: speed up with index table
   for( vector<Vflt_t>::iterator it = fADCsamp.begin(); it != fADCsamp.end();
@@ -304,7 +304,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 	centroid = 0.0;
       }
       if( adc == 0.0 ) continue;
-      ++fNsigStrips;
+      ++fNrawStrips;
 
       // Save results for cluster finding later
       fADC[istrip] = adc;
@@ -333,7 +333,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     }  // chans
   }    // modules
 
-  fRawOcc = static_cast<Double_t>(fNsigStrips)/static_cast<Double_t>(fNelem);
+  fRawOcc = static_cast<Double_t>(fNrawStrips)/static_cast<Double_t>(fNelem);
 
   // Calculate average common-mode noise and subtract it from corrected
   // ADC values, if requested

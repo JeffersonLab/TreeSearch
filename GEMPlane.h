@@ -68,8 +68,8 @@ namespace TreeSearch {
     vector<Int_t> fSigStrips;   // Strip numbers with signal (adcped > minampl)
 
     UInt_t        fNhitStrips;  // Statistics: strips with any data
-    UInt_t        fNsigStrips;  // Statistics: strips > 0
-    Double_t      fRawOcc;      // Statistics: raw occupancy fNsigStrips/fNelem
+    UInt_t        fNrawStrips;  // Statistics: strips > 0
+    Double_t      fRawOcc;      // Statistics: raw occupancy fNrawStrips/fNelem
     Double_t      fOccupancy;   // Statistics: occupancy GetNsigStrips/fNelem
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
