@@ -65,15 +65,17 @@ namespace TreeSearch {
     Float_t*      fADCped;      // [fNelem] Pedestal/noise-subtracted ADC vals
     Float_t*      fTimeCentroid;// [fNelem] Time centroid information of signal
     Double_t      fDnoise;      // Event-by-event noise (avg below fMinAmpl)
+    vector<Int_t> fSigStrips;   // Strip numbers with signal (adcped > minampl)
 
     UInt_t        fNhitStrips;  // Statistics: strips with any data
     UInt_t        fNsigStrips;  // Statistics: strips > 0
-    UInt_t        fNRawHits;    // Statistics: strips > fMinAmpl
     Double_t      fRawOcc;      // Statistics: raw occupancy fNsigStrips/fNelem
-    Double_t      fOccupancy;   // Statistics: occupancy fNRawHits/fNelem
+    Double_t      fOccupancy;   // Statistics: occupancy GetNsigStrips/fNelem
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
+
+    Int_t         GetNsigStrips() const { return fSigStrips.size(); }
 
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
