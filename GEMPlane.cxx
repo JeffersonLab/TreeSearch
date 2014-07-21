@@ -36,7 +36,7 @@ GEMPlane::GEMPlane( const char* name, const char* description,
   : Plane(name,description,parent),
     fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
     fMaxSamp(1), fAmplSigma(0), fADC(0), fADCped(0), fTimeCentroid(0),
-    fDnoise(0), fNhitStrips(0), fNsigStrips(0), fNRawHits(0), fRawOcc(0),
+    fDnoise(0), fNhitStrips(0), fNsigStrips(0), fRawOcc(0),
     fOccupancy(0), fADCMap(0)
 {
   // Constructor
@@ -108,13 +108,14 @@ void GEMPlane::Clear( Option_t* opt )
   assert( fTimeCentroid );
   memset( fTimeCentroid, 0, fNelem*sizeof(Float_t) );
 
-  fNhitStrips = fNsigStrips = fNRawHits = 0;
+  fNhitStrips = fNsigStrips = 0;
   fRawOcc = fOccupancy = 0.0;
   // FIXME: speed up with index table
   for( vector<Vflt_t>::iterator it = fADCsamp.begin(); it != fADCsamp.end();
        ++it ) {
     (*it).clear();
   }
+  fSigStrips.clear();
 }
 
 //_____________________________________________________________________________
@@ -226,11 +227,9 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 {
   // Extract this plane's hit data from the raw evData.
   //
-  // This routine decodes the Gassiplex analog multiplexer readout data.
+  // This routine decodes the front-end readout data.
   // Finds clusters of active strips (=above software threshold) and
   // computes weighted average of position. Each such cluster makes one "Hit".
-
-  typedef map<Int_t,Float_t> Hitmap_t;
 
   // const char* const here = "GEMPlane::Decode";
 
@@ -249,6 +248,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 	  fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
   assert( fMaxSamp == 1 or
 	  fADCsamp.size() == static_cast<vector<Vflt_t>::size_type>(fNelem) );
+  assert( fSigStrips.empty() );
 
   UInt_t nHits = 0;
 
@@ -344,18 +344,14 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       fDnoise = 0.0;
   }
 
-  // Put corrected ADC data into sorted map. Fill histograms.
-  // FIXME: using a map here is overkill, a vector of strip numbers will do
-  Hitmap_t rawhits;
+  // Save strip numbers of corrected ADC data above threshold. Fill histograms.
   for( Int_t i = 0; i < fNelem; i++ ) {
     if( do_noise_subtraction )
       fADCped[i] -= fDnoise;
 
-    // Apply the ADC cut
+    // Save strip numbers with ADC above threshold
     if( fADCped[i] >= fMinAmpl ) {
-      // Sort the ADC data into a map, with the strip number as index
-      ++fNRawHits;
-      rawhits[i] = fADCped[i];
+      fSigStrips.push_back(i);
     }
 #ifdef TESTCODE
     if( TestBit(kDoHistos) ) {
@@ -365,7 +361,8 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #endif
   }
 
-  fOccupancy = static_cast<Double_t>(fNRawHits)/static_cast<Double_t>(fNelem);
+  fOccupancy =
+    static_cast<Double_t>(GetNsigStrips()) / static_cast<Double_t>(fNelem);
 
   // Find and analyze clusters. Clusters of active strips are considered
   // a "Hit".
@@ -398,31 +395,33 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #ifndef NDEBUG
   GEMHit* prevHit = 0;
 #endif
-  Hitmap_t::iterator next = rawhits.begin();
-  while( next != rawhits.end() ) {
-    Hitmap_t::iterator start = next, cur = next;
+  typedef vector<Int_t>::iterator viter_t;
+  vector<Int_t> splits;  // Strips with ampl split between 2 clusters
+  viter_t next = fSigStrips.begin();
+  while( next != fSigStrips.end() ) {
+    viter_t start = next, cur = next;
     ++next;
-    assert( next == rawhits.end() or ((*next).first > (*cur).first) );
-    while( next != rawhits.end() and ((*next).first - (*cur).first == 1)  ) {
+    assert( next == fSigStrips.end() or *next > *cur );
+    while( next != fSigStrips.end() and (*next - *cur) == 1  ) {
       ++cur;
       ++next;
     }
     // Now the cluster candidate is between start and cur
-    assert( (*cur).first >= (*start).first );
+    assert( *cur >= *start );
     // The "type" parameter indicates the result of the cluster analysis:
     // 0: clean (i.e. smaller than fMaxClusterSize, no further analysis)
     // 1: large, maximum at right edge, not split
     // 2: large, no clear minimum on the right side found, not split
     // 3: split, well-defined peak found (may still be larger than maxsize)
     Int_t  type = 0;
-    UInt_t size = (*cur).first - (*start).first + 1;
+    UInt_t size = *cur - *start + 1;
     if( size > fMaxClusterSize ) {
       Double_t maxadc = 0.0, minadc = kBig;
-      Hitmap_t::iterator it = start, maxpos = start, minpos = start;
+      viter_t it = start, maxpos = start, minpos = start;
       enum EStep { kFindMax = 1, kFindMin, kDone };
       EStep step = kFindMax;
       while( step != kDone and it != next ) {
-        Double_t adc = (*it).second;
+        Double_t adc = fADCped[*it];
         switch( step ) {
           case kFindMax:
             // Looking for maximum
@@ -455,7 +454,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
         // Found maximum followed by minimum
         assert( minpos != start );
         assert( minpos != cur );
-        assert( (*minpos).first > (*maxpos).first );
+        assert( *minpos > *maxpos );
         // Split the cluster at the position of the minimum, assuming that
         // the strip with the minimum amplitude is shared between both clusters
         cur  = minpos;
@@ -464,11 +463,12 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
         // of that strip evenly between the two clusters. This is a very
         // crude way of doing what we really should be doing: "fitting" a peak
         // shape and using the area and centroid of the curve
-        (*minpos).second /= 2.0;
+	fADCped[*minpos] /= 2.0;
+	splits.push_back(*minpos);
       }
       type = step;
-      size = (*cur).first - (*start).first + 1;
-      assert( (*cur).first >= (*start).first );
+      size = *cur - *start + 1;
+      assert( *cur >= *start );
     }
     assert( size > 0 );
     // Compute weighted position average. Again, a crude (but fast) substitute
@@ -476,9 +476,9 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     Double_t xsum = 0.0, adcsum = 0.0, mcpos = 0.0, mctime = kBig;
     Int_t mctrack = 0, num_bg = 0;
     for( ; start != next; ++start ) {
-      Int_t istrip = (*start).first;
+      Int_t istrip = *start;
       Double_t pos = GetStart() + istrip * GetPitch();
-      Double_t adc = (*start).second;
+      Double_t adc = fADCped[istrip];
       xsum   += pos * adc;
       adcsum += adc;
       // If doing MC data, analyze the strip truth information
@@ -568,6 +568,11 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #endif
   }
 
+  // Undo amplitude splitting, if any, so fADCped contains correct ADC values
+  for( viter_t it = splits.begin(); it != splits.end(); ++it ) {
+    fADCped[*it] *= 2.0;
+  }
+
   // Negative return value indicates potential problem
   if( nHits > fMaxHits )
     nHits = -nHits;
@@ -586,7 +591,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
   // Register variables in global list
 
   RVarDef vars[] = {
-    { "nstrips",        "Num strips with hits > adc.min",   "fNRawHits" },
+    { "nstrips",        "Num strips with hits > adc.min",   "GetNsigStrips()" },
     { "rawocc",         "strips w/data / n_all_strips",     "fRawOcc" },
     { "occupancy",      "nstrips / n_all_strips",           "fOccupancy" },
     { "strip.adc",      "Raw strip ADC values",             "fADC" },
@@ -740,6 +745,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   fADC = new Float_t[fNelem];
   fADCped = new Float_t[fNelem];
   fTimeCentroid = new Float_t[fNelem];
+  fSigStrips.reserve(fNelem);
 
   TString::ECaseCompare cmp = TString::kIgnoreCase;
   if( !mapping.IsNull() ) {
