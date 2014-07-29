@@ -14,15 +14,15 @@
 #include "TClonesArray.h"
 #include "TVector2.h"
 #include "TMath.h"
+#include "TString.h"
 #include <vector>
-#include <string>
 #include <cassert>
 #include <functional>
 
-using std::vector;
-using std::string;
-
 class TH1;
+namespace Podd {
+  class MCHitInfo;
+}
 
 namespace TreeSearch {
 
@@ -33,8 +33,10 @@ namespace TreeSearch {
   extern const Double_t kBig;
 
   class Plane : public THaSubDetector {
-
   public:
+    typedef std::vector<Int_t>  Vint_t;
+    typedef std::vector<Float_t> Vflt_t;
+
     Plane( const char* name, const char* description = "",
 	   THaDetectorBase* parent = 0 );
     // For ROOT RTTI
@@ -116,7 +118,7 @@ namespace TreeSearch {
       bool operator() ( const Plane* pl ) const
       { assert(pl); return ( name == pl->GetName() ); }
     private:
-      string name;
+      TString name;
     };
 
   protected:
@@ -148,6 +150,10 @@ namespace TreeSearch {
 
     // Only for TESTCODE, but kept for binary compatibility
     TH1*          fHitMap;     // Histogram of active sensor numbers
+
+    // Only set when analyzing simulation data
+    Vint_t            fMCHitList;  // Elements in fMCHitInfo with data
+    Podd::MCHitInfo*  fMCHitInfo;  // [fNelem] MC truth data for fHits
 
     // Bits for Planes
     enum {

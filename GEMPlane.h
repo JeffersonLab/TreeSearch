@@ -15,13 +15,11 @@
 namespace TreeSearch {
 
   class GEMPlane : public Plane {
-
-    typedef vector<Float_t> Vflt_t;
-
   public:
     GEMPlane( const char* name, const char* description = "",
 	      THaDetectorBase* parent = 0 );
-    GEMPlane() : fADC(0), fADCped(0), fTimeCentroid(0) {} // For ROOT RTTI
+    // For ROOT RTTI
+    GEMPlane() : fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fGoodHit(0) {}
     virtual ~GEMPlane();
 
     virtual void    Clear( Option_t* opt="" );
@@ -34,7 +32,7 @@ namespace TreeSearch {
 #endif
 
     Double_t        GetAmplSigma( Double_t ampl ) const;
-    Double_t        GetRawOcc()      const { return fRawOcc; }
+    Double_t        GetHitOcc()      const { return fHitOcc; }
     Double_t        GetOccupancy()   const { return fOccupancy; }
 
   protected:
@@ -44,7 +42,7 @@ namespace TreeSearch {
 			kGassiplexAdapter2, kTable };
 
     EChanMapType  fMapType;     // Type of hardware channel mapping to use
-    vector<Int_t> fChanMap;     // [fNelem] Optional hardware channel mapping
+    Vint_t        fChanMap;     // [fNelem] Optional hardware channel mapping
     Int_t         MapChannel( Int_t idx ) const;
 
     // Parameters, calibration, flags
@@ -56,26 +54,27 @@ namespace TreeSearch {
 
     Vflt_t        fPed;         // [fNelem] Per-channel pedestal values
     TBits         fBadChan;     // Bad channel map
-    Double_t      fAmplSigma;   // Sigma of hit ampliude distribution
+    Double_t      fAmplSigma;   // Sigma of hit amplitude distribution
 
     // Event data, hits etc.
-    vector<Vflt_t> fADCsamp;    // [fNelem] Raw ADC values/time samples
-    // TODO: convert to vectors once global variable system can handle them
-    Float_t*      fADC;         // [fNelem] Raw ADC integrals
-    Float_t*      fADCped;      // [fNelem] Pedestal/noise-subtracted ADC vals
-    Float_t*      fTimeCentroid;// [fNelem] Time centroid information of signal
+    Float_t*      fADCraw;      // [fNelem] Integral of raw ADC samples
+    Float_t*      fADC;         // [fNelem] Integral of deconvoluted ADC samples
+    Float_t*      fHitTime;     // [fNelem] Leading-edge time of deconv signal (ns)
+    Float_t*      fADCcor;      // [fNelem] fADC corrected for pedestal & noise
+    Byte_t*       fGoodHit;     // [fNelem] Strip data passed pulse shape test
     Double_t      fDnoise;      // Event-by-event noise (avg below fMinAmpl)
-    vector<Int_t> fSigStrips;   // Strip numbers with signal (adcped > minampl)
+    Vint_t        fSigStrips;   // Strip numbers with signal (adccor > minampl)
 
-    UInt_t        fNhitStrips;  // Statistics: strips with any data
-    UInt_t        fNrawStrips;  // Statistics: strips > 0
-    Double_t      fRawOcc;      // Statistics: raw occupancy fNrawStrips/fNelem
+    UInt_t        fNrawStrips;  // Statistics: strips with any data
+    UInt_t        fNhitStrips;  // Statistics: strips > 0
+    Double_t      fHitOcc;      // Statistics: hit occupancy fNhitStrips/fNelem
     Double_t      fOccupancy;   // Statistics: occupancy GetNsigStrips/fNelem
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
 
     Int_t         GetNsigStrips() const { return fSigStrips.size(); }
+    void          AddHit( Int_t istrip );
 
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
