@@ -30,13 +30,26 @@ using namespace Podd;
 
 namespace TreeSearch {
 
+struct StripData_t {
+  Float_t adcraw;
+  Float_t adc;
+  Float_t time;
+  Bool_t  pass;
+  StripData_t() {}
+  StripData_t( Float_t _raw, Float_t _adc, Float_t _time, Bool_t _pass )
+    : adcraw(_raw), adc(_adc), time(_time), pass(_pass) {}
+};
+
+// Sanity limit on number of channels (strips)
+static const Int_t kMaxNChan = 20000;
+
 //_____________________________________________________________________________
 GEMPlane::GEMPlane( const char* name, const char* description,
 		    THaDetectorBase* parent )
   : Plane(name,description,parent),
     fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
-    fMaxSamp(1), fAmplSigma(0), fADC(0), fADCped(0), fTimeCentroid(0),
-    fDnoise(0), fNhitStrips(0), fNrawStrips(0), fRawOcc(0),
+    fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0),
+    fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
     fOccupancy(0), fADCMap(0)
 {
   // Constructor
@@ -71,9 +84,11 @@ GEMPlane::~GEMPlane()
     RemoveVariables();
 
   // fHits deleted in base class
+  delete fGoodHit;
+  delete fADCcor;
+  delete fHitTime;
   delete fADC;
-  delete fADCped;
-  delete fTimeCentroid;
+  delete fADCraw;
 }
 
 //_____________________________________________________________________________
@@ -101,20 +116,16 @@ void GEMPlane::Clear( Option_t* opt )
 
   Plane::Clear(opt);
 
-  assert( fADC );
+  assert( fADCraw and fADC and fHitTime and fADCcor and fGoodHit );
+  memset( fADCraw, 0, fNelem*sizeof(Float_t) );
   memset( fADC, 0, fNelem*sizeof(Float_t) );
-  assert( fADCped );
-  memset( fADCped, 0, fNelem*sizeof(Float_t) );
-  assert( fTimeCentroid );
-  memset( fTimeCentroid, 0, fNelem*sizeof(Float_t) );
+  memset( fHitTime, 0, fNelem*sizeof(Float_t) );
+  memset( fADCcor, 0, fNelem*sizeof(Float_t) );
+  memset( fGoodHit, 0, fNelem*sizeof(Byte_t) );
 
   fNhitStrips = fNrawStrips = 0;
-  fRawOcc = fOccupancy = 0.0;
-  // FIXME: speed up with index table
-  for( vector<Vflt_t>::iterator it = fADCsamp.begin(); it != fADCsamp.end();
-       ++it ) {
-    (*it).clear();
-  }
+  fHitOcc = fOccupancy = fDnoise = 0.0;
+
   fSigStrips.clear();
 }
 
@@ -158,7 +169,7 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
     break;
   case kTable:
     // Use the mapping lookup table
-    assert( fChanMap.size() == static_cast<vector<Int_t>::size_type>(fNelem) );
+    assert( fChanMap.size() == static_cast<Vint_t::size_type>(fNelem) );
     ret = fChanMap[idx];
     break;
   }
@@ -167,8 +178,7 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
 }
 
 //_____________________________________________________________________________
-static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
-			  bool check_shape )
+static StripData_t ChargeDep( const vector<Float_t>& amp )
 {
   // Deconvolute signal given by samples in 'amp', return approximate integral.
   // Currently analyzes exactly 3 samples.
@@ -181,20 +191,7 @@ static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
 
   assert( amp.size() >= 3 );
 
-  centroid = 0;
-
-  if( check_shape ) {
-    // Calculate ratios for 3 samples and check for bad signals
-    if( amp[2] == 0 )
-      return 0;
-    Float_t r1 = Float_t(amp[0])/amp[2];
-    Float_t r2 = Float_t(amp[1])/amp[2];
-    if(r1>1.0 || r2>1.0 || r1 > r2) {
-      return 0;
-    }
-  }
-
-  // TODO: calculate centroid
+  Float_t adcraw = delta_t*(amp[0]+amp[1]+amp[2]);
 
   // Weight factors calculated based on the response of the silicon microstrip
   // detector:
@@ -212,14 +209,40 @@ static Float_t ChargeDep( const vector<Float_t>& amp, Float_t& centroid,
 
   // Deconvoluted signal samples, assuming measurements of zero before the
   // leading edge
-  Float_t sig[3];
-  sig[0] = amp[0]*w1;
-  sig[1] = amp[1]*w1+amp[0]*w2;
-  sig[2] = amp[2]*w1+amp[1]*w2+amp[0]*w3;
+  Float_t sig[3] = { amp[0]*w1,
+		     amp[1]*w1+amp[0]*w2,
+		     amp[2]*w1+amp[1]*w2+amp[0]*w3 };
 
-  Float_t sum = delta_t*(sig[0]+sig[1]+sig[2]);
+  Float_t adc    = delta_t*(sig[0]+sig[1]+sig[2]);
+  Float_t time   = 0;     // TODO
 
-  return sum;
+  Bool_t pass;
+  // Calculate ratios for 3 samples and check for bad signals
+  if( amp[2] > 0 ) {
+    Float_t r1 = amp[0]/amp[2];
+    Float_t r2 = amp[1]/amp[2];
+    pass = (r1 < 1.0 and r2 < 1.0 and r1 < r2);
+  } else
+    pass = false;
+
+  return StripData_t(adcraw,adc,time,pass);
+}
+
+//_____________________________________________________________________________
+void GEMPlane::AddHit( Int_t istrip )
+{
+  Float_t adc = fADCcor[istrip];
+  if( adc > 0 )
+    ++fNhitStrips;
+  if( fGoodHit[istrip] and adc >= fMinAmpl ) {
+    fSigStrips.push_back(istrip);
+  }
+#ifdef TESTCODE
+  if( TestBit(kDoHistos) ) {
+    fHitMap->Fill(istrip);
+    fADCMap->Fill(istrip, adc);
+  }
+#endif
 }
 
 //_____________________________________________________________________________
@@ -236,9 +259,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   bool mc_data = fTracker->TestBit(Tracker::kMCdata);
 
   assert( !mc_data || dynamic_cast<const SimDecoder*>(&evData) != 0 );
-  assert( fADC );
-  assert( fADCped );
-  assert( fTimeCentroid );
+  assert( fADCraw and fADC and fADCcor and fHitTime );
 
 #ifdef TESTCODE
   if( TestBit(kDoHistos) )
@@ -246,8 +267,6 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #endif
   assert( fPed.empty() or
 	  fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
-  assert( fMaxSamp == 1 or
-	  fADCsamp.size() == static_cast<vector<Vflt_t>::size_type>(fNelem) );
   assert( fSigStrips.empty() );
 
   UInt_t nHits = 0;
@@ -255,14 +274,18 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   // Set up pedestal and noise corrections
   Double_t noisesum = 0.0;
   UInt_t   n_noise = 0;
-  fDnoise = 0.0;
 
   bool do_pedestal_subtraction = !fPed.empty();
   bool do_noise_subtraction    = TestBit(kDoNoise);
 
-  vector<MCHitInfo> mcinfo;
-  if( mc_data )
-    mcinfo.resize(fNelem);   // this can be fairly big, ~500 kB
+  const SimDecoder* simdata = 0;
+  if( mc_data ) {
+    assert( dynamic_cast<const SimDecoder*>(&evData) );
+    simdata = static_cast<const SimDecoder*>(&evData);
+  }
+  Vflt_t samples;
+  if( fMaxSamp > 1 )
+    samples.reserve(fMaxSamp);
 
   // Decode data
   for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
@@ -277,92 +300,87 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       // Map channel number to strip number
       Int_t istrip =
 	MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
+      //TODO: test for duplicate istrip, if found, warn and skip
 
       // For the APV25 analog pipeline, multiple "hits" on a decoder channel
       // correspond to time samples 25 ns apart
       Int_t nsamp = evData.GetNumHits( d->crate, d->slot, chan );
       assert( nsamp > 0 );
-      ++fNhitStrips;
+      ++fNrawStrips;
       nsamp = TMath::Min( nsamp, static_cast<Int_t>(fMaxSamp) );
 
-      // Integrate the signal over time, if necessary
-      Float_t adc, centroid;
+      // Integrate the signal over time and analyze pulse shape
+      StripData_t stripdata;
       if( nsamp > 1 ) {
-	Vflt_t& samples = fADCsamp[istrip];
-	assert( samples.empty() );
+	samples.clear();
 	for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
 	  Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
 	  samples.push_back( fsamp );
 	}
-
-	adc = ChargeDep( samples, centroid, TestBit(kCheckPulseShape) );
-
-      } else {
-	adc = static_cast<Float_t>
-	  ( evData.GetData(d->crate, d->slot, chan, 0) );
-	centroid = 0.0;
+	// Analyze the pulse shape
+	stripdata = ChargeDep(samples);
       }
-      if( adc == 0.0 ) continue;
-      ++fNrawStrips;
+      else {
+	stripdata.adcraw = stripdata.adc =
+	  static_cast<Float_t>( evData.GetData(d->crate, d->slot, chan, 0) );
+	stripdata.time = 0;
+      }
+      // Skip null data
+      if( stripdata.adcraw == 0 )
+	continue;
 
       // Save results for cluster finding later
-      fADC[istrip] = adc;
-      fTimeCentroid[istrip] = centroid;
+      fADCraw[istrip]  = stripdata.adcraw;
+      fADC[istrip]     = stripdata.adc;
+      fHitTime[istrip] = stripdata.time;
 
       // Strip-by-strip pedestal subtraction
+      Float_t adc = stripdata.adc;
       if( do_pedestal_subtraction )
 	adc -= fPed[istrip];
-      if( adc < 0.0 )
-	adc = 0.0;
 
-      // Sum up ADCs that are likely not a hit
-      // and are not suppressed through pedestal
-      if( do_noise_subtraction and adc > 0.0 and adc < fMinAmpl ){
-	noisesum += adc;
-	n_noise++;
+      fADCcor[istrip] = adc;
+      fGoodHit[istrip] = not TestBit(kCheckPulseShape) or stripdata.pass;
+
+      if( do_noise_subtraction ) {
+	// Sum up ADCs that are likely not a hit
+	if( adc < fMinAmpl ) {
+	  noisesum += adc;
+	  n_noise++;
+	}
       }
-      fADCped[istrip] = adc;
+      else {
+	// If no noise subtraction is done, then we can finish up with this
+	// strip number right here. Otherwise we need a second iteration below
+	AddHit( istrip );
+      }
 
       // If doing MC data, save the truth information for each strip
       if( mc_data ) {
-	assert( dynamic_cast<const SimDecoder*>(&evData) );
-	const SimDecoder& simdata = static_cast<const SimDecoder&>(evData);
-	mcinfo[istrip] = simdata.GetMCHitInfo(d->crate,d->slot,chan);
+	fMCHitList.push_back(istrip);
+	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
       }
     }  // chans
   }    // modules
 
-  fRawOcc = static_cast<Double_t>(fNrawStrips)/static_cast<Double_t>(fNelem);
-
   // Calculate average common-mode noise and subtract it from corrected
   // ADC values, if requested
-  if( do_noise_subtraction and n_noise > 0 ) {
-    fDnoise = noisesum/static_cast<Double_t>(n_noise);
-    assert( fDnoise >= 0.0 );
-    if( fDnoise > 1000.0 )
-      fDnoise = 0.0;
+  if( do_noise_subtraction ) {
+    if ( n_noise > 0 ) {
+      fDnoise = noisesum/n_noise;
+      assert( fDnoise < fMinAmpl );
+    }
+    // Save strip numbers of corrected ADC data above threshold. Fill histograms.
+    assert( fSigStrips.empty() );
+    for( Int_t i = 0; i < fNelem; i++ ) {
+      fADCcor[i] -= fDnoise;
+      AddHit( i );
+    }
   }
 
-  // Save strip numbers of corrected ADC data above threshold. Fill histograms.
-  for( Int_t i = 0; i < fNelem; i++ ) {
-    if( do_noise_subtraction )
-      fADCped[i] -= fDnoise;
-
-    // Save strip numbers with ADC above threshold
-    if( fADCped[i] >= fMinAmpl ) {
-      fSigStrips.push_back(i);
-    }
-#ifdef TESTCODE
-    if( TestBit(kDoHistos) ) {
-      fHitMap->Fill(i);
-      fADCMap->Fill(i, fADCped[i]);
-    }
-#endif
-  }
-
-  fOccupancy =
-    static_cast<Double_t>(GetNsigStrips()) / static_cast<Double_t>(fNelem);
+  fHitOcc    = static_cast<Double_t>(fNhitStrips) / fNelem;
+  fOccupancy = static_cast<Double_t>(GetNsigStrips()) / fNelem;
 
   // Find and analyze clusters. Clusters of active strips are considered
   // a "Hit".
@@ -395,8 +413,8 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #ifndef NDEBUG
   GEMHit* prevHit = 0;
 #endif
-  typedef vector<Int_t>::iterator viter_t;
-  vector<Int_t> splits;  // Strips with ampl split between 2 clusters
+  typedef Vint_t::iterator viter_t;
+  Vint_t splits;  // Strips with ampl split between 2 clusters
   viter_t next = fSigStrips.begin();
   while( next != fSigStrips.end() ) {
     viter_t start = next, cur = next;
@@ -421,7 +439,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       enum EStep { kFindMax = 1, kFindMin, kDone };
       EStep step = kFindMax;
       while( step != kDone and it != next ) {
-        Double_t adc = fADCped[*it];
+        Double_t adc = fADCcor[*it];
         switch( step ) {
           case kFindMax:
             // Looking for maximum
@@ -463,7 +481,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
         // of that strip evenly between the two clusters. This is a very
         // crude way of doing what we really should be doing: "fitting" a peak
         // shape and using the area and centroid of the curve
-	fADCped[*minpos] /= 2.0;
+	fADCcor[*minpos] /= 2.0;
 	splits.push_back(*minpos);
       }
       type = step;
@@ -478,12 +496,12 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     for( ; start != next; ++start ) {
       Int_t istrip = *start;
       Double_t pos = GetStart() + istrip * GetPitch();
-      Double_t adc = fADCped[istrip];
+      Double_t adc = fADCcor[istrip];
       xsum   += pos * adc;
       adcsum += adc;
       // If doing MC data, analyze the strip truth information
       if( mc_data ) {
-	MCHitInfo& mc = mcinfo[istrip];
+	MCHitInfo& mc = fMCHitInfo[istrip];
 	// This may be smaller than the actual total number of background hits
 	// contributing to the entire cluster, but counting them would involve
 	// lists of secondary particle numbers ... overkill for now
@@ -568,9 +586,9 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #endif
   }
 
-  // Undo amplitude splitting, if any, so fADCped contains correct ADC values
+  // Undo amplitude splitting, if any, so fADCcor contains correct ADC values
   for( viter_t it = splits.begin(); it != splits.end(); ++it ) {
-    fADCped[*it] *= 2.0;
+    fADCcor[*it] *= 2.0;
   }
 
   // Negative return value indicates potential problem
@@ -591,14 +609,18 @@ Int_t GEMPlane::DefineVariables( EMode mode )
   // Register variables in global list
 
   RVarDef vars[] = {
+    { "nrawstrips",     "nstrips with decoder data",        "fNrawStrips" },
+    { "nhitstrips",     "nstrips > 0",                      "fNhitStrips" },
     { "nstrips",        "Num strips with hits > adc.min",   "GetNsigStrips()" },
-    { "rawocc",         "strips w/data / n_all_strips",     "fRawOcc" },
+    { "hitocc",         "strips > 0 / n_all_strips",        "fHitOcc" },
     { "occupancy",      "nstrips / n_all_strips",           "fOccupancy" },
-    { "strip.adc",      "Raw strip ADC values",             "fADC" },
-    { "strip.adc_p",    "Pedstal sub strip ADC values",     "fADCped" },
-    { "strip.time",     "Centroid of strip signal (ns)",    "fTimeCentroid" },
+    { "strip.adcraw",   "Raw strip ADC sum",                "fADCraw" },
+    { "strip.adc",      "Deconvoluted strip ADC sum",       "fADC" },
+    { "strip.adc_c",    "Pedestal-sub strip ADC sum",       "fADCcor" },
+    { "strip.time",     "Leading time of strip signal (ns)","fHitTime" },
+    { "strip.good",     "Good pulse shape on strip",        "fGoodHit" },
     { "nhits",          "Num hits (clusters of strips)",    "GetNhits()" },
-    { "noise",          "Noise",                            "fDnoise" },
+    { "noise",          "Noise level (avg below adc.min)",  "fDnoise" },
     { "ncoords",        "Num fit coords",                   "GetNcoords()" },
     { "coord.rank",     "Fit rank of coord",                "fFitCoords.TreeSearch::FitCoord.fFitRank" },
     { "coord.pos",      "Position used in fit (m)",         "fFitCoords.TreeSearch::FitCoord.fPos" },
@@ -688,7 +710,6 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   fMaxSamp   = 1;
   fChanMap.clear();
   fPed.clear();
-  fADCsamp.clear();
   fAmplSigma = 0.36; // default, an educated guess
 
   Int_t gbl = GetDBSearchLevel(fPrefix);
@@ -723,8 +744,10 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     return status;
 
   // Sanity checks
-  if( fNelem <= 0 or fNelem > 1000000 ) { // arbitray upper limit
-    Error( Here(here), "Invalid number of channels: %d", fNelem );
+  if( fNelem <= 0 or fNelem > kMaxNChan ) {
+    Error( Here(here), "Invalid number of channels: %d. Must be > 0 and < %d. "
+	   "Fix database or recompile code with a larger limit.",
+	   fNelem, kMaxNChan );
     return kInitError;
   }
 
@@ -738,14 +761,28 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   SetBit( kDoNoise, do_noise );
   SetBit( kCheckPulseShape, check_pulse_shape );
 
-  delete fADC; fADC = 0;
-  delete fADCped; fADCped = 0;
-  delete fTimeCentroid; fTimeCentroid = 0;
+  SafeDelete(fADCraw);
+  SafeDelete(fADC);
+  SafeDelete(fHitTime);
+  SafeDelete(fADCcor);
+  SafeDelete(fGoodHit);
+  delete [] fMCHitInfo; fMCHitInfo = 0;
 
+  // Allocate arrays. The only reason that these are parallel C-arrays is
+  // that the global variable system still doesn't support arrays/vectors
+  // of structures/objects.
+  // Out of memory exceptions from here are caught in Tracker.cxx.
+  fADCraw = new Float_t[fNelem];
   fADC = new Float_t[fNelem];
-  fADCped = new Float_t[fNelem];
-  fTimeCentroid = new Float_t[fNelem];
+  fHitTime = new Float_t[fNelem];
+  fADCcor = new Float_t[fNelem];
+  fGoodHit = new Byte_t[fNelem];
   fSigStrips.reserve(fNelem);
+
+  if( fTracker->TestBit(Tracker::kMCdata) ) {
+    fMCHitInfo = new Podd::MCHitInfo[fNelem];
+    fMCHitList.reserve(fNelem);
+  }
 
   TString::ECaseCompare cmp = TString::kIgnoreCase;
   if( !mapping.IsNull() ) {
@@ -786,7 +823,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
         return kInitError;
       }
       // check if entries in channel map are within range
-      for( vector<Int_t>::const_iterator it = fChanMap.begin();
+      for( Vint_t::const_iterator it = fChanMap.begin();
           it != fChanMap.end(); ++it ) {
         if( (*it) < 0 or (*it) >= fNelem ) {
           Error( Here(here), "Illegal chanmap entry: %d. Must be >= 0 and "
@@ -820,21 +857,8 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
 	     "Adjusted to maximum allowed = %u.", fMaxSamp, max_maxsamp );
     fMaxSamp = max_maxsamp;
   }
-  if( fMaxSamp > 1 ) {
-    // NB: this may very well allocate O(1000) vectors of O(10) floats
-    try {
-      fADCsamp.resize( fNelem );
-      for( vector<Vflt_t>::iterator it = fADCsamp.begin();
-	   it != fADCsamp.end(); ++it ) {
-	(*it).reserve( fMaxSamp );
-      }
-    }
-    catch( bad_alloc ) {
-      Error( Here(here), "Out of memory trying to allocate ADC sample "
-	     "buffers. Reduce maxsamp." );
-      return kInitError;
-    }
-  }
+  if( fMaxSamp == 1 )
+    ResetBit( kCheckPulseShape );
 
   if( fAmplSigma < 0.0 ) {
     Warning( Here(here), "Negative adc.sigma = %lf makes no sense. Adjusted "
