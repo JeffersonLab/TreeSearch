@@ -1869,16 +1869,19 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 
   // Initialize the planes
   if( status == kOK ) {
-    try {
-      for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
+    vrsiz_t iplane = 0;
+    for( ; iplane < fPlanes.size(); ++iplane ) {
+      try {
 	status = fPlanes[iplane]->Init(date);
 	if( status )
 	  break;
       }
-    }
-    catch(...) {
-      Error( Here(here), "Failed to initialize planes. Call expert." );
-      return status = kInitError;
+      catch( exception& e ) {
+	Error( Here(here), "Caught %s when initializing plane \"%s\". "
+	       "Call expert.", e.what(), fPlanes[iplane]->GetName() );
+	status = kInitError;
+	break;
+      }
     }
   }
   delete fCrateMap; fCrateMap = 0;
