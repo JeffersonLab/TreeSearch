@@ -44,7 +44,7 @@ namespace TreeSearch {
     Double_t    fMaxTime;      // Maximum drift time for a hit (s)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
-    vector<float>   fTDCOffset; // [fNelem] TDC offsets for each wire
+    Vflt_t          fTDCOffset; // [fNelem] TDC offsets for each wire
 
     // Only needed for TESTCODE, but kept for binary compatibility
     UInt_t          fNmiss;     // Statistics: Decoder channel misses
