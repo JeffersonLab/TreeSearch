@@ -465,7 +465,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       fTrkStat = kTooManyRawHits;
       continue;
     }
-    // No need to fill the hitpattern if no tracking requested
+    // Fill the hitpattern if doing tracking
     if( TestBit(kDoCoarse) )
       theProj->FillHitpattern();
   }
@@ -529,7 +529,7 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
 
   // Convert the MC point to the tracker frame
   TVector3 point = pt->fMCPoint - fOrigin;
-  // Find plane(s) for this point. Since the plane numbering can be ambiguous,
+  // Find the plane for this point. Since the plane numbering can be ambiguous,
   // we search by z-position. Certain trackers have more than one plane with the
   // same z, which are then distinguished by the plane type (u,v,x etc.)
   pair<citer_t,citer_t> range =
@@ -545,6 +545,7 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
     const TSeqCollection* hits = pl->GetHits();
     Int_t end = hits->GetLast()+1;
     if( end > 0 ) {
+      // Calculate the position of the MC hit along the plane's coordinate axis
       // NB: the plane hit coordinates are given in the tracker frame
       Double_t cosa = pl->GetProjection()->GetCosAngle();
       Double_t sina = pl->GetProjection()->GetSinAngle();
@@ -552,6 +553,7 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
 
       Int_t pos = FindHitWithLowerBound( hits, x );
       if( pos == end ) --pos;
+      assert( pos >= 0 );
       hit = static_cast<Hit*>(hits->At(pos));
 
       // We need the dynamic_cast here because Hits use multiple inheritance
@@ -562,27 +564,41 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
 	// We have a hit, but it's not from our track. Check nearby hits.
 	hit = 0;
 	Int_t down = pos, up = pos;
+	Hit *hitD = 0, *hitU = 0;
 	while( --down >= 0 or ++up < end ) {
-	  if( down >= 0 ) {
+	  if( down >= 0 and not hitD ) {
 	    Hit* hcur = static_cast<Hit*>( hits->At(down) );
+	    if( hitU and
+		TMath::Abs(hcur->GetPos()-x) > TMath::Abs(hitU->GetPos()-x) )
+	      break;
 	    mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
 	    if( mcinfo->fMCTrack == pt->fMCTrack ) {
-	      hit = hcur;
-	      break;
+	      hitD = hcur;
 	    }
 	  }
-	  if( up < end ) {
+	  if( up < end and not hitU ) {
 	    Hit* hcur = static_cast<Hit*>( hits->At(up) );
+	    if( hitD and
+		TMath::Abs(hcur->GetPos()-x) > TMath::Abs(hitD->GetPos()-x) )
+	      break;
 	    mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
 	    if( mcinfo->fMCTrack == pt->fMCTrack ) {
-	      hit = hcur;
-	      break;
+	      hitU = hcur;
 	    }
 	  }
+	  if( hitD and hitU )
+	    break;
 	}
+	if( hitD ) {
+	  if( hitU ) {
+	    hit = (TMath::Abs(hitU->GetPos()-x) > TMath::Abs(hitD->GetPos()-x))
+	      ? hitD : hitU;
+	  } else
+	    hit = hitD;
+	} else
+	  hit = hitU;
       }
-      if( hit )
-	break;
+      break;
     }
   }
   if( Updater )
