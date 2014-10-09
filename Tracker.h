@@ -83,13 +83,13 @@ namespace TreeSearch {
 #endif
 
     enum ETrackingStatus {
-      kTrackOK             = 0,
+      kTrackOK             = 0, // At least one seemingly good track found
       // Decode
       kTooManyRawHits      = 1, // Raw occupancy too high
       // Coarse Track
       kNoTrackingRequested = 2, // CoarseTracking turned off
       kProjTrackError      = 3, // Failure in Projection::Track()
-      kTooFewProj          = 4, // Not enough projections with tracks
+      kTooFewProj          = 4, // Too few projections with tracks
       kFailed3DMatch       = 5, // No roads matched in 3D
       kFailedTrackCuts     = 6, // All road combos failed ndof & chi2 cuts
       kFailedOptimalN      = 7, // Failed 3D de-ghosting algorithm
@@ -174,16 +174,16 @@ namespace TreeSearch {
     THaTrack* NewTrack( TClonesArray& tracks, const FitRes_t& fit_par );
     Bool_t    PassTrackCuts( const FitRes_t& fit_par ) const;
 
-    UInt_t MatchRoadsGeneric( vector<Rvec_t>& roads, UInt_t ncombos,
-             std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-	     Rset_t& unique_found );
+    UInt_t    MatchRoadsGeneric( vector<Rvec_t>& roads, UInt_t ncombos,
+		   std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+		   Rset_t& unique_found );
 
-    UInt_t MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t ncombos,
-	     std::list<std::pair<Double_t,Rvec_t> >& combos_found,
-	     Rset_t& unique_found );
+    UInt_t    MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t ncombos,
+	           std::list<std::pair<Double_t,Rvec_t> >& combos_found,
+	           Rset_t& unique_found );
 
-    Int_t FindHitWithLowerBound( const TSeqCollection* hits,
-				 Double_t x ) const;
+    Int_t     FindHitWithLowerBound( const TSeqCollection* hits,
+				     Double_t x ) const;
 
     // Virtualization of the tracker class, specialized Trackers may/must
     // override
@@ -212,8 +212,8 @@ namespace TreeSearch {
     virtual Int_t NewTrackCalc( THaTrack* newTrack, const TVector3& pos,
 				const TVector3& dir );
 
-    virtual Hit* FindHitForMCPoint( Podd::MCTrackPoint* pt,
-				    MCPointUpdater* updater ) const;
+    virtual Hit*  FindHitForMCPoint( Podd::MCTrackPoint* pt,
+				     MCPointUpdater* updater ) const;
     virtual THaTrack* FindTrackForMCPoint( Podd::MCTrackPoint* pt,
 					   TClonesArray& tracks,
 					   MCPointUpdater* updater ) const;
