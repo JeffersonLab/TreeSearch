@@ -87,7 +87,8 @@ namespace TreeSearch {
 
     // Analysis control flags
     enum {
-      kEventDisplay = BIT(14) // Support event display
+      kEventDisplay = BIT(14), // Support event display
+      kMCdata       = BIT(15)  // Assume input is Monte Carlo data
     };
 
     // Helper functors for STL algos

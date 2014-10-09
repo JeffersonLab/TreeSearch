@@ -211,6 +211,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     }
   }
 
+  SetBit( kMCdata, fDetector->TestBit(Tracker::kMCdata) );
+
   // Standard initialization. This calls ReadDatabase() and DefineVariables()
   THaAnalysisObject::EStatus status = THaAnalysisObject::Init(date);
   if( status )
@@ -587,6 +589,22 @@ Int_t Projection::DefineVariables( EMode mode )
       { 0 }
     };
     DefineVarsFromList( vars_evtdisp, mode );
+  }
+
+  // Additional variables for MC input data
+  if( TestBit(kMCdata) ) {
+    RVarDef mcvars[] = {
+      { "rd.nmcplanes", "Number of planes with hits from MC track",
+                                  "fRoads.TreeSearch::Road.fNMCTrackHits" },
+      { "rd.mcpat",     "Bit pattern of plane nums w/hits from MC track",
+                           "fRoads.TreeSearch::Road.fMCTrackPlanePattern" },
+      { "rd.nmcfit",    "Number of planes with hits from fitted MC track",
+                               "fRoads.TreeSearch::Road.fNMCTrackHitsFit" },
+      { "rd.mcfitpat",  "Bit pattern of planes nums w/fitted MC track hits",
+                        "fRoads.TreeSearch::Road.fMCTrackPlanePatternFit" },
+      { 0 }
+    };
+    DefineVarsFromList( mcvars, mode );
   }
 
   return 0;

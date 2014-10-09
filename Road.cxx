@@ -13,6 +13,7 @@
 #include "Hit.h"
 #include "Plane.h"
 #include "Helper.h"
+#include "SimDecoder.h"  // for MCHitInfo
 
 #include "TMath.h"
 #include "TBits.h"
@@ -26,6 +27,7 @@
 #include <stdexcept>
 
 using namespace std;
+using namespace Podd;
 
 ClassImp(TreeSearch::Road)
 ClassImp(TreeSearch::Road::Point)
@@ -140,6 +142,8 @@ public:
 //_____________________________________________________________________________
 Road::Road( const Projection* proj )
   : TObject(), fPlanePattern(0), fProjection(proj), fZL(kBig), fZU(kBig),
+    fNMCTrackHits(0), fMCTrackPlanePattern(0),
+    fNMCTrackHitsFit(0), fMCTrackPlanePatternFit(0),
     fPos(kBig), fSlope(kBig), fChi2(kBig), fDof(kMaxUInt), fGood(false),
     fTrack(0), fBuild(0), fGrown(false), fTrkStat(kTrackOK)
 #ifdef TESTCODE
@@ -159,7 +163,10 @@ Road::Road( const Projection* proj )
 //_____________________________________________________________________________
 Road::Road( const Node_t& nd, const Projection* proj )
   : TObject(), fPatterns(1,&nd), fPlanePattern(0), fProjection(proj),
-    fZL(kBig), fZU(kBig), fPos(kBig), fSlope(kBig), fChi2(kBig),
+    fZL(kBig), fZU(kBig),
+    fNMCTrackHits(0), fMCTrackPlanePattern(0),
+    fNMCTrackHitsFit(0), fMCTrackPlanePatternFit(0),
+    fPos(kBig), fSlope(kBig), fChi2(kBig),
     fDof(kMaxUInt), fGood(false), fTrack(0), fBuild(0), fGrown(true),
     fTrkStat(kTrackOK)
 #ifdef TESTCODE
@@ -188,8 +195,12 @@ Road::Road( const Node_t& nd, const Projection* proj )
 //_____________________________________________________________________________
 Road::Road( const Road& orig ) :
   TObject(orig), fPatterns(orig.fPatterns), fHits(orig.fHits),
-  fPlanePattern(orig.fPlanePattern), fGrown(orig.fGrown),
-  fTrkStat(orig.fTrkStat)
+  fPlanePattern(orig.fPlanePattern),
+  fNMCTrackHits(orig.fNMCTrackHits),
+  fMCTrackPlanePattern(orig.fMCTrackPlanePattern),
+  fNMCTrackHitsFit(orig.fNMCTrackHitsFit),
+  fMCTrackPlanePatternFit(orig.fMCTrackPlanePatternFit),
+  fGrown(orig.fGrown), fTrkStat(orig.fTrkStat)
 #ifdef TESTCODE
   , fNfits(orig.fNfits)
 #endif
@@ -225,6 +236,10 @@ Road& Road::operator=( const Road& rhs )
     DeleteContainerOfContainers( fPoints );
     CopyPointData( rhs );
     fPlanePattern = rhs.fPlanePattern;
+    fNMCTrackHits = fNMCTrackHits;
+    fMCTrackPlanePattern = fMCTrackPlanePattern;
+    fNMCTrackHitsFit = fNMCTrackHitsFit;
+    fMCTrackPlanePatternFit = fMCTrackPlanePatternFit;
 
     delete fBuild;
     if( rhs.fBuild )
@@ -560,9 +575,10 @@ Bool_t Road::CollectCoordinates()
 #endif
   Double_t zp[kNcorner] = { fZL, fZL, fZU, fZU, fZL };
   Bool_t good = true;
+  Bool_t mcdata = fProjection->TestBit(Projection::kMCdata);
 
   // Collect the hit coordinates within this Road
-  TBits planepattern;
+  TBits planepattern, mcpattern;
   UInt_t last_np = kMaxUInt;
   for( siter_t it = fHits.begin(); it != fHits.end(); ++it ) {
     Hit* hit = const_cast<Hit*>(*it);
@@ -582,6 +598,14 @@ Bool_t Road::CollectCoordinates()
 	  assert( last_np == kMaxUInt or np > last_np );
 	  fPoints.push_back( Pvec_t() );
 	  planepattern.SetBitNumber(np);
+	  if( mcdata ) {
+	    MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(hit);
+	    assert( mcinfo );
+	    // TODO: currently does not distinguish between different MC tracks
+	    // We assume anything with fMCtrack != 0 is _the_ MC signal track
+	    if( mcinfo->fMCTrack != 0 )
+	      mcpattern.SetBitNumber(np);
+	  }
 	  last_np = np;
 	}
 	fPoints.back().push_back( new Point(x, z, hit) );
@@ -596,6 +620,12 @@ Bool_t Road::CollectCoordinates()
     // Need at least MinFitPlanes planes for fitting
     and planepattern.CountBits() >= fProjection->GetMinFitPlanes();
 
+  if( mcdata ) {
+    fNMCTrackHits = mcpattern.CountBits();
+    assert( mcpattern.GetNbytes() <= sizeof(fMCTrackPlanePattern) );
+    fMCTrackPlanePattern = 0;
+    mcpattern.Get( &fMCTrackPlanePattern );
+  }
 #ifdef VERBOSE
   if( fProjection->GetDebug() > 3 ) {
     cout << "Collected:" << endl;
@@ -644,6 +674,8 @@ Bool_t Road::Fit()
   else {
     fFitCoord.clear();
     fPlanePattern = 0;
+    fMCTrackPlanePattern = fNMCTrackHits = 0;
+    fMCTrackPlanePatternFit = fNMCTrackHitsFit = 0;
     fV[2]= fV[1] = fV[0] = fChi2 = fSlope = fPos = kBig;
     fDof = kMaxUInt;
   }
@@ -675,6 +707,8 @@ Bool_t Road::Fit()
     return false;
   }
 
+  Bool_t mcdata = fProjection->TestBit(Projection::kMCdata);
+
   // Loop over all combinations of hits in the planes
   vector<Pvec_t>::size_type npts = fPoints.size();
   Pvec_t selected;
@@ -691,7 +725,7 @@ Bool_t Road::Fit()
     // We fit x = a1 + a2*z (z independent).
     // Notation from: Review of Particle Properties, PRD 50, 1277 (1994)
     Double_t S11 = 0, S12 = 0, S22 = 0, G1 = 0, G2 = 0, chi2 = 0;
-    UInt_t pat = 0;
+    UInt_t pat = 0, mcpat = 0, nmcplanes = 0;
     for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
       register Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
@@ -714,6 +748,15 @@ Bool_t Road::Fit()
       // Must never use two points in the same plane
       assert( (pat & (1U << p->hit->GetPlaneNum())) == 0 );
       pat |= 1U << p->hit->GetPlaneNum();
+      if( mcdata ) {
+	MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(p->hit);
+	assert( mcinfo );
+	// TODO: see CollectCoordinates
+	if( mcinfo->fMCTrack != 0 ) {
+	  mcpat |= 1U << p->hit->GetPlaneNum();
+	  ++nmcplanes;
+	}
+      }
     }
 
 #ifdef VERBOSE
@@ -735,6 +778,10 @@ Bool_t Road::Fit()
       // Save points used for this fit
       fFitCoord.swap( selected );
       fPlanePattern = pat;
+      if( mcdata ) {
+	fNMCTrackHitsFit = nmcplanes;
+	fMCTrackPlanePatternFit = mcpat;
+      }
       // Throw out Chi2's outside of selected confidence interval
       // NB: Obviously, this requires accurate hit resolutions
       //TODO: keep statistics

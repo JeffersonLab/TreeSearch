@@ -125,8 +125,8 @@ namespace TreeSearch {
 
     enum ETrackingStatus {
       kTrackOK              = 0,
-      kTooFewPlanesWithHits = 1, // Bad planepattern of hits
-      kTooManyHitCombos     = 2,// Too many hit combinations to fit
+      kTooFewPlanesWithHits = 1, // Too few planes with hits
+      kTooManyHitCombos     = 2, // Too many hit combinations to fit
       kNoGoodFit            = 3, // No fit with good chi2
     };
     ETrackingStatus GetTrackingStatus() const { return fTrkStat; }
@@ -144,6 +144,12 @@ namespace TreeSearch {
     Double_t       fCornerX[5]; // x positions of corners
     Double_t       fZL;         // z-eps of first plane
     Double_t       fZU;         // z+eps of last plane
+
+    // MC truth data, for diagnosing tracking failures
+    UInt_t         fNMCTrackHits;        // # planes with hits from MC track
+    UInt_t         fMCTrackPlanePattern; // Planepattern of MC track hits
+    UInt_t         fNMCTrackHitsFit;     // # MC track hits used in best fit
+    UInt_t         fMCTrackPlanePatternFit; // Planepattern of fitted MC track hits
 
     // Best fit results
     Double_t       fPos;        // Track origin
