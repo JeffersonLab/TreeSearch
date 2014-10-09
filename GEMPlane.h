@@ -34,6 +34,7 @@ namespace TreeSearch {
     Double_t        GetAmplSigma( Double_t ampl ) const;
     Double_t        GetHitOcc()      const { return fHitOcc; }
     Double_t        GetOccupancy()   const { return fOccupancy; }
+    Int_t           GetNsigStrips()  const { return fSigStrips.size(); }
 
   protected:
 
@@ -73,7 +74,6 @@ namespace TreeSearch {
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
 
-    Int_t         GetNsigStrips() const { return fSigStrips.size(); }
     void          AddHit( Int_t istrip );
 
     // Podd interface
