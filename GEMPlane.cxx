@@ -622,7 +622,6 @@ Int_t GEMPlane::DefineVariables( EMode mode )
     { "nhits",          "Num hits (clusters of strips)",    "GetNhits()" },
     { "noise",          "Noise level (avg below adc.min)",  "fDnoise" },
     { "ncoords",        "Num fit coords",                   "GetNcoords()" },
-    { "coord.rank",     "Fit rank of coord",                "fFitCoords.TreeSearch::FitCoord.fFitRank" },
     { "coord.pos",      "Position used in fit (m)",         "fFitCoords.TreeSearch::FitCoord.fPos" },
     { "coord.trkpos",   "Track pos from projection fit (m)","fFitCoords.TreeSearch::FitCoord.fTrackPos" },
     { "coord.trkslope", "Track slope from projection fit",  "fFitCoords.TreeSearch::FitCoord.fTrackSlope" },

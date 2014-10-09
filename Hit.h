@@ -146,8 +146,7 @@ namespace TreeSearch {
 	      Double_t trkpos2d, Double_t trkslope2d,
 	      Double_t trkpos, Double_t trkslope )
       : fHit(hit), fRoad(road), fPos(pos), fTrackPos(trkpos2d),
-	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope),
-	fFitRank(0) {}
+	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope) {}
     FitCoord() : fHit(0), fRoad(0) {} // For ROOT RTTI
     virtual ~FitCoord() {}
 
@@ -179,9 +178,7 @@ namespace TreeSearch {
     Double_t  f3DTrkSlope; // Slope of fitted 3D track
     //TODO: add more members (for correction data etc)
 
-    UInt_t    fFitRank;    // Fit rank by chi2 within the road (0 = best)
-
-    ClassDef(FitCoord,1) // Coordinate information from road fit
+    ClassDef(FitCoord,2) // Coordinate information from road fit
   };
 
   //___________________________________________________________________________

@@ -280,7 +280,6 @@ Int_t WirePlane::DefineVariables( EMode mode )
   RVarDef vars[] = {
     { "nhits",       "Num accepted hits",                           "GetNhits()" },
     { "ncoords",     "Num fit coords",                              "GetNcoords()" },
-    { "coord.rank",  "Fit rank of coord",                           "fFitCoords.TreeSearch::FitCoord.fFitRank" },
     // { "coord.wire", "Wire number of fitted hit",                    "fFitCoords.TreeSearch::FitCoord.GetWireNum()" },
     // { "coord.time", "Drift time of hit (s)",                        "fFitCoords.TreeSearch::FitCoord.GetDriftTime()" },
     // { "coord.dist", "Drift distance of hit (m)",                    "fFitCoords.TreeSearch::FitCoord.GetDriftDist()" },
