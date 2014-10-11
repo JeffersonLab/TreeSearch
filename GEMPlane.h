@@ -26,10 +26,8 @@ namespace TreeSearch {
     virtual Int_t   Decode( const THaEvData& );
     virtual void    Print( Option_t* opt="" ) const;
 
-#ifdef TESTCODE
     virtual Int_t   Begin( THaRunBase* r=0 );
     virtual Int_t   End( THaRunBase* r=0 );
-#endif
 
     Double_t        GetAmplSigma( Double_t ampl ) const;
     Double_t        GetHitOcc()      const { return fHitOcc; }
