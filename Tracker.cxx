@@ -42,6 +42,7 @@
 #include <map>
 #include <string>
 #include <stdexcept>
+#include <cstring>   // for memset
 
 #ifdef TESTCODE
 #include "TStopwatch.h"
