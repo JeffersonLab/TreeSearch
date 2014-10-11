@@ -133,6 +133,13 @@ const Double_t kBig = 1e38;
 // Default value for minimum difference between all projection angles
 static const Double_t kMinProjAngleDiff = 5.0 * TMath::DegToRad();
 
+#ifdef MCDATA
+// Reconstruction status bit numbers, for evaluating tracking with MC data
+enum EReconBits {
+  kHitsFound = 0       // Sufficient number of hits found
+};
+#endif
+
 //_____________________________________________________________________________
 // Structures we want to put into STL containers
 
@@ -435,14 +442,21 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 #ifdef MCDATA
   static const char* const here = "Tracker::Decode";
 
+  Bool_t mcdata = TestBit(kMCdata);
+  struct MCHitCount {
+    UInt_t min;
+    UInt_t nfound;
+  } mchitcount[kTypeEnd-kTypeBegin];
+
   if( !fChecked ) {
-    if( TestBit(kMCdata) ) {
+    if( mcdata ) {
       fMCDecoder = dynamic_cast<const Podd::SimDecoder*>(&evdata);
       if( fMCDecoder == 0 ) {
 	Error( Here(here), "MCdata flag set, but decoder is not a SimDecoder. "
 	       "Fix database or replay configuration." );
 	throw bad_config("Attempt to decode MCdata without a SimDecoder");
       }
+      memset( mchitcount, 0, (kTypeEnd-kTypeBegin)*sizeof(MCHitCount) );
     }
     fChecked = true;
   }
@@ -467,6 +481,10 @@ Int_t Tracker::Decode( const THaEvData& evdata )
   for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
     Projection* theProj = *it;
     Int_t nhits = theProj->Decode( evdata );
+#ifdef MCDATA
+    if( mcdata )
+      mchitcount[theProj->GetType()].min = theProj->GetMinFitPlanes();
+#endif
     // Sanity cut on overfull planes. nhits < 0 indicates overflow
     if( nhits < 0 ) {
       fTrkStat = kTooManyRawHits;
@@ -479,10 +497,39 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 
 #ifdef MCDATA
   // For MCdata, check which MC track points were detected
-  if( TestBit(kMCdata) ) {
-    for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
-      FindHitForMCPoint( fMCDecoder->GetMCPoint(i), fMCPointUpdater );
+  if( mcdata ) {
+    if( fMCDecoder->GetNMCTracks() > 0 ) {
+      MCTrack* trk = static_cast<MCTrack*>( fMCDecoder->GetMCTrack(0) );
+      assert(trk);
+      trk->fNHitsFound = 0;
+      for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
+	MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
+	FindHitForMCPoint( fMCDecoder->GetMCPoint(i), fMCPointUpdater );
+	if( pt->fStatus == 0 ) {
+	  trk->fNHitsFound++;
+	  mchitcount[pt->fType].nfound++;
+	}
+      }
+      // Is number of found hits sufficient for the 3D fit?
+      if( trk->fNHitsFound-4 >= fMinNdof ) {
+	// If so, check if there are enough hits for each 2D fit, too
+	bool good = !fProj.empty();
+	for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
+	  const MCHitCount& mcnt = mchitcount[(*it)->GetType()];
+	  assert( mcnt.min > 0 );
+	  if( mcnt.nfound < mcnt.min ) {
+	    good = false;
+	    break;
+	  }
+	}
+	if( good )
+	  SETBIT( trk->fReconFlags, kHitsFound );
+	else
+	  CLRBIT( trk->fReconFlags, kHitsFound );
+      }
     }
+    else
+      Warning( Here(here), "No MC track in event %d?", evdata.GetEvNum() );
   }
 #endif
 
