@@ -15,11 +15,14 @@
 #include "Projection.h"
 
 #include "THaDetMap.h"
-#include "SimDecoder.h"
 #include "TClonesArray.h"
 #include "TH1.h"
 #include "TError.h"
 #include "TString.h"
+
+#ifdef MCDATA
+#include "SimDecoder.h"
+#endif
 
 #include <iostream>
 #include <string>
@@ -59,9 +62,11 @@ GEMPlane::GEMPlane( const char* name, const char* description,
   assert( dynamic_cast<GEMTracker*>(fTracker) );
 
   try {
+#ifdef MCDATA
     if( fTracker->TestBit(Tracker::kMCdata) ) // Monte Carlo data mode?
       fHits = new TClonesArray("TreeSearch::MCGEMHit", 200);
     else
+#endif
       fHits = new TClonesArray("TreeSearch::GEMHit", 200);
   }
   catch( std::bad_alloc ) {
@@ -256,9 +261,10 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 
   // const char* const here = "GEMPlane::Decode";
 
+#ifdef MCDATA
   bool mc_data = fTracker->TestBit(Tracker::kMCdata);
-
   assert( !mc_data || dynamic_cast<const SimDecoder*>(&evData) != 0 );
+#endif
   assert( fADCraw and fADC and fADCcor and fHitTime );
 
 #ifdef TESTCODE
@@ -278,11 +284,13 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   bool do_pedestal_subtraction = !fPed.empty();
   bool do_noise_subtraction    = TestBit(kDoNoise);
 
+#ifdef MCDATA
   const SimDecoder* simdata = 0;
   if( mc_data ) {
     assert( dynamic_cast<const SimDecoder*>(&evData) );
     simdata = static_cast<const SimDecoder*>(&evData);
   }
+#endif
   Vflt_t samples;
   if( fMaxSamp > 1 )
     samples.reserve(fMaxSamp);
@@ -356,11 +364,13 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 	AddHit( istrip );
       }
 
+#ifdef MCDATA
       // If doing MC data, save the truth information for each strip
       if( mc_data ) {
 	fMCHitList.push_back(istrip);
 	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
       }
+#endif
     }  // chans
   }    // modules
 
@@ -491,14 +501,18 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     assert( size > 0 );
     // Compute weighted position average. Again, a crude (but fast) substitute
     // for fitting the centroid of the peak.
-    Double_t xsum = 0.0, adcsum = 0.0, mcpos = 0.0, mctime = kBig;
+    Double_t xsum = 0.0, adcsum = 0.0;
+#ifdef MCDATA
+    Double_t mcpos = 0.0, mctime = kBig;
     Int_t mctrack = 0, num_bg = 0;
+#endif
     for( ; start != next; ++start ) {
       Int_t istrip = *start;
       Double_t pos = GetStart() + istrip * GetPitch();
       Double_t adc = fADCcor[istrip];
       xsum   += pos * adc;
       adcsum += adc;
+#ifdef MCDATA
       // If doing MC data, analyze the strip truth information
       if( mc_data ) {
 	MCHitInfo& mc = fMCHitInfo[istrip];
@@ -522,14 +536,16 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 	  }
 	}
       }
+#endif // MCDATA
     }
     assert( adcsum > 0.0 );
     Double_t pos = xsum/adcsum;
 
+#ifdef MCDATA
     if( mc_data && mctrack == 0 ) {
       mcpos /= static_cast<Double_t>(size);
     }
-
+#endif
     // The resolution (sigma) of the position measurement depends on the
     // cluster size. In particular, if the cluster consists of only a single
     // hit, the resolution is much reduced
@@ -551,7 +567,9 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 #ifndef NDEBUG
     GEMHit* theHit = 0;
 #endif
+#ifdef MCDATA
     if( !mc_data ) {
+#endif
 #ifndef NDEBUG
       theHit =
 #endif
@@ -562,6 +580,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 					 resolution,
 					 this
 					 );
+#ifdef MCDATA
     } else {
       // Monte Carlo data
 #ifndef NDEBUG
@@ -579,6 +598,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
 					   num_bg
 					   );
     }
+#endif // MCDATA
 #ifndef NDEBUG
     // Ensure hits are ordered by position (should be guaranteed by std::map)
     assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
@@ -636,7 +656,9 @@ Int_t GEMPlane::DefineVariables( EMode mode )
   if( ret != kOK )
     return ret;
 
+#ifdef MCDATA
   if( !fTracker->TestBit(Tracker::kMCdata) ) {
+#endif
     // Non-Monte Carlo hit data
     RVarDef nonmcvars[] = {
       { "hit.pos",  "Hit centroid (m)",      "fHits.TreeSearch::GEMHit.fPos" },
@@ -646,6 +668,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
       { 0 }
     };
     ret = DefineVarsFromList( nonmcvars, mode );
+#ifdef MCDATA
   } else {
     // Monte Carlo hit data includes the truth information
     // For safety, we make sure that all hit variables are referenced with
@@ -664,6 +687,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
     };
     ret = DefineVarsFromList( mcvars, mode );
   }
+#endif
   return ret;
 }
 
@@ -765,7 +789,9 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   SafeDelete(fHitTime);
   SafeDelete(fADCcor);
   SafeDelete(fGoodHit);
+#ifdef MCDATA
   delete [] fMCHitInfo; fMCHitInfo = 0;
+#endif
 
   // Allocate arrays. The only reason that these are parallel C-arrays is
   // that the global variable system still doesn't support arrays/vectors
@@ -778,10 +804,12 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   fGoodHit = new Byte_t[fNelem];
   fSigStrips.reserve(fNelem);
 
+#ifdef MCDATA
   if( fTracker->TestBit(Tracker::kMCdata) ) {
     fMCHitInfo = new Podd::MCHitInfo[fNelem];
     fMCHitList.reserve(fNelem);
   }
+#endif
 
   TString::ECaseCompare cmp = TString::kIgnoreCase;
   if( !mapping.IsNull() ) {

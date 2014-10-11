@@ -11,7 +11,9 @@
 
 #include "Hit.h"
 #include "GEMPlane.h"
+#ifdef MCDATA
 #include "SimDecoder.h"  // for MC data support
+#endif
 
 namespace TreeSearch {
 
@@ -39,6 +41,7 @@ namespace TreeSearch {
     ClassDef(GEMHit,1)     // Hit on an ADC-based readout plane, e.g. GEMs
   };
 
+#ifdef MCDATA
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
 
@@ -57,6 +60,7 @@ namespace TreeSearch {
 
     ClassDef(MCGEMHit,2)   // Monte Carlo hit in ADC-based readout plane
   };
+#endif // MCDATA
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -15,8 +15,10 @@ using std::cout;
 using std::endl;
 
 ClassImp(TreeSearch::WireHit)
-ClassImp(TreeSearch::MCWireHit)
 ClassImp(TreeSearch::HitSet)
+#ifdef MCDATA
+ClassImp(TreeSearch::MCWireHit)
+#endif
 
 namespace TreeSearch {
 
@@ -70,6 +72,7 @@ Double_t WireHit::ConvertTimeToDist( Double_t slope )
   return dist;
 }
 
+#ifdef MCDATA
 //_____________________________________________________________________________
 void MCWireHit::Print( Option_t* ) const
 {
@@ -78,6 +81,7 @@ void MCWireHit::Print( Option_t* ) const
   WireHit::Print("C");
   MCPrint();
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

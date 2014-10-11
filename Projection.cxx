@@ -211,7 +211,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     }
   }
 
+#ifdef MCDATA
   SetBit( kMCdata, fDetector->TestBit(Tracker::kMCdata) );
+#endif
 
   // Standard initialization. This calls ReadDatabase() and DefineVariables()
   THaAnalysisObject::EStatus status = THaAnalysisObject::Init(date);
@@ -591,6 +593,7 @@ Int_t Projection::DefineVariables( EMode mode )
     DefineVarsFromList( vars_evtdisp, mode );
   }
 
+#ifdef MCDATA
   // Additional variables for MC input data
   if( TestBit(kMCdata) ) {
     RVarDef mcvars[] = {
@@ -606,6 +609,7 @@ Int_t Projection::DefineVariables( EMode mode )
     };
     DefineVarsFromList( mcvars, mode );
   }
+#endif
 
   return 0;
 }

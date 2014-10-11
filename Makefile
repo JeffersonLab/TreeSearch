@@ -43,6 +43,8 @@ GEMLINKDEF = $(GEM)_LinkDef.h
 export VERBOSE = 1
 # Compile extra diagnostic code (extra computations and global variables)
 export TESTCODE = 1
+# Compile support code for MC input data
+export MCDATA = 1
 
 #export I387MATH = 1
 export EXTRAWARN = 1
@@ -144,6 +146,9 @@ DEFINES      += -DVERBOSE
 endif
 ifdef TESTCODE
 DEFINES      += -DTESTCODE
+endif
+ifdef MCDATA
+DEFINES      += -DMCDATA
 endif
 
 CXXFLAGS     += $(DEFINES) $(INCLUDES)

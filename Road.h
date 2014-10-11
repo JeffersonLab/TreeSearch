@@ -145,11 +145,13 @@ namespace TreeSearch {
     Double_t       fZL;         // z-eps of first plane
     Double_t       fZU;         // z+eps of last plane
 
+#ifdef MCDATA
     // MC truth data, for diagnosing tracking failures
     UInt_t         fNMCTrackHits;        // # planes with hits from MC track
     UInt_t         fMCTrackPlanePattern; // Planepattern of MC track hits
     UInt_t         fNMCTrackHitsFit;     // # MC track hits used in best fit
     UInt_t         fMCTrackPlanePatternFit; // Planepattern of fitted MC track hits
+#endif
 
     // Best fit results
     Double_t       fPos;        // Track origin

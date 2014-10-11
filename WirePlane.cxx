@@ -15,11 +15,13 @@
 #include "Projection.h"
 
 #include "THaDetMap.h"
-#include "SimDecoder.h"
 #include "TClonesArray.h"
 #include "TError.h"
 #include "TClass.h"
 #include "TString.h"
+#ifdef MCDATA
+#include "SimDecoder.h"
+#endif
 
 #include <iostream>
 #include <stdexcept>
@@ -47,9 +49,11 @@ WirePlane::WirePlane( const char* name, const char* description,
   assert( dynamic_cast<MWDC*>(fTracker) );
 
   try {
+#ifdef MCDATA
     if( fTracker->TestBit(Tracker::kMCdata) ) // Monte Carlo data mode?
       fHits = new TClonesArray("TreeSearch::MCWireHit", 200);
     else
+#endif
       fHits = new TClonesArray("TreeSearch::WireHit", 200);
   }
   catch( std::bad_alloc ) {
@@ -144,9 +148,10 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 
   UInt_t nHits = 0;
   bool no_time_cut = !fTracker->TestBit(MWDC::kDoTimeCut);
+#ifdef MCDATA
   bool mc_data     = fTracker->TestBit(Tracker::kMCdata);
-
   assert( !mc_data || dynamic_cast<const SimDecoder*>(&evData) != 0 );
+#endif
 
   // Decode data. This is done fairly efficiently by looping over only the
   // channels with hits on each module.
@@ -210,6 +215,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 	Double_t time = tdc_offset+ref_time - d->resolution*(data+0.5);
 	if( no_time_cut || (fMinTime < time && time < fMaxTime) ) {
 	  WireHit* theHit;
+#ifdef MCDATA
 	  if( mc_data ) {
 	    theHit = new( (*fHits)[nHits++] )
 	      MCWireHit( iw,
@@ -222,6 +228,7 @@ Int_t WirePlane::Decode( const THaEvData& evData )
 			 0, 0.0, 0.0
 			 );
 	  } else
+#endif
 	    theHit = new( (*fHits)[nHits++] )
 	      WireHit( iw,
 		       GetStart() + iw * GetPitch(),
@@ -307,7 +314,9 @@ Int_t WirePlane::DefineVariables( EMode mode )
   };
   Int_t ret = DefineVarsFromList( vars, mode );
 
+#ifdef MCDATA
   if( !fTracker->TestBit(MWDC::kMCdata) && ret == kOK ) {
+#endif
     // Non-Monte Carlo hit data
     RVarDef nonmcvars[] = {
       { "hit.wire",    "Hit wire number",    "fHits.TreeSearch::WireHit.fWireNum" },
@@ -322,6 +331,7 @@ Int_t WirePlane::DefineVariables( EMode mode )
       { 0 }
     };
     ret = DefineVarsFromList( nonmcvars, mode );
+#ifdef MCDATA
   } else {
     // Monte Carlo hit data includes the truth information
     RVarDef mcvars[] = {
@@ -339,6 +349,7 @@ Int_t WirePlane::DefineVariables( EMode mode )
     };
     ret = DefineVarsFromList( mcvars, mode );
   }
+#endif // MCDATA
   return ret;
 }
 

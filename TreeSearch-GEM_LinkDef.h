@@ -11,6 +11,8 @@
 #pragma link C++ class TreeSearch::GEMTracker+;
 #pragma link C++ class TreeSearch::GEMPlane+;
 #pragma link C++ class TreeSearch::GEMHit+;
+#ifdef MCDATA
 #pragma link C++ class TreeSearch::MCGEMHit+;
+#endif
 
 #endif

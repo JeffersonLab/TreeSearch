@@ -11,7 +11,9 @@
 
 #include "Hit.h"
 #include "WirePlane.h"
+#ifdef MCDATA
 #include "SimDecoder.h"  // for MC data support
+#endif
 
 namespace TreeSearch {
 
@@ -102,6 +104,7 @@ namespace TreeSearch {
   };
 
 
+#ifdef MCDATA
   //___________________________________________________________________________
   // Monte Carlo hit class. Same as a hit plus the MC truth info.
 
@@ -118,6 +121,7 @@ namespace TreeSearch {
 
     ClassDef(MCWireHit,2)  // Monte Carlo hit in horizontal drift chamber
   };
+#endif // MCDATA
 
   //___________________________________________________________________________
   inline
