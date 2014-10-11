@@ -151,9 +151,11 @@ namespace TreeSearch {
     // Only for TESTCODE, but kept for binary compatibility
     TH1*          fHitMap;     // Histogram of active sensor numbers
 
+#ifdef MCDATA
     // Only set when analyzing simulation data
     Vint_t            fMCHitList;  // Elements in fMCHitInfo with data
     Podd::MCHitInfo*  fMCHitInfo;  // [fNelem] MC truth data for fHits
+#endif
 
     // Bits for Planes
     enum {

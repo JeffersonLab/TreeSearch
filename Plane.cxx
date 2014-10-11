@@ -15,11 +15,14 @@
 
 #include "ha_compiledata.h"  // for ANALYZER_VERSION
 #include "THaDetMap.h"
-#include "SimDecoder.h"      // for Podd::MCHitInfo
 #include "TClonesArray.h"
 #include "TH1.h"
 #include "TClass.h"
 #include "TString.h"
+
+#ifdef MCDATA
+#include "SimDecoder.h"      // for Podd::MCHitInfo
+#endif
 
 #include <iostream>
 #include <string>
@@ -35,8 +38,10 @@ Plane::Plane( const char* name, const char* description,
   : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
     fDefinedNum(kMaxUInt), fType(kUndefinedType), fStart(0),
     fPitch(0), fCoordOffset(0), fPartner(0), fProjection(0),
-    fResolution(0), fMaxHits(kMaxUInt), fHits(0), fFitCoords(0),
-    fHitMap(0), fMCHitInfo(0)
+    fResolution(0), fMaxHits(kMaxUInt), fHits(0), fFitCoords(0)
+#ifdef MCDATA
+  , fHitMap(0), fMCHitInfo(0)
+#endif
 {
   // Constructor
 
@@ -71,7 +76,9 @@ Plane::~Plane()
   // Histograms in fHist should be automatically deleted by ROOT when
   // the output file is closed
 
+#ifdef MCDATA
   delete [] fMCHitInfo;
+#endif
   delete fFitCoords;
   delete fHits;
 }
@@ -112,6 +119,7 @@ void Plane::Clear( Option_t* opt )
 
   fHits->Clear(opt);
   fFitCoords->Clear(opt);
+#ifdef MCDATA
   if( fMCHitInfo ) {
     assert( fTracker->TestBit(Tracker::kMCdata) );
     for( Vint_t::size_type i = 0; i < fMCHitList.size(); ++i ) {
@@ -119,6 +127,7 @@ void Plane::Clear( Option_t* opt )
     }
     fMCHitList.clear();
   }
+#endif
 }
 
 //___________________________________________________________________________

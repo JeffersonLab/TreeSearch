@@ -361,11 +361,14 @@ private:
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
   : THaTrackingDetector(name,desc,app), fCrateMap(0),
     fMinProjAngleDiff(kMinProjAngleDiff), fIsRotated(false),
-    fAllPartnered(false), fChecked(false), fMaxThreads(1), fThreads(0),
+    fAllPartnered(false), fMaxThreads(1), fThreads(0),
     fMinReqProj(3), f3dMatchvalScalefact(1), f3dMatchCut(0),
-    fMinNdof(1), fTrkStat(kTrackOK), fMCDecoder(0), fMCPointUpdater(0),
+    fMinNdof(1), fTrkStat(kTrackOK),
     fNcombos(0), fN3dFits(0), fEvNum(0),
     t_track(0), t_3dmatch(0), t_3dfit(0), t_coarse(0)
+#ifdef MCDATA
+  , fMCDecoder(0), fMCPointUpdater(0), fChecked(false)
+#endif
 {
   // Constructor
 
@@ -386,7 +389,9 @@ Tracker::~Tracker()
   DeleteContainer( fPlanes );
   DeleteContainer( fProj );
 
+#ifdef MCDATA
   delete fMCPointUpdater;
+#endif
 }
 
 //_____________________________________________________________________________
@@ -427,6 +432,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 {
   // Decode all planes and fill hitpatterns per projection
 
+#ifdef MCDATA
   static const char* const here = "Tracker::Decode";
 
   if( !fChecked ) {
@@ -440,7 +446,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
     }
     fChecked = true;
   }
-
+#endif
 #ifdef TESTCODE
   // Save current event number for diagnostics
   fEvNum = evdata.GetEvNum();
@@ -471,16 +477,19 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       theProj->FillHitpattern();
   }
 
+#ifdef MCDATA
   // For MCdata, check which MC track points were detected
   if( TestBit(kMCdata) ) {
     for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
       FindHitForMCPoint( fMCDecoder->GetMCPoint(i), fMCPointUpdater );
     }
   }
+#endif
 
   return 0;
 }
 
+#ifdef MCDATA
 //_____________________________________________________________________________
 void Tracker::MCPointUpdater::UpdateHit( MCTrackPoint* pt, Hit* hit,
 					 Double_t x ) const
@@ -608,14 +617,16 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
 }
 
 //_____________________________________________________________________________
-THaTrack* Tracker::FindTrackForMCPoint( MCTrackPoint* pt, TClonesArray& tracks,
-					MCPointUpdater* Updater ) const
+THaTrack* Tracker::FindTrackForMCPoint( MCTrackPoint* /* pt */,
+					TClonesArray& /* tracks */,
+					MCPointUpdater* /* Updater */ ) const
 {
   // Find the best-matching track for the given MC track point
 
   //TODO
   return 0;
 }
+#endif // MCDATA
 
 //_____________________________________________________________________________
 Int_t Tracker::End( THaRunBase* run )
@@ -2086,11 +2097,13 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   // Keep a simple flag for the rotation status for efficiency.
   fIsRotated = !fRotation.IsIdentity();
 
+#ifdef MCDATA
   // Set up handler for MC data
   if( TestBit(kMCdata) ) {
     delete fMCPointUpdater;
     fMCPointUpdater = new MCPointUpdater;
   }
+#endif
 
   return fStatus = kOK;
 }
@@ -2129,8 +2142,11 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 
   string planeconfig, calibconfig;
   f3dMatchCut = 1e-4;
-  Int_t mc_data = 0, event_display = 0, disable_tracking = 0,
+  Int_t event_display = 0, disable_tracking = 0,
     disable_finetrack = 0, proj_to_z0 = 1;
+#ifdef MCDATA
+  Int_t mc_data = 0;
+#endif
   Int_t maxmiss = -1, maxthreads = -1;
   Double_t conf_level = 1e-9;
   ResetBit( k3dFastMatch ); // Set in Init()
@@ -2138,7 +2154,9 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   DBRequest request[] = {
     { "planeconfig",       &planeconfig,       kString },
     { "cratemap",          cmap,               kIntM,   GetCrateMapDBcols() },
+#ifdef MCDATA
     { "MCdata",            &mc_data,           kInt,    0, 1 },
+#endif
     { "3d_matchcut",       &f3dMatchCut,       kDouble, 0, 1 },
     { "event_display",     &event_display,     kInt,    0, 1 },
     { "disable_tracking",  &disable_tracking,  kInt,    0, 1 },
@@ -2186,7 +2204,9 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     return status;
 
   // Set common analysis control flags
+#ifdef MCDATA
   SetBit( kMCdata,        mc_data );
+#endif
   SetBit( kEventDisplay,  event_display );
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
@@ -2195,9 +2215,15 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 
   cout << endl;
   if( fDebug > 0 ) {
+#ifdef MCDATA
     Info( Here(here), "Tracker flags mcdata/evdisp/coarse/fine/projz0 = "
 	  "%d/%d/%d/%d/%d", TestBit(kMCdata), TestBit(kEventDisplay),
 	  TestBit(kDoCoarse), TestBit(kDoFine), TestBit(kProjTrackToZ0) );
+#else
+    Info( Here(here), "Tracker flags evdisp/coarse/fine/projz0 = "
+	  "%d/%d/%d/%d", TestBit(kEventDisplay), TestBit(kDoCoarse),
+	  TestBit(kDoFine), TestBit(kProjTrackToZ0) );
+#endif
   }
 
   vector<string> planes = vsplit(planeconfig);

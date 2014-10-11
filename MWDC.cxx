@@ -246,11 +246,13 @@ THaAnalysisObject::EStatus MWDC::Init( const TDatime& date )
   // Reference map set up correctly and without conflicts
   fRefTime.assign( fRefMap->GetSize(), kBig );
 
+#ifdef MCDATA
   // Set up handler for MC data aware of LR hits
   if( TestBit(kMCdata) ) {
     delete fMCPointUpdater;
     fMCPointUpdater = new LRPointUpdater;
   }
+#endif
 
   return fStatus = kOK;
 }
@@ -393,6 +395,7 @@ UInt_t MWDC::GetCrateMapDBcols() const
   return 6;
 }
 
+#ifdef MCDATA
 //_____________________________________________________________________________
 void MWDC::LRPointUpdater::UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
 				      Double_t x ) const
@@ -410,6 +413,8 @@ void MWDC::LRPointUpdater::UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
   Double_t dx2 = wirehit->GetPosL() - x;
   pt->fHitResid = TMath::Min(dx1,dx2);
 };
+
+#endif // MCDATA
 
 ///////////////////////////////////////////////////////////////////////////////
 

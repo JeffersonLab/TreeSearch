@@ -13,7 +13,9 @@ using std::cout;
 using std::endl;
 
 ClassImp(TreeSearch::GEMHit)
+#ifdef MCDATA
 ClassImp(TreeSearch::MCGEMHit)
+#endif
 
 namespace TreeSearch {
 
@@ -29,6 +31,7 @@ void GEMHit::Print( Option_t* opt ) const
     cout << endl;
 }
 
+#ifdef MCDATA
 //_____________________________________________________________________________
 void MCGEMHit::Print( Option_t* ) const
 {
@@ -37,6 +40,7 @@ void MCGEMHit::Print( Option_t* ) const
   GEMHit::Print("C");
   MCPrint();
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

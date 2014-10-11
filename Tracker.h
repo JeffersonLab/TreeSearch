@@ -11,7 +11,6 @@
 
 #include "THaTrackingDetector.h"
 #include "THaDetMap.h"
-#include "SimDecoder.h"
 #include "Types.h"
 #include <vector>
 #include <utility>
@@ -21,6 +20,11 @@
 #include <exception>
 #include "TMatrixDSym.h"
 #include "TRotation.h"
+#ifndef MCDATA
+#include "THaEvData.h"
+#else
+#include "SimDecoder.h"
+#endif
 
 class THaTrack;
 class THaBenchmark;
@@ -68,7 +72,9 @@ namespace TreeSearch {
 
     // Analysis control flags. Set via database.
     enum {
+#ifdef MCDATA
       kMCdata        = BIT(16), // Assume input is Monte Carlo data
+#endif
       k3dFastMatch   = BIT(18), // Use fast 3D matching algo (auto detected)
       kEventDisplay  = BIT(19), // Support event display
       kDoCoarse      = BIT(20), // Do coarse tracking (if unset, decode only)
@@ -99,12 +105,14 @@ namespace TreeSearch {
     };
     ETrackingStatus GetTrackingStatus() const { return fTrkStat; }
 
+#ifdef MCDATA
     // Bad configuration exception, may be thrown by Decode
     class bad_config : public std::runtime_error {
     public:
       bad_config( const std::string& what_arg )
 	: std::runtime_error(what_arg) {}
     };
+#endif
 
   protected:
     friend class Plane;
@@ -121,8 +129,6 @@ namespace TreeSearch {
     typedef std::vector<Plane*>  Rpvec_t;
     typedef std::vector<Projection*> Prvec_t;
 
-    class MCPointUpdater;
-
     // Planes and projections
     Rpvec_t        fPlanes;           // Readout planes
     Prvec_t        fProj;             // Plane projections
@@ -134,7 +140,6 @@ namespace TreeSearch {
     TRotation      fRotation;         // Rotation Tracker -> lab frame
     Bool_t         fIsRotated;        // Tracker frame is rotated
     Bool_t         fAllPartnered;     // All planes have partners
-    Bool_t         fChecked;          // Configuration checked to be good
 
     // Multithread support
     UInt_t         fMaxThreads;       // Maximum simultaneously active threads
@@ -152,9 +157,6 @@ namespace TreeSearch {
 
     // Event-by-event data
     ETrackingStatus fTrkStat;    // Reconstruction status
-
-    const Podd::SimDecoder* fMCDecoder; //! MC data decoder (if kMCdata)
-    MCPointUpdater* fMCPointUpdater;    //! MC track point update (if kMCdata)
 
     // Only needed for TESTCODE, but kept for binary compatibility
     UInt_t         fNcombos;     // # of road combinations tried
@@ -212,11 +214,6 @@ namespace TreeSearch {
     virtual Int_t NewTrackCalc( THaTrack* newTrack, const TVector3& pos,
 				const TVector3& dir );
 
-    virtual Hit*  FindHitForMCPoint( Podd::MCTrackPoint* pt,
-				     MCPointUpdater* updater ) const;
-    virtual THaTrack* FindTrackForMCPoint( Podd::MCTrackPoint* pt,
-					   TClonesArray& tracks,
-					   MCPointUpdater* updater ) const;
 
     // Helper functions for getting DAQ module parameters - used by Init
     UInt_t    LoadDAQmodel( THaDetMap::Module* m ) const;
@@ -226,6 +223,19 @@ namespace TreeSearch {
     // Podd interface
     virtual Int_t  ReadDatabase( const TDatime& date );
 
+#ifdef MCDATA
+    // Monte Carlo data support
+    class MCPointUpdater;
+    const Podd::SimDecoder* fMCDecoder; //! MC data decoder (if kMCdata)
+    MCPointUpdater* fMCPointUpdater;    //! MC track point update (if kMCdata)
+    Bool_t          fChecked;           // Configuration checked to be good
+
+    virtual Hit*  FindHitForMCPoint( Podd::MCTrackPoint* pt,
+				     MCPointUpdater* updater ) const;
+    virtual THaTrack* FindTrackForMCPoint( Podd::MCTrackPoint* pt,
+					   TClonesArray& tracks,
+					   MCPointUpdater* updater ) const;
+
     // Helper class to use with FindHitForMCPoint & FindTrackForMCPoint
     class MCPointUpdater {
     public:
@@ -234,6 +244,7 @@ namespace TreeSearch {
       virtual void UpdateTrack( Podd::MCTrackPoint* pt, Plane* pl,
 				THaTrack* track, Double_t x ) const;
     };
+#endif
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };

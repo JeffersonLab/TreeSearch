@@ -11,7 +11,9 @@
 #pragma link C++ class TreeSearch::MWDC+;
 #pragma link C++ class TreeSearch::WirePlane+;
 #pragma link C++ class TreeSearch::WireHit+;
+#ifdef MCDATA
 #pragma link C++ class TreeSearch::MCWireHit+;
+#endif
 #pragma link C++ class TreeSearch::HitpatternLR+;
 #pragma link C++ class TreeSearch::ProjectionLR+;
 #pragma link C++ class TreeSearch::TimeToDistConv+;
