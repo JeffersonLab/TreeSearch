@@ -440,13 +440,16 @@ Int_t Tracker::Decode( const THaEvData& evdata )
   // Decode all planes and fill hitpatterns per projection
 
 #ifdef MCDATA
-  static const char* const here = "Tracker::Decode";
+  const char* const here = "Tracker::Decode";
 
-  Bool_t mcdata = TestBit(kMCdata);
   struct MCHitCount {
     UInt_t min;
     UInt_t nfound;
   } mchitcount[kTypeEnd-kTypeBegin];
+
+  Bool_t mcdata = TestBit(kMCdata);
+  if( mcdata )
+    memset( mchitcount, 0, (kTypeEnd-kTypeBegin)*sizeof(MCHitCount) );
 
   if( !fChecked ) {
     if( mcdata ) {
@@ -456,7 +459,6 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 	       "Fix database or replay configuration." );
 	throw bad_config("Attempt to decode MCdata without a SimDecoder");
       }
-      memset( mchitcount, 0, (kTypeEnd-kTypeBegin)*sizeof(MCHitCount) );
     }
     fChecked = true;
   }
@@ -499,6 +501,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
   // For MCdata, check which MC track points were detected
   if( mcdata ) {
     if( fMCDecoder->GetNMCTracks() > 0 ) {
+      assert( dynamic_cast<MCTrack*>(fMCDecoder->GetMCTrack(0)) );
       MCTrack* trk = static_cast<MCTrack*>( fMCDecoder->GetMCTrack(0) );
       assert(trk);
       trk->fNHitsFound = 0;
