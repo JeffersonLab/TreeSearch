@@ -12,9 +12,11 @@
 #include "Hit.h"
 #include "Tracker.h"
 #include "Projection.h"
+#include "Road.h"
 
 #include "ha_compiledata.h"  // for ANALYZER_VERSION
 #include "THaDetMap.h"
+#include "THaTrack.h"
 #include "TClonesArray.h"
 #include "TH1.h"
 #include "TClass.h"
@@ -29,6 +31,7 @@
 #include <stdexcept>
 
 using namespace std;
+using namespace Podd;
 
 namespace TreeSearch {
 
@@ -366,8 +369,206 @@ Double_t Plane::GetMaxSlope() const
 }
 
 //_____________________________________________________________________________
+Int_t Plane::FindHitWithLowerBound( Double_t x ) const
+{
+  // Binary search of the sorted hits array for the track crossing position x,
+  // similar to std::lower_bound(). This finds the index in fHits of the
+  // first hit with position >= x.
 
+  Int_t last = GetNhits();
+  Int_t first = 0;
+
+  if( last > 0 ) {
+    Int_t len = last - first;
+    while( len > 0 ) {
+      Int_t half = len >> 1;
+      Int_t middle = first + half;
+      if( GetHit(middle)->GetPos() < x ) {
+	first = middle + 1;
+	len -= half + 1;
+      } else
+	len = half;
+    }
+    assert( first <= last );
+  }
+  return first;
 }
+
+//_____________________________________________________________________________
+Hit* Plane::FindNearestHitAndPos( Double_t x, Double_t& pmin ) const
+{
+  // Find the hit with position closest to x. Return pointer to the hit object
+  // found and the position of this hit (which may be different from
+  // hit->GetPos() in case of hits with left-right ambiguity, for example).
+  //
+  // This is a generic implementation that works for any type of readout
+  // that provides single position information, such readout plane strips.
+
+  pmin = kBig;
+  if( GetNhits() == 0 )
+    return 0;
+
+  const Int_t pos = FindHitWithLowerBound( x );
+
+  // Decide whether the hit >= x or the first one < x are closest.
+  Hit *hnext = 0, *hprev = 0;
+  if( pos < GetNhits() ) {
+    hnext = GetHit(pos);
+    assert( hnext && hnext->GetPos() >= x );
+  }
+  if( pos > 0 ) {
+    hprev = GetHit(pos-1);
+    assert( hprev && hprev->GetPos() < x );
+    if( hnext ) {
+      assert( hprev->GetPos() < hnext->GetPos() );
+      if( x - hprev->GetPos() < hnext->GetPos() - x )
+	hnext = 0;
+      else
+	hprev = 0;
+    }
+  }
+  assert( (hprev != 0) xor (hnext != 0) );
+  Hit* hmin = ( hnext != 0 ) ? hnext : hprev;
+  pmin = hmin->GetPos();
+  return hmin;
+}
+
+//_____________________________________________________________________________
+void Plane::RecordNearestHits( const THaTrack* track, const Rvec_t& roads )
+{
+  // For the given plane, find the hit nearest to the given track
+  // and register it in the plane's fit coordinates array.
+  // The given roads are the ones generating the given track.
+  // This routine is used for efficiency and alignment studies and testing.
+
+  assert( !roads.empty() );
+
+  // Search for the hit with position closest to the track crossing
+  // position in this plane. The hits are sorted by position, so
+  // the search can be made fast.
+  Double_t z     = GetZ();
+  Double_t cosa  = GetProjection()->GetCosAngle();
+  Double_t sina  = GetProjection()->GetSinAngle();
+  Double_t slope = track->GetDTheta()*cosa + track->GetDPhi()*sina;
+  Double_t x     = track->GetDX()*cosa + track->GetDY()*sina + slope*z;
+
+  // Find the hit (hmin) and its coordinate of closest approach (pmin).
+  // Details depend on the type of detector technology (wires, strips).
+  Double_t pmin;
+  Hit* hmin = FindNearestHitAndPos( x, pmin );
+
+  // The road vector does not necessarily contain all projections, so
+  // search for the road of the type of this readout plane, taking advantage
+  // of the fact that the road vector is sorted by type
+  Road* rd = 0;
+  Int_t k = min( roads.size(), (Rvec_t::size_type)GetType() );
+  do {
+    if( roads[k]->GetProjection()->GetType() > GetType() )
+      --k;
+    else {
+      if( roads[k]->GetProjection() == GetProjection() )
+	rd = roads[k];
+      break;
+    }
+  } while( k>=0 );
+  Double_t slope2d = rd ? rd->GetSlope() : kBig;
+  Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
+
+  // Finally, record the hit info in the readout plane
+  AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
+}
+
+//_____________________________________________________________________________
+pair<Int_t,Int_t> Plane::FindHitsInRange( Double_t lower,
+					  Double_t upper ) const
+{
+  // Find range of hits with positions in [lower,upper). Return hit
+  // indexes of start and one-past-end of region
+
+  assert( lower <= upper );
+
+  Int_t end = GetNhits();
+  Int_t lo = FindHitWithLowerBound( lower );
+  // The test lo == end is purely for efficiency
+  Int_t hi = ( lo == end ) ? lo : FindHitWithLowerBound( upper );
+
+  assert( lo <= hi );
+  return make_pair(lo,hi);
+}
+
+
+#ifdef MCDATA
+//_____________________________________________________________________________
+Hit* Plane::FindNearestMCHitAndPos( Double_t x, Int_t mctrack,
+				    Double_t& pmin ) const
+{
+  // Same as FindNearestHitAndPos, but assume the hits are from MC data and
+  // require that the hit returned originates from MC track 'mctrack'
+
+  Int_t end = GetNhits();
+  pmin = kBig;
+  if( end == 0 )
+    return 0;
+
+  Int_t pos = FindHitWithLowerBound( x );
+  if( pos == end ) --pos;
+  assert( pos >= 0 );
+  Hit* hit = GetHit(pos);
+
+  // We need the dynamic_cast here because Hits use multiple inheritance
+  // to bring in the MCHitInfo
+  MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(hit);
+  assert( mcinfo );
+  if( mcinfo->fMCTrack != mctrack ) {
+    // We have a hit, but it's not from the indicated track. Search nearby hits
+    hit = 0;
+    Int_t down = pos, up = pos;
+    Hit *hitD = 0, *hitU = 0;
+    while( --down >= 0 or ++up < end ) {
+      if( down >= 0 and not hitD ) {
+	Hit* hcur = GetHit(down);
+	if( hitU and
+	    TMath::Abs(hcur->GetPos()-x) > TMath::Abs(hitU->GetPos()-x) )
+	  break;
+	mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
+	if( mcinfo->fMCTrack == mctrack ) {
+	  hitD = hcur;
+	}
+      }
+      if( up < end and not hitU ) {
+	Hit* hcur = GetHit(up);
+	if( hitD and
+	    TMath::Abs(hcur->GetPos()-x) > TMath::Abs(hitD->GetPos()-x) )
+	  break;
+	mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
+	if( mcinfo->fMCTrack == mctrack ) {
+	  hitU = hcur;
+	}
+      }
+      if( hitD and hitU )
+	break;
+    }
+    if( hitD ) {
+      if( hitU ) {
+	hit = (TMath::Abs(hitU->GetPos()-x) > TMath::Abs(hitD->GetPos()-x))
+	  ? hitD : hitU;
+      } else
+	hit = hitD;
+    } else
+      hit = hitU;
+  }
+
+  if( hit )
+    pmin = hit->GetPos();
+
+  return hit;
+}
+#endif // MCDATA
+
+//_____________________________________________________________________________
+
+
+} // namespace TreeSearch
 
 ClassImp(TreeSearch::Plane)
 

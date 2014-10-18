@@ -184,9 +184,6 @@ namespace TreeSearch {
 	           std::list<std::pair<Double_t,Rvec_t> >& combos_found,
 	           Rset_t& unique_found );
 
-    Int_t     FindHitWithLowerBound( const TSeqCollection* hits,
-				     Double_t x ) const;
-
     // Virtualization of the tracker class, specialized Trackers may/must
     // override
     virtual Plane* MakePlane( const char* name, const char* description = "",
@@ -195,12 +192,6 @@ namespace TreeSearch {
 					Double_t angle,
 					THaDetectorBase* parent ) const;
     virtual UInt_t GetCrateMapDBcols() const = 0;
-
-    virtual void   FindNearestHits( Plane* pl, const THaTrack* track,
-				    const Rvec_t& roads ) const;
-    virtual void   FindNearestHitsImpl( const TSeqCollection* hits,
-					Int_t first, Int_t last, Double_t x,
-					Hit*& hmin, Double_t& pmin ) const;
 
     virtual UInt_t MatchRoads( vector<Rvec_t>& roads,
 	         std::list<std::pair<Double_t,Rvec_t> >& combos_found,

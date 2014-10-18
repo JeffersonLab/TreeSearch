@@ -29,6 +29,8 @@ namespace TreeSearch {
     virtual void     Print( Option_t* opt="" ) const;
 
     virtual Double_t GetMaxLRdist() const { return GetPitch(); }
+    virtual Hit*     FindNearestHitAndPos( Double_t x, Double_t& pos ) const;
+
 
     TimeToDistConv*  GetTTDConv()   const { return fTTDConv; }
 

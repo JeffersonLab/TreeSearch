@@ -363,6 +363,7 @@ private:
   TCondition*          fTrackDone;    // Finish condition
 };
 
+//====================== Tracker class ========================================
 
 //_____________________________________________________________________________
 Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
@@ -507,8 +508,8 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       trk->fNHitsFound = 0;
       for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
 	MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
-	FindHitForMCPoint( fMCDecoder->GetMCPoint(i), fMCPointUpdater );
-	if( pt->fStatus == 0 ) {
+	FindHitForMCPoint( pt, fMCPointUpdater );
+	if( TESTBIT(pt->fStatus, MCTrackPoint::kCorrectClosest) ) {
 	  trk->fNHitsFound++;
 	  mchitcount[pt->fType].nfound++;
 	}
@@ -549,12 +550,8 @@ void Tracker::MCPointUpdater::UpdateHit( MCTrackPoint* pt, Hit* hit,
   // belongs to.
 
   assert( pt );
-  if( hit ) {
-    pt->fStatus = 0;
+  if( hit )
     pt->fHitResid = hit->GetPos() - x;
-  }
-  else
-    pt->fStatus = 1;
 };
 
 //_____________________________________________________________________________
@@ -572,9 +569,10 @@ void Tracker::MCPointUpdater::UpdateTrack( MCTrackPoint* pt, Plane* pl,
     Double_t slope  = trk->GetDTheta()*cosa + trk->GetDPhi()*sina;
     Double_t trkpos = trk->GetDX()*cosa + trk->GetDY()*sina + slope*pl->GetZ();
     pt->fTrackResid = trkpos - x;
+    SETBIT(pt->fStatus, MCTrackPoint::kUsedInTrack);
   }
   else
-    pt->fStatus = 2; // FIXME: set bits?
+    CLRBIT(pt->fStatus, MCTrackPoint::kUsedInTrack);
 };
 
 //_____________________________________________________________________________
@@ -592,74 +590,65 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
   // Find the plane for this point. Since the plane numbering can be ambiguous,
   // we search by z-position. Certain trackers have more than one plane with the
   // same z, which are then distinguished by the plane type (u,v,x etc.)
-  pair<citer_t,citer_t> range =
+  pair<citer_t,citer_t> plane_range =
     equal_range( ALL(fPlanes), point.Z(), Plane::ZIsNear(0.001) );
 
   Hit* hit = 0;
   Double_t x = kBig;
-  for( citer_t it = range.first; it != range.second; ++it ) {
+  for( citer_t it = plane_range.first; it != plane_range.second; ++it ) {
     const Plane* pl = *it;
     if( pl->GetType() != pt->fType )
       continue;
 
-    const TSeqCollection* hits = pl->GetHits();
-    Int_t end = hits->GetLast()+1;
-    if( end > 0 ) {
-      // Calculate the position of the MC hit along the plane's coordinate axis
-      // NB: the plane hit coordinates are given in the tracker frame
-      Double_t cosa = pl->GetProjection()->GetCosAngle();
-      Double_t sina = pl->GetProjection()->GetSinAngle();
-      x = point.X()*cosa + point.Y()*sina;
+    // Calculate position of the point in its projection coordinate system
+    Double_t cosa = pl->GetProjection()->GetCosAngle();
+    Double_t sina = pl->GetProjection()->GetSinAngle();
+    x = point.X()*cosa + point.Y()*sina;
 
-      Int_t pos = FindHitWithLowerBound( hits, x );
-      if( pos == end ) --pos;
-      assert( pos >= 0 );
-      hit = static_cast<Hit*>(hits->At(pos));
+    pair<Int_t,Int_t> hit_range = pl->FindHitsInRange( x - pt->fgWindowSize,
+						       x + pt->fgWindowSize );
+    Int_t nfound = hit_range.second - hit_range.first;
+    pt->fNFound = nfound;
+    if( nfound > 0 )
+      SETBIT(pt->fStatus, MCTrackPoint::kFound);
 
-      // We need the dynamic_cast here because Hits use multiple inheritance
-      // to bring in the MCHitInfo
-      MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(hit);
+    // Find two types of reconstructed hits closest to the point's position:
+    // 1) any hit
+    // 2) a hit originating at least in part from the point's MC track
+    Double_t anyHitPos, mcHitPos;
+    Hit* anyHit = pl->FindNearestHitAndPos( x, anyHitPos );
+    Hit* mcHit  = pl->FindNearestMCHitAndPos( x, pt->fMCTrack, mcHitPos );
+
+    // Sanity checks
+    assert( not mcHit or anyHit ); // mcHit implies anyHit
+    assert( nfound == 0 or  // nfound > 0 implies anyHit and pos within window
+	    (anyHit != 0 and TMath::Abs(x-anyHitPos) <= pt->fgWindowSize) );
+    assert( mcHit == 0 or   // mcHit, if any, cannot be closer than anyHit
+	    TMath::Abs(x-anyHitPos) <= TMath::Abs(x-mcHitPos) );
+
+    // Flag too-distant MC hits. In this case, nfound may or may not be zero
+    if( mcHit and TMath::Abs(x-mcHitPos) > pt->fgWindowSize )
+      SETBIT(pt->fStatus, MCTrackPoint::kCorrectFarAway);
+
+    // Record what we found in the status flags of the point
+    if( mcHit ) {
+      SETBIT(pt->fStatus, MCTrackPoint::kCorrectFound);
+      if( anyHit == mcHit )
+	SETBIT(pt->fStatus, MCTrackPoint::kCorrectClosest);
+      MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(mcHit);
       assert( mcinfo );
-      if( mcinfo->fMCTrack != pt->fMCTrack ) {
-	// We have a hit, but it's not from our track. Check nearby hits.
-	hit = 0;
-	Int_t down = pos, up = pos;
-	Hit *hitD = 0, *hitU = 0;
-	while( --down >= 0 or ++up < end ) {
-	  if( down >= 0 and not hitD ) {
-	    Hit* hcur = static_cast<Hit*>( hits->At(down) );
-	    if( hitU and
-		TMath::Abs(hcur->GetPos()-x) > TMath::Abs(hitU->GetPos()-x) )
-	      break;
-	    mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
-	    if( mcinfo->fMCTrack == pt->fMCTrack ) {
-	      hitD = hcur;
-	    }
-	  }
-	  if( up < end and not hitU ) {
-	    Hit* hcur = static_cast<Hit*>( hits->At(up) );
-	    if( hitD and
-		TMath::Abs(hcur->GetPos()-x) > TMath::Abs(hitD->GetPos()-x) )
-	      break;
-	    mcinfo = dynamic_cast<Podd::MCHitInfo*>(hcur);
-	    if( mcinfo->fMCTrack == pt->fMCTrack ) {
-	      hitU = hcur;
-	    }
-	  }
-	  if( hitD and hitU )
-	    break;
-	}
-	if( hitD ) {
-	  if( hitU ) {
-	    hit = (TMath::Abs(hitU->GetPos()-x) > TMath::Abs(hitD->GetPos()-x))
-	      ? hitD : hitU;
-	  } else
-	    hit = hitD;
-	} else
-	  hit = hitU;
-      }
-      break;
+      if( mcinfo->fContam > 0 )
+	SETBIT(pt->fStatus, MCTrackPoint::kContaminated);
     }
+    if( anyHit ) {
+      MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(anyHit);
+      assert( mcinfo );
+      Int_t mctrack = mcinfo->fMCTrack;
+      if( mctrack > 0 and mctrack != pt->fMCTrack )
+	SETBIT(pt->fStatus, MCTrackPoint::kWrongTrack);
+    }
+    hit = anyHit;
+    break;  // plane of correct type found
   }
   if( Updater )
     Updater->UpdateHit( pt, hit, x );
@@ -918,126 +907,6 @@ Int_t Tracker::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 }
 
 //_____________________________________________________________________________
-void Tracker::FindNearestHits( Plane* pl, const THaTrack* track,
-			       const Rvec_t& roads ) const
-{
-  // For the given plane, find the hit nearest to the given track
-  // and register it in the plane's fit coordinates array.
-  // The given roads are the ones generating the given track.
-  // This routine is used for efficiency and alignment studies and testing.
-
-  assert( !roads.empty() );
-
-  // Search for the hit with position closest to the track crossing
-  // position in this plane. The hits are sorted by position, so
-  // the search can be made fast.
-  Double_t z     = pl->GetZ();
-  Double_t cosa  = pl->GetProjection()->GetCosAngle();
-  Double_t sina  = pl->GetProjection()->GetSinAngle();
-  Double_t slope = track->GetDTheta()*cosa + track->GetDPhi()*sina;
-  Double_t x     = track->GetDX()*cosa + track->GetDY()*sina + slope*z;
-  Double_t pmin  = kBig;
-  Hit*     hmin  = 0;
-
-  const TSeqCollection* hits = pl->GetHits();
-  // Int_t last = hits->GetSize();
-  // If "hits" is a TObjArray or TClonesArray, we must get the size using
-  // GetLast() instead of GetSize() (a ROOT quirk)
-  // const TObjArray* arr = dynamic_cast<const TObjArray*>(hits);
-  // if( arr )
-  //   last = arr->GetLast()+1;
-  assert( dynamic_cast<const TObjArray*>(hits) );
-  Int_t last = hits->GetLast()+1;
-  if( last > 0 ) {
-    Int_t first = FindHitWithLowerBound( hits, x );
-    // Find the hit (hmin) and its coordinate of closest approach (pmin).
-    // Details depend on the type of detector technology (wires, strips).
-    FindNearestHitsImpl( hits, first, last, x, hmin, pmin );
-  }
-
-  // The road vector does not necessarily contain all projections, so
-  // search for the road of the type of this readout plane, taking advantage
-  // of the fact that the road vector is sorted by type
-  Road* rd = 0;
-  Int_t k = min( roads.size(), (Rvec_t::size_type)pl->GetType() );
-  do {
-    if( roads[k]->GetProjection()->GetType() > pl->GetType() )
-      --k;
-    else {
-      if( roads[k]->GetProjection() == pl->GetProjection() )
-	rd = roads[k];
-      break;
-    }
-  } while( k>=0 );
-  Double_t slope2d = rd ? rd->GetSlope() : kBig;
-  Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
-
-  // Finally, record the hit info in the readout plane
-  pl->AddFitCoord( FitCoord(hmin, rd, pmin, pos2d, slope2d, x, slope) );
-}
-
-//_____________________________________________________________________________
-Int_t Tracker::FindHitWithLowerBound( const TSeqCollection* hits,
-				      Double_t x ) const
-{
-  // Binary search of the sorted hits array for the track crossing position x,
-  // similar to std::lower_bound(). This finds the first hit with position >= x.
-
-  Int_t last = hits->GetLast()+1;
-  Int_t first = 0;
-
-  if( last > 0 ) {
-    Int_t len = last - first;
-    while( len > 0 ) {
-      Int_t half = len >> 1;
-      Int_t middle = first + half;
-      if( static_cast<Hit*>(hits->At(middle))->GetPos() < x ) {
-	first = middle + 1;
-	len -= half + 1;
-      } else
-	len = half;
-    }
-    assert( first <= last );
-  }
-  return first;
-}
-
-//_____________________________________________________________________________
-void Tracker::FindNearestHitsImpl( const TSeqCollection* hits,
-				   const Int_t first, const Int_t last,
-				   const Double_t x,
-				   Hit*& hmin, Double_t& pmin ) const
-{
-  // Generic implementation of FindNearestHits. This should work for any type
-  // of readout that provides single position information, such readout plane
-  // strips.
-
-  // Decide whether the hit >= x or the first one < x are closest.
-  Hit *hnext = 0, *hprev = 0;
-  if( first < last ) {
-    hnext = static_cast<Hit*>(hits->At(first));
-    assert( hnext->GetPos() >= x );
-  }
-  if( first > 0 ) {
-    hprev = static_cast<Hit*>(hits->At(first-1));
-    assert( hprev->GetPos() < x );
-    if( hnext ) {
-      assert( hprev->GetPos() < hnext->GetPos() );
-      if( x - hprev->GetPos() < hnext->GetPos() - x )
-	hnext = 0;
-      else
-	hprev = 0;
-    }
-  }
-  assert( (hprev != 0) xor (hnext != 0) );
-  if( hnext )
-    hmin = hnext;
-  else
-    hmin = hprev;
-  pmin = hmin->GetPos();
-}
-
-//_____________________________________________________________________________
 Int_t Tracker::NewTrackCalc( THaTrack*, const TVector3&, const TVector3& )
 {
   // Hook for additional calculations for a newly generated track
@@ -1120,7 +989,8 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   ForAllTrackPoints( *fit_par.roads, fit_par.coef, AddFitCoord() );
   for( Rpvec_t::const_iterator it = fCalibPlanes.begin(); it !=
 	 fCalibPlanes.end(); ++it ) {
-    FindNearestHits( (*it), newTrack, *fit_par.roads );
+    Plane* pl = *it;
+    pl->RecordNearestHits( newTrack, *fit_par.roads );
   }
 
   // Do additional calculations for the new track (used by derived classes)
