@@ -18,8 +18,10 @@
 #include <vector>
 #include <cassert>
 #include <functional>
+#include <utility>
 
 class TH1;
+class THaTrack;
 namespace Podd {
   class MCHitInfo;
 }
@@ -30,6 +32,7 @@ namespace TreeSearch {
   class Tracker;
   class Hit;
   class FitCoord;
+  class Road;
   extern const Double_t kBig;
 
   class Plane : public THaSubDetector {
@@ -53,13 +56,22 @@ namespace TreeSearch {
 
     virtual Bool_t  Contains( Double_t x, Double_t y ) const;
     virtual Double_t GetMaxLRdist() const { return 0; }
-
+    virtual Hit*    FindNearestHitAndPos( Double_t x, Double_t& pos ) const;
+    virtual void    RecordNearestHits( const THaTrack* track,
+				       const std::vector<TreeSearch::Road*>& roads );
+    virtual std::pair<Int_t,Int_t>
+                    FindHitsInRange( Double_t xmin, Double_t xmax ) const;
+#ifdef MCDATA
+    virtual Hit*    FindNearestMCHitAndPos( Double_t x, Int_t mctrack,
+					    Double_t& pos ) const;
+#endif
 //     virtual Int_t   Compare ( const TObject* obj ) const;
 //     virtual Bool_t  IsSortable () const { return kTRUE; }
 
     FitCoord*       AddFitCoord( const FitCoord& coord );
     Bool_t          Contains( const TVector2& point ) const;
     void            EnableCalibration( Bool_t enable = true );
+    Int_t           FindHitWithLowerBound( Double_t x ) const;
     EProjType       GetType()        const { return fType; }
     Double_t        GetZ()           const { return fOrigin.Z(); }
     static Int_t    GetDBSearchLevel( const char* prefix );
@@ -73,6 +85,7 @@ namespace TreeSearch {
     Double_t        GetStart()       const { return fStart+fCoordOffset; }
     Double_t        GetPitch()       const { return fPitch; }
 
+    Hit*            GetHit(Int_t i)  const;
     TSeqCollection* GetHits()        const { return fHits; }
     Int_t           GetNhits()       const { return fHits->GetLast()+1; }
     TSeqCollection* GetCoords()      const { return fFitCoords; }
@@ -187,6 +200,24 @@ namespace TreeSearch {
     // Enable/disable calibration mode flag
 
     SetBit( kCalibrating, enable );
+  }
+
+  //___________________________________________________________________________
+  inline
+  Hit* Plane::GetHit( Int_t i ) const
+  {
+    // Return i-th hit in this plane
+
+    assert( fHits );
+
+    // We use C-style casts here to avoid having to include Hit.h, which would
+    // create a circular include file dependency; Hit.h includes Plane.h
+    return (Hit*)fHits->
+#ifdef NDEBUG
+      UncheckedAt(i);
+#else
+      At(i);
+#endif
   }
 
   //___________________________________________________________________________

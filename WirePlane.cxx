@@ -477,6 +477,84 @@ void WirePlane::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
+Hit* WirePlane::FindNearestHitAndPos( Double_t x, Double_t& pmin ) const
+{
+  // Version of FindNearestHitandPos for horizontal drift chambers. Carries out
+  // additional checks to account for left/right ambiguity.
+
+  pmin = kBig;
+  if( GetNhits() == 0 )
+    return 0;
+
+  const Int_t pos = FindHitWithLowerBound( x );
+
+  // Decide whether the wire >= x or the first one < x are closest.
+  // If the track crosses between two adjacent wires, keep both.
+  WireHit *hnext = 0, *hprev = 0;
+  if( pos < GetNhits() ) {
+    assert( dynamic_cast<WireHit*>(GetHit(pos)) );
+    hnext = static_cast<WireHit*>(GetHit(pos));
+    assert( hnext->GetWirePos() >= x );
+  }
+  if( pos > 0 ) {
+    assert( dynamic_cast<WireHit*>(GetHit(pos-1)) );
+    hprev = static_cast<WireHit*>(GetHit(pos-1));
+    assert( hprev->GetWirePos() < x );
+    if( hnext ) {
+      assert( hprev->GetWireNum() < hnext->GetWireNum() );
+      if( hprev->GetWireNum() + 1 < hnext->GetWireNum() ) {
+	if( x - hprev->GetWirePos() < hnext->GetWirePos() - x )
+	  hnext = 0;
+	else
+	  hprev = 0;
+      }
+    }
+  }
+  // Of the closest wire(s) found, find the closest drift distance.
+  // If there are multiple hits one a wire, test all hits - without
+  // making assumptions about the order of drift distances
+  Double_t dmin = kBig;
+  Hit* hmin = 0;
+  if( hnext ) {
+    hmin = hnext;
+    pmin = hnext->GetPosL();
+    dmin = TMath::Abs(pmin-x);
+    Int_t i = pos;
+    WireHit* h;
+    while( ++i < GetNhits() and
+	   (h = static_cast<WireHit*>(GetHit(i)))->GetWireNum() ==
+	   hnext->GetWireNum() ) {
+      Double_t d = TMath::Abs(h->GetPosL()-x);
+      if( d < dmin ) {
+	dmin = d;
+	hmin = h;
+	pmin = h->GetPosL();
+      }
+    }
+  }
+  if( hprev ) {
+    Double_t d = TMath::Abs(hprev->GetPosR()-x);
+    if( !hmin or d < dmin ) {
+      dmin = d;
+      hmin = hprev;
+      pmin = hprev->GetPosR();
+    }
+    Int_t i = pos-1;
+    WireHit* h;
+    while( --i >= 0 and (h = static_cast<WireHit*>(GetHit(i)))->GetWireNum()
+	   == hprev->GetWireNum() ) {
+      d = TMath::Abs(h->GetPosR()-x);
+      if( d < dmin ) {
+	dmin = d;
+	hmin = h;
+	pmin = h->GetPosR();
+      }
+    }
+  }
+  return hmin;
+}
+
+//_____________________________________________________________________________
 
 }
 
