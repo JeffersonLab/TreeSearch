@@ -509,7 +509,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
 	MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
 	FindHitForMCPoint( pt, fMCPointUpdater );
-	if( TESTBIT(pt->fStatus, MCTrackPoint::kCorrectClosest) ) {
+	if( TESTBIT(pt->fStatus, MCTrackPoint::kCorrectFound) ) {
 	  trk->fNHitsFound++;
 	  mchitcount[pt->fType].nfound++;
 	}
