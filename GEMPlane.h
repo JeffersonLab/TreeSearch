@@ -35,6 +35,7 @@ namespace TreeSearch {
     Int_t           GetNsigStrips()  const { return fSigStrips.size(); }
 
   protected:
+    typedef std::vector<bool>  Vbool_t;
 
     // Hardware channel mapping
     enum EChanMapType { kOneToOne, kReverse, kGassiplexAdapter1,
@@ -62,7 +63,8 @@ namespace TreeSearch {
     Float_t*      fADCcor;      // [fNelem] fADC corrected for pedestal & noise
     Byte_t*       fGoodHit;     // [fNelem] Strip data passed pulse shape test
     Double_t      fDnoise;      // Event-by-event noise (avg below fMinAmpl)
-    Vint_t        fSigStrips;   // Strip numbers with signal (adccor > minampl)
+    Vint_t        fSigStrips;   // Ordered strip numbers with signal (adccor > minampl)
+    Vbool_t       fStripsSeen;  // Flags for duplicate strip number detection
 
     UInt_t        fNrawStrips;  // Statistics: strips with any data
     UInt_t        fNhitStrips;  // Statistics: strips > 0
