@@ -19,7 +19,9 @@
 #include "TError.h"
 #include "TClass.h"
 #include "TString.h"
-#ifdef MCDATA
+#ifndef MCDATA
+#include "THaEvData.h"
+#else
 #include "SimDecoder.h"
 #endif
 
