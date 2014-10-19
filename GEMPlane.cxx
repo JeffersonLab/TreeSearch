@@ -20,16 +20,21 @@
 #include "TError.h"
 #include "TString.h"
 
-#ifdef MCDATA
+#ifndef MCDATA
+#include "THaEvData.h"
+#else
 #include "SimDecoder.h"
 #endif
 
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <algorithm>
 
 using namespace std;
 using namespace Podd;
+
+#define ALL(c) (c).begin(), (c).end()
 
 namespace TreeSearch {
 
@@ -132,6 +137,7 @@ void GEMPlane::Clear( Option_t* opt )
   fHitOcc = fOccupancy = fDnoise = 0.0;
 
   fSigStrips.clear();
+  fStripsSeen.assign( fNelem, false );
 }
 
 //_____________________________________________________________________________
@@ -259,7 +265,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   // Finds clusters of active strips (=above software threshold) and
   // computes weighted average of position. Each such cluster makes one "Hit".
 
-  // const char* const here = "GEMPlane::Decode";
+  const char* const here = "GEMPlane::Decode";
 
 #ifdef MCDATA
   bool mc_data = fTracker->TestBit(Tracker::kMCdata);
@@ -274,6 +280,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   assert( fPed.empty() or
 	  fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
   assert( fSigStrips.empty() );
+  assert( fStripsSeen.size() == static_cast<Vbool_t::size_type>(fNelem) );
 
   UInt_t nHits = 0;
 
@@ -308,7 +315,20 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       // Map channel number to strip number
       Int_t istrip =
 	MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
-      //TODO: test for duplicate istrip, if found, warn and skip
+      // Test for duplicate istrip, if found, warn and skip
+      assert( istrip >= 0 and istrip < fNelem );
+      if( fStripsSeen[istrip] ) {
+	const char* inp_source = "DAQ";
+#ifdef MCDATA
+	if( mc_data )
+	  inp_source = "digitization";
+#endif
+	Warning( Here(here), "Duplicate strip number %d in plane %s, event %d. "
+		 "Ignorning it. Fix your %s.",
+		 istrip, GetName(), evData.GetEvNum(), inp_source );
+	continue;
+      }
+      fStripsSeen[istrip] = true;
 
       // For the APV25 analog pipeline, multiple "hits" on a decoder channel
       // correspond to time samples 25 ns apart
@@ -418,7 +438,10 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
   // frac = 0.1 means: trigger on a drop below 90% etc. Likewise for the
   // following valley: the bottom is found if the amplitude rises again
   // by (1+frac), so frac = 0.1 means: trigger on a rise above 110% etc.
-  //
+
+  // The active strip numbers must be sorted for the clustering algorithm
+  sort( ALL(fSigStrips) );
+
   Double_t frac_down = 1.0 - fSplitFrac, frac_up = 1.0 + fSplitFrac;
 #ifndef NDEBUG
   GEMHit* prevHit = 0;
@@ -803,6 +826,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   fADCcor = new Float_t[fNelem];
   fGoodHit = new Byte_t[fNelem];
   fSigStrips.reserve(fNelem);
+  fStripsSeen.resize(fNelem);
 
 #ifdef MCDATA
   if( fTracker->TestBit(Tracker::kMCdata) ) {
