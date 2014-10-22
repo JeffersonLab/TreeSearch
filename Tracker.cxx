@@ -433,6 +433,10 @@ void Tracker::Clear( Option_t* opt )
 
   // Clear tracking status
   fTrkStat = kTrackOK;
+
+#ifdef MCDATA
+  fMCHitBits.clear();
+#endif
 }
 
 //_____________________________________________________________________________
@@ -779,6 +783,29 @@ private:
   UInt_t fBits;
 };
 
+#ifdef MCDATA
+//_____________________________________________________________________________
+// Set bit for the unique number (fDefinedNum) of the plane of the given point
+// if the point corresponds to a true MC hit (contaminated or not)
+class SetMCPlaneBit
+{
+public:
+  SetMCPlaneBit() : fBits(0) {}
+  void operator() ( Road*, Road::Point* p, const vector<Double_t>& )
+  {
+    Hit* hit = p->hit;
+    MCHitInfo* mcinfo = dynamic_cast<Podd::MCHitInfo*>(hit);
+    assert(mcinfo); // may only call this with MC-generated data
+    if( mcinfo->fMCTrack > 0 )
+      fBits |= 1U << hit->GetPlane()->GetDefinedNum();
+  }
+  void     Clear() { fBits = 0; }
+  UInt_t   GetBits() const { return fBits; }
+private:
+  UInt_t fBits;
+};
+#endif
+
 //_____________________________________________________________________________
 template< typename Action >
 Action Tracker::ForAllTrackPoints( const Rvec_t& roads,
@@ -986,6 +1013,24 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
 				      SetPlaneBit() ).GetBits();
   newTrack->SetFlag( hitbits );
 
+#ifdef MCDATA
+  // For MC data, determine which of the hits that were used for fitting this
+  // track are true MC hits, i.e. hits left by the MC track we are trying to
+  // reconstruct.
+  if( TestBit(kMCdata) ) {
+    hitbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef,
+				 SetMCPlaneBit() ).GetBits();
+    // Since the track has already been added, the tracks array must be
+    // one element larger than fMCHitBits here.
+    assert( fMCHitBits.size() ==
+	    static_cast<vec_uint_t::size_type>(tracks.GetLast()) );
+    fMCHitBits.push_back(hitbits);
+  }
+#endif
+
+  // For any planes in calibration mode, save the hits closest to this track.
+  // Minimizing the hit residuals is the standard procedure for alignment
+  // calibration.
   ForAllTrackPoints( *fit_par.roads, fit_par.coef, AddFitCoord() );
   for( Rpvec_t::const_iterator it = fCalibPlanes.begin(); it !=
 	 fCalibPlanes.end(); ++it ) {
