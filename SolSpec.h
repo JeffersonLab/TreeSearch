@@ -15,19 +15,17 @@
 
 namespace SoLID {
 
-  // Helper class for holding additional track coordinates not in THaTrack
-  class SolTrackCoords : public TObject {
+  // Helper class for holding additional track data not in THaTrack
+  class SolTrackInfo : public TObject {
   public:
-    SolTrackCoords() {}
-    SolTrackCoords( Int_t sector, const TVector3& point,
-		    const TVector3& direction, Double_t phi0 )
+    SolTrackInfo() {}
+    SolTrackInfo( Int_t sector, const TVector3& point,
+		  const TVector3& direction, Double_t phi0 )
       : TObject(), fSector(sector), fRtransv(point.Perp()),
 	fTheta(point.Theta()), fPhi(point.Phi()),
 	fPhiRot(TVector2::Phi_mpi_pi(fPhi-phi0)),
 	fThetaDir(direction.Theta()), fPhiDir(direction.Phi()),
 	fPhiDirRot(TVector2::Phi_mpi_pi(fPhiDir-phi0)) {}
-
-    virtual ~SolTrackCoords() {}
 
   protected:
 
@@ -43,7 +41,7 @@ namespace SoLID {
     Double_t  fPhiDir;     // Azimuth of track direction [rad]
     Double_t  fPhiDirRot;  // Azimuth of track dir wrt to sector center [rad]
 
-    ClassDef(SolTrackCoords,0) // SoLID track coordinates
+    ClassDef(SolTrackInfo,0) // SoLID track coordinates
   };
 
   class SolSpec : public THaSpectrometer {
@@ -57,11 +55,11 @@ namespace SoLID {
     virtual Int_t     FindVertices( TClonesArray& tracks );
     virtual Int_t     TrackCalc();
 
-    TClonesArray*     GetTrackCoord() { return fTrackCoord; }
+    TClonesArray*     GetTrackInfo() { return fSolTrackInfo; }
 
   protected:
 
-    TClonesArray*     fTrackCoord;   // Track coordinates in cylindrical system
+    TClonesArray*     fSolTrackInfo;   // SoLID-specific per-track info
 
     virtual Int_t     DefineVariables( EMode mode = kDefine );
     virtual Int_t     ReadRunDatabase( const TDatime& date );

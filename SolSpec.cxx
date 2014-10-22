@@ -63,7 +63,7 @@ SolSpec::SolSpec( const char* name, const char* description,
     }
   }
 
-  fTrackCoord = new TClonesArray( "SoLID::SolTrackCoords", kInitTrackMultiplicity );
+  fSolTrackInfo = new TClonesArray( "SoLID::SolTrackInfo", kInitTrackMultiplicity );
 
   // For now, don't require run database
   // We might need it later to read things like the field setting
@@ -75,7 +75,7 @@ SolSpec::~SolSpec()
 {
   // Destructor
 
-  delete fTrackCoord; fTrackCoord = 0;
+  delete fSolTrackInfo; fSolTrackInfo = 0;
 
   DefineVariables( kDelete );
 }
@@ -86,7 +86,7 @@ void SolSpec::Clear( Option_t* opt )
   // Clear event-by-event data
 
   THaSpectrometer::Clear(opt);
-  fTrackCoord->Clear();
+  fSolTrackInfo->Clear();
 }
 
 //_____________________________________________________________________________
@@ -156,21 +156,21 @@ Int_t SolSpec::DefineVariables( EMode mode )
 
   RVarDef vars[] = {
     { "tr.sect",      "Sector number",
-      "fTrackCoord.SoLID::SolTrackCoords.fSector" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fSector" },
     { "tr.r",         "Transv dist (m)",
-      "fTrackCoord.SoLID::SolTrackCoords.fRtransv" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fRtransv" },
     { "tr.theta",     "Polar angle (rad)",
-      "fTrackCoord.SoLID::SolTrackCoords.fTheta" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fTheta" },
     { "tr.phi",       "Azimuth (rad)",
-      "fTrackCoord.SoLID::SolTrackCoords.fPhi" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fPhi" },
     { "tr.phi_rot",   "Azimuth in sector (rad)",
-      "fTrackCoord.SoLID::SolTrackCoords.fPhiRot" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fPhiRot" },
     { "tr.thdir",     "Direction polar angle (rad)",
-      "fTrackCoord.SoLID::SolTrackCoords.fThetaDir" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fThetaDir" },
     { "tr.phdir",     "Direction azimuth (rad)",
-      "fTrackCoord.SoLID::SolTrackCoords.fPhiDir" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fPhiDir" },
     { "tr.phdir_rot", "Direction azimuth in sector (rad)",
-      "fTrackCoord.SoLID::SolTrackCoords.fPhiDirRot" },
+      "fSolTrackInfo.SoLID::SolTrackInfo.fPhiDirRot" },
     { 0 }
   };
 
@@ -200,7 +200,7 @@ Int_t SolSpec::FindVertices( TClonesArray& tracks )
 
   // TODO
 
-  assert( tracks.GetLast() == fTrackCoord->GetLast() );
+  assert( tracks.GetLast() == fSolTrackInfo->GetLast() );
 
   return 0;
 }

@@ -159,10 +159,10 @@ Int_t GEMTracker::NewTrackCalc( THaTrack*, const TVector3& pos,
   assert( dynamic_cast<SolSpec*>(GetApparatus()) );
   SolSpec* solid = static_cast<SolSpec*>(GetApparatus());
 
-  TClonesArray* trackCoord = solid->GetTrackCoord();
-  Int_t i = trackCoord->GetLast()+1;
+  TClonesArray* trackInfo = solid->GetTrackInfo();
+  Int_t i = trackInfo->GetLast()+1;
 
-  new( (*trackCoord)[i] ) SolTrackCoords( fSector, pos, dir, fPhi );
+  new( (*trackInfo)[i] ) SolTrackInfo( fSector, pos, dir, fPhi );
 
   return 0;
 }
