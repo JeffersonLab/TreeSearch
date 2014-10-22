@@ -4,6 +4,9 @@
 //                                                                           //
 // SoLID::GEMTracker                                                         //
 //                                                                           //
+// This is class GEMTracker in namespace SoLID. It inherits from class       //
+// GEMTracker in namespace TreeSearch. Although confusing, this is fine.     //
+//                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "SoLIDGEMTracker.h"
@@ -162,7 +165,15 @@ Int_t GEMTracker::NewTrackCalc( THaTrack*, const TVector3& pos,
   TClonesArray* trackInfo = solid->GetTrackInfo();
   Int_t i = trackInfo->GetLast()+1;
 
+#ifdef MCDATA
+  SolTrackInfo* trkinfo =
+#endif
   new( (*trackInfo)[i] ) SolTrackInfo( fSector, pos, dir, fPhi );
+
+#ifdef MCDATA
+  assert( static_cast<vector<UInt_t>::size_type>(i) < fMCHitBits.size() );
+  trkinfo->SetMCHitBits( fMCHitBits[i] );
+#endif
 
   return 0;
 }

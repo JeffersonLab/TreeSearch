@@ -25,7 +25,16 @@ namespace SoLID {
 	fTheta(point.Theta()), fPhi(point.Phi()),
 	fPhiRot(TVector2::Phi_mpi_pi(fPhi-phi0)),
 	fThetaDir(direction.Theta()), fPhiDir(direction.Phi()),
-	fPhiDirRot(TVector2::Phi_mpi_pi(fPhiDir-phi0)) {}
+	fPhiDirRot(TVector2::Phi_mpi_pi(fPhiDir-phi0))
+#ifdef MCDATA
+      , fMCHitBits(0)
+#endif
+    {}
+
+#ifdef MCDATA
+    Int_t    GetMCHitBits() const       { return fMCHitBits; }
+    void     SetMCHitBits( Int_t bits ) { fMCHitBits = bits; }
+#endif
 
   protected:
 
@@ -40,6 +49,11 @@ namespace SoLID {
     Double_t  fThetaDir;   // Polar angle of track direction [rad]
     Double_t  fPhiDir;     // Azimuth of track direction [rad]
     Double_t  fPhiDirRot;  // Azimuth of track dir wrt to sector center [rad]
+
+#ifdef MCDATA
+    // Diagnostic info derived from Monte Carlo truth data
+    Int_t     fMCHitBits;  // Bitpattern of plane #s w/MC hit used by this track
+#endif
 
     ClassDef(SolTrackInfo,0) // SoLID track coordinates
   };

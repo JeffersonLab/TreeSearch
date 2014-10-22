@@ -171,6 +171,10 @@ Int_t SolSpec::DefineVariables( EMode mode )
       "fSolTrackInfo.SoLID::SolTrackInfo.fPhiDir" },
     { "tr.phdir_rot", "Direction azimuth in sector (rad)",
       "fSolTrackInfo.SoLID::SolTrackInfo.fPhiDirRot" },
+#ifdef MCDATA
+    { "tr.mchitbits", "Planepattern of true MC hits in this track",
+      "fSolTrackInfo.SoLID::SolTrackInfo.fMCHitBits" },
+#endif
     { 0 }
   };
 
