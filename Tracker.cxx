@@ -774,7 +774,7 @@ public:
     fBits |= 1U << p->hit->GetPlane()->GetDefinedNum();
   }
   void     Clear() { fBits = 0; }
-  Double_t GetBits() const { return fBits; }
+  UInt_t   GetBits() const { return fBits; }
 private:
   UInt_t fBits;
 };
