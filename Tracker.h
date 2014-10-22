@@ -220,6 +220,7 @@ namespace TreeSearch {
     const Podd::SimDecoder* fMCDecoder; //! MC data decoder (if kMCdata)
     MCPointUpdater* fMCPointUpdater;    //! MC track point update (if kMCdata)
     Bool_t          fChecked;           // Configuration checked to be good
+    vec_uint_t      fMCHitBits;         // Per-track MC hit planepattern
 
     virtual Hit*  FindHitForMCPoint( Podd::MCTrackPoint* pt,
 				     MCPointUpdater* updater ) const;
