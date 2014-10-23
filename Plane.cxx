@@ -195,7 +195,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
 
   // Set defaults
   TString plane_type;
-  Int_t required = 0, do_histos = 0;
+  Int_t required = 0, do_histos = 0, dummy = 0;
   fMaxHits   = kMaxUInt;
 
   // Read fOrigin (plane position) and fSize. fOrigin is the chamber
@@ -217,6 +217,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
 	{ "xp.res",         &fResolution,     kDouble,  0, 0, gbl },
 	{ "maxhits",        &fMaxHits,        kUInt,    0, 1, gbl },
 	{ "required",       &required,        kInt,     0, 1 },
+	{ "dummy",          &dummy,           kInt,     0, 1 },
 	{ "type",           &plane_type,      kTString, 0, 1 },
 	{ "description",    &fTitle,          kTString, 0, 1 },
 	{ "partner",        &fPartnerName,    kTString, 0, 1 },
@@ -281,7 +282,8 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
     return kInitError;
   }
 
-  SetBit( kIsRequired, required );
+  SetRequired( required );
+  SetDummy( dummy );
 #ifdef TESTCODE
   SetBit( kDoHistos, do_histos );
 #endif
