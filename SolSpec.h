@@ -13,12 +13,22 @@
 #include "THaSpectrometer.h"
 #include "TVector2.h"
 
+#ifndef KBIG
+#define KBIG 1e38
+#endif
+
 namespace SoLID {
 
   // Helper class for holding additional track data not in THaTrack
   class SolTrackInfo : public TObject {
   public:
-    SolTrackInfo() {}
+    SolTrackInfo()
+      : fSector(-1), fRtransv(KBIG), fTheta(KBIG), fPhi(KBIG),
+	fPhiRot(KBIG), fThetaDir(KBIG), fPhiDir(KBIG), fPhiDirRot(KBIG)
+#ifdef MCDATA
+      , fMCHitBits(0)
+#endif
+    {}
     SolTrackInfo( Int_t sector, const TVector3& point,
 		  const TVector3& direction, Double_t phi0 )
       : TObject(), fSector(sector), fRtransv(point.Perp()),

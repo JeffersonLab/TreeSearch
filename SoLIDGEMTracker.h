@@ -30,8 +30,8 @@ namespace SoLID {
 			      THaDetectorBase* parent = 0 ) const;
 
     virtual THaAnalysisObject::EStatus PartnerPlanes();
-    virtual Int_t NewTrackCalc( THaTrack* newTrack, const TVector3& pos,
-				const TVector3& dir );
+    virtual Int_t NewTrackCalc( Int_t idx, THaTrack* newTrack,
+				const TVector3& pos, const TVector3& dir );
 
      // Podd interface
     virtual const char* GetDBFileName() const;

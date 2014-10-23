@@ -152,7 +152,7 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 }
 
 //_____________________________________________________________________________
-Int_t GEMTracker::NewTrackCalc( THaTrack*, const TVector3& pos,
+Int_t GEMTracker::NewTrackCalc( Int_t idx, THaTrack*, const TVector3& pos,
 				const TVector3& dir )
 {
   // For every new track, convert track coordinates to the cylindrical system
@@ -163,16 +163,15 @@ Int_t GEMTracker::NewTrackCalc( THaTrack*, const TVector3& pos,
   SolSpec* solid = static_cast<SolSpec*>(GetApparatus());
 
   TClonesArray* trackInfo = solid->GetTrackInfo();
-  Int_t i = trackInfo->GetLast()+1;
 
 #ifdef MCDATA
-  SolTrackInfo* trkinfo =
+  SolTrackInfo* theInfo =
 #endif
-  new( (*trackInfo)[i] ) SolTrackInfo( fSector, pos, dir, fPhi );
+  new( (*trackInfo)[idx] ) SolTrackInfo( fSector, pos, dir, fPhi );
 
 #ifdef MCDATA
-  assert( static_cast<vector<UInt_t>::size_type>(i) < fMCHitBits.size() );
-  trkinfo->SetMCHitBits( fMCHitBits[i] );
+  assert( static_cast<vrsiz_t>(idx) < fMCHitBits.size() );
+  theInfo->SetMCHitBits( fMCHitBits[idx] );
 #endif
 
   return 0;
