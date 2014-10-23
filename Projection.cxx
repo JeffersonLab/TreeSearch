@@ -1169,7 +1169,8 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
       const vector<Hit*>& hits = fHitpattern->GetHits( i, nd[i] );
       node->second.hits.insert( ALL(hits) );
     }
-    assert( HitSet::GetMatchValue(node->second.hits) == match.first );
+    assert( (HitSet::GetMatchValue(node->second.hits) xor
+	     fHitpattern->GetDummyPlanePattern()) == match.first );
     node->second.plane_pattern = match.first;
     node->second.nplanes = match.second;
 
