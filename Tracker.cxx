@@ -934,7 +934,8 @@ Int_t Tracker::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 }
 
 //_____________________________________________________________________________
-Int_t Tracker::NewTrackCalc( THaTrack*, const TVector3&, const TVector3& )
+Int_t Tracker::NewTrackCalc( Int_t , THaTrack*, const TVector3&,
+			     const TVector3& )
 {
   // Hook for additional calculations for a newly generated track
 
@@ -1006,6 +1007,9 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   assert( newTrack );
   newTrack->SetD( d_x, d_y, d_xp, d_yp );
   newTrack->SetChi2( fit_par.chi2, fit_par.ndof );
+  // Index of currect track
+  Int_t idx = tracks.GetLast();
+  assert( idx >= 0 );
   //TODO: make a TrackID?
 
   // Save the bitpattern of planes whose hits were used in the track fit
@@ -1020,11 +1024,11 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   if( TestBit(kMCdata) ) {
     hitbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef,
 				 SetMCPlaneBit() ).GetBits();
-    // Since the track has already been added, the tracks array must be
-    // one element larger than fMCHitBits here.
-    assert( fMCHitBits.size() ==
-	    static_cast<vec_uint_t::size_type>(tracks.GetLast()) );
-    fMCHitBits.push_back(hitbits);
+    // Use resize instead of push_back since there could be gaps in the
+    // sequence of track indexes if other trackers also fill the tracks array
+    assert( static_cast<vrsiz_t>(idx) >= fMCHitBits.size() );
+    fMCHitBits.resize(idx+1);
+    fMCHitBits[idx] = hitbits;
   }
 #endif
 
@@ -1039,7 +1043,7 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   }
 
   // Do additional calculations for the new track (used by derived classes)
-  NewTrackCalc( newTrack, pos, dir );
+  NewTrackCalc( idx, newTrack, pos, dir );
 
   return newTrack;
 }
