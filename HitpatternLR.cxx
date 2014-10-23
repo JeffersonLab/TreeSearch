@@ -76,6 +76,8 @@ Int_t HitpatternLR::Fill( const vector<Plane*>& planes )
        it != planes.end(); ++it ) {
     Plane* plane = *it;
     assert( plane );
+    if( plane->IsDummy() )
+      SETBIT(fDummyPlanePattern, plane->GetPlaneNum());
     // Hitpatterns interprets hits as wire hits with L/R ambiguity
     Plane* partner = plane->GetPartner();
     // If a plane has a partner (usually with staggered wires), scan them
@@ -88,7 +90,7 @@ Int_t HitpatternLR::Fill( const vector<Plane*>& planes )
       assert( *it == partner );
     }
 #ifndef NDEBUG
-    // Bugcheck
+    // Bugcheck for projection mismatch
     if( proj ) {
       assert( plane->GetProjection() == proj );
       if( partner )
@@ -140,6 +142,9 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
     WireHit* hitA = static_cast<WireHit*>((*it).first);
     WireHit* hitB = static_cast<WireHit*>((*it).second);
     assert( hitA || hitB );
+    // Don't record the pseudo-hits in dummy planes
+    WireHit* recA = A->IsDummy() ? 0 : hitA;
+    WireHit* recB = B->IsDummy() ? 0 : hitB;
     if( hitA && hitB ) {
       // A pair of hits registered in partner planes. One or more combinations
       // of hit positions may be within maxdist of each other.
@@ -153,7 +158,7 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
 	else      { posB = hitB->GetPosR(); bitB = 1; }
 	if( TMath::Abs( posA-posB ) <= maxdist ) {
 	  if( (bitA & set) == 0 ) {
-	    SetPosition( posA+fOffset, hitA->GetResolution(), planeA, hitA );
+	    SetPosition( posA+fOffset, hitA->GetResolution(), planeA, recA );
 	    // Prevent duplicate entries for zero-drift hits
 	    if( hitA->GetDriftDist() == 0 )
 	      set |= 12;
@@ -161,7 +166,7 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
 	      set |= bitA;
 	  }
 	  if( (bitB & set) == 0 ) {
-	    SetPosition( posB+fOffset, hitB->GetResolution(), planeB, hitB );
+	    SetPosition( posB+fOffset, hitB->GetResolution(), planeB, recB );
 	    if( hitB->GetDriftDist() == 0 )
 	      set |= 3;
 	    else
@@ -174,14 +179,14 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
       // Unpaired hit in only one plane
       if( hitA ) {
 	SetPosition( hitA->GetPosL()+fOffset, hitA->GetResolution(),
-		     planeA, hitA );
+		     planeA, recA );
 	SetPosition( hitA->GetPosR()+fOffset, hitA->GetResolution(),
-		     planeA, hitA );
+		     planeA, recA );
       } else {
 	SetPosition( hitB->GetPosL()+fOffset, hitB->GetResolution(),
-		     planeB, hitB );
+		     planeB, recB );
 	SetPosition( hitB->GetPosR()+fOffset, hitB->GetResolution(),
-		     planeB, hitB );
+		     planeB, recB );
       }
     }
     ++it;
