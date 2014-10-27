@@ -199,7 +199,7 @@ THaAnalysisObject::EStatus MWDC::PartnerPlanes()
   // Associate planes and partners (either via partner name or, if not given,
   // identical names except trailing "p")
   if( !TestBit(kNoPartner) ) {
-    fAllPartnered = true;
+    vwsiz_t npairs = 0;
     for( vwsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
       Plane* thePlane = fPlanes[iplane];
       assert( thePlane->IsInit() );
@@ -252,12 +252,14 @@ THaAnalysisObject::EStatus MWDC::PartnerPlanes()
 	  Info( Here(here), "Partnering plane %s with %s",
 		thePlane->GetName(), partner->GetName() );
 	partner->SetPartner( thePlane );
+	npairs++;
       } else {
 	Error( Here(here), "Partner plane %s of %s is not defined!"
 	       " Fix database.", other.Data(), thePlane->GetName() );
 	return kInitError;
       }
     }
+    fAllPartnered = ( 2*npairs == fPlanes.size() );
   } else {
     fAllPartnered = false;
   }
