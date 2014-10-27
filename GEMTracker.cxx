@@ -133,6 +133,13 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 	       partner->GetName(), ppname.IsNull() ? "(none)":ppname.Data() );
 	return kInitError;
       }
+      // Cannot partner dummy and non-dummy planes
+      if( thePlane->IsDummy() xor partner->IsDummy() ) {
+	Error( Here(here), "Partner planes %s and %s must either both be "
+	       "regular or both be dummy planes. Fix database.",
+	       thePlane->GetName(), partner->GetName() );
+	return kInitError;
+      }
       // Nothing to do if partner already set (prevents duplicate printouts)
       if( thePlane->GetPartner() == partner ) {
 	assert( partner->GetPartner() == thePlane );
