@@ -11,7 +11,8 @@
 
 #include "Plane.h"
 #include "TBits.h"
-#include "Node.h"  // for NodeDescriptor
+#include "Node.h"   // for NodeDescriptor
+#include "Helper.h" // for NumberOfSetBits
 #include <utility>
 #include <set>
 #include <cassert>
@@ -193,9 +194,11 @@ namespace TreeSearch {
 
     HitSet() : plane_pattern(0), nplanes(0), used(0) {}
     virtual ~HitSet() {}
+    void          CalculatePlanePattern();
     static Bool_t CheckMatch( const Hset_t& hits, const TBits* bits );
     Bool_t        CheckMatch( const TBits* bits ) const;
     static UInt_t GetMatchValue( const Hset_t& hits );
+    static UInt_t GetAltMatchValue( const Hset_t& hits );
     Bool_t        IsSimilarTo( const HitSet& tryset, Int_t maxdist=0 ) const;
 
     ClassDef(HitSet, 0)  // A set of hits associated with a pattern
@@ -238,6 +241,19 @@ namespace TreeSearch {
 
   //___________________________________________________________________________
   inline
+  UInt_t HitSet::GetMatchValue( const Hset_t& hits )
+  {
+    // Return plane occupancy pattern of given hitset
+
+    UInt_t curpat = 0;
+    for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
+      curpat |= 1U << (*it)->GetPlaneNum();
+
+    return curpat;
+  }
+
+  //___________________________________________________________________________
+  inline
   Bool_t HitSet::CheckMatch( const Hset_t& hits, const TBits* bits )
   {
     // Check if the plane occupancy pattern of the given hits is marked as
@@ -255,6 +271,16 @@ namespace TreeSearch {
 
     assert( plane_pattern || hits.empty() );
     return bits->TestBitNumber(plane_pattern);
+  }
+
+  //___________________________________________________________________________
+  inline
+  void HitSet::CalculatePlanePattern()
+  {
+    // Set plane_pattern and nplanes according to the hits stored in this HitSet
+
+    plane_pattern = GetMatchValue(hits);
+    nplanes = NumberOfSetBits(plane_pattern);
   }
 
   //___________________________________________________________________________

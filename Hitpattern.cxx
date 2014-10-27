@@ -39,7 +39,7 @@ Hitpattern::Hitpattern( const PatternTree& pt )
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
-  : fNlevels(nlevels), fNplanes(0), fDummyPlanePattern(0),
+  : fNlevels(nlevels), fNplanes(nplanes), fDummyPlanePattern(0),
     fScale(0), fOffset(0.5*width), fPattern(0)
   , fMaxhitBin(0)
 {
@@ -53,7 +53,6 @@ Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
   } else if( width < 1e-2 ) { // Negative or very small width?
     ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", width );
   } else {
-    fNplanes = nplanes;
     Init( width );
   }
 }
@@ -208,7 +207,7 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
     }
 #endif
     if( plane->IsDummy() )
-      SETBIT(fDummyPlanePattern, plane->GetPlaneNum());
+      SETBIT(fDummyPlanePattern, plane->GetAltPlaneNum());
 
     ntot += ScanHits( plane );
   }
@@ -279,7 +278,7 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
   // Returns number of hits found in the plane
 
   if( !pl ) return 0;
-  UInt_t plane = pl->GetPlaneNum();
+  UInt_t plane = pl->GetAltPlaneNum();
   assert( plane < fNplanes );
 
   Int_t nhits = 0;

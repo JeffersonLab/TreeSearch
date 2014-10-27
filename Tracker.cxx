@@ -1934,7 +1934,10 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       proj->SetDebug( fDebug ); // Projections inherit parent's debug level
       fProj.push_back( proj );
     }
-    proj->AddPlane( thePlane );
+    if( thePlane->IsDummy() )
+      proj->AddDummyPlane( thePlane );
+    else
+      proj->AddPlane( thePlane );
   }
   if( fDebug > 0 )
     Info( Here(here), "Set up %u projections", (UInt_t)fProj.size() );

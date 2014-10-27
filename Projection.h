@@ -30,6 +30,11 @@ namespace TreeSearch {
   class Hitpattern;
   class PatternTree;
   class Road;
+  class Plane;
+
+  typedef std::vector<Plane*>            vpl_t;
+  typedef std::vector<Plane*>::size_type vplsiz_t;
+  typedef std::vector<Plane*>::iterator  vpliter_t;
 
   class Projection : public THaAnalysisObject {
   public:
@@ -37,11 +42,12 @@ namespace TreeSearch {
     Projection( EProjType type, const char* name, Double_t angle,
 		THaDetectorBase* parent );
     Projection() : fType(kUndefinedType), fDetector(0), fPatternTree(0),
-		   fPlaneCombos(0), fHitpattern(0), fRoads(0),
-		   fRoadCorners(0) {} // ROOT RTTI
+		   fPlaneCombos(0), fAltPlaneCombos(0), fHitpattern(0),
+		   fRoads(0), fRoadCorners(0) {} // ROOT RTTI
     virtual ~Projection();
 
     void            AddPlane( Plane* pl, Plane* partner = 0 );
+    void            AddDummyPlane( Plane* pl, Plane* partner = 0 );
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
     virtual EStatus Init( const TDatime& date );
@@ -82,14 +88,14 @@ namespace TreeSearch {
 
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
 
-    const std::vector<TreeSearch::Plane*>&
-                    GetListOfPlanes() const { return fPlanes; }
+    const vpl_t&    GetListOfPlanes() const { return fPlanes; }
 
     // Analysis control flags
     enum {
-      kEventDisplay = BIT(14)  // Support event display
+      kEventDisplay = BIT(14), // Support event display
+      kHaveDummies  = BIT(15)  // Dummy planes present
 #ifdef MCDATA
-    , kMCdata       = BIT(15)  // Assume input is Monte Carlo data
+    , kMCdata       = BIT(23)  // Assume input is Monte Carlo data
 #endif
     };
 
@@ -133,8 +139,9 @@ namespace TreeSearch {
     typedef std::vector<Node_t*> NodeVec_t;
 
     // Configuration
-    EProjType        fType;          // Type of plane (u,v,x,y...)
-    std::vector<Plane*> fPlanes;     // Planes in this projection
+    EProjType        fType;          // Projection type (u,v,x,y...)
+    vpl_t            fPlanes;     // Active (non-dummy) planes in this projection
+    vpl_t            fAllPlanes;  // All planes in this projection (incl dummies)
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
     Double_t         fWidth;         // Width of tracking region (m)
@@ -147,6 +154,7 @@ namespace TreeSearch {
     UInt_t           fMaxMiss;       // Allowed number of missing planes
     Bool_t           fRequire1of2;   // Require hit in at least one plane of a pair
     TBits*           fPlaneCombos;   // Allowed plane occupancy patterns
+    TBits*           fAltPlaneCombos;// Allowed plane patterns including dummies
 
     // Road construction control
     UInt_t           fMaxPat;        // Sanity cut on number of patterns
@@ -175,6 +183,10 @@ namespace TreeSearch {
     Bool_t  FitRoads();
     Bool_t  RemoveDuplicateRoads();
     void    SetAngle( Double_t a );
+    UInt_t  GetNallPlanes() const { return (UInt_t)fAllPlanes.size(); }
+
+    virtual Hitpattern* MakeHitpattern( const PatternTree& ) const;
+    virtual void MakePlaneCombos( const vpl_t& planes, TBits*& combos ) const;
 
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
@@ -188,8 +200,9 @@ namespace TreeSearch {
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
-		      NodeVec_t* matches )
-	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches)
+		      NodeVec_t* matches, Bool_t have_dummies = false )
+	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches),
+	  fHaveDummies(have_dummies)
 #ifdef TESTCODE
 	, fNtest(0)
 #endif
@@ -202,6 +215,7 @@ namespace TreeSearch {
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
       NodeVec_t*        fMatches;      // Set of matching patterns
+      Bool_t            fHaveDummies;  // Dummy planes present in projection
 #ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif
@@ -211,8 +225,6 @@ namespace TreeSearch {
     // Prevent default copying, assignment
     Projection( const Projection& orig );
     const Projection& operator=( const Projection& rhs );
-
-    virtual Hitpattern* MakeHitpattern( const PatternTree& );
 
     ClassDef(Projection,0)  // A track projection plane
   };
