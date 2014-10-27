@@ -20,12 +20,12 @@ namespace TreeSearch {
 		  THaDetectorBase* parent );
     virtual ~ProjectionLR();
 
+    virtual Hitpattern* MakeHitpattern( const PatternTree& ) const;
+
   private:
     // Prevent default copying, assignment
     ProjectionLR( const Projection& orig );
     const ProjectionLR& operator=( const Projection& rhs );
-
-    virtual Hitpattern* MakeHitpattern( const PatternTree& );
 
     ClassDef(ProjectionLR,0)  // A track projection plane with LR hitpattern
   };

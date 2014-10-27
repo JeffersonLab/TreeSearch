@@ -77,7 +77,7 @@ Int_t HitpatternLR::Fill( const vector<Plane*>& planes )
     Plane* plane = *it;
     assert( plane );
     if( plane->IsDummy() )
-      SETBIT(fDummyPlanePattern, plane->GetPlaneNum());
+      SETBIT(fDummyPlanePattern, plane->GetAltPlaneNum());
     // Hitpatterns interprets hits as wire hits with L/R ambiguity
     Plane* partner = plane->GetPartner();
     // If a plane has a partner (usually with staggered wires), scan them
@@ -118,13 +118,13 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
   // Returns number of hits processed
 
   if( !A ) return 0;
-  UInt_t planeA = A->GetPlaneNum();
+  UInt_t planeA = A->GetAltPlaneNum();
   assert( planeA < fNplanes );
   Double_t maxdist = 0.0;
   UInt_t planeB = fNplanes;
   if( B ) {
     maxdist = A->GetMaxSlope() * (B->GetZ() - A->GetZ());
-    planeB = B->GetPlaneNum();
+    planeB = B->GetAltPlaneNum();
     assert( planeB < fNplanes );
   }
   assert( A->GetTracker() );

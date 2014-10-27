@@ -256,13 +256,16 @@ HitPairIter& HitPairIter::Next()
 }
 
 //_____________________________________________________________________________
-UInt_t HitSet::GetMatchValue( const Hset_t& hits )
+UInt_t HitSet::GetAltMatchValue( const Hset_t& hits )
 {
-  // Return plane occupancy pattern of given hitset
+  // Return plane occupancy pattern of given hitset using
+  // Plane::GetAltPlaneNum(), i.e. the plane index including dummy planes.
+  // Currently only used for asserting that TreeSearch found the correct
+  // plane pattern.
 
   UInt_t curpat = 0;
   for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
-    curpat |= 1U << (*it)->GetPlaneNum();
+    curpat |= 1U << (*it)->GetPlane()->GetAltPlaneNum();
 
   return curpat;
 }

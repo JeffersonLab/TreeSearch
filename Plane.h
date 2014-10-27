@@ -91,13 +91,15 @@ namespace TreeSearch {
     TSeqCollection* GetCoords()      const { return fFitCoords; }
     Int_t           GetNcoords()     const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum()    const { return fPlaneNum; }
+    UInt_t          GetAltPlaneNum() const { return fAltPlaneNum; }
     UInt_t          GetDefinedNum()  const { return fDefinedNum; }
     Bool_t          IsCalibrating()  const { return TestBit(kCalibrating); }
     Bool_t          IsDummy()        const { return TestBit(kIsDummy); }
     Bool_t          IsRequired()     const;
 
-    void            SetPlaneNum( UInt_t n )   { fPlaneNum = n; }
-    void            SetDefinedNum( UInt_t n ) { fDefinedNum = n; }
+    void            SetPlaneNum( UInt_t n )    { fPlaneNum = n; }
+    void            SetAltPlaneNum( UInt_t n ) { fAltPlaneNum = n; }
+    void            SetDefinedNum( UInt_t n )  { fDefinedNum = n; }
     void            SetProjection( Projection* p )
     { fProjection = p; UpdateOffset(); }
     void            SetDummy( Bool_t enable = true );
@@ -140,6 +142,7 @@ namespace TreeSearch {
 
     // Geometry, configuration
     UInt_t        fPlaneNum;    // Ordinal of this plane within its projection
+    UInt_t        fAltPlaneNum; // Ordinal of plane in proj incl dummy planes
     UInt_t        fDefinedNum;  // Ordinal of this plane in planeconfig string
     EProjType     fType;        // Plane type (e.g. x,y,u,v)
     Double_t      fStart;       // Position of 1st sensor (e.g. wire/strip) (m)

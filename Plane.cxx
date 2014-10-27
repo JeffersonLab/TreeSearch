@@ -39,8 +39,8 @@ namespace TreeSearch {
 Plane::Plane( const char* name, const char* description,
 	      THaDetectorBase* parent )
   : THaSubDetector(name,description,parent), fPlaneNum(kMaxUInt),
-    fDefinedNum(kMaxUInt), fType(kUndefinedType), fStart(0),
-    fPitch(0), fCoordOffset(0), fPartner(0), fProjection(0),
+    fAltPlaneNum(kMaxUInt), fDefinedNum(kMaxUInt), fType(kUndefinedType),
+    fStart(0), fPitch(0), fCoordOffset(0), fPartner(0), fProjection(0),
     fResolution(0), fMaxHits(kMaxUInt), fHits(0), fFitCoords(0)
 #ifdef MCDATA
   , fHitMap(0), fMCHitInfo(0)
