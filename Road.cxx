@@ -407,6 +407,7 @@ Bool_t Road::Add( const Node_t& nd )
       UInt_t outer_bits = fBuild->fOuterBits;
       for( siter_t it = new_hits.begin(); it != new_hits.end(); ++it ) {
 	pair< siter_t, bool > ins = fBuild->fCluster.hits.insert(*it);
+	assert( !ins.second or (*it)->GetPlaneNum() != kMaxUInt );
 	if( ins.second and TESTBIT(outer_bits,(*it)->GetPlaneNum()) )
 	  fGrown = true;
       }
@@ -601,6 +602,7 @@ Bool_t Road::CollectCoordinates()
     Double_t z = hit->GetZ();
     UInt_t np = hit->GetPlaneNum();
     UInt_t i = hit->GetNumPos(); // Wire chamber hits may have 2 pos'ns (L/R)
+    assert( np != kMaxUInt );
     assert( i>0 );
     do {
       Double_t x = hit->GetPosI(--i);
@@ -770,6 +772,7 @@ Bool_t Road::Fit()
       Double_t d = a1 + a2*p->z - p->x;
       chi2 += d*d * w[j];
       // Must never use two points in the same plane
+      assert( p->hit->GetPlaneNum() != kMaxUInt );
       assert( (pat & (1U << p->hit->GetPlaneNum())) == 0 );
       pat |= 1U << p->hit->GetPlaneNum();
 #ifdef MCDATA

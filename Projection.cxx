@@ -842,6 +842,7 @@ static void PrintNode( const Node_t& node )
        << "  wnums= ";
   UInt_t ipl = 0;
   for( Hset_t::iterator ihit = hs.hits.begin(); ihit != hs.hits.end(); ) {
+    assert( (*ihit)->GetPlaneNum() != kMaxUInt );
     while( ipl < (*ihit)->GetPlaneNum() ) { cout << "--/"; ++ipl; }
     bool seq = false;
     do {
@@ -849,6 +850,7 @@ static void PrintNode( const Node_t& node )
       cout << (*ihit)->GetPos();
       seq = true;
       ++ihit;
+      assert( (*ihit)->GetPlaneNum() != kMaxUInt );
     } while( ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
     if( ipl != node.first.link->GetPattern()->GetNbits()-1 ) {
       cout << "/";
@@ -1236,6 +1238,9 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // in the node's HitSet.
     for( UInt_t i = 0; i < fHitpattern->GetNplanes(); ++i ) {
       const vector<Hit*>& hits = fHitpattern->GetHits( i, nd[i] );
+      assert( hits.empty() or
+	      (hits.front()->GetAltPlaneNum() == i and
+	       not hits.front()->GetPlane()->IsDummy()) );
       node->second.hits.insert( ALL(hits) );
     }
     assert( (HitSet::GetAltMatchValue(node->second.hits) xor
