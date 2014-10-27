@@ -574,13 +574,13 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     // hit, the resolution is much reduced
     Double_t resolution = fResolution;
     if( size == 1 ) {
-      resolution = 0.25*GetPitch();
+      resolution = TMath::Max( 0.25*GetPitch(), fResolution );
       // The factor of 1/2*pitch is just a guess. Since with real GEMs
       // there _should_ always be more than one strip per cluster, we must
       // assume that the other strip(s) did not fire due to inefficiency.
       // As a result, the error is bigger than it would be if only ever one
       // strip fired per hit.
-//       resolution = TMath::Max( 0.5*GetStripPitch(), 2.0*fResolution );
+//       resolution = TMath::Max( 0.5*GetPitch(), 2.0*fResolution );
 //     } else if( size == 2 ) {
 //       // Again, this is a guess, to be quantified with Monte Carlo
 //       resolution = 1.2*fResolution;
