@@ -107,7 +107,7 @@ ifdef DEBUG
 else
   CXXFLAGS    = -O2 -g #-march=pentium4
   LDFLAGS     = -O -g
-  DEFINES     = -DNDEBUG
+#  DEFINES     = -DNDEBUG
 endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
 CXXFLAGS     += -Wall -Woverloaded-virtual -fPIC
