@@ -337,6 +337,8 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	if( not ybits.TestBitNumber(xnum) )
 	  continue;
 	// Move y-iterator forward until it gets to the same plane
+	assert( ityp == ypoints.end() or
+		(*ityp)->hit->GetPlaneNum() != kMaxUInt );
 	while( ityp != ypoints.end() and
 	       (*ityp)->hit->GetPlaneNum() != xnum ) {
 	  ++ityp;

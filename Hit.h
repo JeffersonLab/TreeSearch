@@ -54,6 +54,7 @@ namespace TreeSearch {
 
     Plane*   GetPlane()      const { return fPlane; }
     UInt_t   GetPlaneNum()   const { return fPlane->GetPlaneNum(); }
+    UInt_t   GetAltPlaneNum() const { return fPlane->GetAltPlaneNum(); }
 
     // Functor for ordering hits in sets
     struct PosIsLess : public std::binary_function< Hit*, Hit*, bool >
@@ -61,6 +62,7 @@ namespace TreeSearch {
       bool operator() ( const Hit* a, const Hit* b ) const
       {
 	assert( a && b );
+	assert( a->GetPlaneNum() != kMaxUInt && b->GetPlaneNum() != kMaxUInt );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() ) {
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
 	}
