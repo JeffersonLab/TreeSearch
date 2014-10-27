@@ -91,15 +91,17 @@ ROOTCFLAGS   := $(shell root-config --cflags)
 ROOTLIBS     := $(shell root-config --libs)
 ROOTGLIBS    := $(shell root-config --glibs)
 ROOTBIN      := $(shell root-config --bindir)
+CXX          := $(shell root-config --cxx)
+LD           := $(shell root-config --ld)
 
-INCLUDES      = $(ROOTCFLAGS) $(addprefix -I, $(INCDIRS) ) -I$(shell pwd)
+PKGINCLUDES  = $(addprefix -I, $(INCDIRS) ) -I$(shell pwd)
+INCLUDES     = -I$(shell root-config --incdir) $(PKGINCLUDES)
 
 LIBS          = 
 GLIBS         = 
 
 ifeq ($(ARCH),linux)
 # Linux with gcc (RedHat)
-CXX           = g++
 ifdef DEBUG
   CXXFLAGS    = -g -O0
   LDFLAGS     = -g -O0
@@ -120,7 +122,6 @@ CXXFLAGS     += -Wextra -Wno-missing-field-initializers
 DICTCXXFLG   := -Wno-strict-aliasing 
 endif
 endif
-LD            = g++
 SOFLAGS       = -shared
 ifdef I387MATH
 CXXFLAGS     += -mfpmath=387
@@ -131,7 +132,6 @@ endif
 
 ifeq ($(ARCH),solarisCC5)
 # Solaris CC 5.0
-CXX           = CC
 ifdef DEBUG
   CXXFLAGS    = -g
   LDFLAGS     = -g
@@ -143,13 +143,8 @@ else
 endif
 DEFINES      += -DSUNVERS -DHAS_SSTREAM
 CXXFLAGS     += -KPIC
-LD            = CC
 SOFLAGS       = -G
 DICTCXXFLG   :=
-endif
-
-ifeq ($(CXX),)
-$(error $(ARCH) invalid architecture)
 endif
 
 ifdef VERBOSE
@@ -162,7 +157,7 @@ ifdef MCDATA
 DEFINES      += -DMCDATA
 endif
 
-CXXFLAGS     += $(DEFINES) $(INCLUDES)
+CXXFLAGS     += $(DEFINES) $(ROOTCFLAGS) $(ROOTCFLAGS) $(PKGINCLUDES)
 LIBS         += $(ROOTLIBS) $(SYSLIBS)
 GLIBS        += $(ROOTGLIBS) $(SYSLIBS)
 
