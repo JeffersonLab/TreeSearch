@@ -19,6 +19,7 @@
 #include "TH1.h"
 #include "TError.h"
 #include "TString.h"
+#include "TVector2.h"
 
 #ifndef MCDATA
 #include "THaEvData.h"
@@ -257,7 +258,7 @@ void GEMPlane::AddHit( Int_t istrip )
 }
 
 //_____________________________________________________________________________
-Int_t GEMPlane::Decode( const THaEvData& evData )
+Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 {
   // Extract this plane's hit data from the raw evData.
   //
@@ -639,6 +640,134 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     nHits = -nHits;
 
   return nHits;
+}
+
+//_____________________________________________________________________________
+Int_t GEMPlane::DummyDecode( const THaEvData& evData )
+{
+  // Dummy planes are decoded very differently from regular GEM planes.
+  // The event data contain hit x and y coordinates (in the lab system)
+  // at the z-position of this plane. All that needs to be done here is
+  // to convert the given (x,y) points to this plane's projection coordinates.
+
+  //const char* const here = "GEMPlane::DummyDecode";
+
+  UInt_t nHits = 0;
+
+#ifdef MCDATA
+  bool mc_data = fTracker->TestBit(Tracker::kMCdata);
+#endif
+#ifndef NDEBUG
+  GEMHit* prevHit = 0;
+  Bool_t did_decode = false;
+#endif
+
+  // Dummy detectors have always exactly one module with exactly one channel
+  // (assured in ReadDatabase)
+  assert( fDetMap->GetSize() == 1 and fDetMap->GetTotNumChan() == 1 );
+
+  // Decode data
+  THaDetMap::Module* d = fDetMap->GetModule(0);
+
+  // Read active channels of this module
+  Int_t nchan = evData.GetNumChan( d->crate, d->slot );
+  for( Int_t ichan = 0; ichan < nchan; ++ichan ) {
+    Int_t chan = evData.GetNextChan( d->crate, d->slot, ichan );
+    if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
+    assert( !did_decode );  // otherwise more than one active channel
+#ifndef NDEBUG
+    did_decode = true;
+#endif
+    vector<Double_t> coords;
+    Int_t nhit = evData.GetNumHits( d->crate, d->slot, chan );
+    for( Int_t ihit = 0; ihit < nhit; ++ihit ) {
+      // Each hit's data and raw data represent the x and y coordinates,
+      // respectively
+      union FloatIntUnion {
+	Float_t f;
+	Int_t   i;
+      } datx, daty;
+      datx.i = evData.GetData( d->crate, d->slot, chan, ihit );
+      daty.i = evData.GetRawData( d->crate, d->slot, chan, ihit );
+      TVector2 hitpos( datx.f, daty.f );
+
+      // Convert (x,y) to this plane's projection coordinates
+      Double_t pos = hitpos.Rotate(-fProjection->GetAngle()).X();
+      coords.push_back(pos);
+    }
+    // Ensure that the hit coordinates are sorted
+    sort( ALL(coords) );
+
+    // Make a new hit for each coordinate
+    for( vector<Double_t>::size_type ihit = 0; ihit < coords.size(); ++ihit ) {
+#ifndef NDEBUG
+      GEMHit* theHit = 0;
+#endif
+      // Emulate parameters for dummy hits
+      const UInt_t size = 1, type = 0;
+      const Double_t adcsum = 10.*fMinAmpl, resolution = fResolution;
+#ifdef MCDATA
+      const Int_t mctrack = 1, num_bg = 0;
+      const Double_t mcpos = coords[ihit], mctime = 0.0;
+      if( !mc_data ) {
+#endif
+#ifndef NDEBUG
+	theHit =
+#endif
+	  new( (*fHits)[nHits++] ) GEMHit( coords[ihit],
+					   adcsum,
+					   size,
+					   type,
+					   resolution,
+					   this
+					   );
+#ifdef MCDATA
+      } else {
+	// Monte Carlo data
+#ifndef NDEBUG
+	theHit =
+#endif
+	  new( (*fHits)[nHits++] ) MCGEMHit( coords[ihit],
+					     adcsum,
+					     size,
+					     type,
+					     resolution,
+					     this,
+					     mctrack,
+					     mcpos,
+					     mctime,
+					     num_bg
+					     );
+      }
+#endif // MCDATA
+#ifndef NDEBUG
+      // Ensure hits are ordered by position (guaranteed by sort of coords)
+      assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
+      prevHit = theHit;
+#endif
+    }
+#ifdef NDEBUG
+    break;  // Break loop over ichan. There should be at most one channel.
+#endif
+  }
+
+  // Negative return value indicates potential problem
+  if( nHits > fMaxHits )
+    nHits = -nHits;
+
+  return nHits;
+}
+
+//_____________________________________________________________________________
+Int_t GEMPlane::Decode( const THaEvData& evData )
+{
+  // Convert evData to hits
+
+  if( IsDummy() )
+    // Special "decoding" for dummy planes
+    return DummyDecode( evData );
+
+  return GEMDecode( evData );
 }
 
 //_____________________________________________________________________________
