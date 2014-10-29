@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <utility>
+#include <iomanip>
 
 //#include "TDatime.h"
 #include <unistd.h>    // for basename()
@@ -28,7 +29,7 @@ using namespace std;
 
 #define ALL(c) (c).begin(), (c).end()
 
-#define INFILE_DEFAULT "/data/data/SoLID/tracking_1/db_gemc.dat"
+#define INFILE_DEFAULT  "db_gemc.dat"
 #define OUTFILE_DEFAULT "db_solid.tracker.dat"
 
 // Command line parameters
@@ -434,6 +435,10 @@ int main( int argc, const char** argv )
        // << "# on " << now.AsString() << " by " << basename(argv[0]) << endl
        << endl;
 
+  // This database is for replay of Monte Carlo data, so say so
+  outp << allsect_prefix << "MCdata = 1" << endl;
+  outp << endl;
+
   // Plane configuration
   outp << "# Plane configuration. One string of the all plane names." << endl;
   outp << endl;
@@ -576,7 +581,7 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 1 << endl;
+  outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 2 << endl;
   outp << allsect_prefix << "3d_ampcorr_nsigma = " << 0.18 << endl;
   outp << allsect_prefix << "3d_chi2_conflevel = " << 1e-6 << endl;
   outp << allsect_prefix << "3d_maxmiss = " << 2 << endl;
@@ -589,8 +594,8 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << allsect_prefix << "maxmiss = " << 1 << endl;
-  outp << allsect_prefix << "maxpat = " << 1000 << endl;
+  outp << allsect_prefix << "maxmiss = " << 2 << endl;
+  outp << allsect_prefix << "maxpat = " << 100000 << endl;
   outp << allsect_prefix << "chi2_conflevel = " << 1e-6 << endl;
   outp << endl;
 
@@ -640,7 +645,7 @@ int main( int argc, const char** argv )
       outp << pfx << "rmin = " << v.rmin << endl;
       outp << pfx << "rmax = " << v.rmax << endl;
       //      outp << pfx << "z = " << v.z << endl;
-      outp << pfx << "z = " << plane_z[v.iplane-1] << endl;
+      outp << pfx << "z = " << setprecision(7) << plane_z[v.iplane-1] << endl;
       outp << pfx << "dz = " << v.dz << endl;
       outp << pfx << "dphi = " << v.dphi << endl;
       if( v.phioff != 0.0 )
