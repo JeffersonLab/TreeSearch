@@ -230,8 +230,16 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
       if( status == kOK ) {
 	UInt_t flags = TestBit(kHaveRefChans) ? THaDetMap::kFillRefChan : 0;
 	// Parse the detector map of the data channels
-	if( FillDetMap( *detmap, flags, here ) == 0 )
+	if( FillDetMap( *detmap, flags, here ) <= 0 )
 	  status = kInitError;
+	// Dummy planes must have exactly one module with exactly one channel
+	if( dummy != 0 and
+	    (fDetMap->GetSize() > 1 or
+	     (fDetMap->GetSize() == 1 and fDetMap->GetTotNumChan() > 1)) ) {
+	  Error( Here(here), "Detector map of dummy planes must have exactly "
+		 "one module with excatly one channel. Fix database." );
+	  status = kInitError;
+	}
       }
       delete detmap;
     }

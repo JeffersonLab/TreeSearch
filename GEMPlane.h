@@ -76,6 +76,9 @@ namespace TreeSearch {
 
     void          AddHit( Int_t istrip );
 
+    virtual Int_t GEMDecode( const THaEvData& );
+    virtual Int_t DummyDecode( const THaEvData& );
+
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );
