@@ -21,6 +21,7 @@
 #include <map>
 #include <utility>
 #include <iomanip>
+#include <cassert>
 
 //#include "TDatime.h"
 #include <unistd.h>    // for basename()
@@ -32,11 +33,12 @@ using namespace std;
 #define INFILE_DEFAULT  "db_gemc.dat"
 #define OUTFILE_DEFAULT "db_solid.tracker.dat"
 
-// Command line parameters
-static bool do_debug = false;
+// Command line parameter defaults
+static bool do_debug = false, do_dummies = false;
 static string infile = INFILE_DEFAULT;
 static string outfile = OUTFILE_DEFAULT;
 static const char* prgname = "";
+static const string spc = "                   ";
 
 //-----------------------------------------------------------------------------
 static string find_key( ifstream& inp, const string& key )
@@ -132,6 +134,7 @@ void usage()
        << " <outfile>" << endl;
   cerr << " -h: Print this help message" << endl;
   cerr << " -d: Output extensive debug information" << endl;
+  cerr << " -m: Add extra dummy mode planes to emulate calorimeter" << endl;
   cerr << " -o <outfile>: Write output to <outfile>. Default: "
        << OUTFILE_DEFAULT << endl;
   cerr << " <infile>: Read input from <infile>. Default: "
@@ -155,6 +158,9 @@ void getargs( int argc, const char** argv )
 	case 'd':
 	  do_debug = true;
 	  break;
+	case 'm':
+	  do_dummies = true;
+	  break;
 	case 'o':
 	  if (!*++opt) {
 	    if (argc-- < 1)
@@ -172,6 +178,28 @@ void getargs( int argc, const char** argv )
       infile = *argv;
     }
   }
+}
+
+//-----------------------------------------------------------------------------
+static inline
+void write_module( ostream& outp, int ic, int slot_hi, int model, int nchan )
+{
+  outp << spc << ic << "    ";
+  if( ic < 10 )  outp << " ";
+  outp << 0 << "       " << slot_hi << "      ";
+  if( slot_hi < 10 ) outp << " ";
+  outp << model << "   " << nchan;
+}
+
+//-----------------------------------------------------------------------------
+static inline
+void write_cslh( ostream& outp, int cr, int sl, int lo, int hi )
+{
+  outp << cr << " ";
+  if( cr < 10 )  outp << " ";
+  outp << sl << " ";
+  if( sl < 10 ) outp << " ";
+  outp << lo << " " << hi;
 }
 
 //-----------------------------------------------------------------------------
@@ -243,12 +271,12 @@ int main( int argc, const char** argv )
   int max_nstrips = 0;
   map<int,int> nstrip_map;
 
-  for( int ip = 0; ip < nplanes; ++ip ) {
+  int nplanes_eff = nplanes;
+  if( do_dummies ) ++nplanes_eff;
+
+  for( int ip = 0; ip < nplanes_eff; ++ip ) {
     for( int is = 0; is < nsect; ++is ) {
       ValueSet_t vals;
-      int idx = is + nsect*ip; // linear index of this plane/sector combo
-      ostringstream sector_prefix(prefix, ios_base::ate);
-      sector_prefix << "gem" << idx+1 << ".";
       DBRequest request[] = {
 	{ "r0",    &vals.rmin },
 	{ "r1",    &vals.rmax },
@@ -258,26 +286,6 @@ int main( int argc, const char** argv )
 	{ "depth", &vals.dz },
 	{ 0 }
       };
-      int err = load_db( inp, request, sector_prefix.str() );
-      if( err )
-	exit(2);
-
-      if( vals.rmin <= 0 or vals.rmax <= 0 or vals.rmax <= vals.rmin ) {
-	cerr << "Invalid radii r0 = " << vals.rmin
-	     << ", r1 = " << vals.rmax << endl;
-	exit(3);
-      }
-      if( vals.dphi < 0 or vals.dphi >= 90.0 ) {
-	cerr << "Invalid opening angle dphi = " << vals.dphi << endl;
-	exit(3);
-      }
-      if( vals.dz < 0 ) {
-	cerr << "Invalid  z = " << vals.z << endl;
-	exit(3);
-      }
-
-      ostringstream plane_prefix(sector_prefix.str(), ios_base::ate);
-      plane_prefix << "gem" << idx+1; // sic, the same thing again
       DBRequest plane_request[] = {
 	{ "x.stripangle", &vals.xangle },
 	{ "x.pitch",      &vals.xpitch },
@@ -285,18 +293,73 @@ int main( int argc, const char** argv )
 	{ "y.pitch",      &vals.ypitch },
 	{ 0 }
       };
-      err = load_db( inp, plane_request, plane_prefix.str() );
-      if( err )
-	exit(2);
+      if( ip < nplanes ) {
+	// Regular GEM planes
+	int idx = is + nsect*ip; // linear index of this plane/sector combo
+	ostringstream sector_prefix(prefix, ios_base::ate);
+	sector_prefix << "gem" << idx+1 << ".";
+	int err = load_db( inp, request, sector_prefix.str() );
+	if( err )
+	  exit(2);
 
-      if( vals.xpitch <= 0 or vals.ypitch <= 0 ) {
-	cerr << "Illegal strip pitch xpitch = " << vals.xpitch
-	     << ", ypitch = " << vals.ypitch << endl;
-	exit(3);
+	if( vals.rmin <= 0 or vals.rmax <= 0 or vals.rmax <= vals.rmin ) {
+	  cerr << "Invalid radii r0 = " << vals.rmin
+	       << ", r1 = " << vals.rmax << endl;
+	  exit(3);
+	}
+	if( vals.dphi < 0 or vals.dphi >= 90.0 ) {
+	  cerr << "Invalid opening angle dphi = " << vals.dphi << endl;
+	  exit(3);
+	}
+	if( vals.dz < 0 ) {
+	  cerr << "Invalid  z = " << vals.z << endl;
+	  exit(3);
+	}
+	// Override the database z value - it is not accurate enough
+	if( fabs(vals.z-plane_z[ip]) > 1e-2 ) { // max 1cm tolerance
+	  cerr << "Input z = " << vals.z <<  "differs from \"correct\" z = "
+	       << plane_z[ip] << "by more than 1cm. Update dbconvert."
+	       << endl;
+	  exit(3);
+	}
+	vals.z = plane_z[ip];
+
+	ostringstream plane_prefix(sector_prefix.str(), ios_base::ate);
+	plane_prefix << "gem" << idx+1; // sic, the same thing again
+	err = load_db( inp, plane_request, plane_prefix.str() );
+	if( err )
+	  exit(2);
+
+	if( vals.xpitch <= 0 or vals.ypitch <= 0 ) {
+	  cerr << "Illegal strip pitch xpitch = " << vals.xpitch
+	       << ", ypitch = " << vals.ypitch << endl;
+	  exit(3);
+	}
+	vals.phioff = phi_offset[ip];
       }
+      else {
+	// Dummy planes
+	assert( do_dummies );
+	assert( values.size() >= nplanes*nsect );
+	// Use some values from the last GEM plane for the dummy plane as well
+	const ValueSet_t& last_gem = values[is+nsect*(nplanes-1)];
+	vals.rmin = 1.18;
+	vals.rmax = 2.61;
+	vals.phi0 = last_gem.phi0;
+	vals.dphi = last_gem.dphi;
+	vals.z    = 3.20;
+	vals.xangle = last_gem.xangle;
+	vals.xpitch = 10.*last_gem.xpitch;
+	vals.yangle = last_gem.yangle;
+	vals.ypitch = 10.*last_gem.ypitch;
+	vals.phioff = last_gem.phioff;
+	if( do_debug ) {
+	  cout << "Dummy plane in sector " << is+1 << endl;
+	}
+      }
+
       // Convert parameters from libsolgem conventions to ours
       double phi2 = 0.5*vals.dphi;  // half opening angle
-      vals.phioff = phi_offset[ip];
       vals.phi    = vals.phi0 + phi2 - vals.phioff;
 
       // Calculate strip start positions in the same way as in
@@ -343,16 +406,18 @@ int main( int argc, const char** argv )
 
       // Save the number of strips of each readout for later use when writing
       // the detector maps
-      for( int ij = 0; ij < nproj; ij++ ) {
-	max_nstrips = max(max_nstrips,vals.nstrips[ij]);
-	int jx = ij + nproj*( ip + nplanes*is );
-	pair<map<int,int>::iterator,bool> itx =
-	  nstrip_map.insert( make_pair(jx,vals.nstrips[ij]) );
-	if( !itx.second ) {
-	  cerr << "Duplicate index " << jx << " for sector/plane/proj = "
-	       << is+1 << "/" << ip+1 << "/" << ij << endl;
-	  cerr << "Bug - should never happen." << endl;
-	  exit(6);
+      if( ip < nplanes ) {
+	for( int ij = 0; ij < nproj; ij++ ) {
+	  max_nstrips = max(max_nstrips,vals.nstrips[ij]);
+	  int jx = ij + nproj*( ip + nplanes*is );
+	  pair<map<int,int>::iterator,bool> itx =
+	    nstrip_map.insert( make_pair(jx,vals.nstrips[ij]) );
+	  if( !itx.second ) {
+	    cerr << "Duplicate index " << jx << " for sector/plane/proj = "
+		 << is+1 << "/" << ip+1 << "/" << ij << endl;
+	    cerr << "Bug - should never happen." << endl;
+	    exit(6);
+	  }
 	}
       }
 
@@ -443,10 +508,14 @@ int main( int argc, const char** argv )
   outp << "# Plane configuration. One string of the all plane names." << endl;
   outp << endl;
   outp << allsect_prefix << "planeconfig = ";
-  for( int ip = 0; ip < nplanes; ++ip ) {
+  for( int ip = 0; ip < nplanes_eff; ++ip ) {
     for( int ij = 0; ij < nproj; ++ij ) {
-      outp << proj_name[ij] << ip+1;
-      if( ip+1 != nplanes or ij+1 != nproj )
+      outp << proj_name[ij];
+      if( ip < nplanes )
+	outp << ip+1;
+      else
+	outp << "d";
+      if( ip+1 != nplanes_eff or ij+1 != nproj )
 	outp << " ";
       else
 	outp << endl;
@@ -479,7 +548,6 @@ int main( int argc, const char** argv )
     cout << "           sectors_per_crate   = " << chambers_per_crate/nplanes
 	 << endl;
   }
-  const string spc = "                   ";
   outp << "# \"Crate map\". Specifies the overall DAQ module configuration." << endl;
   outp << "# The map can be common to all sectors. It's just a lookup table" << endl;
   outp << "# for (crate,slot) -> (model,nchan)" << endl;
@@ -495,12 +563,12 @@ int main( int argc, const char** argv )
   int maxcrates = TMath::CeilNint( (double)nplanes*nsect /
 				   (double)chambers_per_crate );
   for( int ic = 0; ic < maxcrates; ++ ic ) {
-    outp << spc << ic << "    ";
-    if( ic < 10 )  outp << " ";
-    outp << 0 << "       " << slot_hi << "      ";
-    if( slot_hi < 10 ) outp << " ";
-    outp << model << "   " << nchan;
-    if( ic+1 != maxcrates ) outp << " \\";
+    write_module( outp, ic, slot_hi, model, nchan );
+    if( ic+1 != maxcrates or do_dummies ) outp << " \\";
+    outp << endl;
+  }
+  if( do_dummies ) {
+    write_module( outp, maxcrates, nproj-1, model, nsect );
     outp << endl;
   }
   outp << endl;
@@ -538,11 +606,7 @@ int main( int argc, const char** argv )
 	  int lo = im*nchan;
 	  int hi = min((im+1)*nchan,the_nstrips)-1;
 	  if( modules_per_readout > 1 ) outp << spc;
-	  outp << cr << " ";
-	  if( cr < 10 )  outp << " ";
-	  outp << sl << " ";
-	  if( sl < 10 ) outp << " ";
-	  outp << lo << " " << hi;
+	  write_cslh( outp, cr, sl, lo, hi );
 	  if( 2*(im+1) < modules_per_chamber )
 	    outp << " \\";
 	  outp << endl;
@@ -551,6 +615,24 @@ int main( int argc, const char** argv )
     }
   }
   outp << endl;
+
+  if( do_dummies) {
+    outp << "# Dummy GEM planes recording emulated calorimeter hits" << endl;
+    outp << "#" << endl;
+    for( int is = 0; is < nsect; ++is ) {
+      for( int ij = 0; ij < nproj; ++ij ) {
+	// E.g.: solid.tracker.1.ud.detmap =
+	outp << out_prefix << is+1 << "." << proj_name[ij] << "d.detmap = ";
+	// The crate for the dummy calorimeter planes follows right after those
+	// of the regular GEM planes. u and v each get one module (slot).
+	// The channel number in each slot is the sector number. Hits in each
+	// channel represent measured coordinates.
+	write_cslh( outp, maxcrates, ij, is, is );
+	outp << endl;
+      }
+    }
+    outp << endl;
+  }
 
   // Phi angles of sectors
   outp << dashes << endl;
@@ -628,24 +710,44 @@ int main( int argc, const char** argv )
 
   for( vector<ValueSet_t>::size_type i = 0; i < values.size(); ++i ) {
     ValueSet_t& v = values[i];
+    bool dummy = (v.iplane == nplanes+1);
+    assert( not dummy or do_dummies );
+
     for( int ij = 0; ij < nproj; ++ij ) {
       ostringstream the_plane_prefix( out_prefix, ios_base::ate );
-      the_plane_prefix << v.isector << "."
-		       << proj_name[ij] << v.iplane << ".";
+      the_plane_prefix << v.isector << "." << proj_name[ij];
+      if( not dummy )
+	the_plane_prefix << v.iplane << ".";
+      else
+	the_plane_prefix << "d.";
       const string& pfx = the_plane_prefix.str();
 
+      outp << pfx << "description = " << proj_name[ij];
+      if( not dummy )
+	outp << v.iplane;
+      else
+	outp << " dummy";
+      outp << " plane in sector " << v.isector << endl;
+      if( dummy ) {
+	// Extra parameters for dummy planes
+	outp << pfx << "dummy = "  << 1 << endl;
+	outp << pfx << "xp.res = " << 1e-2 << endl;    // 1cm resolution
+      }
       outp << pfx << "nstrips = " << v.nstrips[ij] << endl;
-      outp << pfx << "description = " << proj_name[ij] << v.iplane
-	   << " plane in sector " << v.isector << endl;
       // The !ij trick only works when nproj == 2
-      outp << pfx << "partner = " << proj_name[!ij] << v.iplane << endl;
+      outp << pfx << "partner = " << proj_name[!ij];
+      if( not dummy )
+	outp << v.iplane;
+      else
+	outp << "d";
+      outp << endl;
       outp << pfx << "strip.pos = " << v.start[ij] << endl;
       outp << pfx << "strip.pitch = " << v.pitch[ij] << endl;
       // TODO: these may be redundant - test for defaults per plane or tracker
       outp << pfx << "rmin = " << v.rmin << endl;
       outp << pfx << "rmax = " << v.rmax << endl;
-      //      outp << pfx << "z = " << v.z << endl;
-      outp << pfx << "z = " << setprecision(7) << plane_z[v.iplane-1] << endl;
+      outp << pfx << "z = " << setprecision(7) << v.z << endl;
+      //outp << pfx << "z = " << setprecision(7) << plane_z[v.iplane-1] << endl;
       outp << pfx << "dz = " << v.dz << endl;
       outp << pfx << "dphi = " << v.dphi << endl;
       if( v.phioff != 0.0 )
