@@ -40,7 +40,7 @@ namespace TreeSearch {
 typedef Hset_t::iterator siter_t;
 #define ALL(c) (c).begin(), (c).end()
 
-// Number of points for polygon test
+// Number of points for trapezoid test
 static const size_t kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
 
@@ -377,7 +377,7 @@ Bool_t Road::Add( const Node_t& nd )
   }
 #endif
 
-  // If hitdist > 0, roads will collect patterns not only identical hits,
+  // If hitdist > 0, roads will collect patterns with not only identical hits,
   // but also nearby ones (at most hitdist wire numbers apart)
   UInt_t hitdist = fProjection->GetHitMaxDist();
 
@@ -464,7 +464,7 @@ void Road::Finish()
   assert( fHits.empty() );
   fHits.swap( fBuild->fCluster.hits );
 
-  // Calculate the corner coordinates fCornerX of a polygon with points in the
+  // Calculate the vertices fCornerX of a trapezoid with points in the
   // order LL (lower left), LR, UR, UL, LL, as needed by TMath::IsInside()
 
   // Convert the bin numbers of the left/right edges to physical coordinates
@@ -505,9 +505,9 @@ void Road::Finish()
   // Now UL and UR are points on the left and right road boundary,
   // respectively. The boundaries share the common slope calculated above.
 
-  // To compute the corners of the polygon, shift the z-positions of the first
-  // and last planes down and up, respectively, by eps, so that the points
-  // on the planes are guaranteed to be included
+  // To compute the vertices of the trapezoid, shift the z-positions of the
+  // first/ and last planes down and up, respectively, by eps, so that the
+  // points on the planes are guaranteed to be included
   const Double_t eps = 1e-3;
   fZL = fProjection->GetPlaneZ(0) - eps;
   fZU = fProjection->GetPlaneZ(lastpl) + eps;
