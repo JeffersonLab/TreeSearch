@@ -682,7 +682,7 @@ Int_t GEMPlane::DummyDecode( const THaEvData& evData )
     vector<Double_t> coords;
     Int_t nhit = evData.GetNumHits( d->crate, d->slot, chan );
     for( Int_t ihit = 0; ihit < nhit; ++ihit ) {
-      // Each hit's data and raw data represent the x and y coordinates,
+      // The hit's data and raw data words hold the x and y coordinates,
       // respectively
       union FloatIntUnion {
 	Float_t f;
@@ -975,22 +975,22 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   TString::ECaseCompare cmp = TString::kIgnoreCase;
   if( !mapping.IsNull() ) {
     if( mapping.Length() >= 3 and
-        TString("one-to-one").BeginsWith(mapping,cmp) )
+	TString("one-to-one").BeginsWith(mapping,cmp) )
       fMapType = kOneToOne;
     else if( mapping.Length() >=3 and
-        TString("reverse").BeginsWith(mapping,cmp) )
+	     TString("reverse").BeginsWith(mapping,cmp) )
       fMapType = kReverse;
     else if( mapping.Length() >= 5 and
-        mapping.BeginsWith(TString("gassiplex-adapter"),cmp) ) {
+	     mapping.BeginsWith(TString("gassiplex-adapter"),cmp) ) {
       if( fNelem > 240 ) {
-        Error( Here(here), "Gassiplex adapter mapping allows at most 240 "
-            "strips, but %d configured. Fix database.", fNelem );
-        return kInitError;
+	Error( Here(here), "Gassiplex adapter mapping allows at most 240 "
+	       "strips, but %d configured. Fix database.", fNelem );
+	return kInitError;
       }
       if( fNelem < 240 ) {
-        Warning( Here(here), "Gassiplex adapter mapping expects 240 "
-            "strips, but %d configured. Database may be misconfigured "
-            "(or you know what you are doing).", fNelem );
+	Warning( Here(here), "Gassiplex adapter mapping expects 240 "
+		 "strips, but %d configured. Database may be misconfigured "
+		 "(or you know what you are doing).", fNelem );
       }
       if( mapping.BeginsWith(TString("gassiplex-adapter-2"),cmp) ) {
 	fMapType = kGassiplexAdapter2;
@@ -1000,29 +1000,29 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     }
     else if( TString("table").CompareTo(mapping,cmp) ) {
       if( fChanMap.empty() ) {
-        Error( Here(here), "Channel mapping table requested, but no map "
-            "defined. Specify chanmap in database." );
-        return kInitError;
+	Error( Here(here), "Channel mapping table requested, but no map "
+	       "defined. Specify chanmap in database." );
+	return kInitError;
       }
       if( fChanMap.size() != static_cast<UInt_t>(fNelem) ) {
-        Error( Here(here), "Number of channel map entries (%u) msut equal "
-            "number of strips (%d). Fix database.",
+	Error( Here(here), "Number of channel map entries (%u) msut equal "
+	       "number of strips (%d). Fix database.",
 	       static_cast<unsigned int>(fChanMap.size()), fNelem );
-        return kInitError;
+	return kInitError;
       }
       // check if entries in channel map are within range
       for( Vint_t::const_iterator it = fChanMap.begin();
-          it != fChanMap.end(); ++it ) {
-        if( (*it) < 0 or (*it) >= fNelem ) {
-          Error( Here(here), "Illegal chanmap entry: %d. Must be >= 0 and "
-              "< %d. Fix database.", (*it), fNelem );
-          return kInitError;
-        }
+	   it != fChanMap.end(); ++it ) {
+	if( (*it) < 0 or (*it) >= fNelem ) {
+	  Error( Here(here), "Illegal chanmap entry: %d. Must be >= 0 and "
+		 "< %d. Fix database.", (*it), fNelem );
+	  return kInitError;
+	}
       }
       fMapType = kTable;
     } else {
       Error( Here(here), "Unknown channel mapping type %s. Fix database.",
-          mapping.Data() );
+	     mapping.Data() );
       return kInitError;
     }
 
