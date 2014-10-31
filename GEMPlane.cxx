@@ -127,18 +127,19 @@ void GEMPlane::Clear( Option_t* opt )
 
   Plane::Clear(opt);
 
-  assert( fADCraw and fADC and fHitTime and fADCcor and fGoodHit );
-  memset( fADCraw, 0, fNelem*sizeof(Float_t) );
-  memset( fADC, 0, fNelem*sizeof(Float_t) );
-  memset( fHitTime, 0, fNelem*sizeof(Float_t) );
-  memset( fADCcor, 0, fNelem*sizeof(Float_t) );
-  memset( fGoodHit, 0, fNelem*sizeof(Byte_t) );
+  if( !IsDummy() ) {
+    assert( fADCraw and fADC and fHitTime and fADCcor and fGoodHit );
+    memset( fADCraw, 0, fNelem*sizeof(Float_t) );
+    memset( fADC, 0, fNelem*sizeof(Float_t) );
+    memset( fHitTime, 0, fNelem*sizeof(Float_t) );
+    memset( fADCcor, 0, fNelem*sizeof(Float_t) );
+    memset( fGoodHit, 0, fNelem*sizeof(Byte_t) );
+    fSigStrips.clear();
+    fStripsSeen.assign( fNelem, false );
+  }
 
   fNhitStrips = fNrawStrips = 0;
   fHitOcc = fOccupancy = fDnoise = 0.0;
-
-  fSigStrips.clear();
-  fStripsSeen.assign( fNelem, false );
 }
 
 //_____________________________________________________________________________
@@ -926,10 +927,17 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     return kInitError;
   }
 
+  // Dummy planes ignore all of the parameters that are checked below,
+  // so we can return right here.
+  if( IsDummy() ) {
+    fIsInit = true;
+    return kOK;
+  }
+
   Int_t nchan = fDetMap->GetTotNumChan();
   if( nchan != fNelem ) {
     Error( Here(here), "Number of detector map channels (%d) "
-	   "disagrees with number of wires/strips (%d)", nchan, fNelem );
+	   "disagrees with number of strips (%d)", nchan, fNelem );
     return kInitError;
   }
 

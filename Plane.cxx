@@ -188,7 +188,7 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
 {
   // Read database
 
-  static const char* const here = "ReadDatabase";
+  static const char* const here = "ReadDatabaseCommon";
 
   FILE* file = OpenFile( date );
   if( !file ) return kFileError;
@@ -343,7 +343,7 @@ void Plane::Print( Option_t* ) const
 {
   // Print plane info
 
-  cout << IsA()->GetName() << ":  #" << GetPlaneNum() << " "
+  cout << IsA()->GetName() << ":  #" << GetAltPlaneNum() << " "
        << GetName() << " \"" << GetTitle() << "\"\t"
        << fNelem << " channels\t"
        << "z = " << GetZ();
