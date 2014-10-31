@@ -46,15 +46,23 @@ Pattern::Pattern( const Pattern& orig )
 //_____________________________________________________________________________
 const Pattern& Pattern::operator=( const Pattern& rhs )
 {
-  // Assignment. Copies only this bits, not the pointers to the children.
+  // Assignment. Copies only the bits, not the pointers to the children.
 
   if( this != &rhs ) {
+    if( fDelChld ) {
+      while( fChild ) {
+	Link* child = fChild;
+	fChild = fChild->Next();
+	delete child;
+      }
+    }
     fChild = 0;
     fNbits = rhs.fNbits;
+    if( fDelBits )
+      delete [] fBits;
     fDelBits = rhs.fDelBits;
     fDelChld = false;
     if( fDelBits ) {
-      delete fBits;
       if( fNbits ) {
 	fBits = new UShort_t[fNbits];
 	memcpy( fBits, rhs.fBits, fNbits*sizeof(UShort_t) );
