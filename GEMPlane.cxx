@@ -19,7 +19,6 @@
 #include "TH1.h"
 #include "TError.h"
 #include "TString.h"
-#include "TVector2.h"
 
 #ifndef MCDATA
 #include "THaEvData.h"
@@ -690,10 +689,10 @@ Int_t GEMPlane::DummyDecode( const THaEvData& evData )
       } datx, daty;
       datx.i = evData.GetData( d->crate, d->slot, chan, ihit );
       daty.i = evData.GetRawData( d->crate, d->slot, chan, ihit );
-      TVector2 hitpos( datx.f, daty.f );
 
       // Convert (x,y) to this plane's projection coordinates
-      Double_t pos = hitpos.Rotate(-fProjection->GetAngle()).X();
+      Double_t pos = datx.f*fProjection->GetCosAngle() +
+	daty.f*fProjection->GetSinAngle();
       coords.push_back(pos);
     }
     // Ensure that the hit coordinates are sorted
