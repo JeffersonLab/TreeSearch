@@ -36,9 +36,9 @@ namespace TreeSearch {
     friend class PatternGenerator;
     friend class NodeVisitor;
   private:
-    UShort_t*  fBits;        // [fNbits] Bit pattern array
+    UShort_t*  fBits;        // [fNbits] Bit numbers set in each plane
     Link*      fChild;       // Linked list of child patterns
-    UShort_t   fNbits;       // Bit count (size of fBits array, <=16)
+    UShort_t   fNbits;       // Size of fBits array (<=16) = number of planes
     Bool_t     fDelBits;     // If true, delete fBits in d'tor
     Bool_t     fDelChld;     // If true, delete fChild list in d'tor
 
