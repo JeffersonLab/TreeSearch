@@ -405,6 +405,13 @@ Int_t WirePlane::ReadDatabase( const TDatime& date )
   if( status != kOK )
     return status;
 
+  // Dummy planes ignore all of the parameters that are checked below,
+  // so we can return right here.
+  if( IsDummy() ) {
+    fIsInit = true;
+    return kOK;
+  }
+
   // Create time-to-distance converter
   if( status == kOK ) {
     if( !ttd_conv.Contains("::") )

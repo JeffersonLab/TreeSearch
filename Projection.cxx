@@ -165,8 +165,8 @@ Int_t Projection::Decode( const THaEvData& evdata )
 
   Int_t sum = 0;
   bool err = false;
-  for( vplsiz_t i = 0; i < GetNplanes(); ++i ) {
-    Plane* pl = fPlanes[i];
+  for( vplsiz_t i = 0; i < GetNallPlanes(); ++i ) {
+    Plane* pl = fAllPlanes[i];
     Int_t nhits = pl->Decode( evdata );
     if( nhits < 0 ) {
       err = true;
@@ -306,8 +306,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 
   // Determine the width of this projection based on the plane geometry
   assert( fWidth == 0.0 );  // fWidth set to 0.0 in Reset()
-  for( vplsiz_t i = 0; i < fPlanes.size(); ++i ) {
-    Plane* thePlane = fPlanes[i];
+  for( UInt_t i = 0; i < GetNallPlanes(); ++i ) {
+    Plane* thePlane = fAllPlanes[i];
     assert( thePlane->IsInit() );
     // Determine the "width" of this projection plane (=width along the
     // projection coordinate).
@@ -391,7 +391,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 
     vector<Double_t> zpos;
     for( UInt_t i = 0; i < GetNallPlanes(); ++i )
-      zpos.push_back( GetPlaneZ(i) );
+      zpos.push_back( fAllPlanes[i]->GetZ() );
     TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
 
     if( tp.Normalize() != 0 )
