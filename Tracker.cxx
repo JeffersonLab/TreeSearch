@@ -2103,6 +2103,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   // zero, tracks will be projected into the z=0 plane.
   fOrigin.SetXYZ(0,0,0);
   fRotation.SetToIdentity();
+  fInvRot.SetToIdentity();
   Int_t err = ReadGeometry( file, date );
   if( err ) {
     fclose(file);
