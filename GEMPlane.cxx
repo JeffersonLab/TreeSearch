@@ -690,9 +690,15 @@ Int_t GEMPlane::DummyDecode( const THaEvData& evData )
       datx.i = evData.GetData( d->crate, d->slot, chan, ihit );
       daty.i = evData.GetRawData( d->crate, d->slot, chan, ihit );
 
-      // Convert (x,y) to this plane's projection coordinates
-      Double_t pos = datx.f*fProjection->GetCosAngle() +
-	daty.f*fProjection->GetSinAngle();
+      // These coordinates are in the lab frame. Convert to the tracker frame,
+      // then to this plane's projection coordinates
+      TVector3 hitpos( datx.f, daty.f, GetZ() );
+      hitpos -= fTracker->GetOrigin();
+      if( fTracker->IsRotated() )
+	hitpos *= fTracker->GetInvRotation();
+
+      Double_t pos = hitpos.X()*fProjection->GetCosAngle() +
+	hitpos.Y()*fProjection->GetSinAngle();
       coords.push_back(pos);
     }
     // Ensure that the hit coordinates are sorted
