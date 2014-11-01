@@ -273,7 +273,7 @@ void Projection::MakePlaneCombos( const vpl_t& planes, TBits*& combos ) const
       assert( bitval < nc );
       if( k == planes.size() ) {
 	// No objections were raised (in the loop over k) over this bitval
-	fPlaneCombos->SetBitNumber( bitval );
+	combos->SetBitNumber( bitval );
       }
       ++c; // next UniqueCombo
     }
