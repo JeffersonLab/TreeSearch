@@ -61,7 +61,6 @@ namespace TreeSearch {
     UInt_t   GetNbins()   const { return 1U<<(fNlevels-1); }
     UInt_t   GetNlevels() const { return fNlevels; }
     UInt_t   GetNplanes() const { return fNplanes; }
-    UInt_t   GetDummyPlanePattern() const { return fDummyPlanePattern; }
     Double_t GetOffset()  const { return fOffset; }
     Double_t GetWidth()   const { return GetNbins()/fScale; }
     Double_t GetBinWidth() const { return fBinWidth; }  // meters per bin
@@ -97,7 +96,6 @@ namespace TreeSearch {
 
     UInt_t   fNlevels;  // Number of levels in the pattern tree
     UInt_t   fNplanes;  // Number of planes contained in the pattern
-    UInt_t   fDummyPlanePattern; // Bit pattern of dummy plane #s
     Double_t fScale;    // 1/(bin resolution) = 2^(fNlevels-1)/width (1/m)
     Double_t fBinWidth; // 1/fScale (meters per bin)
     Double_t fOffset;   // Offset of zero hit position wrt zero det coord (m)
