@@ -94,7 +94,7 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
     // Bypass the const& - presumably we know what we're doing...
     TVector3& org = const_cast<TVector3&>( fPlanes.front()->GetOrigin() );
     fOrigin = org;
-    org.SetXYZ( 0.0, 0.0, 0.0 );
+    org.SetXYZ( 0.0, 0.0, 0.0 );  // update first plane
     for( vrsiz_t iplane = 1; iplane < fPlanes.size(); ++iplane ) {
       Plane* thePlane = fPlanes[iplane];
       assert( thePlane->GetZ() >= fOrigin.Z() ); // else not sorted
@@ -113,7 +113,7 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 				Bool_t /* required */ )
 {
-  // Read basic geometry for a GEM tracker sector
+  // Read basic geometry for a SoLID GEM tracker sector
   //
   // The only geometry parameter needed for the a SoLID Tracker (which
   // represents the collection of GEM trackers in a sector) is 'phi', the
@@ -147,6 +147,8 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 
   fRotation.SetToIdentity();
   fRotation.RotateZ( fPhi );
+  fInvRot.RotateZ( -fPhi );
+  assert( fRotation == fInvRot.Inverse() ); // might fail due to rounding
 
   return kOK;
 }
