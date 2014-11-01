@@ -86,6 +86,11 @@ namespace TreeSearch {
     Double_t        GetWidth()        const { return fWidth; }
     Double_t        GetZsize()        const;
 
+    // Dummy plane support
+    UInt_t          GetDummyPlanePattern() const { return fDummyPlanePattern; }
+    UInt_t          GetFirstPlaneNum()     const { return fFirstPlaneNum; }
+    UInt_t          GetLastPlaneNum()      const { return fLastPlaneNum; }
+
     void            SetPatternTree( PatternTree* pt ) { fPatternTree = pt; }
 
     const vpl_t&    GetListOfPlanes() const { return fPlanes; }
@@ -149,6 +154,10 @@ namespace TreeSearch {
     THaDetectorBase* fDetector;      //! Parent detector
     PatternTree*     fPatternTree;   // Precomputed template database
 
+    UInt_t           fDummyPlanePattern; // Bitpattern of dummy plane numbers
+    UInt_t           fFirstPlaneNum; // Idx of first active plane in fAllPlanes
+    UInt_t           fLastPlaneNum;  // Idx of last active plane in fAllPlanes
+
     // Plane occupancy parameters
     UInt_t           fMinFitPlanes;  // Min num of planes required for fitting
     UInt_t           fMaxMiss;       // Allowed number of missing planes
@@ -200,9 +209,9 @@ namespace TreeSearch {
     class ComparePattern : public NodeVisitor {
     public:
       ComparePattern( const Hitpattern* hitpat, const TBits* combos,
-		      NodeVec_t* matches, Bool_t have_dummies = false )
+		      NodeVec_t* matches, UInt_t dummypattern = 0 )
 	: fHitpattern(hitpat), fPlaneCombos(combos), fMatches(matches),
-	  fHaveDummies(have_dummies)
+	  fDummyPlanePattern(dummypattern)
 #ifdef TESTCODE
 	, fNtest(0)
 #endif
@@ -215,7 +224,7 @@ namespace TreeSearch {
       const Hitpattern* fHitpattern;   // Hitpattern to compare to
       const TBits*      fPlaneCombos;  // Allowed plane occupancy patterns
       NodeVec_t*        fMatches;      // Set of matching patterns
-      Bool_t            fHaveDummies;  // Dummy planes present in projection
+      UInt_t            fDummyPlanePattern;  // Dummy plane # bitpattern
 #ifdef TESTCODE
       UInt_t fNtest;  // Number of pattern comparisons
 #endif

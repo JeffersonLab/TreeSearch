@@ -28,8 +28,8 @@ namespace TreeSearch {
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const PatternTree& pt )
-  : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fDummyPlanePattern(0),
-    fScale(0), fOffset(0.5*pt.GetWidth()), fPattern(0)
+  : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0),
+    fOffset(0.5*pt.GetWidth()), fPattern(0)
   , fMaxhitBin(0)
 {
   // Construct Hitpattern using paramaters of pattern tree
@@ -39,8 +39,8 @@ Hitpattern::Hitpattern( const PatternTree& pt )
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
-  : fNlevels(nlevels), fNplanes(nplanes), fDummyPlanePattern(0),
-    fScale(0), fOffset(0.5*width), fPattern(0)
+  : fNlevels(nlevels), fNplanes(nplanes), fScale(0), fOffset(0.5*width),
+    fPattern(0)
   , fMaxhitBin(0)
 {
   // Constructor
@@ -85,7 +85,6 @@ void Hitpattern::Init( Double_t width )
 Hitpattern::Hitpattern( const Hitpattern& orig )
 try
   : fNlevels(orig.fNlevels), fNplanes(orig.fNplanes),
-    fDummyPlanePattern(orig.fDummyPlanePattern),
     fScale(orig.fScale), fBinWidth(orig.fBinWidth), fOffset(orig.fOffset),
     fPattern(0), fHits(orig.fHits), fHitList(orig.fHitList)
   , fMaxhitBin(orig.fMaxhitBin)
@@ -113,7 +112,6 @@ Hitpattern& Hitpattern::operator=( const Hitpattern& rhs )
   if( this != &rhs ) {
     fNlevels = rhs.fNlevels;
     fNplanes = rhs.fNplanes;
-    fDummyPlanePattern = rhs.fDummyPlanePattern;
     fScale   = rhs.fScale;
     fBinWidth= rhs.fBinWidth;
     fOffset  = rhs.fOffset;
@@ -206,9 +204,6 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
       assert( proj );
     }
 #endif
-    if( plane->IsDummy() )
-      SETBIT(fDummyPlanePattern, plane->GetAltPlaneNum());
-
     ntot += ScanHits( plane );
   }
 

@@ -90,33 +90,49 @@ struct BuildInfo_t {
   vector< pair<UShort_t,UShort_t> >
                     fLimits; // [nplanes] Min/max bin numbers in each plane
   UInt_t            fOuterBits;
+  const Projection* fProjection;
 
-  BuildInfo_t() : fOuterBits(0) {}
-  BuildInfo_t( const Node_t& node )
+  BuildInfo_t( const Projection* proj ) : fOuterBits(0), fProjection(proj) {}
+  BuildInfo_t( const Node_t& node, const Projection* proj )
     : fCluster(node.second),
-      fOuterBits(GetOuterBits(node.second.plane_pattern))
+      fOuterBits(GetOuterBits(node.second.plane_pattern)), fProjection(proj)
   {
     // Construct from given start pattern/hitset
     const NodeDescriptor& nd = node.first;
+    UInt_t last  = fProjection->GetLastPlaneNum()+1;
+    UInt_t dmpat = fProjection->GetDummyPlanePattern();
     assert( fCluster.plane_pattern > 0 and fCluster.nplanes > 0 );
-    UInt_t npl = nd.link->GetPattern()->GetNbits();
-    fLimits.reserve( npl );
-    for( UInt_t i = 0; i < npl; ++i )
-      fLimits.push_back( make_pair(nd[i], nd[i]+1) );
+    assert( last <= nd.link->GetPattern()->GetNbits() );
+    assert( last-1 >= fProjection->GetFirstPlaneNum() );
+    fLimits.reserve( fProjection->GetNplanes() );
+    for( UInt_t i = fProjection->GetFirstPlaneNum(); i < last; ++i ) {
+      if( not TESTBIT(dmpat,i) )
+	fLimits.push_back( make_pair(nd[i], nd[i]+1) );
+    }
+    assert( fLimits.size() == fProjection->GetNplanes() );
   }
   void ExpandWidth( const NodeDescriptor& nd ) {
     // Widen the bin ranges using the bins in the given pattern
-    UInt_t npl = nd.link->GetPattern()->GetNbits();
+    UInt_t last  = fProjection->GetLastPlaneNum()+1;
+    UInt_t npl   = fProjection->GetNplanes();
+    UInt_t dmpat = fProjection->GetDummyPlanePattern();
+    assert( last <= nd.link->GetPattern()->GetNbits() );
+    assert( last-1 >= fProjection->GetFirstPlaneNum() );
     assert( fLimits.size() == npl or fLimits.empty() );
     if( fLimits.empty() )
       fLimits.assign( npl, make_pair(kMaxUShort, 0) );
-    for( UInt_t i = npl; i; ) { --i;
-      pair<UShort_t,UShort_t>& lim = fLimits[i];
-      UInt_t bin = nd[i];
-      if( bin < lim.first )
-	lim.first = bin;
-      if( bin+1 > lim.second )
-	lim.second = bin+1;
+    for( UInt_t i = last, ip = npl; i; ) {
+      --i;
+      if( not TESTBIT(dmpat,i) ) {
+	--ip;
+	assert( ip < npl );
+	pair<UShort_t,UShort_t>& lim = fLimits[ip];
+	UInt_t bin = nd[i];
+	if( bin < lim.first )
+	  lim.first = bin;
+	if( bin+1 > lim.second )
+	  lim.second = bin+1;
+      }
     }
   }
 };
@@ -161,7 +177,7 @@ Road::Road( const Projection* proj )
   memset( fCornerX, 0, kNcorner*sizeof(Double_t) );
   fV[2] = fV[1] = fV[0] = kBig;
   fPoints.reserve( fProjection->GetNplanes() );
-  fBuild = new BuildInfo_t;
+  fBuild = new BuildInfo_t(fProjection);
 }
 
 //_____________________________________________________________________________
@@ -187,7 +203,7 @@ Road::Road( const Node_t& nd, const Projection* proj )
   memset( fCornerX, 0, kNcorner*sizeof(Double_t) );
   fV[2] = fV[1] = fV[0] = kBig;
   fPoints.reserve( fProjection->GetNplanes() );
-  fBuild = new BuildInfo_t(nd);
+  fBuild = new BuildInfo_t(nd,fProjection);
 
 #ifdef VERBOSE
   if( fProjection->GetDebug() > 3 ) {
@@ -333,24 +349,30 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
 inline
 Bool_t Road::IsInBackRange( const NodeDescriptor& nd ) const
 {
-  assert( fBuild && !fBuild->fLimits.empty() );
-
+  UInt_t last  = fProjection->GetLastPlaneNum();
   UInt_t bdist = fProjection->GetBinMaxDistB();
 
-  return ( nd.End() + bdist >= fBuild->fLimits.back().first and
-	   nd.End()         <  fBuild->fLimits.back().second + bdist );
+  assert( fBuild && !fBuild->fLimits.empty() );
+  assert( last < nd.link->GetPattern()->GetNbits() );
+  assert( not TESTBIT(fProjection->GetDummyPlanePattern(), last) );
+
+  return ( nd[last] + bdist >= fBuild->fLimits.back().first and
+	   nd[last]         <  fBuild->fLimits.back().second + bdist );
 }
 
 //_____________________________________________________________________________
 //inline
 Bool_t Road::IsInFrontRange( const NodeDescriptor& nd ) const
 {
-  assert( fBuild && !fBuild->fLimits.empty() );
-
+  UInt_t first = fProjection->GetFirstPlaneNum();
   UInt_t fdist = fProjection->GetBinMaxDistF();
 
-  return ( nd.Start() + fdist >= fBuild->fLimits.front().first and
-	   nd.Start()         <  fBuild->fLimits.front().second + fdist );
+  assert( fBuild && !fBuild->fLimits.empty() );
+  assert( first < nd.link->GetPattern()->GetNbits() );
+  assert( not TESTBIT(fProjection->GetDummyPlanePattern(), first) );
+
+  return ( nd[first] + fdist >= fBuild->fLimits.front().first and
+	   nd[first]         <  fBuild->fLimits.front().second + fdist );
 }
 
 //_____________________________________________________________________________

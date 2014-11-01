@@ -49,6 +49,7 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
+    fDummyPlanePattern(0), fFirstPlaneNum(kMaxUInt), fLastPlaneNum(0),
     fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
     fPlaneCombos(0), fAltPlaneCombos(0), fMaxPat(kMaxUInt),
     fFrontMaxBinDist(kMaxUInt), fBackMaxBinDist(kMaxUInt), fHitMaxDist(0),
@@ -122,18 +123,32 @@ void Projection::AddDummyPlane( Plane* pl, Plane* partner )
 
   assert( pl );
 
-  pl->SetAltPlaneNum( fAllPlanes.size() );
+  UInt_t apn = fAllPlanes.size(), appn;
+  pl->SetAltPlaneNum( apn );
   fAllPlanes.push_back( pl );
   pl->SetProjection( this );
   if( partner ) {
     assert( partner != pl );
     assert( not (pl->IsDummy() xor partner->IsDummy()) );
-    partner->SetAltPlaneNum( fAllPlanes.size() );
+    appn = fAllPlanes.size();
+    partner->SetAltPlaneNum( appn );
     fAllPlanes.push_back( partner );
     partner->SetProjection( this );
   }
-  if( pl->IsDummy() )
+  if( pl->IsDummy() ) {
     SetBit( kHaveDummies );
+    SETBIT( fDummyPlanePattern, apn );
+    if( partner ) {
+      SETBIT( fDummyPlanePattern, appn );
+    }
+  } else {
+    fFirstPlaneNum = TMath::Min( fFirstPlaneNum, apn );
+    fLastPlaneNum  = TMath::Max( fLastPlaneNum,  apn );
+    if( partner ) {
+      fFirstPlaneNum = TMath::Min( fFirstPlaneNum, appn );
+      fLastPlaneNum  = TMath::Max( fLastPlaneNum,  appn );
+    }
+  }
 }
 
 //_____________________________________________________________________________
@@ -725,7 +740,7 @@ Int_t Projection::Track()
 #endif
 
   ComparePattern compare( fHitpattern, fAltPlaneCombos, &fPatternsFound,
-			  TestBit(kHaveDummies) );
+			  fDummyPlanePattern );
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
@@ -1244,8 +1259,8 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
       node->second.hits.insert( ALL(hits) );
     }
     assert( (HitSet::GetAltMatchValue(node->second.hits) xor
-	     fHitpattern->GetDummyPlanePattern()) == match.first );
-    if( fHaveDummies ) {
+	     fDummyPlanePattern) == match.first );
+    if( fDummyPlanePattern != 0 ) {
       // If dummy planes are present, then match is given with respect to
       // Plane::GetAltPlaneNum(). We need to calculate the node's
       // plane_pattern and nplanes explicitly wrt to Plane::GetPlaneNum()
