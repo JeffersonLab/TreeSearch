@@ -50,6 +50,7 @@ namespace TreeSearch {
       bool operator() ( const WireHit* a, const WireHit* b ) const
       {
 	assert( a && b );
+	assert( a->GetPlaneNum() != kMaxUInt && b->GetPlaneNum() != kMaxUInt );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() )
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
 	if( a->GetPlaneNum() != b->GetPlaneNum() ) {
@@ -70,6 +71,7 @@ namespace TreeSearch {
       bool operator() ( const WireHit* a, const WireHit* b ) const
       {
 	assert( a && b );
+	assert( a->GetPlaneNum() != kMaxUInt && b->GetPlaneNum() != kMaxUInt );
 	if( a->GetPlane()->GetType() != b->GetPlane()->GetType() )
 	  return (a->GetPlane()->GetType() < b->GetPlane()->GetType());
 	if( a->GetPlaneNum() != b->GetPlaneNum() ) {

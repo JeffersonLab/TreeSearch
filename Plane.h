@@ -54,6 +54,7 @@ namespace TreeSearch {
     virtual Int_t   Begin( THaRunBase* r=0 );
     virtual Int_t   End( THaRunBase* r=0 );
 
+    virtual Hit*    AddHit( Double_t x, Double_t y );
     virtual Bool_t  Contains( Double_t x, Double_t y ) const;
     virtual Double_t GetMaxLRdist() const { return 0; }
     virtual Hit*    FindNearestHitAndPos( Double_t x, Double_t& pos ) const;
@@ -91,14 +92,18 @@ namespace TreeSearch {
     TSeqCollection* GetCoords()      const { return fFitCoords; }
     Int_t           GetNcoords()     const { return fFitCoords->GetLast()+1; }
     UInt_t          GetPlaneNum()    const { return fPlaneNum; }
+    UInt_t          GetAltPlaneNum() const { return fAltPlaneNum; }
     UInt_t          GetDefinedNum()  const { return fDefinedNum; }
     Bool_t          IsCalibrating()  const { return TestBit(kCalibrating); }
+    Bool_t          IsDummy()        const { return TestBit(kIsDummy); }
     Bool_t          IsRequired()     const;
 
-    void            SetPlaneNum( UInt_t n )   { fPlaneNum = n; }
-    void            SetDefinedNum( UInt_t n ) { fDefinedNum = n; }
+    void            SetPlaneNum( UInt_t n )    { fPlaneNum = n; }
+    void            SetAltPlaneNum( UInt_t n ) { fAltPlaneNum = n; }
+    void            SetDefinedNum( UInt_t n )  { fDefinedNum = n; }
     void            SetProjection( Projection* p )
     { fProjection = p; UpdateOffset(); }
+    void            SetDummy( Bool_t enable = true );
     void            SetRequired( Bool_t enable = true );
     void            UpdateOffset();
 
@@ -138,6 +143,7 @@ namespace TreeSearch {
 
     // Geometry, configuration
     UInt_t        fPlaneNum;    // Ordinal of this plane within its projection
+    UInt_t        fAltPlaneNum; // Ordinal of plane in proj incl dummy planes
     UInt_t        fDefinedNum;  // Ordinal of this plane in planeconfig string
     EProjType     fType;        // Plane type (e.g. x,y,u,v)
     Double_t      fStart;       // Position of 1st sensor (e.g. wire/strip) (m)
@@ -170,10 +176,15 @@ namespace TreeSearch {
     Podd::MCHitInfo*  fMCHitInfo;  // [fNelem] MC truth data for fHits
 #endif
 
+    // Support functions for dummy planes
+    virtual Hit*  AddHitImpl( Double_t x );
+    virtual Int_t DummyDecode( const THaEvData& );
+
     // Bits for Planes
     enum {
       kIsRequired  = BIT(14), // Tracks must have a hit in this plane
       kCalibrating = BIT(15), // Plane in calibration mode (implies !required)
+      kIsDummy     = BIT(20), // Plane is a dummy = used for TreeSearch only
       kTDCReadout  = BIT(21), // Readout is TDC-based
       kHaveRefChans= BIT(22)  // Hardware modules have reference channels
 #ifdef TESTCODE
@@ -234,6 +245,15 @@ namespace TreeSearch {
     // Enable/disable calibration mode flag
 
     SetBit( kIsRequired, enable );
+  }
+
+  //___________________________________________________________________________
+  inline
+  void Plane::SetDummy( Bool_t enable )
+  {
+    // Enable/disable calibration mode flag
+
+    SetBit( kIsDummy, enable );
   }
 
 ///////////////////////////////////////////////////////////////////////////////

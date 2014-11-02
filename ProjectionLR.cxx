@@ -34,7 +34,7 @@ ProjectionLR::~ProjectionLR()
 }
 
 //_____________________________________________________________________________
-Hitpattern* ProjectionLR::MakeHitpattern( const PatternTree& pt )
+Hitpattern* ProjectionLR::MakeHitpattern( const PatternTree& pt ) const
 {
   // Instantiate a HitpatternLR that interprets hits as L/R-ambiguous wire hits.
 

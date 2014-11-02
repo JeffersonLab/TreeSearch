@@ -377,6 +377,7 @@ Tracker::Tracker( const char* name, const char* desc, THaApparatus* app )
 #ifdef MCDATA
   , fMCDecoder(0), fMCPointUpdater(0), fChecked(false)
 #endif
+  , fDBmaxmiss(-1), fDBconf_level(1e-9)
 {
   // Constructor
 
@@ -1865,6 +1866,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   EStatus status = THaTrackingDetector::Init(date);
 
   // Initialize the planes
+  UInt_t nplanes = 0;  // number of active planes
   if( status == kOK ) {
     vrsiz_t iplane = 0;
     for( ; iplane < fPlanes.size(); ++iplane ) {
@@ -1879,6 +1881,9 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 	status = kInitError;
 	break;
       }
+      if( !fPlanes[iplane]->IsDummy() ) {
+	++nplanes;
+      }
     }
   }
   delete fCrateMap; fCrateMap = 0;
@@ -1887,6 +1892,41 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 
   // Sort planes by increasing z-position
   sort( ALL(fPlanes), Plane::ZIsLess() );
+
+  // Calculate track fitting parameters. This needs to be done here because
+  // we need to know the number of active (non-dummy) planes, which is not
+  // available until after Plane initialization.
+  if( TestBit(kDoCoarse) ) {   // only needed if doing tracking
+    if( nplanes < 5 ) {
+      Error( Here(here), "Insufficient number of planes = %u. Need at least 5. "
+	     "Fix database.", nplanes );
+      return kInitError;
+    }
+    if( fDBmaxmiss+5 > static_cast<Int_t>(nplanes) ) {
+      Error( Here(here), "3d_maxmiss = %d (number of allowed planes with "
+	     "missing hits) too large. Must be %u or less. Fix database.",
+	     fDBmaxmiss, nplanes-5 );
+      return kInitError;
+    }
+    // Convert maximum number of missing hits to ndof of fits
+    fMinNdof = ( fDBmaxmiss >= 0 ) ? nplanes - 4 - fDBmaxmiss : 1;
+
+    // Determine Chi2 confidence interval limits for the selected CL and the
+    // possible degrees of freedom of the 3D track fit
+    if( fDBconf_level < 0.0 || fDBconf_level > 1.0 ) {
+      Error( Here(here), "Illegal fit confidence level = %lf. "
+	     "Must be 0-1. Fix database.", fDBconf_level );
+      return kInitError;
+    }
+    fChisqLimits.clear();
+    fChisqLimits.resize( nplanes-3, make_pair<Double_t,Double_t>(0,0) );
+    for( vec_pdbl_t::size_type dof = fMinNdof; dof < fChisqLimits.size();
+	 ++dof ) {
+      fChisqLimits[dof].first  = TMath::ChisquareQuantile( fDBconf_level, dof );
+      fChisqLimits[dof].second =
+	TMath::ChisquareQuantile( 1.0-fDBconf_level, dof );
+    }
+  }
 
   // Find partners for the planes, if appropriate. Details depend on the type
   // of detector.
@@ -1934,7 +1974,10 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
       proj->SetDebug( fDebug ); // Projections inherit parent's debug level
       fProj.push_back( proj );
     }
-    proj->AddPlane( thePlane );
+    if( thePlane->IsDummy() )
+      proj->AddDummyPlane( thePlane );
+    else
+      proj->AddPlane( thePlane );
   }
   if( fDebug > 0 )
     Info( Here(here), "Set up %u projections", (UInt_t)fProj.size() );
@@ -2100,6 +2143,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   // zero, tracks will be projected into the z=0 plane.
   fOrigin.SetXYZ(0,0,0);
   fRotation.SetToIdentity();
+  fInvRot.SetToIdentity();
   Int_t err = ReadGeometry( file, date );
   if( err ) {
     fclose(file);
@@ -2116,8 +2160,9 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 #ifdef MCDATA
   Int_t mc_data = 0;
 #endif
-  Int_t maxmiss = -1, maxthreads = -1;
-  Double_t conf_level = 1e-9;
+  Int_t maxthreads = -1;
+  fDBmaxmiss = -1;
+  fDBconf_level = 1e-9;
   ResetBit( k3dFastMatch ); // Set in Init()
   assert( GetCrateMapDBcols() >= 5 );
   DBRequest request[] = {
@@ -2132,8 +2177,8 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     { "disable_finetrack", &disable_finetrack, kInt,    0, 1 },
     { "proj_to_z0",        &proj_to_z0,        kInt,    0, 1 },
     { "calibrate",         &calibconfig,       kString, 0, 1 },
-    { "3d_maxmiss",        &maxmiss,           kInt,    0, 1 },
-    { "3d_chi2_conflevel", &conf_level,        kDouble, 0, 1 },
+    { "3d_maxmiss",        &fDBmaxmiss,        kInt,    0, 1 },
+    { "3d_chi2_conflevel", &fDBconf_level,     kDouble, 0, 1 },
     { "maxthreads",        &maxthreads,        kInt,    0, 1 },
     { 0 }
   };
@@ -2180,7 +2225,6 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
   SetBit( kProjTrackToZ0, proj_to_z0 );
-  bool doing_tracking = TestBit(kDoCoarse);
 
   cout << endl;
   if( fDebug > 0 ) {
@@ -2251,41 +2295,8 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 	     "Error in database?", s.c_str() );
   }
 
-  UInt_t nplanes = fPlanes.size();
-  if( fDebug > 0 and not (doing_tracking and nplanes < 5) )
-    Info( Here(here), "Loaded %u planes", nplanes );
-
-  if( doing_tracking ) {
-    if( nplanes < 5 ) {
-      Error( Here(here), "Insufficient number of planes = %u. Need at least 5. "
-	     "Fix database.", nplanes );
-      return kInitError;
-    }
-    if( maxmiss+5 > static_cast<Int_t>(nplanes) ) {
-      Error( Here(here), "3d_maxmiss = %d (number of allowed planes with "
-	     "missing hits) too large. Must be %u or less. Fix database.",
-	     maxmiss, nplanes-5 );
-      return kInitError;
-    }
-    // Convert maximum number of missing hits to ndof of fits
-    fMinNdof = ( maxmiss >= 0 ) ? nplanes - 4 - maxmiss : 1;
-
-    // Determine Chi2 confidence interval limits for the selected CL and the
-    // possible degrees of freedom of the 3D track fit
-    if( conf_level < 0.0 or conf_level > 1.0 ) {
-      Error( Here(here), "Illegal fit confidence level = %lf. "
-	     "Must be 0-1. Fix database.", conf_level );
-      return kInitError;
-    }
-    fChisqLimits.clear();
-    fChisqLimits.resize( nplanes-3, make_pair<Double_t,Double_t>(0,0) );
-    for( vec_pdbl_t::size_type dof = fMinNdof; dof < fChisqLimits.size();
-	 ++dof ) {
-      fChisqLimits[dof].first  = TMath::ChisquareQuantile( conf_level, dof );
-      fChisqLimits[dof].second =
-	TMath::ChisquareQuantile( 1.0-conf_level, dof );
-    }
-  }
+  if( fDebug > 0 )
+    Info( Here(here), "Loaded %u planes", static_cast<UInt_t>(fPlanes.size()) );
 
   // Determine maximum number of threads to run. maxthreads from the database
   // has priority. maxthreads = 0 or negative indicates that the number of

@@ -36,9 +36,6 @@ using namespace std;
 
 namespace TreeSearch {
 
-typedef vector<Plane*>::size_type vplsiz_t;
-typedef vector<Plane*>::iterator  vpliter_t;
-
 #define ALL(c) (c).begin(), (c).end()
 
 // Need at least 3 planes to do proper fits
@@ -52,11 +49,12 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
     fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
+    fDummyPlanePattern(0), fFirstPlaneNum(kMaxUInt), fLastPlaneNum(0),
     fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
-    fPlaneCombos(0), fMaxPat(kMaxUInt), fFrontMaxBinDist(kMaxUInt),
-    fBackMaxBinDist(kMaxUInt), fHitMaxDist(0), fConfLevel(1e-3),
-    fHitpattern(0), fRoads(0), fNgoodRoads(0), fRoadCorners(0),
-    fTrkStat(kTrackOK)
+    fPlaneCombos(0), fAltPlaneCombos(0), fMaxPat(kMaxUInt),
+    fFrontMaxBinDist(kMaxUInt), fBackMaxBinDist(kMaxUInt), fHitMaxDist(0),
+    fConfLevel(1e-3), fHitpattern(0), fRoads(0), fNgoodRoads(0),
+    fRoadCorners(0), fTrkStat(kTrackOK)
 {
   // Constructor
 
@@ -73,6 +71,8 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
   size_t nbytes = (char*)&t_track - (char*)&n_hits + sizeof(t_track);
   memset( &n_hits, 0, nbytes );
 #endif
+
+  ResetBit( kHaveDummies );
 }
 
 //_____________________________________________________________________________
@@ -86,6 +86,8 @@ Projection::~Projection()
   delete fRoadCorners;
   delete fPatternTree;
   delete fHitpattern;
+  if( fAltPlaneCombos != fPlaneCombos )
+    delete fAltPlaneCombos;
   delete fPlaneCombos;
 }
 
@@ -95,16 +97,57 @@ void Projection::AddPlane( Plane* pl, Plane* partner )
   // Add plane pl (and optional partner plane) to this projection.
   // Sets plane numbers.
 
-  assert(pl);
+  assert( pl );
+  assert( !pl->IsDummy() );
 
   pl->SetPlaneNum( fPlanes.size() );
   fPlanes.push_back( pl );
-  pl->SetProjection( this );
+  // pl->SetProjection( this );
   if( partner ) {
-    //    assert( partner->GetZ() > pl->GetZ() ); // Planes must be ordered
+    //    assert( partner->GetZ() > pl->GetZ() ); // planes must be ordered
+    assert( partner != pl );
+    assert( !partner->IsDummy() );
     partner->SetPlaneNum( fPlanes.size() );
     fPlanes.push_back( partner );
+    // partner->SetProjection( this );
+  }
+
+  AddDummyPlane( pl, partner );
+}
+
+//_____________________________________________________________________________
+void Projection::AddDummyPlane( Plane* pl, Plane* partner )
+{
+  // Add dummy plane pl (and optional partner plane) to this projection.
+  // Sets plane numbers.
+
+  assert( pl );
+
+  UInt_t apn = fAllPlanes.size(), appn = 0;
+  pl->SetAltPlaneNum( apn );
+  fAllPlanes.push_back( pl );
+  pl->SetProjection( this );
+  if( partner ) {
+    assert( partner != pl );
+    assert( not (pl->IsDummy() xor partner->IsDummy()) );
+    appn = fAllPlanes.size();
+    partner->SetAltPlaneNum( appn );
+    fAllPlanes.push_back( partner );
     partner->SetProjection( this );
+  }
+  if( pl->IsDummy() ) {
+    SetBit( kHaveDummies );
+    SETBIT( fDummyPlanePattern, apn );
+    if( partner ) {
+      SETBIT( fDummyPlanePattern, appn );
+    }
+  } else {
+    fFirstPlaneNum = TMath::Min( fFirstPlaneNum, apn );
+    fLastPlaneNum  = TMath::Max( fLastPlaneNum,  apn );
+    if( partner ) {
+      fFirstPlaneNum = TMath::Min( fFirstPlaneNum, appn );
+      fLastPlaneNum  = TMath::Max( fLastPlaneNum,  appn );
+    }
   }
 }
 
@@ -137,8 +180,8 @@ Int_t Projection::Decode( const THaEvData& evdata )
 
   Int_t sum = 0;
   bool err = false;
-  for( vplsiz_t i = 0; i < GetNplanes(); ++i ) {
-    Plane* pl = fPlanes[i];
+  for( vplsiz_t i = 0; i < GetNallPlanes(); ++i ) {
+    Plane* pl = fAllPlanes[i];
     Int_t nhits = pl->Decode( evdata );
     if( nhits < 0 ) {
       err = true;
@@ -171,12 +214,68 @@ void Projection::Reset( Option_t* opt )
   fMaxSlope = fWidth = 0.0;
   delete fHitpattern; fHitpattern = 0;
   delete fPatternTree; fPatternTree = 0;
+  if( fAltPlaneCombos != fPlaneCombos ) {
+    delete fAltPlaneCombos; fAltPlaneCombos = 0;
+  }
   delete fPlaneCombos; fPlaneCombos = 0;
   delete fRoadCorners; fRoadCorners = 0;
   if( opt and *opt ) {
     TString s(opt);
     if( s.Contains( "FULL", TString::kIgnoreCase )) {
       fPlanes.clear();
+      fAllPlanes.clear();
+      ResetBit( kHaveDummies );
+    }
+  }
+}
+
+//_____________________________________________________________________________
+void Projection::MakePlaneCombos( const vpl_t& planes, TBits*& combos ) const
+{
+  // Utility function to fill fPlaneCombos and fAltPlaneCombos according
+  // to the configuration parameters fMaxMiss, fRequire1of2, and plane
+  // required/dummy flags
+
+  assert( combos == 0 );
+  UInt_t nc = 1U << planes.size();
+  combos = new TBits( nc );
+  combos->SetBitNumber( nc-1 );  // Always allow full occupancy
+  for( UInt_t i = 1; i <= fMaxMiss; ++i ) {
+    UniqueCombo c( planes.size(), i );
+    while( c ) {
+      // Clear the bit numbers from this combination
+      UInt_t bitval = nc-1;
+      for( vplsiz_t j = 0; j < c().size(); ++j )
+	CLRBIT( bitval, c()[j] );
+      // Test if this pattern satisfies other constraints
+      vplsiz_t k = 0;
+      for( ; k < planes.size(); ++k ) {
+	Plane* p = planes[k], *pp;
+	// Disallow bit pattern if a required or dummy plane is missing
+	if( !TESTBIT(bitval,k) and (p->IsRequired() or p->IsDummy()) )
+	  break;
+	// If requested, ensure that at least one plane of a plane pair is set
+	if( fRequire1of2 and (pp = p->GetPartner()) and !TESTBIT(bitval,k) ) {
+	  // Find the index of the partner plane. A bit tedious because calling
+	  // GetPlaneNum or GetAltPlaneNum would require us to know which
+	  // array of planes we have, and we want to keep things general
+	  vplsiz_t j = 0;
+	  for( ; j < planes.size(); ++j ) {
+	    if( planes[j] == pp )
+	      break; // break loop over j
+	  }
+	  assert( j < planes.size() ); // Partner plane must be in array
+	  assert( j != k );            // Plane cannot be partner of itself
+	  if( !TESTBIT(bitval,j) )
+	    break;  // break loop over k
+	}
+      }
+      assert( bitval < nc );
+      if( k == planes.size() ) {
+	// No objections were raised (in the loop over k) over this bitval
+	combos->SetBitNumber( bitval );
+      }
+      ++c; // next UniqueCombo
     }
   }
 }
@@ -222,8 +321,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 
   // Determine the width of this projection based on the plane geometry
   assert( fWidth == 0.0 );  // fWidth set to 0.0 in Reset()
-  for( vplsiz_t i = 0; i < fPlanes.size(); ++i ) {
-    Plane* thePlane = fPlanes[i];
+  for( UInt_t i = 0; i < GetNallPlanes(); ++i ) {
+    Plane* thePlane = fAllPlanes[i];
     assert( thePlane->IsInit() );
     // Determine the "width" of this projection plane (=width along the
     // projection coordinate).
@@ -306,8 +405,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   if( doing_tracking ) {
 
     vector<Double_t> zpos;
-    for( UInt_t i = 0; i < GetNplanes(); ++i )
-      zpos.push_back( GetPlaneZ(i) );
+    for( UInt_t i = 0; i < GetNallPlanes(); ++i )
+      zpos.push_back( fAllPlanes[i]->GetZ() );
     TreeParam_t tp( fNlevels-1, fWidth, fMaxSlope, zpos );
 
     if( tp.Normalize() != 0 )
@@ -338,7 +437,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     catch( bad_alloc ) { fHitpattern = 0; }
     if( !fHitpattern || fHitpattern->IsError() )
       return fStatus = kInitError;
-    assert( GetNplanes() == fHitpattern->GetNplanes() );
+    assert( GetNallPlanes() == fHitpattern->GetNplanes() );
 
     // Determine maximum search distance (in bins) for combining patterns,
     // separately for front and back planes since they can have different
@@ -401,37 +500,21 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   assert( fMinFitPlanes >= kMinFitPlanes );
 
   // Set up the lookup bitpattern indicating which planes are allowed to have
-  // missing hits. The value of the bit pattern of plane hits is used as an
-  // index into this table; if the corresponding bit is set, the plane
+  // missing hits in fits. The value of the bit pattern of plane hits is used
+  // as an index into this table; if the corresponding bit is set, the plane
   // combination is allowed.
-  assert( fPlaneCombos == 0 );
-  UInt_t np = 1U<<GetNplanes();
-  fPlaneCombos = new TBits( np );
-  fPlaneCombos->SetBitNumber( np-1 );  // Always allow full occupancy
-  for( UInt_t i = 1; i <= fMaxMiss; ++i ) {
-    UniqueCombo c( GetNplanes(), i );
-    while( c ) {
-      // Clear the bit numbers from this combination
-      UInt_t bitval = np-1;
-      for( vector<int>::size_type j = 0; j < c().size(); ++j )
-	bitval &= ~( 1U << c()[j] );
-      // Test if this pattern satisfies other constraints
-      UInt_t k = 0;
-      for( ; k < GetNplanes(); ++k ) {
-	// Disallow bit pattern if a required plane is missing
-	if( 0 == (bitval & (1U<<k)) and fPlanes[k]->IsRequired() )
-	  break;
-	// If requested, ensure that at least one plane of a plane pair is set
-	if( fRequire1of2 and fPlanes[k]->GetPartner() and
-	    0 == (bitval & (1U<<k)) and
-	    0 == (bitval & (1U<<fPlanes[k]->GetPartner()->GetPlaneNum())) )
-	  break;
-      }
-      assert( bitval < np );
-      if( k == GetNplanes() )
-	fPlaneCombos->SetBitNumber( bitval );
-      ++c;
-    }
+  MakePlaneCombos( fPlanes, fPlaneCombos );
+
+  // For TreeSerach, the allowed plane pattern is different in case we have
+  // dummy planes. We consider dummy planes to be always required (why else
+  // would one configure them?).
+  if( TestBit(kHaveDummies) ) {
+    assert( GetNplanes() < GetNallPlanes() );
+    MakePlaneCombos( fAllPlanes, fAltPlaneCombos );
+  } else {
+    // If there are no dummy planes, the allowed plane patterns are the same
+    // for TreeSearch and for fits.
+    fAltPlaneCombos = fPlaneCombos;
   }
 
   // Determine Chi2 confidence interval limits for the selected CL and the
@@ -620,7 +703,7 @@ Int_t Projection::FillHitpattern()
   // Fill this projection's hitpattern from hits in the planes.
   // Returns the total number of hits processed.
 
-  Int_t ntot = fHitpattern->Fill( fPlanes );
+  Int_t ntot = fHitpattern->Fill( fAllPlanes );
 
 #ifdef TESTCODE
   n_hits = ntot;
@@ -656,7 +739,8 @@ Int_t Projection::Track()
   TStopwatch timer, timer_tot;
 #endif
 
-  ComparePattern compare( fHitpattern, fPlaneCombos, &fPatternsFound );
+  ComparePattern compare( fHitpattern, fAltPlaneCombos, &fPatternsFound,
+			  fDummyPlanePattern );
   TreeWalk walk( fNlevels );
   walk( fPatternTree->GetRoot(), compare );
 
@@ -773,6 +857,7 @@ static void PrintNode( const Node_t& node )
        << "  wnums= ";
   UInt_t ipl = 0;
   for( Hset_t::iterator ihit = hs.hits.begin(); ihit != hs.hits.end(); ) {
+    assert( (*ihit)->GetPlaneNum() != kMaxUInt );
     while( ipl < (*ihit)->GetPlaneNum() ) { cout << "--/"; ++ipl; }
     bool seq = false;
     do {
@@ -780,6 +865,7 @@ static void PrintNode( const Node_t& node )
       cout << (*ihit)->GetPos();
       seq = true;
       ++ihit;
+      assert( (*ihit)->GetPlaneNum() != kMaxUInt );
     } while( ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
     if( ipl != node.first.link->GetPattern()->GetNbits()-1 ) {
       cout << "/";
@@ -1114,7 +1200,7 @@ void Projection::Print( Option_t* opt ) const
 }
 
 //_____________________________________________________________________________
-Hitpattern* Projection::MakeHitpattern( const PatternTree& pt )
+Hitpattern* Projection::MakeHitpattern( const PatternTree& pt ) const
 {
   // Instantiate Hitpattern to be used for this type of projection.
   // The Hitpattern determines how hit information it processed,
@@ -1167,11 +1253,23 @@ Projection::ComparePattern::operator() ( const NodeDescriptor& nd )
     // in the node's HitSet.
     for( UInt_t i = 0; i < fHitpattern->GetNplanes(); ++i ) {
       const vector<Hit*>& hits = fHitpattern->GetHits( i, nd[i] );
+      assert( hits.empty() or
+	      (hits.front()->GetAltPlaneNum() == i and
+	       not hits.front()->GetPlane()->IsDummy()) );
       node->second.hits.insert( ALL(hits) );
     }
-    assert( HitSet::GetMatchValue(node->second.hits) == match.first );
-    node->second.plane_pattern = match.first;
-    node->second.nplanes = match.second;
+    assert( (HitSet::GetAltMatchValue(node->second.hits) xor
+	     fDummyPlanePattern) == match.first );
+    if( fDummyPlanePattern != 0 ) {
+      // If dummy planes are present, then match is given with respect to
+      // Plane::GetAltPlaneNum(). We need to calculate the node's
+      // plane_pattern and nplanes explicitly wrt to Plane::GetPlaneNum()
+      node->second.CalculatePlanePattern();
+    } else {
+      // No dummy planes, less work :)
+      node->second.plane_pattern = match.first;
+      node->second.nplanes = match.second;
+    }
 
     // Add the pointer to the new node to the vector of results
     //TODO: stop if max num of patterns reached

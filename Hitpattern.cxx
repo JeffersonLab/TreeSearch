@@ -39,7 +39,8 @@ Hitpattern::Hitpattern( const PatternTree& pt )
 
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
-  : fNlevels(nlevels), fNplanes(0), fScale(0), fOffset(0.5*width), fPattern(0)
+  : fNlevels(nlevels), fNplanes(nplanes), fScale(0), fOffset(0.5*width),
+    fPattern(0)
   , fMaxhitBin(0)
 {
   // Constructor
@@ -52,7 +53,6 @@ Hitpattern::Hitpattern( UInt_t nlevels, UInt_t nplanes, Double_t width )
   } else if( width < 1e-2 ) { // Negative or very small width?
     ::Error( here, "Illegal detector width %lf. Must be >= +1cm.", width );
   } else {
-    fNplanes = nplanes;
     Init( width );
   }
 }
@@ -195,10 +195,8 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
        it != planes.end(); ++it ) {
     Plane* plane = *it;
     assert( plane );
-    ntot += ScanHits( plane );
-
 #ifndef NDEBUG
-    // Bugcheck
+    // Bugcheck for projection mismatch
     if( proj )
       assert( plane->GetProjection() == proj );
     else {
@@ -206,6 +204,7 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
       assert( proj );
     }
 #endif
+    ntot += ScanHits( plane );
   }
 
   return ntot;
@@ -248,8 +247,10 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
   // Save the hit pointer(s) in the hit array so that we can efficiently
   // retrieve later the hit(s) that caused the bits to be set.
   // NB: This is quite expensive
-  for( Int_t i = lo; i <= hi; ++i )
-    AddHit( plane, i, hit );
+  if( hit ) {
+    for( Int_t i = lo; i <= hi; ++i )
+      AddHit( plane, i, hit );
+  }
 
   // Loop through the tree levels, starting at the highest resolution.
   // In practice, we usually have hi-lo <= 1 even at the highest resolution.
@@ -272,7 +273,7 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
   // Returns number of hits found in the plane
 
   if( !pl ) return 0;
-  UInt_t plane = pl->GetPlaneNum();
+  UInt_t plane = pl->GetAltPlaneNum();
   assert( plane < fNplanes );
 
   Int_t nhits = 0;
@@ -284,8 +285,9 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
 #endif
   while( (phit = static_cast<Hit*>(it->Next())) ) {
     ++nhits;
-    SetPosition( phit->GetPos()+fOffset, 2.0*phit->GetResolution(),
-		 plane, phit );
+    SetPosition( phit->GetPos()+fOffset, 2.0*phit->GetResolution(), plane,
+		 // Don't record the pseudo-hits in dummy planes
+		 pl->IsDummy() ? 0 : phit );
 #ifndef NDEBUG
     assert( phit != prevHit );
     prevHit = phit;

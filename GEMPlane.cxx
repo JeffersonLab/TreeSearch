@@ -126,18 +126,19 @@ void GEMPlane::Clear( Option_t* opt )
 
   Plane::Clear(opt);
 
-  assert( fADCraw and fADC and fHitTime and fADCcor and fGoodHit );
-  memset( fADCraw, 0, fNelem*sizeof(Float_t) );
-  memset( fADC, 0, fNelem*sizeof(Float_t) );
-  memset( fHitTime, 0, fNelem*sizeof(Float_t) );
-  memset( fADCcor, 0, fNelem*sizeof(Float_t) );
-  memset( fGoodHit, 0, fNelem*sizeof(Byte_t) );
+  if( !IsDummy() ) {
+    assert( fADCraw and fADC and fHitTime and fADCcor and fGoodHit );
+    memset( fADCraw, 0, fNelem*sizeof(Float_t) );
+    memset( fADC, 0, fNelem*sizeof(Float_t) );
+    memset( fHitTime, 0, fNelem*sizeof(Float_t) );
+    memset( fADCcor, 0, fNelem*sizeof(Float_t) );
+    memset( fGoodHit, 0, fNelem*sizeof(Byte_t) );
+    fSigStrips.clear();
+    fStripsSeen.assign( fNelem, false );
+  }
 
   fNhitStrips = fNrawStrips = 0;
   fHitOcc = fOccupancy = fDnoise = 0.0;
-
-  fSigStrips.clear();
-  fStripsSeen.assign( fNelem, false );
 }
 
 //_____________________________________________________________________________
@@ -240,8 +241,11 @@ static StripData_t ChargeDep( const vector<Float_t>& amp )
 }
 
 //_____________________________________________________________________________
-void GEMPlane::AddHit( Int_t istrip )
+void GEMPlane::AddStrip( Int_t istrip )
 {
+  // Record a hit on the given strip number in internal arrays.
+  // Utility function used by Decode.
+
   Float_t adc = fADCcor[istrip];
   if( adc > 0 )
     ++fNhitStrips;
@@ -257,7 +261,7 @@ void GEMPlane::AddHit( Int_t istrip )
 }
 
 //_____________________________________________________________________________
-Int_t GEMPlane::Decode( const THaEvData& evData )
+Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 {
   // Extract this plane's hit data from the raw evData.
   //
@@ -381,7 +385,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
       else {
 	// If no noise subtraction is done, then we can finish up with this
 	// strip number right here. Otherwise we need a second iteration below
-	AddHit( istrip );
+	AddStrip( istrip );
       }
 
 #ifdef MCDATA
@@ -405,7 +409,7 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     assert( fSigStrips.empty() );
     for( Int_t i = 0; i < fNelem; i++ ) {
       fADCcor[i] -= fDnoise;
-      AddHit( i );
+      AddStrip( i );
     }
   }
 
@@ -574,13 +578,13 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     // hit, the resolution is much reduced
     Double_t resolution = fResolution;
     if( size == 1 ) {
-      resolution = 0.25*GetPitch();
+      resolution = TMath::Max( 0.25*GetPitch(), fResolution );
       // The factor of 1/2*pitch is just a guess. Since with real GEMs
       // there _should_ always be more than one strip per cluster, we must
       // assume that the other strip(s) did not fire due to inefficiency.
       // As a result, the error is bigger than it would be if only ever one
       // strip fired per hit.
-//       resolution = TMath::Max( 0.5*GetStripPitch(), 2.0*fResolution );
+//       resolution = TMath::Max( 0.5*GetPitch(), 2.0*fResolution );
 //     } else if( size == 2 ) {
 //       // Again, this is a guess, to be quantified with Monte Carlo
 //       resolution = 1.2*fResolution;
@@ -639,6 +643,61 @@ Int_t GEMPlane::Decode( const THaEvData& evData )
     nHits = -nHits;
 
   return nHits;
+}
+
+//_____________________________________________________________________________
+Hit* GEMPlane::AddHitImpl( Double_t pos )
+{
+  // Make a dummy hit of the correct type at the given projection coordinate
+  // and add it to the hit array
+
+  assert( IsDummy() );
+
+  GEMHit* theHit = 0;
+
+  // Emulate parameters for dummy hits
+  const UInt_t size = 1, type = 0;
+  const Double_t adcsum = 10.*fMinAmpl, resolution = fResolution;
+
+#ifdef MCDATA
+  const Int_t mctrack = 1, num_bg = 0;
+  const Double_t mcpos = pos, mctime = 0.0;
+  bool mc_data = fTracker->TestBit(Tracker::kMCdata);
+  if( mc_data )
+    // Monte Carlo data
+    theHit = new( (*fHits)[GetNhits()] ) MCGEMHit( pos,
+						   adcsum,
+						   size,
+						   type,
+						   resolution,
+						   this,
+						   mctrack,
+						   mcpos,
+						   mctime,
+						   num_bg
+						   );
+    else
+#endif
+      theHit = new( (*fHits)[GetNhits()] ) GEMHit( pos,
+						   adcsum,
+						   size,
+						   type,
+						   resolution,
+						   this
+						   );
+  return theHit;
+}
+
+//_____________________________________________________________________________
+Int_t GEMPlane::Decode( const THaEvData& evData )
+{
+  // Convert evData to hits
+
+  if( IsDummy() )
+    // Special "decoding" for dummy planes
+    return DummyDecode( evData );
+
+  return GEMDecode( evData );
 }
 
 //_____________________________________________________________________________
@@ -797,10 +856,17 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     return kInitError;
   }
 
+  // Dummy planes ignore all of the parameters that are checked below,
+  // so we can return right here.
+  if( IsDummy() ) {
+    fIsInit = true;
+    return kOK;
+  }
+
   Int_t nchan = fDetMap->GetTotNumChan();
   if( nchan != fNelem ) {
     Error( Here(here), "Number of detector map channels (%d) "
-	   "disagrees with number of wires/strips (%d)", nchan, fNelem );
+	   "disagrees with number of strips (%d)", nchan, fNelem );
     return kInitError;
   }
 
@@ -838,22 +904,22 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
   TString::ECaseCompare cmp = TString::kIgnoreCase;
   if( !mapping.IsNull() ) {
     if( mapping.Length() >= 3 and
-        TString("one-to-one").BeginsWith(mapping,cmp) )
+	TString("one-to-one").BeginsWith(mapping,cmp) )
       fMapType = kOneToOne;
     else if( mapping.Length() >=3 and
-        TString("reverse").BeginsWith(mapping,cmp) )
+	     TString("reverse").BeginsWith(mapping,cmp) )
       fMapType = kReverse;
     else if( mapping.Length() >= 5 and
-        mapping.BeginsWith(TString("gassiplex-adapter"),cmp) ) {
+	     mapping.BeginsWith(TString("gassiplex-adapter"),cmp) ) {
       if( fNelem > 240 ) {
-        Error( Here(here), "Gassiplex adapter mapping allows at most 240 "
-            "strips, but %d configured. Fix database.", fNelem );
-        return kInitError;
+	Error( Here(here), "Gassiplex adapter mapping allows at most 240 "
+	       "strips, but %d configured. Fix database.", fNelem );
+	return kInitError;
       }
       if( fNelem < 240 ) {
-        Warning( Here(here), "Gassiplex adapter mapping expects 240 "
-            "strips, but %d configured. Database may be misconfigured "
-            "(or you know what you are doing).", fNelem );
+	Warning( Here(here), "Gassiplex adapter mapping expects 240 "
+		 "strips, but %d configured. Database may be misconfigured "
+		 "(or you know what you are doing).", fNelem );
       }
       if( mapping.BeginsWith(TString("gassiplex-adapter-2"),cmp) ) {
 	fMapType = kGassiplexAdapter2;
@@ -863,29 +929,29 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
     }
     else if( TString("table").CompareTo(mapping,cmp) ) {
       if( fChanMap.empty() ) {
-        Error( Here(here), "Channel mapping table requested, but no map "
-            "defined. Specify chanmap in database." );
-        return kInitError;
+	Error( Here(here), "Channel mapping table requested, but no map "
+	       "defined. Specify chanmap in database." );
+	return kInitError;
       }
       if( fChanMap.size() != static_cast<UInt_t>(fNelem) ) {
-        Error( Here(here), "Number of channel map entries (%u) msut equal "
-            "number of strips (%d). Fix database.",
+	Error( Here(here), "Number of channel map entries (%u) msut equal "
+	       "number of strips (%d). Fix database.",
 	       static_cast<unsigned int>(fChanMap.size()), fNelem );
-        return kInitError;
+	return kInitError;
       }
       // check if entries in channel map are within range
       for( Vint_t::const_iterator it = fChanMap.begin();
-          it != fChanMap.end(); ++it ) {
-        if( (*it) < 0 or (*it) >= fNelem ) {
-          Error( Here(here), "Illegal chanmap entry: %d. Must be >= 0 and "
-              "< %d. Fix database.", (*it), fNelem );
-          return kInitError;
-        }
+	   it != fChanMap.end(); ++it ) {
+	if( (*it) < 0 or (*it) >= fNelem ) {
+	  Error( Here(here), "Illegal chanmap entry: %d. Must be >= 0 and "
+		 "< %d. Fix database.", (*it), fNelem );
+	  return kInitError;
+	}
       }
       fMapType = kTable;
     } else {
       Error( Here(here), "Unknown channel mapping type %s. Fix database.",
-          mapping.Data() );
+	     mapping.Data() );
       return kInitError;
     }
 

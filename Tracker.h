@@ -68,7 +68,9 @@ namespace TreeSearch {
 
     void            EnableEventDisplay( Bool_t enable = true );
     const pdbl_t&   GetChisqLimits( UInt_t i ) const;
-    const TRotation& GetRotation() const { return fRotation; }
+    const TRotation& GetRotation()     const { return fRotation; }
+    const TRotation& GetInvRotation()  const { return fInvRot; }
+    Bool_t          IsRotated()        const { return fIsRotated; }
 
     // Analysis control flags. Set via database.
     enum {
@@ -138,6 +140,7 @@ namespace TreeSearch {
     THashTable*    fCrateMap;         // Map of DAQ modules
     Double_t       fMinProjAngleDiff; // Min coord axis angle diff required
     TRotation      fRotation;         // Rotation Tracker -> lab frame
+    TRotation      fInvRot;           // Rotation lab frame -> Tracker
     Bool_t         fIsRotated;        // Tracker frame is rotated
     Bool_t         fAllPartnered;     // All planes have partners
 
@@ -237,6 +240,11 @@ namespace TreeSearch {
 				THaTrack* track, Double_t x ) const;
     };
 #endif
+
+  private:
+    // Shared between Init and ReadDatabase
+    Int_t    fDBmaxmiss;
+    Double_t fDBconf_level;
 
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };
