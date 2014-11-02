@@ -74,10 +74,11 @@ namespace TreeSearch {
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
 
-    void          AddHit( Int_t istrip );
+    void          AddStrip( Int_t istrip );
 
+    // Support functions for dummy planes
+    virtual Hit*  AddHitImpl( Double_t x );
     virtual Int_t GEMDecode( const THaEvData& );
-    virtual Int_t DummyDecode( const THaEvData& );
 
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );

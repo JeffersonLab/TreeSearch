@@ -54,6 +54,7 @@ namespace TreeSearch {
     virtual Int_t   Begin( THaRunBase* r=0 );
     virtual Int_t   End( THaRunBase* r=0 );
 
+    virtual Hit*    AddHit( Double_t x, Double_t y );
     virtual Bool_t  Contains( Double_t x, Double_t y ) const;
     virtual Double_t GetMaxLRdist() const { return 0; }
     virtual Hit*    FindNearestHitAndPos( Double_t x, Double_t& pos ) const;
@@ -174,6 +175,10 @@ namespace TreeSearch {
     Vint_t            fMCHitList;  // Elements in fMCHitInfo with data
     Podd::MCHitInfo*  fMCHitInfo;  // [fNelem] MC truth data for fHits
 #endif
+
+    // Support functions for dummy planes
+    virtual Hit*  AddHitImpl( Double_t x );
+    virtual Int_t DummyDecode( const THaEvData& );
 
     // Bits for Planes
     enum {

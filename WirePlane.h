@@ -59,6 +59,10 @@ namespace TreeSearch {
     UInt_t          fNdbl;      // Statistics: num wires with neighboring hits
     UInt_t          fClsiz;     // Statistics: max cluster size
 
+    // Support functions for dummy planes
+    virtual Hit*  AddHitImpl( Double_t x );
+    virtual Int_t WireDecode( const THaEvData& );
+
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t DefineVariables( EMode mode = kDefine );

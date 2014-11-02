@@ -87,6 +87,36 @@ Plane::~Plane()
 }
 
 //_____________________________________________________________________________
+Hit* Plane::AddHit( Double_t x, Double_t y )
+{
+  // Add a hit with the given coordinates (given in the lab frame).
+  // Only for dummy planes!
+
+  assert( IsDummy() );
+
+  // Convert coordinates to the tracker frame, then to this plane's projection
+  // coordinates
+  TVector3 hitpos( x, y, GetZ() );
+  hitpos -= fTracker->GetOrigin();
+  if( fTracker->IsRotated() )
+    hitpos *= fTracker->GetInvRotation();
+
+  Double_t pos = hitpos.X()*fProjection->GetCosAngle() +
+    hitpos.Y()*fProjection->GetSinAngle();
+
+  return AddHitImpl( pos );
+}
+
+//_____________________________________________________________________________
+Hit* Plane::AddHitImpl( Double_t )
+{
+  // Default AddHit implementation. Does nothing. Should be overridden by
+  // derived classes.
+
+  return 0;
+}
+
+//_____________________________________________________________________________
 FitCoord* Plane::AddFitCoord( const FitCoord& coord )
 {
   // Add given fit coordinate data to this plane's array of fit coordinates
@@ -150,6 +180,68 @@ Bool_t Plane::Contains( Double_t x, Double_t y ) const
 
   return ( TMath::Abs( x-fOrigin.X() ) < fSize[0] and
 	   TMath::Abs( y-fOrigin.Y() ) < fSize[1] );
+}
+
+//_____________________________________________________________________________
+Int_t Plane::DummyDecode( const THaEvData& evData )
+{
+  // Standard dummy planes decoder. If hits have been added with AddHit(x,y),
+  // simply sort the hit array. If there are no hits yet, attempt to decode
+  // the given event data. evData is assumed to contain hit x and y coordinates
+  // (in the lab system) at the z-position of this plane.
+
+  //const char* const here = "GEMPlane::DummyDecode";
+
+  assert( IsDummy() );
+
+  if( GetNhits() == 0 ) {
+#ifndef NDEBUG
+    Bool_t did_decode = false;
+#endif
+    // Dummy detectors have always exactly one module with exactly one channel
+    // (assured in ReadDatabase)
+    assert( fDetMap->GetSize() == 1 and fDetMap->GetTotNumChan() == 1 );
+
+    // Decode data
+    THaDetMap::Module* d = fDetMap->GetModule(0);
+
+    // Read active channels of this module
+    Int_t nchan = evData.GetNumChan( d->crate, d->slot );
+    for( Int_t ichan = 0; ichan < nchan; ++ichan ) {
+      Int_t chan = evData.GetNextChan( d->crate, d->slot, ichan );
+      if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
+      assert( !did_decode );  // otherwise more than one active channel
+#ifndef NDEBUG
+      did_decode = true;
+#endif
+      Int_t nhit = evData.GetNumHits( d->crate, d->slot, chan );
+      for( Int_t ihit = 0; ihit < nhit; ++ihit ) {
+	// The hit's data and raw data words hold the x and y coordinates,
+	// respectively
+	union FloatIntUnion {
+	  Float_t f;
+	  Int_t   i;
+	} datx, daty;
+	datx.i = evData.GetData( d->crate, d->slot, chan, ihit );
+	daty.i = evData.GetRawData( d->crate, d->slot, chan, ihit );
+
+	AddHit( datx.f, daty.f );
+      }
+#ifdef NDEBUG
+      break;  // Break loop over ichan. There should be at most one channel.
+#endif
+    }
+  }
+
+  // Sort hits according to their Compare method
+  fHits->Sort();
+
+  // Negative return value indicates potential problem
+  UInt_t nHits = GetNhits();
+  if( nHits > fMaxHits )
+    nHits = -nHits;
+
+  return nHits;
 }
 
 //_____________________________________________________________________________
