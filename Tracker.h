@@ -241,6 +241,11 @@ namespace TreeSearch {
     };
 #endif
 
+  private:
+    // Shared between Init and ReadDatabase
+    Int_t    fDBmaxmiss;
+    Double_t fDBconf_level;
+
     ClassDef(Tracker,0)   // Tracking system analyzed using TreeSearch reconstruction
   };
 
