@@ -134,7 +134,7 @@ void WirePlane::CheckCrosstalk()
 #endif
 
 //_____________________________________________________________________________
-Int_t WirePlane::Decode( const THaEvData& evData )
+Int_t WirePlane::WireDecode( const THaEvData& evData )
 {
   // Extract this plane's hit data from the raw evData.
   //
@@ -273,6 +273,61 @@ Int_t WirePlane::Decode( const THaEvData& evData )
     return -nHits;
 
   return nHits;
+}
+
+//_____________________________________________________________________________
+Hit* WirePlane::AddHitImpl( Double_t pos )
+{
+  // Make a dummy hit of the correct type at the given projection coordinate
+  // and add it to the hit array
+
+  assert( IsDummy() );
+
+  WireHit* theHit = 0;
+
+  // Emulate parameters for dummy hits
+  const Int_t iw = TMath::Nint( (pos-GetStart()) / GetPitch() );
+  const Int_t data = 0;
+  const Double_t time = 0.0, resolution = fResolution;
+
+#ifdef MCDATA
+  const Int_t mctrack = 1;
+  const Double_t mcpos = pos, mctime = 0.0;
+  bool mc_data = fTracker->TestBit(Tracker::kMCdata);
+  if( mc_data )
+    // Monte Carlo data
+    theHit = new( (*fHits)[GetNhits()] ) MCWireHit( iw,
+						    GetStart() + iw * GetPitch(),
+						    data,
+						    time,
+						    resolution,
+						    this,
+						    mctrack,
+						    mcpos,
+						    mctime
+						    );
+  else
+#endif
+    theHit = new( (*fHits)[GetNhits()] ) WireHit( iw,
+						  GetStart() + iw * GetPitch(),
+						  data,
+						  time,
+						  resolution,
+						  this
+						  );
+  return theHit;
+}
+
+//_____________________________________________________________________________
+Int_t WirePlane::Decode( const THaEvData& evData )
+{
+  // Convert evData to hits
+
+  if( IsDummy() )
+    // Special "decoding" for dummy planes
+    return DummyDecode( evData );
+
+  return WireDecode( evData );
 }
 
 //_____________________________________________________________________________
