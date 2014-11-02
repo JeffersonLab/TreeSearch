@@ -153,7 +153,8 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
 	else      { posB = hitB->GetPosR(); bitB = 1; }
 	if( TMath::Abs( posA-posB ) <= maxdist ) {
 	  if( (bitA & set) == 0 ) {
-	    SetPosition( posA+fOffset, hitA->GetResolution(), planeA, hitA );
+	    // Cover +/- 2 sigma position range
+	    SetPosition( posA+fOffset, 2.*hitA->GetResolution(), planeA, hitA );
 	    // Prevent duplicate entries for zero-drift hits
 	    if( hitA->GetDriftDist() == 0 )
 	      set |= 12;
@@ -161,7 +162,7 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
 	      set |= bitA;
 	  }
 	  if( (bitB & set) == 0 ) {
-	    SetPosition( posB+fOffset, hitB->GetResolution(), planeB, hitB );
+	    SetPosition( posB+fOffset, 2.*hitB->GetResolution(), planeB, hitB );
 	    if( hitB->GetDriftDist() == 0 )
 	      set |= 3;
 	    else
@@ -173,14 +174,14 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
     else if( do_single_hits ) {
       // Unpaired hit in only one plane
       if( hitA ) {
-	SetPosition( hitA->GetPosL()+fOffset, hitA->GetResolution(),
+	SetPosition( hitA->GetPosL()+fOffset, 2.*hitA->GetResolution(),
 		     planeA, hitA );
-	SetPosition( hitA->GetPosR()+fOffset, hitA->GetResolution(),
+	SetPosition( hitA->GetPosR()+fOffset, 2.*hitA->GetResolution(),
 		     planeA, hitA );
       } else {
-	SetPosition( hitB->GetPosL()+fOffset, hitB->GetResolution(),
+	SetPosition( hitB->GetPosL()+fOffset, 2.*hitB->GetResolution(),
 		     planeB, hitB );
-	SetPosition( hitB->GetPosR()+fOffset, hitB->GetResolution(),
+	SetPosition( hitB->GetPosR()+fOffset, 2.*hitB->GetResolution(),
 		     planeB, hitB );
       }
     }

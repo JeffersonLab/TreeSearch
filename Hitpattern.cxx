@@ -284,6 +284,7 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
 #endif
   while( (phit = static_cast<Hit*>(it->Next())) ) {
     ++nhits;
+    // Cover +/- 2 sigma position range
     SetPosition( phit->GetPos()+fOffset, 2.0*phit->GetResolution(),
 		 plane, phit );
 #ifndef NDEBUG
