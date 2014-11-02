@@ -123,7 +123,7 @@ void Projection::AddDummyPlane( Plane* pl, Plane* partner )
 
   assert( pl );
 
-  UInt_t apn = fAllPlanes.size(), appn;
+  UInt_t apn = fAllPlanes.size(), appn = 0;
   pl->SetAltPlaneNum( apn );
   fAllPlanes.push_back( pl );
   pl->SetProjection( this );
