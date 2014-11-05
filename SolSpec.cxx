@@ -174,6 +174,8 @@ Int_t SolSpec::DefineVariables( EMode mode )
 #ifdef MCDATA
     { "tr.mchitbits", "Planepattern of true MC hits in this track",
       "fSolTrackInfo.SoLID::SolTrackInfo.fMCHitBits" },
+    { "tr.nmchits",   "Number of MC hits in this track",
+      "fSolTrackInfo.SoLID::SolTrackInfo.fNMCHits" },
 #endif
     { 0 }
   };

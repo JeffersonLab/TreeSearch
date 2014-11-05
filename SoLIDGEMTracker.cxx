@@ -12,6 +12,7 @@
 #include "SoLIDGEMTracker.h"
 #include "SoLIDGEMPlane.h"
 #include "SolSpec.h"
+#include "Helper.h"
 #include "TClonesArray.h"
 
 using namespace std;
@@ -172,8 +173,10 @@ Int_t GEMTracker::NewTrackCalc( Int_t idx, THaTrack*, const TVector3& pos,
   new( (*trackInfo)[idx] ) SolTrackInfo( fSector, pos, dir, fPhi );
 
 #ifdef MCDATA
+  using TreeSearch::NumberOfSetBits;
   assert( static_cast<vrsiz_t>(idx) < fMCHitBits.size() );
   theInfo->SetMCHitBits( fMCHitBits[idx] );
+  theInfo->SetNMCHits( NumberOfSetBits(theInfo->GetMCHitBits()) );
 #endif
 
   return 0;

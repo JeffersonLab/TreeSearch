@@ -26,7 +26,7 @@ namespace SoLID {
       : fSector(-1), fRtransv(KBIG), fTheta(KBIG), fPhi(KBIG),
 	fPhiRot(KBIG), fThetaDir(KBIG), fPhiDir(KBIG), fPhiDirRot(KBIG)
 #ifdef MCDATA
-      , fMCHitBits(0)
+      , fMCHitBits(0), fNMCHits(0)
 #endif
     {}
     SolTrackInfo( Int_t sector, const TVector3& point,
@@ -37,13 +37,15 @@ namespace SoLID {
 	fThetaDir(direction.Theta()), fPhiDir(direction.Phi()),
 	fPhiDirRot(TVector2::Phi_mpi_pi(fPhiDir-phi0))
 #ifdef MCDATA
-      , fMCHitBits(0)
+      , fMCHitBits(0), fNMCHits(0)
 #endif
     {}
 
 #ifdef MCDATA
     Int_t    GetMCHitBits() const       { return fMCHitBits; }
+    Int_t    GetNMCHits()   const       { return fNMCHits; }
     void     SetMCHitBits( Int_t bits ) { fMCHitBits = bits; }
+    void     SetNMCHits( Int_t nhits )  { fNMCHits = nhits; }
 #endif
 
   protected:
@@ -63,6 +65,7 @@ namespace SoLID {
 #ifdef MCDATA
     // Diagnostic info derived from Monte Carlo truth data
     Int_t     fMCHitBits;  // Bitpattern of plane #s w/MC hit used by this track
+    Int_t     fNMCHits;    // Number of MC hits in this track (# bits set in fMCHitBits)
 #endif
 
     ClassDef(SolTrackInfo,0) // SoLID track coordinates
