@@ -80,6 +80,14 @@ THaAnalysisObject::EStatus GEMTracker::Init( const TDatime& date )
     }
   }
 
+#ifdef MCDATA
+  // Set up handler for MC data aware of GEM hits
+  if( TestBit(kMCdata) ) {
+    delete fMCPointUpdater;
+    fMCPointUpdater = new GEMPointUpdater;
+  }
+#endif
+
   return fStatus = kOK;
 }
 
@@ -445,6 +453,25 @@ UInt_t GEMTracker::MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
 
   return nfound;
 }
+
+#ifdef MCDATA
+using Podd::MCTrackPoint;
+
+//_____________________________________________________________________________
+void GEMTracker::GEMPointUpdater::UpdateHit( MCTrackPoint* pt, Hit* hit,
+					     Double_t x ) const
+{
+  // GEM version of MCTrackPoint hit residual updater. In addition to the
+  // standard version, we also retrieve the cluster size (number of strips).
+
+  Tracker::MCPointUpdater::UpdateHit( pt, hit, x );
+
+  if( hit ) {
+    assert( dynamic_cast<GEMHit*>(hit) );
+    pt->fClustSize = static_cast<GEMHit*>(hit)->GetSize();
+  }
+}
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
