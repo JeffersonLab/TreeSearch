@@ -51,6 +51,14 @@ namespace TreeSearch {
      // Podd interface
     virtual Int_t  ReadDatabase( const TDatime& date );
 
+#ifdef MCDATA
+    class GEMPointUpdater : public MCPointUpdater {
+    public:
+      virtual void UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
+			      Double_t x ) const;
+    };
+#endif
+
     ClassDef(GEMTracker,0)   // TreeSearch track reconstruction for GEM trackers
   };
 
