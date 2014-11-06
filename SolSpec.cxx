@@ -15,6 +15,7 @@
 #include "TList.h"
 #include "THaGlobals.h"
 #include "THaTextvars.h"
+#include "THaTrack.h"
 
 #include <string>
 #include <sstream>
@@ -196,18 +197,54 @@ Int_t SolSpec::ReadRunDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-#ifdef NDEBUG
-Int_t SolSpec::FindVertices( TClonesArray& /* tracks */)
-#else
 Int_t SolSpec::FindVertices( TClonesArray& tracks )
-#endif
 {
   // Reconstruct target coordinates for all tracks found.
 
-  // TODO
-
   assert( tracks.GetLast() == fSolTrackInfo->GetLast() );
 
+  for( Int_t i = 0; i < GetNTracks(); ++i ) {
+    // VERTEX RECONSTRUCTION FOR STRAIGHT TRACKS
+#ifdef NDEBUG  // this is asking for Heisenbugs....
+    THaTrack* theTrack = static_cast<THaTrack*>( fTracks->UncheckedAt(i) );
+    // The track coordinates (fX etc., called "focal plane coordinates"
+    // in THaTrack) are in the lab frame, i.e. wrt to this spectrometer's
+    // origin. We do need the tracker origin for its z-position, however ...
+    Double_t z = theTrack->GetCreator()->GetOrigin().Z();
+#else
+    THaTrack* theTrack = dynamic_cast<THaTrack*>( fTracks->At(i) );
+    assert( theTrack );
+    THaTrackingDetector* tracker = theTrack->GetCreator();
+    assert( tracker );
+    Double_t z = tracker->GetOrigin().Z();
+#endif
+    // Now, define the vertex as the point of closest approach to the beam.
+    // For the time being, take the beam to be exactly at (x,y) = (0,0)
+    // At the closest approach of two skewed lines, the connecting segment
+    // is simultaneously perpendicular to both.
+    // Call the lines g(t) = g0 + g1*t, h(s) = h0 + h1*s
+    // where g1 and h1 are unit vectors. Let h(s) be the beam.
+    // Then at the closest approach,
+    // tc = - (g0-h0)*(g1-h1(g1*h1))/(1-(g1*h1)^2)
+    // sc =   (g0-h0)*(h1-g1(g1*h1))/(1-(g1*h1)^2)
+    TVector3 g0( theTrack->GetX(), theTrack->GetY(), z );
+    TVector3 g1( theTrack->GetTheta(), theTrack->GetPhi(), 1.0 );
+    g1 = g1.Unit();
+    TVector3 h0( 0, 0, 0  );
+    TVector3 h1( 0, 0, 1. );
+    Double_t gh = g1*h1;
+    Double_t denom = 1.-gh*gh;
+    if( TMath::Abs(denom) > 1e-6 ) {
+      TVector3 D0 = g0-h0;
+      Double_t tc = -D0*(g1-h1*gh)/denom;
+      Double_t sc =  D0*(h1-g1*gh)/denom;
+      TVector3 vertex = g0 + g1*tc;
+      theTrack->SetVertex( vertex );
+      theTrack->SetVertexError( vertex - h0-h1*sc );
+    }
+    // With straight tracks, we only know the momentum vector's direction
+    theTrack->SetPvect(g1);
+  }
   return 0;
 }
 
@@ -216,8 +253,6 @@ Int_t SolSpec::TrackCalc()
 {
   // Additional track calculations
 
-
-  // TODO: Vertex reconstruction
 
   return 0;
 }

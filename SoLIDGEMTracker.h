@@ -46,6 +46,10 @@ namespace SoLID {
     // Configuration
     TString   fDBPrefix;     // Safe storage for database file name prefix
 
+#ifdef MCDATA
+    virtual Int_t FitMCPoints( Podd::MCTrack* mctrk ) const;
+#endif
+
     ClassDef(GEMTracker,0)   // Collection of GEM trackers in one SoLID sector
   };
 

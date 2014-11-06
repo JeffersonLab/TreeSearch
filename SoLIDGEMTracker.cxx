@@ -182,6 +182,43 @@ Int_t GEMTracker::NewTrackCalc( Int_t idx, THaTrack*, const TVector3& pos,
   return 0;
 }
 
+#ifdef MCDATA
+//_____________________________________________________________________________
+Int_t GEMTracker::FitMCPoints( Podd::MCTrack* mctrk ) const
+{
+  // SoLID version of FitMCPoints to a MC track. In addition to fitting
+  // the track, also reconstruct the track to the target.
+  // Currently assumes stright tracks.
+
+  Int_t npt = TreeSearch::Tracker::FitMCPoints( mctrk );
+  if( npt < 0 )
+    return npt;
+
+  // See SolSpec::FindVertices. Find distance of closest approach of
+  // the fitted MC track to the beam (assumed to be exactly along z)
+  // At this point, the track parameters have been converted to the lab frame
+  Double_t* coef = mctrk->fMCFitPar;
+  TVector3 g0( coef[0], coef[2], fOrigin.Z() );
+  TVector3 g1( coef[1], coef[3], 1.0  );
+  g1 = g1.Unit();
+  TVector3 h0( 0, 0, 0  );
+  TVector3 h1( 0, 0, 1. );
+  Double_t gh = g1*h1;
+  Double_t denom = 1.-gh*gh;
+  if( TMath::Abs(denom) > 1e-6 ) {
+    TVector3 D0 = g0-h0;
+    Double_t tc = -D0*(g1-h1*gh)/denom;
+    //Double_t sc =  D0*(h1-g1*gh)/denom;
+    TVector3 vertex = g0 + g1*tc;
+    // Save the results as additional fit results with mctrk
+    coef[6] = vertex.X();
+    coef[7] = vertex.Y();
+    coef[8] = vertex.Z();
+  }
+  return npt;
+}
+#endif // MCDATA
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // end namespace SoLID
