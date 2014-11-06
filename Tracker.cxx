@@ -17,7 +17,6 @@
 #include "Tracker.h"
 #include "Plane.h"
 #include "Projection.h"
-#include "Hit.h"
 #include "Road.h"
 #include "Helper.h"
 
@@ -46,6 +45,9 @@
 
 #ifdef TESTCODE
 #include "TStopwatch.h"
+#endif
+#ifdef MCDATA
+#include "Hit.h"
 #endif
 
 using namespace std;
@@ -507,12 +509,16 @@ Int_t Tracker::Decode( const THaEvData& evdata )
   // For MCdata, check which MC track points were detected
   if( mcdata ) {
     if( fMCDecoder->GetNMCTracks() > 0 ) {
+      // TODO: support multiple tracks
       assert( dynamic_cast<MCTrack*>(fMCDecoder->GetMCTrack(0)) );
       MCTrack* trk = static_cast<MCTrack*>( fMCDecoder->GetMCTrack(0) );
       assert(trk);
       trk->fNHitsFound = 0;
       for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
 	MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
+	assert( pt->fMCTrack == trk->fNumber ); // temporary
+	if( pt->fMCTrack != trk->fNumber )
+	  continue;
 	FindHitForMCPoint( pt, fMCPointUpdater );
 	if( TESTBIT(pt->fStatus, MCTrackPoint::kCorrectFound) ) {
 	  trk->fNHitsFound++;
@@ -535,6 +541,9 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 	  SETBIT( trk->fReconFlags, kHitsFound );
 	else
 	  CLRBIT( trk->fReconFlags, kHitsFound );
+
+	// Fit the MC points. Results are stored in fMCFitPar of the MC track
+	FitMCPoints( trk );
       }
     }
     else
@@ -557,7 +566,7 @@ void Tracker::MCPointUpdater::UpdateHit( MCTrackPoint* pt, Hit* hit,
   assert( pt );
   if( hit )
     pt->fHitResid = hit->GetPos() - x;
-};
+}
 
 //_____________________________________________________________________________
 void Tracker::MCPointUpdater::UpdateTrack( MCTrackPoint* pt, Plane* pl,
@@ -578,7 +587,7 @@ void Tracker::MCPointUpdater::UpdateTrack( MCTrackPoint* pt, Plane* pl,
   }
   else
     CLRBIT(pt->fStatus, MCTrackPoint::kUsedInTrack);
-};
+}
 
 //_____________________________________________________________________________
 Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
@@ -670,6 +679,119 @@ THaTrack* Tracker::FindTrackForMCPoint( MCTrackPoint* /* pt */,
   //TODO
   return 0;
 }
+
+//_____________________________________________________________________________
+Int_t Tracker::FitMCPoints( MCTrack* mctrk ) const
+{
+  // Fit the MC points to the expected track shape. This version performs a
+  // straight-line fit. Results are stored in fMCFitPar of the MC track.
+  //
+  // These results can be used to get the baseline for the achievable
+  // resolutions, free of all reconstruction effects, but purely a
+  // measure of the effect of materials and possibly, the fitting algorithm.
+
+  assert( mctrk );
+  assert( not fProj.empty() );
+
+  // Lookup table for projections by type
+  const Projection* projections[ kTypeEnd-kTypeBegin ];
+  memset( projections, 0, (kTypeEnd-kTypeBegin)*sizeof(Projection*) );
+  for( vpsiz_t ip = 0; ip < fProj.size(); ++ip ) {
+    const Projection* proj = fProj[ip];
+    projections[ proj->GetType() ] = proj;
+  }
+
+  // Mimic the fit procedure used in FitTrack, except for the weighting
+  TMatrixDSym AtA(4);
+  TVectorD Aty(4);
+
+  // Fill fit matrixes
+  Int_t npoints = 0;
+  for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
+    MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
+    if( pt->fMCTrack != mctrk->fNumber )
+      continue;
+    const Projection* proj = projections[ pt->fType ];
+    assert( proj );
+    TVector3 hitpos = pt->fMCPoint - fOrigin;
+    if( IsRotated() )
+      hitpos *= fInvRot;
+    Double_t cosa = proj->GetCosAngle();
+    Double_t sina = proj->GetSinAngle();
+    Double_t x = hitpos.X()*cosa + hitpos.Y()*sina;
+    Double_t z = hitpos.Z();
+    Double_t Ai[4] = { cosa, cosa*z, sina, sina*z };
+    for( int j = 0; j<4; ++j ) {
+      for( int k = j; k<4; ++k ) {
+	AtA(j,k) += Ai[j] * Ai[k];
+      }
+      Aty(j) += Ai[j] * x;
+    }
+    ++npoints;
+  }
+  assert( npoints > 4 );  // assured by caller
+
+  for( int j = 0; j<4; ++j )
+    for( int k = j+1; k<4; ++k )
+      AtA(k,j) = AtA(j,k);
+
+  // Solve the normal equations
+  TDecompChol chol(AtA);
+  Bool_t ok = chol.Solve(Aty);
+  if( !ok ) return -1;
+
+  // Results are here, in order x, x', y, y'
+  assert( Aty.GetNrows() == 4 );
+  Double_t* coef = Aty.GetMatrixArray();
+
+  // Calculate chi2
+  //FIXME: too much code duplication here somehow
+  Double_t chi2 = 0;
+  for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
+    MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
+    if( pt->fMCTrack != mctrk->fNumber )
+      continue;
+    const Projection* proj = projections[ pt->fType ];
+    TVector3 hitpos = pt->fMCPoint - fOrigin;
+    if( IsRotated() )
+      hitpos *= fInvRot;
+    Double_t cosa = proj->GetCosAngle();
+    Double_t sina = proj->GetSinAngle();
+    Double_t x = hitpos.X()*cosa + hitpos.Y()*sina;
+    Double_t z = hitpos.Z();
+    Double_t slope = coef[1]*cosa + coef[3]*sina;
+    Double_t pos   = coef[0]*cosa + coef[2]*sina + slope*z;
+    Double_t diff  = pos - x;
+    chi2 += diff*diff;
+  }
+
+  // Convert to lab frame
+  TVector3 pos( coef[0], coef[2], 0.0 );
+  TVector3 dir( coef[1], coef[3], 1.0 );
+  if( fIsRotated ) {
+    dir *= fRotation;
+    dir *= 1.0/dir.Z();
+    pos *= fRotation;
+  }
+  pos += fOrigin;
+  if( TestBit(kProjTrackToZ0) ) {
+    pos -= pos.Z() * dir;
+  }
+  coef[0] = pos.X();
+  coef[1] = dir.X();
+  coef[2] = pos.Y();
+  coef[3] = dir.Y();
+
+  // Save results with the MC track
+  assert( sizeof(mctrk->fMCFitPar)/sizeof(mctrk->fMCFitPar[0]) >= 6 );
+  Double_t* res = mctrk->fMCFitPar;
+  memcpy( res, coef, 4*sizeof(Double_t) );
+  res[4] = chi2;
+  res[5] = npoints;
+
+  return npoints;
+}
+
 #endif // MCDATA
 
 //_____________________________________________________________________________
