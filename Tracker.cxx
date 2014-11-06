@@ -848,24 +848,26 @@ Int_t Tracker::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
   // the hits registered in the different projection planes.
   //
   // This is a much streamlined version of ROOT's TLinearFitter that solves
-  // the normal equations with weights, (At W A) a = (At W) y, using Cholesky
-  // decomposition, TDecompChol. The model used is
+  // the normal equations with weights, (At W A) b = (At W) y, where AWb = Wy,
+  // using Cholesky decomposition, TDecompChol. The model used is
   //   y_i = P_i * T_i
   //       = ( x + z_i * mx, y + z_i * my) * ( cos(a_i), sin(a_i) )
   // where
-  //   y_i is the measured coordinate in the i-th plane at z_i
+  //   y_i is the measured coordinate in the i-th plane at z_i, i=0...nplanes-1
   //   P_i is the physical track intersection point with the z_i plane
   //   T_i is the axis unit vector of the i-th plane
   //   a_i is the angle of the coordinate axis of the i-th plane w.r.t. x
-  //   x,mx,y,my are the track parameters to be fitted, origin x,y and
+  //   b = (x,mx,y,my) are the track parameters to be fitted, origin x,y and
   //       slopes mx,my.
+  // Hence the i-th row of A is
+  // A_i,0..3 = ( cos(a_i), z_i*cos(a_i), sin(a_i), z_i*sin(a_i) )
   //
   // "roads" contains a set of Roads that successfully combine in 3-d, one
   // Road* per projection. Each road, in turn, contains a set of (y_i,z_i)
   // coordinates, at most one per plane of the projection type, that
   // give the best 2D track fit within the road.
   //
-  // "coef" are the fitted track parameters, x, x'(=mx), y, y'(=my).
+  // "coef" (=b) are the fitted track parameters, x, x'(=mx), y, y'(=my).
   // The reference system is the z=0 plane (usually the first chamber).
   //
   // "chi2" is the chi2 of the fit (not normalized).
