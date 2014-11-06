@@ -230,6 +230,7 @@ namespace TreeSearch {
     virtual THaTrack* FindTrackForMCPoint( Podd::MCTrackPoint* pt,
 					   TClonesArray& tracks,
 					   MCPointUpdater* updater ) const;
+    virtual Int_t FitMCPoints( Podd::MCTrack* mctrk ) const;
 
     // Helper class to use with FindHitForMCPoint & FindTrackForMCPoint
     class MCPointUpdater {
