@@ -26,6 +26,8 @@ ClassImp(TreeSearch::Hitpattern)
 
 namespace TreeSearch {
 
+const Double_t Hitpattern::kNResSig = 2.0;
+
 //_____________________________________________________________________________
 Hitpattern::Hitpattern( const PatternTree& pt )
   : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0),
@@ -285,8 +287,7 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
 #endif
   while( (phit = static_cast<Hit*>(it->Next())) ) {
     ++nhits;
-    // Cover +/- 2 sigma position range
-    SetPosition( phit->GetPos()+fOffset, 2.0*phit->GetResolution(), plane,
+    SetPosition( phit->GetPos()+fOffset, phit->GetResolution(), plane,
 		 // Don't record the pseudo-hits in dummy planes
 		 pl->IsDummy() ? 0 : phit );
 #ifndef NDEBUG

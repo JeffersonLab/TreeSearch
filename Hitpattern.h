@@ -72,7 +72,7 @@ namespace TreeSearch {
 			       Hit* hit );
     void     SetPosition( Double_t pos, Double_t res, UInt_t plane,
 			  Hit* hit )
-    { SetPositionRange( pos-res, pos+res, plane, hit ); }
+    { SetPositionRange( pos-kNResSig*res, pos+kNResSig*res, plane, hit ); }
     //Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
     //Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
 
@@ -121,6 +121,8 @@ namespace TreeSearch {
 
     // Only needed for TESTCODE
     UInt_t  fMaxhitBin;  // Maximum depth of hit array per bin
+
+    static const Double_t kNResSig;  // Number of sigmas to cover in SetPosition
 
   private:
     void Init( Double_t width );
