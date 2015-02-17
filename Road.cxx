@@ -759,7 +759,9 @@ Bool_t Road::Fit()
   Pvec_t selected;
   selected.reserve( npts );
   fDof = npts-2;
-  pdbl_t chi2_interval = fProjection->GetChisqLimits(fDof);
+  pdbl_t chi2_interval;
+  if( fProjection->DoingChisqTest() )
+    chi2_interval = fProjection->GetChisqLimits(fDof);
   vector<Double_t> w(npts);
   for( UInt_t i = 0; i < n_combinations; ++i ) {
     NthCombination( i, fPoints, selected );
@@ -835,17 +837,18 @@ Bool_t Road::Fit()
 	fMCTrackPlanePatternFit = mcpat;
       }
 #endif
-      // Throw out Chi2's outside of selected confidence interval
-      // NB: Obviously, this requires accurate hit resolutions
-      //TODO: keep statistics
-      //TODO: allow disabling of low cutoff via database switch
-      if( chi2 < chi2_interval.first )
-	continue;
-      if( chi2 > chi2_interval.second )
-	continue;
+      if( fProjection->DoingChisqTest() ) {
+	// Throw out Chi2's outside of selected confidence interval
+	// NB: Obviously, this requires accurate hit resolutions
+	//TODO: keep statistics
+	if( chi2 < chi2_interval.first )
+	  continue;
+	if( chi2 > chi2_interval.second )
+	  continue;
+      }
       fGood = true;
 #ifdef TESTCODE
-    ++fNfits;
+      ++fNfits;
 #endif
 #ifdef VERBOSE
       if( fProjection->GetDebug() > 3 ) cout << "ACCEPTED" << endl;

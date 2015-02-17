@@ -1672,10 +1672,12 @@ Bool_t Tracker::PassTrackCuts( const FitRes_t& fit_par ) const
   if( fit_par.ndof < fMinNdof )
     return false;
 
-  pdbl_t chi2_interval = GetChisqLimits(fit_par.ndof);
-  if( fit_par.chi2 < chi2_interval.first or
-      fit_par.chi2 > chi2_interval.second )
-    return false;
+  if( TestBit(kDoChi2) ) {
+    pdbl_t chi2_interval = GetChisqLimits(fit_par.ndof);
+    if( fit_par.chi2 < chi2_interval.first or
+	fit_par.chi2 > chi2_interval.second )
+      return false;
+  }
 
   return true;
 }
@@ -2037,18 +2039,20 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 
     // Determine Chi2 confidence interval limits for the selected CL and the
     // possible degrees of freedom of the 3D track fit
-    if( fDBconf_level < 0.0 || fDBconf_level > 1.0 ) {
-      Error( Here(here), "Illegal fit confidence level = %lf. "
-	     "Must be 0-1. Fix database.", fDBconf_level );
-      return kInitError;
-    }
-    fChisqLimits.clear();
-    fChisqLimits.resize( nplanes-3, make_pair<Double_t,Double_t>(0,0) );
-    for( vec_pdbl_t::size_type dof = fMinNdof; dof < fChisqLimits.size();
-	 ++dof ) {
-      fChisqLimits[dof].first  = TMath::ChisquareQuantile( fDBconf_level, dof );
-      fChisqLimits[dof].second =
-	TMath::ChisquareQuantile( 1.0-fDBconf_level, dof );
+    if( TestBit(kDoChi2) ) {
+      if( fDBconf_level < 0.0 || fDBconf_level > 1.0 ) {
+	Error( Here(here), "Illegal fit confidence level = %lf. "
+	       "Must be 0-1. Fix database.", fDBconf_level );
+	return kInitError;
+      }
+      fChisqLimits.clear();
+      fChisqLimits.resize( nplanes-3, make_pair<Double_t,Double_t>(0,0) );
+      for( vec_pdbl_t::size_type dof = fMinNdof; dof < fChisqLimits.size();
+	   ++dof ) {
+	fChisqLimits[dof].first  = TMath::ChisquareQuantile( fDBconf_level, dof );
+	fChisqLimits[dof].second =
+	  TMath::ChisquareQuantile( 1.0-fDBconf_level, dof );
+      }
     }
   }
 
@@ -2280,7 +2284,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   string planeconfig, calibconfig;
   f3dMatchCut = 1e-4;
   Int_t event_display = 0, disable_tracking = 0,
-    disable_finetrack = 0, proj_to_z0 = 1;
+    disable_finetrack = 0, disable_chi2 = 0, proj_to_z0 = 1;
 #ifdef MCDATA
   Int_t mc_data = 0;
 #endif
@@ -2303,6 +2307,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
     { "calibrate",         &calibconfig,       kString, 0, 1 },
     { "3d_maxmiss",        &fDBmaxmiss,        kInt,    0, 1 },
     { "3d_chi2_conflevel", &fDBconf_level,     kDouble, 0, 1 },
+    { "3d_disable_chi2",   &disable_chi2,      kInt,    0, 1 },
     { "maxthreads",        &maxthreads,        kInt,    0, 1 },
     { 0 }
   };
@@ -2348,6 +2353,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
   SetBit( kEventDisplay,  event_display );
   SetBit( kDoCoarse,      !disable_tracking );
   SetBit( kDoFine,        !(disable_tracking or disable_finetrack) );
+  SetBit( kDoChi2,        !disable_chi2 );
   SetBit( kProjTrackToZ0, proj_to_z0 );
 
   cout << endl;

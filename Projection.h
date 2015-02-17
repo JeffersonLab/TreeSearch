@@ -95,10 +95,13 @@ namespace TreeSearch {
 
     const vpl_t&    GetListOfPlanes() const { return fPlanes; }
 
+    Bool_t          DoingChisqTest() const  { return TestBit(kDoChi2); }
+
     // Analysis control flags
     enum {
       kEventDisplay = BIT(14), // Support event display
-      kHaveDummies  = BIT(15)  // Dummy planes present
+      kHaveDummies  = BIT(15), // Dummy planes present
+      kDoChi2       = BIT(22)  // Apply chi2 cut to 2D fits
 #ifdef MCDATA
     , kMCdata       = BIT(23)  // Assume input is Monte Carlo data
 #endif
