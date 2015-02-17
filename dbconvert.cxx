@@ -656,6 +656,7 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "maxthreads = " << 1 << endl;
   outp << allsect_prefix << "disable_tracking = " << 0 << endl;
   outp << allsect_prefix << "disable_finetrack = " << 1 << endl;
+  outp << allsect_prefix << "3d_disable_chi2 = " << 0 << endl;
   outp << endl;
 
   outp << dashes << endl;
@@ -679,6 +680,7 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "maxmiss = " << 2 << endl;
   outp << allsect_prefix << "maxpat = " << 100000 << endl;
   outp << allsect_prefix << "chi2_conflevel = " << 1e-6 << endl;
+  outp << allsect_prefix << "disable_chi2 = " << 0 << endl;
   outp << endl;
 
   // Default plane parameters
