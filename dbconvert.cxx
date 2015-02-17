@@ -210,9 +210,11 @@ int main( int argc, const char** argv )
   const int nplanes = 5, nproj = 2;
   // Angular offsets of the sectors in each plane
   const double phi_offset[nplanes] = { 2.0, 4.0, 4.0, 0.0, 0.0 };
+  //  const double phi_offset[nplanes] = { -3.5, -3.0, -3.0, -2.5, -2.5 };
   // Actual z value of the planes as relevant for tracking (incorrect in input database)
   //  const double plane_z[nplanes] = { 1.536914, 1.836906, 2.946907, 3.096907 };
-  const double plane_z[nplanes] = { 1.571913, 1.851912, 1.896912, 3.056912, 3.146912 };
+  // const double plane_z[nplanes] = { 1.571913, 1.851912, 1.896912, 3.056912, 3.146912 };
+  const double plane_z[nplanes] = { 1.57191, 1.85191, 1.89691, 3.05691, 3.14691 };
   const string prefix = "gemc.";
   const string out_prefix = "solid.tracker.";
   //  const string out_prefix = "${DET}.";
