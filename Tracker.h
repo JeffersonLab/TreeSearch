@@ -81,7 +81,8 @@ namespace TreeSearch {
       kEventDisplay  = BIT(19), // Support event display
       kDoCoarse      = BIT(20), // Do coarse tracking (if unset, decode only)
       kDoFine        = BIT(21), // Do fine tracking (implies kDoCoarse)
-      kProjTrackToZ0 = BIT(22)  // Project tracks to global z = 0
+      kDoChi2        = BIT(22), // Apply chi2 cut to 3D tracks
+      kProjTrackToZ0 = BIT(23)  // Project tracks to global z = 0
     };
 
 #ifdef TESTCODE

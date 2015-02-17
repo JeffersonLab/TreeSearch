@@ -519,12 +519,14 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 
   // Determine Chi2 confidence interval limits for the selected CL and the
   // possible degrees of freedom (minfit-2...nplanes-2) of the projection fit
-  fChisqLimits.clear();
-  fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
-  for( vec_pdbl_t::size_type dof = kMinFitPlanes-2;
-       dof < fChisqLimits.size(); ++dof ) {
-    fChisqLimits[dof].first = TMath::ChisquareQuantile( fConfLevel, dof );
-    fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
+  if( TestBit(kDoChi2) ) {
+    fChisqLimits.clear();
+    fChisqLimits.resize( GetNplanes()-1, make_pair<Double_t,Double_t>(0,0) );
+    for( vec_pdbl_t::size_type dof = kMinFitPlanes-2;
+	 dof < fChisqLimits.size(); ++dof ) {
+      fChisqLimits[dof].first = TMath::ChisquareQuantile( fConfLevel, dof );
+      fChisqLimits[dof].second = TMath::ChisquareQuantile( 1.0-fConfLevel, dof );
+    }
   }
 
   fPatternsFound.reserve( 200 );
@@ -547,7 +549,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   fMaxMiss = 0;
   fMaxPat  = kMaxUInt;
   fConfLevel = 1e-3;
-  Int_t req1of2 = 0;
+  Int_t req1of2 = 0, disable_chi2 = 0;
 
   Int_t gbl = Plane::GetDBSearchLevel(fPrefix);
   const DBRequest request[] = {
@@ -559,6 +561,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, gbl },
     { "req1of2",         &req1of2,       kInt,    0, 1, gbl },
     { "maxpat",          &fMaxPat,       kUInt,   0, 1, gbl },
+    { "disable_chi2",    &disable_chi2,  kInt,    0, 1, gbl },
     { 0 }
   };
 
@@ -584,10 +587,13 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     fMaxSlope = -fMaxSlope;
   }
 
-  if( fConfLevel < 0.0 || fConfLevel > 1.0 ) {
-    Error( Here(here), "Illegal fit confidence level = %lf. "
-	   "Must be 0-1. Fix database.", fConfLevel );
-    return kInitError;
+  SetBit( kDoChi2, !disable_chi2 );
+  if( TestBit(kDoChi2) ) {
+    if( fConfLevel < 0.0 || fConfLevel > 1.0 ) {
+      Error( Here(here), "Illegal fit confidence level = %lf. "
+	     "Must be 0-1. Fix database.", fConfLevel );
+      return kInitError;
+    }
   }
 
   fRequire1of2 = (req1of2 != 0);
