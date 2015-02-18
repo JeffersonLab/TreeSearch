@@ -80,6 +80,7 @@ namespace TreeSearch {
     void           Finish();
     Bool_t         Fit();
     Double_t       GetChi2()    const { return fChi2; }
+    UInt_t         GetNdof()    const { return fDof; }
     const Hset_t&  GetHits()    const { return fHits; }
     const Pvec_t&  GetPoints()  const { return fFitCoord; }
     Double_t       GetPos()     const { return fPos; }
