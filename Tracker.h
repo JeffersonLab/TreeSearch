@@ -207,7 +207,8 @@ namespace TreeSearch {
     virtual THaAnalysisObject::EStatus PartnerPlanes() = 0;
 
     virtual Int_t NewTrackCalc( Int_t idx, THaTrack* newTrack,
-				const TVector3& pos, const TVector3& dir );
+				const TVector3& pos, const TVector3& dir,
+				const FitRes_t& fit_par );
 
 
     // Helper functions for getting DAQ module parameters - used by Init
