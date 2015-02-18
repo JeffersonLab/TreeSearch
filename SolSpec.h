@@ -50,6 +50,7 @@ namespace SoLID {
 
   protected:
 
+    // Track coordinates in the cylindrical system SoLID uses.
     // Aziumthal angles are measured wrt to the x-axis, which is the centerline
     // of sector 0. Positive angles mean clockwise rotation when looking
     // downstream along the beam.

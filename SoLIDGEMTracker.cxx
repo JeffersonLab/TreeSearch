@@ -156,7 +156,7 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 
 //_____________________________________________________________________________
 Int_t GEMTracker::NewTrackCalc( Int_t idx, THaTrack*, const TVector3& pos,
-				const TVector3& dir )
+				const TVector3& dir, const FitRes_t& )
 {
   // For every new track, convert track coordinates to the cylindrical system
   // appropriate for SoLID. This is a temporary solution; the right way to do

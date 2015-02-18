@@ -31,7 +31,8 @@ namespace SoLID {
 
     virtual THaAnalysisObject::EStatus PartnerPlanes();
     virtual Int_t NewTrackCalc( Int_t idx, THaTrack* newTrack,
-				const TVector3& pos, const TVector3& dir );
+				const TVector3& pos, const TVector3& dir,
+				const FitRes_t& fit_par );
 
      // Podd interface
     virtual const char* GetDBFileName() const;

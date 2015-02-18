@@ -146,8 +146,8 @@ THaAnalysisObject::EStatus SolSpec::Init( const TDatime& run_time )
 //_____________________________________________________________________________
 Int_t SolSpec::DefineVariables( EMode mode )
 {
-  // Define/delete standard variables for a spectrometer (tracks etc.)
-  // Can be overridden or extended by derived (actual) apparatuses
+  // Define/delete standard spectrometer variables (tracks etc.) plus
+  // SoLID-specific additional track variables (cylindrical coords etc.)
 
   if( mode == kDefine && fIsSetup ) return kOK;
 
