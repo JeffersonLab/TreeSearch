@@ -1060,7 +1060,7 @@ Int_t Tracker::FitTrack( const Rvec_t& roads, vector<Double_t>& coef,
 
 //_____________________________________________________________________________
 Int_t Tracker::NewTrackCalc( Int_t , THaTrack*, const TVector3&,
-			     const TVector3& )
+			     const TVector3&, const FitRes_t& )
 {
   // Hook for additional calculations for a newly generated track
 
@@ -1168,7 +1168,7 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   }
 
   // Do additional calculations for the new track (used by derived classes)
-  NewTrackCalc( idx, newTrack, pos, dir );
+  NewTrackCalc( idx, newTrack, pos, dir, fit_par );
 
   return newTrack;
 }
