@@ -666,7 +666,7 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 2 << endl;
+  outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 3 << endl;
   outp << allsect_prefix << "3d_ampcorr_nsigma = " << 0.18 << endl;
   outp << allsect_prefix << "3d_chi2_conflevel = " << 1e-6 << endl;
   outp << allsect_prefix << "3d_maxmiss = " << 2 << endl;
@@ -691,7 +691,7 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << out_prefix << "xp.res = " << 4e-5 << endl;
+  outp << out_prefix << "xp.res = " << 9e-5 << endl;
   outp << out_prefix << "maxclustsiz = " << 4 << endl;
   outp << out_prefix << "adc.min = " << 500 << endl;
   outp << out_prefix << "split.frac = " << 0.1 << endl;
