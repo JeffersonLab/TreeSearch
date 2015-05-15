@@ -129,7 +129,7 @@ struct BySectorThenPlane
 void usage()
 {
   // Print usage message and exit
-  cerr << "Usage: " << prgname << "[-hd] [-o outfile] [infile]" << endl;
+  cerr << "Usage: " << prgname << "[-hdm] [-o outfile] [infile]" << endl;
   cerr << " Convert libsolgem database <infile> to TreeSearch-SoLID database"
        << " <outfile>" << endl;
   cerr << " -h: Print this help message" << endl;
@@ -209,8 +209,8 @@ int main( int argc, const char** argv )
   const int nsect = 30;
   const int nplanes = 5, nproj = 2;
   // Angular offsets of the sectors in each plane
-  const double phi_offset[nplanes] = { 2.0, 4.0, 4.0, 0.0, 0.0 };
-  //  const double phi_offset[nplanes] = { -3.5, -3.0, -3.0, -2.5, -2.5 };
+  //const double phi_offset[nplanes] = { 2.0, 4.0, 4.0, 0.0, 0.0 };
+  const double phi_offset[nplanes] = { -3.5, -3.0, -3.0, -2.5, -2.5 };
   // Actual z value of the planes as relevant for tracking (incorrect in input database)
   //  const double plane_z[nplanes] = { 1.536914, 1.836906, 2.946907, 3.096907 };
   // const double plane_z[nplanes] = { 1.571913, 1.851912, 1.896912, 3.056912, 3.146912 };
@@ -538,7 +538,7 @@ int main( int argc, const char** argv )
   // Crate map. Lots of modules here
   int model = 6425;    // Dummy model for virtual APV25
   int nchan = 1500;    // Number of channels per module (arbitrary)
-  int MAXSLOT = 27;    // Max slots per crate (from THaCrateMap.h)
+  int MAXSLOT = 30;    // Max slots per crate (from THaCrateMap.h)
   int modules_per_readout = max_nstrips/nchan+1;
   int modules_per_chamber = nproj*modules_per_readout; // Modules needed per chamber
   int chambers_per_crate = (MAXSLOT/modules_per_chamber/nplanes)*nplanes;
