@@ -423,8 +423,8 @@ bool PatternGenerator::LineTest( const Pattern& pat ) const
     Double_t x, z;
   };
 
-  Point SL = { pat[fNplanes-1], fZ[fNplanes-1] };
-  Point SR = { SL.x + 1, SL.z };
+  Point SL; SL.x = pat[fNplanes-1]; SL.z = fZ[fNplanes-1];
+  Point SR = { SL.x + 1.0, SL.z };
   // Since fZ[0] = 0, we only need the x-coordinate of BL and BR
   Double_t xBL = 0.0;
   Double_t xBR = 1.0;

@@ -357,6 +357,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	stripdata.adcraw = stripdata.adc =
 	  static_cast<Float_t>( evData.GetData(d->crate, d->slot, chan, 0) );
 	stripdata.time = 0;
+	stripdata.pass = true;
       }
       // Skip null data
       if( stripdata.adcraw == 0 )

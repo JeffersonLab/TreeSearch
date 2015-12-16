@@ -237,6 +237,7 @@ namespace TreeSearch {
     // Helper class to use with FindHitForMCPoint & FindTrackForMCPoint
     class MCPointUpdater {
     public:
+      virtual ~MCPointUpdater() {}
       virtual void UpdateHit( Podd::MCTrackPoint* pt, Hit* hit,
 			      Double_t x ) const;
       virtual void UpdateTrack( Podd::MCTrackPoint* pt, Plane* pl,

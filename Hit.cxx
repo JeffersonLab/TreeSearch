@@ -92,7 +92,7 @@ HitPairIter::HitPairIter( const TSeqCollection* collA,
 HitPairIter::HitPairIter( const HitPairIter& rhs )
   : fCollA(rhs.fCollA), fCollB(rhs.fCollB), fIterA(0), fIterB(0),
     fSaveIter(0), fSaveHit(rhs.fSaveHit),
-    fMaxDist(fMaxDist), fStarted(rhs.fStarted), fScanning(rhs.fScanning),
+    fMaxDist(rhs.fMaxDist), fStarted(rhs.fStarted), fScanning(rhs.fScanning),
     fCurrent(rhs.fCurrent), fNext(rhs.fNext)
 {
   // Copy ctor
