@@ -1802,8 +1802,10 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	if( fit_par.ndof > 0 ) {
 	  if( PassTrackCuts(fit_par) ) {
 	    Rset_t road_tuple( ALL(these_roads) );
+#ifndef NDEBUG
 	    pair<FitResMap_t::iterator,bool> ins =
-	      fit_results.insert( make_pair(road_tuple, fit_par) );
+#endif
+	    fit_results.insert( make_pair(road_tuple, fit_par) );
 	    assert( ins.second );
 	    fit_chi2.insert( make_pair( TrackFitWeight(fit_par), road_tuple) );
 	  }
@@ -1818,7 +1820,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	     it != fit_chi2.end(); ++it ) {
 	  FitResMap_t::iterator found = fit_results.find((*it).second);
 	  FitRes_t& r = (*found).second;
-	  cout 	 << "ndof = " << r.ndof
+	  cout	 << "ndof = " << r.ndof
 		 << " rchi2 = " << r.chi2/(double)r.ndof
 		 << " x/y = " << r.coef[0] << "/" << r.coef[2]
 		 << " mx/my = " << r.coef[1] << "/" << r.coef[3]

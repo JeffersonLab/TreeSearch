@@ -88,7 +88,7 @@ UInt_t GetOuterBits( UInt_t p )
 struct BuildInfo_t {
   HitSet            fCluster;      // Copy of start HitSet of the cluster
   vector< pair<UShort_t,UShort_t> >
-                    fLimits; // [nplanes] Min/max bin numbers in each plane
+		    fLimits; // [nplanes] Min/max bin numbers in each plane
   UInt_t            fOuterBits;
   const Projection* fProjection;
 
@@ -315,8 +315,10 @@ void Road::CopyPointData( const Road& orig )
 	// It gets a bit tricky here: To be able to copy the fFitCoord, which
 	// contain pointers to some of the Points in fPoints, we need to keep
 	// track of which old point was copied to which new point.
-	pair<Pmap_t::iterator,bool>
-	  ins = xref.insert( make_pair(old_point,new_point) );
+#ifndef NDEBUG
+	pair<Pmap_t::iterator,bool> ins =
+#endif
+	xref.insert( make_pair(old_point,new_point) );
 	assert( ins.second );  // Duplicate points should never occur
       }
     }
