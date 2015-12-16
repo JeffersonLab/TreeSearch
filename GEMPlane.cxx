@@ -934,7 +934,7 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
 	return kInitError;
       }
       if( fChanMap.size() != static_cast<UInt_t>(fNelem) ) {
-	Error( Here(here), "Number of channel map entries (%u) msut equal "
+	Error( Here(here), "Number of channel map entries (%u) must equal "
 	       "number of strips (%d). Fix database.",
 	       static_cast<unsigned int>(fChanMap.size()), fNelem );
 	return kInitError;
