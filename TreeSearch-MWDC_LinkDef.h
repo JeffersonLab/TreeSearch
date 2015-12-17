@@ -8,6 +8,7 @@
 #pragma link C++ nestedtypedef;
 #pragma link C++ namespace TreeSearch;
 
+#pragma link C++ class TreeSearch::BigBite+;
 #pragma link C++ class TreeSearch::MWDC+;
 #pragma link C++ class TreeSearch::WirePlane+;
 #pragma link C++ class TreeSearch::WireHit+;

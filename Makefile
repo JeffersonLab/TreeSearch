@@ -184,11 +184,11 @@ $(CORELIB):	$(OBJ)
 		@echo "$@ done"
 
 $(MWDCLIB):	$(MOBJ) $(CORELIB)
-		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
 		@echo "$@ done"
 
 $(GEMLIB):	$(GOBJ) $(CORELIB)
-		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
 		@echo "$@ done"
 
 ifeq ($(ARCH),linux)
