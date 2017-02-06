@@ -48,6 +48,17 @@ SOLIDDICT = $(SOLID)Dict
 SOLIDLINKDEF = $(SOLID)_LinkDef.h
 
 #------------------------------------------------------------------------------
+# SBS GEM library
+
+SBSSRC  = SBSSpec.cxx SBSGEMTracker.cxx SBSGEMPlane.cxx
+
+SBS  = TreeSearch-SBS
+SBSLIB  = lib$(SBS).so
+SBSDICT = $(SBS)Dict
+
+SBSLINKDEF = $(SBS)_LinkDef.h
+
+#------------------------------------------------------------------------------
 # Compile debug version (for gdb)
 #export DEBUG = 1
 # Compile extra code for printing verbose messages (enabled with fDebug)
@@ -188,13 +199,19 @@ SOBJ          = $(SOLIDSRC:.cxx=.o) $(SOLIDDICT).o
 SHDR          = $(SOLIDSRC:.cxx=.h)
 SDEP          = $(SOLIDSRC:.cxx=.d)
 
-all:		$(CORELIB) $(MWDCLIB) $(GEMLIB) $(SOLIDLIB)
+BOBJ          = $(SBSSRC:.cxx=.o) $(SBSDICT).o
+BHDR          = $(SBSSRC:.cxx=.h)
+BDEP          = $(SBSSRC:.cxx=.d)
+
+all:		$(CORELIB) $(MWDCLIB) $(GEMLIB) $(SOLIDLIB) $(SBSLIB)
 
 mwdc:		$(MWDCLIB)
 
 gem:		$(GEMLIB)
 
 solid:		$(SOLIDLIB)
+
+sbs:		$(SBSLIB)
 
 $(CORELIB):	$(OBJ)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
@@ -212,6 +229,10 @@ $(SOLIDLIB):	$(SOBJ) $(CORELIB) $(GEMLIB)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^  $(GEMLIB) $(CORELIB)
 		@echo "$@ done"
 
+$(SBSLIB):	$(BOBJ) $(CORELIB) $(GEMLIB)
+		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^  $(GEMLIB) $(CORELIB)
+		@echo "$@ done"
+
 dbconvert:	dbconvert.o
 		$(LD) $(LDFLAGS) $(LIBS) -o $@ $^
 
@@ -223,6 +244,8 @@ $(MWDCDICT).o:	$(MWDCDICT).cxx
 $(GEMDICT).o:	$(GEMDICT).cxx
 	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
 $(SOLIDDICT).o:	$(SOLIDDICT).cxx
+	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
+$(SBSDICT).o:	$(SBSDICT).cxx
 	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
 endif
 
@@ -242,6 +265,10 @@ $(SOLIDDICT).cxx: $(SHDR) $(SOLIDLINKDEF)
 	@echo "Generating dictionary $(SOLIDDICT)..."
 	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
 
+$(SBSDICT).cxx: $(BHDR) $(SBSLINKDEF)
+	@echo "Generating dictionary $(SBSDICT)..."
+	$(ROOTBIN)/rootcint -f $@ -c $(INCLUDES) $(DEFINES) $^
+
 install:	all
 		$(error Please define install yourself)
 # for example:
@@ -251,6 +278,7 @@ clean:
 		rm -f *.o *~ $(CORELIB) $(COREDICT).*
 		rm -f $(MWDCLIB) $(MWDCDICT).* $(GEMLIB) $(GEMDICT).*
 		rm -f $(SOLIDLIB) $(SOLIDDICT).*
+		rm -f $(SBSLIB) $(SBSDICT).*
 
 realclean:	clean
 		rm -f *.d
@@ -260,9 +288,10 @@ srcdist:
 		rm -rf $(PKG)
 		mkdir $(PKG)
 		cp -p $(SRC) $(HDR) $(LINKDEF) db*.dat Makefile $(PKG)
-		cp -p $(MWDCLINKDEF) $(GEMLINKDEF) $(SOLIDLINKDEF) $(PKG)
+		cp -p $(MWDCLINKDEF) $(GEMLINKDEF) $(SOLIDLINKDEF) $(SBSLINKDEF) $(PKG)
 		cp -p $(MWDCSRC) $(MHDR) $(GEMSRC) $(GHDR) $(PKG)
 		cp -p $(SOLIDSRC) $(SHDR) dbconvert.cxx $(PKG)
+		cp -p $(SBSSRC) $(BHDR) dbconvert.cxx $(PKG)
 		gtar czvf $(DISTFILE).gz --ignore-failed-read \
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)
@@ -298,4 +327,5 @@ develdist:	srcdist
 -include $(MDEP)
 -include $(GDEP)
 -include $(SDEP)
+-include $(BDEP)
 
