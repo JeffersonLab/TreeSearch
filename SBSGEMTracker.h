@@ -43,7 +43,10 @@ namespace SBS {
     // Geometry
     Int_t     fSector;     // Sector number (for analysis convenience)
     //Parameters for the chamber localisation
+    Double_t  fDMag;       // distance of Spectrometer "Zero" from the Hall Center 
     Double_t  fXOffset;    // X offset of the plane/sector wrt the spectrometer central ray
+    Double_t  fThetaH;     // Horizontal Spectrometer rotation (wrt hall pivot)
+    Double_t  fThetaV;     // Vertical Spectrometer rotation (wrt Spec "Zero")
     
     // Configuration
     TString   fDBPrefix;     // Safe storage for database file name prefix

@@ -101,8 +101,9 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   // and by five parameters for its location: 
   // dmag, the distance of the magnet to the target, 
   // which is taken as a refence for the spectrometer coordinates 
-  // d0, the distance of the box center to the spectrometer reference, and two angles: 
-  // one of horizontal rotation (thetaH), which translates the SBS angle,
+  // d0, the distance of the box center to the spectrometer reference, 
+  // X_offset, the shift in X_transport of the plane wrt the central ray of the spectrometer, 
+  // and two angles: one of horizontal rotation (thetaH), which translates the SBS angle,
   // one of vertical rotation (thetaV), translating the "bending" of the SBS wrt the xOz plane.
   // The "Zero" of the spectrometer is defined as: ( -dmag*sin(thetaH), 0, dmag*cos(thetaH) ); 
   //
@@ -110,7 +111,10 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   //          the y direction of the box being in the + x direction of the lab 
   // NB: the plane also uses xOffset, the translation in X (in transport coordinates) of the chamber.
   // This variable is read by SBSGEMTracker.
-
+  
+  // In this routine, only D0 is read. It is the parameter which will allow to order the planes in the tracker.
+  // The other parameters are read in class SBSGEMTracker 
+  
   // the box is centered on the "central ray" which is then rotated by thetaH and thetaV.
   // To illustrate this, let's take a dumb example: 
   // if thetaH = thetaV = 0; then the center of the box would be located on the Z axis, 
@@ -132,13 +136,10 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   Double_t depth;
   Int_t gbl = GetDBSearchLevel(fPrefix);
   DBRequest request[] = {
-    {"dmag",        &fDMag,         kDouble, 0, 1},
     {"d0",          &fD0,           kDouble, 0, 1},
     {"dx",          &fDX,           kDouble, 0, 1},
-    {"dy",          &fDX,           kDouble, 0, 1},
-    {"thetaH",      &fThetaH,       kDouble, 0, 1},
-    {"thetaV",      &fThetaV,       kDouble, 0, 1},
-    {"depth",       &depth,         kDouble, 0, 1},
+    {"dy",          &fDY,           kDouble, 0, 1},
+    {"dz",          &depth,         kDouble, 0, 1},
     { 0 }
   };
   Int_t err = LoadDB( file, date, request, fPrefix );
@@ -151,9 +152,9 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   	   "Fix database.", fDX, fDY );
     return kInitError;
   }
-  if( fD0 < 0 or fDMag <0 ) {
-    Error( Here(here), "d0 and dmag must be positive. Read %.1lf and %.1lf. "
-  	   "Fix database.", fD0, fDMag );
+  if( fD0 < 0 ) {
+    Error( Here(here), "d0  must be positive. Read %.1lf. "
+  	   "Fix database.", fD0 );
     return kInitError;
   }
   if( depth <= 0 ) {
@@ -162,10 +163,15 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
     return kInitError;
   }
   
+  // double x0, y0, z0;
+  // x0 = -dmag*sin(fThetaH)*1.0e3;;
+  
+  fOrigin.SetXYZ(0.0, 0.0, fD0);
+  
   fSize[0] = fDX;
   fSize[1] = fDY;
   fSize[2] = depth;
-
+  
   return kOK;
 }
 

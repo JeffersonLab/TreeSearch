@@ -14,6 +14,7 @@
 #include "SBSSpec.h"
 #include "Helper.h"
 #include "TClonesArray.h"
+#include "TMatrixD.h"
 
 using namespace std;
 
@@ -116,37 +117,65 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 {
   // Read basic geometry for a SBS GEM tracker sector
   //
-  // The only geometry parameter needed for the a SBS Tracker (which
-  // represents the collection of GEM trackers in a sector) is 'phi', the
-  // central phi angle of the sector. The origin of the tracker coordinate
-  // system will be determined automatically in PartnerPlanes() using the
-  // positions of the GEM planes that are defined for this tracker.
+  // The geometry parameters needed for a SBS Tracker 
+  // (which represents the collection of GEM trackers in a sector) are: 
+  // X_offset, the shift in X_transport of the plane wrt the central ray of the spectrometer, 
+  // and two angles: one of horizontal rotation (thetaH), which translates the SBS angle,
+  // one of vertical rotation (thetaV), translating the "bending" of the SBS wrt the xOz plane.
   //
-  // 'phi' is always required. The 'required' argument is ignored.
-
-  //  static const char* const here = "ReadGeometry";
-
+  // Those will allow to make the rotation to calculate the 
+  
+  
   DBRequest request[] = {
-    { "xoff",    &fXOffset, kDouble, 0, 0, 0, "" },
+    {"dmag",        &fDMag,         kDouble, 0, 1},
+    {"xoff",        &fXOffset,      kDouble, 0, 1},
+    {"thetaH",      &fThetaH,       kDouble, 0, 1},
+    {"thetaV",      &fThetaV,       kDouble, 0, 1},
     { 0 }
   };
   Int_t err = LoadDB( file, date, request, fPrefix );
   if( err )
     return err;
-
+  
+  fOrigin.SetX(fXOffset);
+  
+  Double_t torad = atan(1) / 45.0;
+  fThetaH *= torad;
+  fThetaV *= torad;
+  
+  //Setting up the rotations to calcuate the plane origin.
+  Double_t arr_roty0[9] = {cos(fThetaH),  0, sin(fThetaH),
+			  0,             1,            0,
+			  -sin(fThetaH), 0, cos(fThetaH)};
+  Double_t arr_rotx1[9] = {1,            0,            0,
+			   0, cos(fThetaV), -sin(fThetaV),
+			   0, sin(fThetaV),  cos(fThetaV)};
+  Double_t arr_rotz2[9] = {0, -1,  0,
+  			   1,  0,  0,
+  			   0,  0,  1};
+  
+  TMatrixD Roty0(3,3,arr_roty0);// rotation along hall pivot (y): spectrometer theta
+  TMatrixD Rotx1(3,3,arr_rotx1);// rotation along x': spectrometer bending
+  TMatrixD Rotz2(3,3,arr_rotz2);// rotation along z": box rotation
+  TMatrixD Rotzx(3,3,arr_rotz2);
+  TMatrixD fRotMat_LB(3,3, arr_roty0);
+  
+  Rotzx.Mult(Rotz2, Rotx1);
+  fRotMat_LB.Mult(Rotzx, Roty0);// Box to Lab transformation
+  
+  TMatrixD fRotMat_BL = fRotMat_LB;
+  fRotMat_BL.Invert();// Lab to Box transformation
   // fOrigin will be set later PartnerPlanes (after Plane init)
-
-  // Define this detector's rotation wrt the global coordinate system.
-  // The rotation rotates the axes and not the vectors, hence it is a rotation
-  // about z by _positive_ phi.
-  // Any vector in this Tracker's reference frame can be transformed to the
-  // global system simply by multiplication with the rotation matrix:
-  // v_global = fRotation * v
-
-  // fRotation.SetToIdentity();
-  // fRotation.RotateZ( fPhi );
-  // fInvRot.RotateZ( -fPhi );
-  // assert( fRotation == fInvRot.Inverse() ); // might fail due to rounding
+  
+  Double_t r_temp[3] = {fOrigin.X(), fOrigin.Y(), fOrigin.Z()};
+  TMatrixD m_temp(3, 1, r_temp);
+  
+  TMatrixD m_res(3, 1, r_temp);
+  m_res.Mult(fRotMat_BL, m_temp);
+  
+  fOrigin.SetX(m_res(0, 0)-fDMag*sin(fThetaH)*1.0e3);
+  fOrigin.SetY(m_res(1, 0));
+  fOrigin.SetY(m_res(2, 0)+fDMag*cos(fThetaH)*1.0e3);
   
   return kOK;
 }

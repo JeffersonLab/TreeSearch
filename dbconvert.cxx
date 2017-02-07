@@ -30,6 +30,7 @@ using namespace std;
 
 #define ALL(c) (c).begin(), (c).end()
 
+// These will be changed as this file will be dedicated to SBS DB
 #define INFILE_DEFAULT  "db_gemc.dat"
 #define OUTFILE_DEFAULT "db_solid.tracker.dat"
 

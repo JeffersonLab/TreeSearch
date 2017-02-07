@@ -36,10 +36,7 @@ namespace SBS {
     //    virtual Int_t DefineVariables( EMode mode = kDefine );
 
     // Geometry, configuration
-    Double_t  fDMag;       // distance of Spectrometer "Zero" from the Hall Center 
     Double_t  fD0;         // distance of Plane from spectrometer "Zero"
-    Double_t  fThetaH;     // Horizontal Spectrometer rotation (wrt hall pivot)
-    Double_t  fThetaV;     // Vertical Spectrometer rotation (wrt Spec "Zero")
     Double_t  fDX;      // Coverage in X_T
     Double_t  fDY;      // Coverage in Y_T
 

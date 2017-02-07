@@ -2017,7 +2017,18 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     return fStatus = status;
 
   // Sort planes by increasing z-position
-  sort( ALL(fPlanes), Plane::ZIsLess() );
+  // FIXME: if possible, have this work out even though the tracker has more than 16 planes.
+  if(fPlanes.size()<=16){
+    // Apparently the sort function cannot do a clean thing when there are more than 16 elements;
+    // It will always run into comparing element a with element a, 
+    // which the code does not allow to do for a reason.
+    sort( ALL(fPlanes), Plane::ZIsLess() );
+  }else{
+    // The two commented out lines of code below will *NOT* do the job in a general case.
+    // In the case I'm considering, the elements are already sorted.
+    // sort( fPlanes.begin(), fPlanes.begin()+16, Plane::ZIsLess() );
+    // sort( fPlanes.begin()+17, fPlanes.end(), Plane::ZIsLess() );
+  }
 
   // Calculate track fitting parameters. This needs to be done here because
   // we need to know the number of active (non-dummy) planes, which is not
@@ -2395,6 +2406,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
       delete newplane;
       return kInitError;
     }
+    
     fPlanes.push_back( newplane );
     newplane->SetDebug( fDebug );
     newplane->SetDefinedNum( i );
