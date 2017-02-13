@@ -213,6 +213,7 @@ int main( int argc, const char** argv )
   int crate_offset_v = 0;
   int nsect_v = 4;
   int nplanes_v = 10;
+  double d0_dummy_v = 6.8;
   string prefix_v = "g4sbs_fpp.";
   string out_prefix_v = "sbs_fpp.tracker.";
   if(do_debug){
@@ -224,6 +225,7 @@ int main( int argc, const char** argv )
     crate_offset_v = 4;
     nsect_v = 3;
     nplanes_v = 6;
+    d0_dummy_v = 1.6;
     prefix_v = "g4sbs_ft.";
     out_prefix_v = "sbs_ft.tracker.";
   }else if(strcmp(infile.c_str(), "db_g4sbs_fpp.dat")!=0){
@@ -236,6 +238,7 @@ int main( int argc, const char** argv )
   const int crate_offset = crate_offset_v;
   const int nsect = nsect_v;
   const int nplanes = nplanes_v;
+  const double d0_dummy = d0_dummy_v;
   const int nproj = 2;
   const string prefix = prefix_v;
   const string out_prefix = out_prefix_v;
@@ -333,7 +336,7 @@ int main( int argc, const char** argv )
 	// Use some values from the last GEM plane for the dummy plane as well
 	const ValueSet_t& last_gem = values[(is+1)*nplanes_eff-2];
 	vals.dmag = last_gem.dmag;
-	vals.d0 = 6.8;
+	vals.d0 = d0_dummy;
 	vals.xoff = last_gem.xoff;
 	vals.dx = last_gem.dx;
 	vals.dy = last_gem.dy;
