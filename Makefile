@@ -236,6 +236,9 @@ $(SBSLIB):	$(BOBJ) $(CORELIB) $(GEMLIB)
 dbconvert:	dbconvert.o
 		$(LD) $(LDFLAGS) $(LIBS) -o $@ $^
 
+dbconvert_sbs:	dbconvert_sbs.o
+		$(LD) $(LDFLAGS) $(LIBS) -o $@ $^
+
 ifeq ($(ARCH),linux)
 $(COREDICT).o:	$(COREDICT).cxx
 	$(CXX) $(CXXFLAGS) $(DICTCXXFLG) -o $@ -c $^
@@ -291,7 +294,7 @@ srcdist:
 		cp -p $(MWDCLINKDEF) $(GEMLINKDEF) $(SOLIDLINKDEF) $(SBSLINKDEF) $(PKG)
 		cp -p $(MWDCSRC) $(MHDR) $(GEMSRC) $(GHDR) $(PKG)
 		cp -p $(SOLIDSRC) $(SHDR) dbconvert.cxx $(PKG)
-		cp -p $(SBSSRC) $(BHDR) dbconvert.cxx $(PKG)
+		cp -p $(SBSSRC) $(BHDR) dbconvert_sbs.cxx $(PKG)
 		gtar czvf $(DISTFILE).gz --ignore-failed-read \
 		 -V $(LOGMSG)" `date -I`" $(PKG)
 		rm -rf $(PKG)

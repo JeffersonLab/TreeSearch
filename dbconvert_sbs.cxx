@@ -23,20 +23,23 @@
 #include <iomanip>
 #include <cassert>
 
-//#include "TDatime.h"
+#include "TDatime.h"
 #include <unistd.h>    // for basename()
 
 using namespace std;
 
 #define ALL(c) (c).begin(), (c).end()
 
-#define INFILE_DEFAULT  "db_gemc.dat"
-#define OUTFILE_DEFAULT "db_solid.tracker.dat"
+// These will be changed as this file will be dedicated to SBS DB
+// TODO: configure all parameters with only the detector suffix as an input.
+//#define DET_SUFFIX_DEFAULT  "fpp"
+#define INFILE_DEFAULT "db_g4sbs_fpp.dat"
+#define OUTFILE_DEFAULT "db_sbs_fpp.tracker.dat"
 
 // Command line parameter defaults
 static bool do_debug = false, do_dummies = false;
-static string infile = INFILE_DEFAULT;
-static string outfile = OUTFILE_DEFAULT;
+static string infile = INFILE_DEFAULT;//"db_g4sbs_"+DET_SUFFIX_DEFAULT+".dat";
+static string outfile = OUTFILE_DEFAULT;//"db_sbs_"+DET_SUFFIX_DEFAULT+".tracker.dat";
 static const char* prgname = "";
 static const string spc = "                   ";
 
@@ -104,13 +107,12 @@ void print_req( const DBRequest* req )
 // Parameters for one GEM chamber (two readout coordinates)
 struct ValueSet_t {
   // Values read from source file
-  double rmin, rmax, phi0, dphi, z, dz;
+  double dmag, d0, xoff, dx, dy, thetaH, thetaV, depth;
   double xangle, xpitch, yangle, ypitch;
   // Computed/converted quantities
-  double phi, phioff;
   double angle[2], start[2], pitch[2];  // angle is that of the axis!
   int nstrips[2];                       // number of u/v strips
-  int iplane, isector;                  // plane index (1-5), sector number
+  int iplane, isector;                  // plane index, sector number
 };
 
 //-----------------------------------------------------------------------------
@@ -146,7 +148,6 @@ void usage()
 void getargs( int argc, const char** argv )
 {
   // Get command line parameters
-
   while (argc-- > 1) {
     const char *opt = *++argv;
     if (*opt == '-') {
@@ -205,63 +206,46 @@ void write_cslh( ostream& outp, int cr, int sl, int lo, int hi )
 //-----------------------------------------------------------------------------
 int main( int argc, const char** argv )
 {
-  // Important parameters
-  const int nsect = 30;
-  const int nplanes = 5, nproj = 2;
-  // Angular offsets of the sectors in each plane
-  //const double phi_offset[nplanes] = { 2.0, 4.0, 4.0, 0.0, 0.0 };
-  const double phi_offset[nplanes] = { -3.5, -3.0, -3.0, -2.5, -2.5 };
-  // Actual z value of the planes as relevant for tracking (incorrect in input database)
-  //  const double plane_z[nplanes] = { 1.536914, 1.836906, 2.946907, 3.096907 };
-  // const double plane_z[nplanes] = { 1.571913, 1.851912, 1.896912, 3.056912, 3.146912 };
-  const double plane_z[nplanes] = { 1.57191, 1.85191, 1.89691, 3.05691, 3.14691 };
-  const string prefix = "gemc.";
-  const string out_prefix = "solid.tracker.";
-  //  const string out_prefix = "${DET}.";
-  const string allsect_prefix = out_prefix + "${allsectors}.";
-  const char* proj_name[2] = { "u", "v" };
-  const string dashes =
-    "#-----------------------------------------------------------------";
-
   // Parse command line
   prgname = basename(argv[0]);
   getargs(argc,argv);
+  
+  int crate_offset_v = 0;
+  int nsect_v = 4;
+  int nplanes_v = 10;
+  string prefix_v = "g4sbs_fpp.";
+  string out_prefix_v = "sbs_fpp.tracker.";
+  if(do_debug){
+    cout << "Compare " << infile.c_str() << ": " << endl 
+	 << " - with db_g4sbs_ft.dat : " << strcmp(infile.c_str(), "db_g4sbs_ft.dat") << endl
+	 << " - with db_g4sbs_fpp.dat : " << strcmp(infile.c_str(), "db_g4sbs_fpp.dat") << endl;
+  }
+  if(strcmp(infile.c_str(), "db_g4sbs_ft.dat")==0){
+    crate_offset_v = 4;
+    nsect_v = 3;
+    nplanes_v = 6;
+    prefix_v = "g4sbs_ft.";
+    out_prefix_v = "sbs_ft.tracker.";
+  }else if(strcmp(infile.c_str(), "db_g4sbs_fpp.dat")!=0){
+    cout << "Invalid input file: exit !" << endl;
+    exit(-1);
+  }
+  
+  // Important parameters
+  const int crate_dummy = 6;
+  const int crate_offset = crate_offset_v;
+  const int nsect = nsect_v;
+  const int nplanes = nplanes_v;
+  const int nproj = 2;
+  const string prefix = prefix_v;
+  const string out_prefix = out_prefix_v;
+  const string allsect_prefix = out_prefix + "${allsectors}.";
+  const char* proj_name[2] = { "x", "y" };
+  const string dashes =
+    "#-----------------------------------------------------------------";
 
 
   vector<ValueSet_t> values;
-
-  // TODO: use this later to store common values
-  // struct GlobalValue_t {
-  //   const char* key;
-  //   double* var;
-  //   double value;
-  //   bool set;
-  //   //    GlobalValue() : key(0), sourcekey(0), value(0.0), set(false) {}
-  // };
-
-  // GlobalValue_t per_plane_vals[] = {
-  //   { "rmin",   &vals.rmin },
-  //   { "rmax",   &vals.rmax },
-  //   { "z",      &vals.z },
-  //   { "dz",     &vals.dz },
-  //   { "phioff", &vals.phioff },
-  //   // { "nstrips", &uvals.nstrips },
-  //   // { "strip.pos", &uvals.start },
-  //   // { "strip.pitchs", &uvals.pitch },
-  //   { 0 }
-  // };
-  // GlobalValue_t per_sector_vals[] = {
-  //   { "phi",    &vals.phi },
-  //   { 0 },
-  // };
-  // GlobalValue_t per_tracker_vals[] = {
-  //   { "dphi",   &vals.dphi },
-  //   { "dz",     &vals.dz },
-  //   // { "nstrips", "nstrips" },
-  //   // { "strip.pos", "strip.pos" },
-  //   // { "strip.pitchs", "strip.pitch" },
-  //   { 0 },
-  // };
 
   //==== Read input ====
   ifstream inp(infile.c_str());
@@ -276,16 +260,18 @@ int main( int argc, const char** argv )
   int nplanes_eff = nplanes;
   if( do_dummies ) ++nplanes_eff;
 
-  for( int ip = 0; ip < nplanes_eff; ++ip ) {
-    for( int is = 0; is < nsect; ++is ) {
+  for( int is = 0; is < nsect; ++is ) {
+    for( int ip = 0; ip < nplanes_eff; ++ip ) {
       ValueSet_t vals;
       DBRequest request[] = {
-	{ "r0",    &vals.rmin },
-	{ "r1",    &vals.rmax },
-	{ "phi0",  &vals.phi0 },
-	{ "dphi",  &vals.dphi },
-	{ "z0",    &vals.z },
-	{ "depth", &vals.dz },
+	{"dmag",        &vals.dmag   },
+	{"d0",          &vals.d0     },
+	{"xoffset",     &vals.xoff   },
+	{"dx",          &vals.dx     },
+	{"dy",          &vals.dy     },
+	{"thetaH",      &vals.thetaH },
+	{"thetaV",      &vals.thetaV },
+	{"depth",       &vals.depth  },
 	{ 0 }
       };
       DBRequest plane_request[] = {
@@ -297,37 +283,35 @@ int main( int argc, const char** argv )
       };
       if( ip < nplanes ) {
 	// Regular GEM planes
-	int idx = is + nsect*ip; // linear index of this plane/sector combo
+	int idx = is*nplanes + ip; // linear index of this plane/sector combo
 	ostringstream sector_prefix(prefix, ios_base::ate);
-	sector_prefix << "gem" << idx+1 << ".";
+	sector_prefix << "gem" << idx << ".";
+	
+	if( do_debug )
+	  cout << "plane_index/sector/plane (input) " 
+	       << idx << "/" << is << "/" << ip << endl;
+	
 	int err = load_db( inp, request, sector_prefix.str() );
 	if( err )
 	  exit(2);
 
-	if( vals.rmin <= 0 or vals.rmax <= 0 or vals.rmax <= vals.rmin ) {
-	  cerr << "Invalid radii r0 = " << vals.rmin
-	       << ", r1 = " << vals.rmax << endl;
+	if( vals.dmag < 0 or vals.d0 < 0) {
+	  cerr << "Invalid  dmag = " << vals.dmag 
+	       << ", d0 = " << vals.d0 << endl;
 	  exit(3);
 	}
-	if( vals.dphi < 0 or vals.dphi >= 90.0 ) {
-	  cerr << "Invalid opening angle dphi = " << vals.dphi << endl;
+	if( vals.dx <= 0 or vals.dy <= 0 ) {
+	  cerr << "Invalid dimensions dx = " << vals.dx
+	       << ", dy = " << vals.dy << endl;
 	  exit(3);
 	}
-	if( vals.dz < 0 ) {
-	  cerr << "Invalid  z = " << vals.z << endl;
+	if( vals.depth < 0 ) {
+	  cerr << "Invalid  depth = " << vals.depth << endl;
 	  exit(3);
 	}
-	// Override the database z value - it is not accurate enough
-	if( fabs(vals.z-plane_z[ip]) > 1e-2 ) { // max 1cm tolerance
-	  cerr << "Input z = " << vals.z <<  "differs from \"correct\" z = "
-	       << plane_z[ip] << "by more than 1cm. Update dbconvert."
-	       << endl;
-	  exit(3);
-	}
-	vals.z = plane_z[ip];
-
+	
 	ostringstream plane_prefix(sector_prefix.str(), ios_base::ate);
-	plane_prefix << "gem" << idx+1; // sic, the same thing again
+	plane_prefix << "gem" << idx; // sic, the same thing again
 	err = load_db( inp, plane_request, plane_prefix.str() );
 	if( err )
 	  exit(2);
@@ -337,97 +321,78 @@ int main( int argc, const char** argv )
 	       << ", ypitch = " << vals.ypitch << endl;
 	  exit(3);
 	}
-	vals.phioff = phi_offset[ip];
-      }
-      else {
+	
+      }else {
 	// Dummy planes
 	assert( do_dummies );
-	assert( values.size() >= nplanes*nsect );
+	if(do_debug)cout << "Values size " << values.size() 
+			 << " dummy plane index " << (is+1)*nplanes_eff-1
+			 << " previous plane index " << (is+1)*nplanes_eff-2
+			 << endl;
+	assert( values.size() >= nplanes*(is+1) );
 	// Use some values from the last GEM plane for the dummy plane as well
-	const ValueSet_t& last_gem = values[is+nsect*(nplanes-1)];
-	vals.rmin = 1.18;
-	vals.rmax = 2.61;
-	vals.phi0 = last_gem.phi0;
-	vals.dphi = last_gem.dphi;
-	vals.z    = 3.20;
+	const ValueSet_t& last_gem = values[(is+1)*nplanes_eff-2];
+	vals.dmag = last_gem.dmag;
+	vals.d0 = 6.8;
+	vals.xoff = last_gem.xoff;
+	vals.dx = last_gem.dx;
+	vals.dy = last_gem.dy;
 	vals.xangle = last_gem.xangle;
 	vals.xpitch = 10.*last_gem.xpitch;
 	vals.yangle = last_gem.yangle;
 	vals.ypitch = 10.*last_gem.ypitch;
-	vals.phioff = last_gem.phioff;
 	if( do_debug ) {
 	  cout << "Dummy plane in sector " << is+1 << endl;
 	}
       }
 
-      // Convert parameters from libsolgem conventions to ours
-      double phi2 = 0.5*vals.dphi;  // half opening angle
-      vals.phi    = vals.phi0 + phi2 - vals.phioff;
-
-      // Calculate strip start positions in the same way as in
-      // TSolGEMPlane::ReadGeometry
-      double torad = TMath::DegToRad(), phi2rad = phi2 * torad;
-      double xs = 0.5 * ( vals.rmax - vals.rmin * TMath::Cos(phi2rad) );
-      double ys = vals.rmax * TMath::Sin(phi2rad);
+      // Remember who we are. Counting starts at 1, as the database is
+      // meant for humans ...
+      vals.isector = is+1;
+      vals.iplane  = ip+1;
+      
+      Int_t Nsx = (Int_t) (vals.dx / vals.xpitch);
+      //The following 3 lines are to avoid to understimate the number of strips 
+      //(hence the active area) because of stupid rounding issues at the 10^-12 level.
+      if( (double)round(vals.dx / vals.xpitch)- (vals.dx / vals.xpitch) < 1.0e-10 ){
+	Nsx = round(vals.dx / vals.xpitch);
+      }
+      Int_t Nsy = (Int_t) (vals.dy / vals.ypitch);
+      //The following 3 lines are to avoid to understimate the number of strips 
+      //(hence the active area) because of stupid rounding issues at the 10^-12 level.
+      if( (double)round(vals.dy / vals.ypitch)- (vals.dy / vals.ypitch) < 1.0e-10 ){
+	Nsy = round(vals.dy / vals.ypitch);
+      }
+      
+      double xs = -Nsx/2*vals.xpitch;
+      double ys = -Nsy/2*vals.ypitch;
       if( do_debug )
 	cout << " xs/ys = " << xs << "/" << ys << endl;
-      TRotation plane_to_xstrip, plane_to_ystrip;
-      plane_to_xstrip.RotateZ(-vals.xangle*torad);
-      plane_to_ystrip.RotateZ(-vals.yangle*torad);
-      TVector3 TR(xs,ys,0.0), BR(xs,-ys,0.0), TL(-xs,ys,0.0), BL(-xs,-ys,0.0);
-      TVector3 C[4] = { TR, BR, TL, BL };
-      int sminx = 1e9, sminy = 1e9, smaxx = -1e9, smaxy = -1e9;
-      for( int i = 0; i < 4; ++i ) {
-	if( do_debug ) {
-	  cout << " i = " <<  i << " ";
-	  C[i].Print();
-	}
-	TVector3 vx = plane_to_xstrip * C[i];
-	TVector3 vy = plane_to_ystrip * C[i];
-	int sx = (int) (vx.X() / vals.xpitch);
-	int sy = (int) (vy.X() / vals.ypitch);
-	sminx = min(sx,sminx);
-	smaxx = max(sx,smaxx);
-	sminy = min(sy,sminy);
-	smaxy = max(sy,smaxy);
-      }
-      vals.nstrips[0] = smaxx - sminx + 1;
-      vals.nstrips[1] = smaxy - sminy + 1;
+      
+      vals.nstrips[0] = Nsx;
+      vals.nstrips[1] = Nsy;
+      vals.start[0] = xs;
+      vals.start[1] = ys;
       vals.pitch[0] = vals.xpitch;
       vals.pitch[1] = vals.ypitch;
-      for( int ij = 0; ij < nproj; ij++ ) {
-	vals.start[ij] = -vals.nstrips[ij] * vals.pitch[ij] * 0.5;
-	// For the tracking code, the strip positions should be the _center_
-	// of the strips, not the lower edge
-	vals.start[ij] += 0.5 * vals.pitch[ij];
-      }
-      // Correct angles for offset. The results are the projection axis angles.
-      // For a given projection, they must be the same for all planes.
-      vals.angle[0] = vals.xangle + vals.phioff;
-      vals.angle[1] = vals.yangle + vals.phioff;
-
-      // Save the number of strips of each readout for later use when writing
-      // the detector maps
+      vals.angle[0] = vals.xangle;
+      vals.angle[1] = vals.yangle;
+ 
       if( ip < nplanes ) {
 	for( int ij = 0; ij < nproj; ij++ ) {
 	  max_nstrips = max(max_nstrips,vals.nstrips[ij]);
-	  int jx = ij + nproj*( ip + nplanes*is );
-	  pair<map<int,int>::iterator,bool> itx =
-	    nstrip_map.insert( make_pair(jx,vals.nstrips[ij]) );
-	  if( !itx.second ) {
-	    cerr << "Duplicate index " << jx << " for sector/plane/proj = "
-		 << is+1 << "/" << ip+1 << "/" << ij << endl;
-	    cerr << "Bug - should never happen." << endl;
-	    exit(6);
-	  }
-	}
+      	  int jx = ij + nproj*( ip + nplanes*is );
+      	  pair<map<int,int>::iterator,bool> itx =
+      	    nstrip_map.insert( make_pair(jx,vals.nstrips[ij]) );
+      	  if( !itx.second ) {
+      	    cerr << "Duplicate index " << jx << " for sector/plane/proj = "
+      		 << is+1 << "/" << ip+1 << "/" << ij << endl;
+      	    cerr << "Bug - should never happen." << endl;
+      	    exit(6);
+      	  }
+      	}
       }
-
-      // Remember who we are. Counting starts at 1, as the database is
-      // meant for humans ...
-      vals.iplane  = ip+1;
-      vals.isector = is+1;
-
+      
       // Save results
       values.push_back( vals );
 
@@ -436,7 +401,7 @@ int main( int argc, const char** argv )
 	//      cout << sector_prefix.str() << endl;
 	print_req( request );
 	print_req( plane_request );
-	cout << " phi/offset = " << vals.phi << "/" << vals.phioff << endl;
+	cout << " d0/xoffset = " << vals.d0 << "/" << vals.xoff << endl;
 
 	cout << " " << proj_name[0] << "/" << proj_name[1] << " n/ang/start/pitch = ";
 	for( int i=0; i < 2; ++i ) {
@@ -447,10 +412,9 @@ int main( int argc, const char** argv )
 	}
 	cout << endl;
       } // do_debug
-
     } // all sectors
   }   // all planes
-
+  
   inp.close();
 
   // Find common values
@@ -458,7 +422,10 @@ int main( int argc, const char** argv )
 
   // Check values for consistency (i.e., the values that MUST be common)
   vector<double> proj_angle(nproj,-1e10);
-  vector<double> sect_phi(nsect,-1e10);
+  vector<double> sect_dmag(nsect,-1e10);
+  vector<double> sect_xoff(nsect,-1e10);
+  vector<double> sect_thetaH(nsect,-1e10);
+  vector<double> sect_thetaV(nsect,-1e10);
   for( vector<ValueSet_t>::size_type i = 0; i < values.size(); ++i ) {
     ValueSet_t& v = values[i];
     if( i == 0 ) {
@@ -467,20 +434,51 @@ int main( int argc, const char** argv )
     } else if( proj_angle[0] != v.angle[0] or proj_angle[1] != v.angle[1] ) {
       cerr << "Error: inconsistent projection angles = "
 	   << v.angle[0] << "/" << v.angle[1] << " "
-	   << "in sector/plane/index = " << v.isector << "/" << v.iplane-1
-	   << "/" << (v.iplane-1)*nsect + v.isector
+	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
+	   << "/" << (v.isector-1)*nplanes + v.iplane-1
 	   << endl
 	   << "Expected " << proj_angle[0] << "/" << proj_angle[1] << endl;
       exit(4);
     }
     int is = v.isector-1;
-    if( sect_phi[is] < -1e9 ) {
-      sect_phi[is] = v.phi;
-    } else if( sect_phi[is] != v.phi ) {
-      cerr << "Error: inconsistent sector angle = " << v.phi
-	   << " in sector " << is+1 << " at plane " << v.iplane
+    if( sect_dmag[is] < -1e9 ) {
+      sect_dmag[is] = v.dmag;
+    }else if( sect_dmag[is] != v.dmag ) {
+      cerr << "Error: inconsistent sector dmag = " << v.dmag
+	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
+	   << "/" << (v.isector-1)*nplanes + v.iplane-1
 	   << endl
-	   << "Expected " << sect_phi[is] << endl;
+    	   << "Expected " << sect_dmag[is] << endl;
+      exit(4);
+    }
+    if( sect_xoff[is] < -1e9 ) {
+      sect_xoff[is] = v.xoff;
+    }else if( sect_xoff[is] != v.xoff ) {
+      cerr << "Error: inconsistent sector xoff = " << v.xoff
+	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
+	   << "/" << (v.isector-1)*nplanes + v.iplane-1
+	   << endl
+	   << "Expected " << sect_xoff[is] << endl;
+      exit(4);
+    }
+    if( sect_thetaH[is] < -1e9 ) {
+      sect_thetaH[is] = v.thetaH;
+    }else if( sect_thetaH[is] != v.thetaH ) {
+      cerr << "Error: inconsistent sector thetaH = " << v.thetaH
+	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
+	   << "/" << (v.isector-1)*nplanes + v.iplane-1
+	   << endl
+    	   << "Expected " << sect_thetaH[is] << endl;
+      exit(4);
+    }
+    if( sect_thetaV[is] < -1e9 ) {
+      sect_thetaV[is] = v.thetaV;
+    }else if( sect_thetaV[is] != v.thetaV ) {
+      cerr << "Error: inconsistent sector thetaV = " << v.thetaV
+	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
+	   << "/" << (v.isector-1)*nplanes + v.iplane-1
+	   << endl
+    	   << "Expected " << sect_thetaV[is] << endl;
       exit(4);
     }
   }
@@ -491,7 +489,7 @@ int main( int argc, const char** argv )
     cerr << " Error opening output file " << outfile << endl;
     exit(5);
   }
-
+  
   // Header
   //TDatime now;
   outp << "# -*- mode: Text -*-" << endl
@@ -524,7 +522,7 @@ int main( int argc, const char** argv )
     }
   }
   outp << endl;
-
+  
   // Strip angles
   outp << "# Strip angles: angles of the normal to the strips, pointing" << endl;
   outp << "# along the direction of increasing strip number." << endl;
@@ -537,7 +535,8 @@ int main( int argc, const char** argv )
 
   // Crate map. Lots of modules here
   int model = 6425;    // Dummy model for virtual APV25
-  int nchan = 1500;    // Number of channels per module (arbitrary)
+  int nchan = 2048;    // Number of channels per module (arbitrary) 
+  // -> We put the real stuff: 1 MPD = 16*128 = 2048 channels
   int MAXSLOT = 30;    // Max slots per crate (from THaCrateMap.h)
   int modules_per_readout = max_nstrips/nchan+1;
   int modules_per_chamber = nproj*modules_per_readout; // Modules needed per chamber
@@ -564,17 +563,20 @@ int main( int argc, const char** argv )
   // the slot.
   int maxcrates = TMath::CeilNint( (double)nplanes*nsect /
 				   (double)chambers_per_crate );
-  for( int ic = 0; ic < maxcrates; ++ ic ) {
+  for( int ic = crate_offset; ic < crate_offset+maxcrates; ++ ic ) {
     write_module( outp, ic, slot_hi, model, nchan );
     if( ic+1 != maxcrates or do_dummies ) outp << " \\";
     outp << endl;
   }
   if( do_dummies ) {
-    write_module( outp, maxcrates, nproj-1, model, nsect );
+    write_module( outp, crate_dummy, nproj-1, model, crate_offset+nsect );
     outp << endl;
   }
   outp << endl;
-
+  
+  if(do_debug)
+    cout << "// Per-plane detector maps. Boyoboy " << endl;
+  
   // Per-plane detector maps. Boyoboy
   outp << "# GEM detector maps" << endl;
   outp << "# " << nsect << " sectors * " << nplanes << " planes * "
@@ -608,7 +610,7 @@ int main( int argc, const char** argv )
 	  int lo = im*nchan;
 	  int hi = min((im+1)*nchan,the_nstrips)-1;
 	  if( modules_per_readout > 1 ) outp << spc;
-	  write_cslh( outp, cr, sl, lo, hi );
+	  write_cslh( outp, crate_offset+cr, sl, lo, hi );
 	  if( 2*(im+1) < modules_per_chamber )
 	    outp << " \\";
 	  outp << endl;
@@ -629,7 +631,8 @@ int main( int argc, const char** argv )
 	// of the regular GEM planes. u and v each get one module (slot).
 	// The channel number in each slot is the sector number. Hits in each
 	// channel represent measured coordinates.
-	write_cslh( outp, maxcrates, ij, is, is );
+	write_cslh( outp, crate_dummy, ij, crate_offset+is, crate_offset+is );
+	//FIXME: it is a little bit "ad-hoc" for the moment. Do this better when I have time...
 	outp << endl;
       }
     }
@@ -638,12 +641,15 @@ int main( int argc, const char** argv )
 
   // Phi angles of sectors
   outp << dashes << endl;
-  outp << "#  Nominal phi angles of the sectors" << endl;
-  outp << "#  Individual planes within each sector may have an angle offset" << endl;
+  outp << "#  X offset of the sectors (in transport coordinates)" << endl;
+  outp << "#  and common position parameters (D_magnet, theta_H, theta_V)" << endl;
   outp << dashes << endl;
   outp << endl;
   for( int is = 0; is < nsect; ++is ) {
-    outp << out_prefix << is+1 << ".phi = " << sect_phi[is] << endl;
+    outp << out_prefix << is+1 << ".dmag = " << sect_dmag[is] << endl;
+    outp << out_prefix << is+1 << ".xoff = " << sect_xoff[is] << endl;
+    outp << out_prefix << is+1 << ".thetaH = " << sect_thetaH[is] << endl;
+    outp << out_prefix << is+1 << ".thetaV = " << sect_thetaV[is] << endl;
   }
   outp << endl;
 
@@ -748,14 +754,10 @@ int main( int argc, const char** argv )
       outp << pfx << "strip.pos = " << v.start[ij] << endl;
       outp << pfx << "strip.pitch = " << v.pitch[ij] << endl;
       // TODO: these may be redundant - test for defaults per plane or tracker
-      outp << pfx << "rmin = " << v.rmin << endl;
-      outp << pfx << "rmax = " << v.rmax << endl;
-      outp << pfx << "z = " << setprecision(7) << v.z << endl;
-      //outp << pfx << "z = " << setprecision(7) << plane_z[v.iplane-1] << endl;
-      outp << pfx << "dz = " << v.dz << endl;
-      outp << pfx << "dphi = " << v.dphi << endl;
-      if( v.phioff != 0.0 )
-	outp << pfx << "phioff = " << v.phioff << endl;
+      outp << pfx << "d0 = " << setprecision(7) << v.d0 << endl;
+      outp << pfx << "dx = " << v.dx << endl;
+      outp << pfx << "dy = " << v.dy << endl;
+      outp << pfx << "dz = " << v.depth << endl;
       outp << endl;
     }
   }
