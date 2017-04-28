@@ -218,9 +218,11 @@ int main( int argc, const char** argv )
   string out_prefix_v = "sbs_fpp.tracker.";
   if(do_debug){
     cout << "Compare " << infile.c_str() << ": " << endl 
+	 << " - with db_g4sbs_bbgem.dat : " << strcmp(infile.c_str(), "db_g4sbs_bbgem.dat") << endl
 	 << " - with db_g4sbs_ft.dat : " << strcmp(infile.c_str(), "db_g4sbs_ft.dat") << endl
 	 << " - with db_g4sbs_fpp.dat : " << strcmp(infile.c_str(), "db_g4sbs_fpp.dat") << endl;
   }
+  bool validfile = false;
   if(strcmp(infile.c_str(), "db_g4sbs_ft.dat")==0){
     crate_offset_v = 4;
     nsect_v = 3;
@@ -228,7 +230,21 @@ int main( int argc, const char** argv )
     d0_dummy_v = 1.6;
     prefix_v = "g4sbs_ft.";
     out_prefix_v = "sbs_ft.tracker.";
-  }else if(strcmp(infile.c_str(), "db_g4sbs_fpp.dat")!=0){
+    validfile = true;
+  }
+  if(strcmp(infile.c_str(), "db_g4sbs_bbgem.dat")==0){
+    crate_offset_v = 0;
+    nsect_v = 1;
+    nplanes_v = 5;
+    d0_dummy_v = 1.853320; 
+    prefix_v = "g4sbs_bbgem.";
+    out_prefix_v = "sbs_bbgem.tracker.";
+    validfile = true;
+  }
+  if(strcmp(infile.c_str(), "db_g4sbs_fpp.dat")==0){
+    validfile = true;
+  }
+  if(!validfile){
     cout << "Invalid input file: exit !" << endl;
     exit(-1);
   }
@@ -580,6 +596,9 @@ int main( int argc, const char** argv )
   if(do_debug)
     cout << "// Per-plane detector maps. Boyoboy " << endl;
   
+  int crate_g = crate_offset;
+  int slot_g = 0;
+  
   // Per-plane detector maps. Boyoboy
   outp << "# GEM detector maps" << endl;
   outp << "# " << nsect << " sectors * " << nplanes << " planes * "
@@ -612,16 +631,30 @@ int main( int argc, const char** argv )
 	  int sl = ix - cr*chambers_per_crate*modules_per_chamber;
 	  int lo = im*nchan;
 	  int hi = min((im+1)*nchan,the_nstrips)-1;
-	  if( modules_per_readout > 1 ) outp << spc;
-	  write_cslh( outp, crate_offset+cr, sl, lo, hi );
-	  if( 2*(im+1) < modules_per_chamber )
+	  if(lo<=hi){
+	    if( modules_per_readout > 1 ) outp << spc;
+	    //write_cslh( outp, crate_offset+cr, sl, lo, hi );
+	    write_cslh( outp, crate_offset+cr, sl, lo%nchan, hi%nchan );
+	    //write_cslh( outp, crate_g, slot_g, lo, hi );
+	    slot_g++;
+	    if(slot_g==30){
+	      crate_g++;
+	      slot_g = 0;
+	    }
+	  }
+	  if( 2*(im+1) < modules_per_chamber && (im+1)*nchan < the_nstrips){
 	    outp << " \\";
-	  outp << endl;
+	  }
+	  if(lo<=hi || 2*(im+1)>modules_per_chamber)
+	    outp << endl;
 	}
       }
     }
   }
   outp << endl;
+
+  if(do_debug)
+    cout << "do dummies " << endl;
 
   if( do_dummies) {
     outp << "# Dummy GEM planes recording emulated calorimeter hits" << endl;
@@ -642,6 +675,9 @@ int main( int argc, const char** argv )
     outp << endl;
   }
 
+  if(do_debug)
+    cout << "# X offsets " << endl;
+
   // Phi angles of sectors
   outp << dashes << endl;
   outp << "#  X offset of the sectors (in transport coordinates)" << endl;
@@ -655,6 +691,9 @@ int main( int argc, const char** argv )
     outp << out_prefix << is+1 << ".thetaV = " << sect_thetaV[is] << endl;
   }
   outp << endl;
+  
+  if(do_debug)
+    cout << "# Tracker feature configuration " << endl;
 
   // Tracker configuration
   outp << dashes << endl;
@@ -670,6 +709,9 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "3d_disable_chi2 = " << 0 << endl;
   outp << endl;
 
+  if(do_debug)
+    cout << "#  Global reconstruction parameters" << endl;
+
   outp << dashes << endl;
   outp << "#  Global reconstruction parameters" << endl;
   outp << dashes << endl;
@@ -682,6 +724,9 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "proj_to_z0 = " << 0 << endl;
   outp << endl;
 
+  if(do_debug)
+    cout << "#  Global projection parameters" << endl;
+  
   // Projection parameters
   outp << dashes << endl;
   outp << "#  Global projection parameters" << endl;
@@ -694,6 +739,9 @@ int main( int argc, const char** argv )
   outp << allsect_prefix << "disable_chi2 = " << 0 << endl;
   outp << endl;
 
+  if(do_debug)
+    cout << "#  Global plane parameters" << endl;
+  
   // Default plane parameters
   outp << dashes << endl;
   outp << "#  Global plane parameters" << endl;
@@ -712,6 +760,9 @@ int main( int argc, const char** argv )
   outp << out_prefix << "do_histos = " << 0 << endl;
   outp << endl;
 
+  if(do_debug)
+    cout << "#   Plane-specific data" << endl;
+
   // Per-plane parameters
   outp << dashes << endl;
   outp << "#   Plane-specific data" << endl;
@@ -719,6 +770,9 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
+  if(do_debug)
+    cout << "sort ()" << endl;
+  
   sort( ALL(values), BySectorThenPlane() );
 
   for( vector<ValueSet_t>::size_type i = 0; i < values.size(); ++i ) {
@@ -764,6 +818,8 @@ int main( int argc, const char** argv )
       outp << endl;
     }
   }
+  if(do_debug)
+    cout << "return" << endl;
 
   return 0;
 }

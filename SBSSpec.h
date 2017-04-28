@@ -46,16 +46,13 @@ namespace SBS {
 
   protected:
 
-    // Track coordinates in the cylindrical system SBS uses.
-    // Aziumthal angles are measured wrt to the x-axis, which is the centerline
-    // of sector 0. Positive angles mean clockwise rotation when looking
-    // downstream along the beam.
+    // Track coordinates in the SBS transport coordinates.
     Int_t     fSector;     // Sector where this track was reconstructed
     Double_t  fX_T;        // X in transport coordinates 
     Double_t  fY_T;        // Y in transport coordinates 
     Double_t  fXdir_T;     // X direction in transport coordinates 
     Double_t  fYdir_T;     // Y direction transport coordinates 
-
+    
 #ifdef MCDATA
     // Diagnostic info derived from Monte Carlo truth data
     Int_t     fMCHitBits;  // Bitpattern of plane #s w/MC hit used by this track

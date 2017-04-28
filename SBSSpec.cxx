@@ -166,6 +166,8 @@ Int_t SBSSpec::DefineVariables( EMode mode )
       "fSBSTrackInfo.SBS::SBSTrackInfo.fXdir_T" },
     { "tr.ydir_t",      "dy/dz transport",
       "fSBSTrackInfo.SBS::SBSTrackInfo.fYdir_T" },
+    { "tr.",      "dy/dz transport",
+      "fSBSTrackInfo.SBS::SBSTrackInfo.fYdir_T" },
 #ifdef MCDATA
     { "tr.mchitbits", "Planepattern of true MC hits in this track",
       "fSBSTrackInfo.SBS::SBSTrackInfo.fMCHitBits" },

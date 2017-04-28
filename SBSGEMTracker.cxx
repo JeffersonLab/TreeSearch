@@ -168,7 +168,7 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
   // fOrigin will be set later PartnerPlanes (after Plane init)
   
   Double_t r_temp[3] = {fOrigin.X(), fOrigin.Y(), fOrigin.Z()};
-  TMatrixD m_temp(3, 1, r_temp);
+  TMatrixD m_temp(3, 1, r_temp); 
   
   TMatrixD m_res(3, 1, r_temp);
   m_res.Mult(fRotMat_BL, m_temp);
@@ -184,14 +184,14 @@ Int_t GEMTracker::ReadGeometry( FILE* file, const TDatime& date,
 Int_t GEMTracker::NewTrackCalc( Int_t idx, THaTrack*, const TVector3& pos,
 				const TVector3& dir, const FitRes_t& )
 {
-  // For every new track, convert track coordinates to the cylindrical system
+  // For every new track, convert track coordinates to the system
   // appropriate for SBS. This is a temporary solution; the right way to do
   // this is to have the SBS spectrometer use its own track class.
 
   assert( dynamic_cast<SBSSpec*>(GetApparatus()) );
-  SBSSpec* solid = static_cast<SBSSpec*>(GetApparatus());
+  SBSSpec* sbs = static_cast<SBSSpec*>(GetApparatus());
 
-  TClonesArray* trackInfo = solid->GetTrackInfo();
+  TClonesArray* trackInfo = sbs->GetTrackInfo();
 
 #ifdef MCDATA
   SBSTrackInfo* theInfo =

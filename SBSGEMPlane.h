@@ -21,10 +21,10 @@ namespace SBS {
     GEMPlane() {} // For ROOT RTTI
     virtual ~GEMPlane();
 
-    //    virtual void    Clear( Option_t* opt="" );
-    //    virtual Int_t   Decode( const THaEvData& );
-    //    virtual void    Print( Option_t* opt="" ) const;
-
+    // virtual void    Clear( Option_t* opt="" );
+    // virtual Int_t   Decode( const THaEvData& );
+    // virtual void    Print( Option_t* opt="" ) const;
+    
     virtual Bool_t  Contains( Double_t x, Double_t y ) const;
 
   protected:

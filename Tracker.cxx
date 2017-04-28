@@ -516,7 +516,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       trk->fNHitsFound = 0;
       for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
 	MCTrackPoint* pt = fMCDecoder->GetMCPoint(i);
-	assert( pt->fMCTrack == trk->fNumber ); // temporary
+	//assert( pt->fMCTrack == trk->fNumber ); // temporary
 	if( pt->fMCTrack != trk->fNumber )
 	  continue;
 	FindHitForMCPoint( pt, fMCPointUpdater );
@@ -541,7 +541,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 	  SETBIT( trk->fReconFlags, kHitsFound );
 	else
 	  CLRBIT( trk->fReconFlags, kHitsFound );
-
+	
 	// Fit the MC points. Results are stored in fMCFitPar of the MC track
 	FitMCPoints( trk );
       }
@@ -606,7 +606,7 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
   // same z, which are then distinguished by the plane type (u,v,x etc.)
   pair<citer_t,citer_t> plane_range =
     equal_range( ALL(fPlanes), point.Z(), Plane::ZIsNear(0.001) );
-
+  
   Hit* hit = 0;
   Double_t x = kBig;
   for( citer_t it = plane_range.first; it != plane_range.second; ++it ) {
@@ -704,7 +704,7 @@ Int_t Tracker::FitMCPoints( MCTrack* mctrk ) const
   // Mimic the fit procedure used in FitTrack, except for the weighting
   TMatrixDSym AtA(4);
   TVectorD Aty(4);
-
+  
   // Fill fit matrixes
   Int_t npoints = 0;
   for( Int_t i = 0; i < fMCDecoder->GetNMCPoints(); ++i ) {
