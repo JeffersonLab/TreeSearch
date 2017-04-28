@@ -613,7 +613,7 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
     const Plane* pl = *it;
     if( pl->GetType() != pt->fType )
       continue;
-
+    
     // Calculate position of the point in its projection coordinate system
     Double_t cosa = pl->GetProjection()->GetCosAngle();
     Double_t sina = pl->GetProjection()->GetSinAngle();

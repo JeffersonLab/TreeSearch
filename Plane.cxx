@@ -586,7 +586,7 @@ pair<Int_t,Int_t> Plane::FindHitsInRange( Double_t lower,
 {
   // Find range of hits with positions in [lower,upper). Return hit
   // indexes of start and one-past-end of region
-
+  
   assert( lower <= upper );
 
   Int_t end = GetNhits();
