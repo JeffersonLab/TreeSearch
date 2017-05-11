@@ -717,7 +717,7 @@ int main( int argc, const char** argv )
   outp << dashes << endl;
   outp << endl;
 
-  outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 3 << endl;
+  outp << allsect_prefix << "3d_ampcorr_maxmiss = " << 2 << endl;
   outp << allsect_prefix << "3d_ampcorr_nsigma = " << 0.18 << endl;
   outp << allsect_prefix << "3d_chi2_conflevel = " << 1e-6 << endl;
   outp << allsect_prefix << "3d_maxmiss = " << 2 << endl;
