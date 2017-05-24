@@ -224,7 +224,7 @@ int main( int argc, const char** argv )
   }
   bool validfile = false;
   if(strcmp(infile.c_str(), "db_g4sbs_ft.dat")==0){
-    crate_offset_v = 4;
+    crate_offset_v = 0;
     nsect_v = 3;
     nplanes_v = 6;
     d0_dummy_v = 1.6;
@@ -750,7 +750,7 @@ int main( int argc, const char** argv )
 
   outp << out_prefix << "xp.res = " << 9e-5 << endl;
   outp << out_prefix << "maxclustsiz = " << 4 << endl;
-  outp << out_prefix << "adc.min = " << 500 << endl;
+  outp << out_prefix << "adc.min = " << 80 << endl;
   outp << out_prefix << "split.frac = " << 0.1 << endl;
   outp << out_prefix << "maxhits = " << 1000 << endl;
   outp << out_prefix << "maxsamp = " << 3 << endl;

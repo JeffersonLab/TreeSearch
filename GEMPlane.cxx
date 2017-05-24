@@ -659,7 +659,7 @@ Hit* GEMPlane::AddHitImpl( Double_t pos )
   // Emulate parameters for dummy hits
   const UInt_t size = 1, type = 0;
   const Double_t adcsum = 10.*fMinAmpl, resolution = fResolution;
-
+  
 #ifdef MCDATA
   const Int_t mctrack = 1, num_bg = 0;
   const Double_t mcpos = pos, mctime = 0.0;
