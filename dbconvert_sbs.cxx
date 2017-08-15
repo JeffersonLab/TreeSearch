@@ -212,7 +212,7 @@ int main( int argc, const char** argv )
   getargs(argc,argv);
   
   int crate_offset_v = 0;
-  int nsect_v = 1;
+  int nsect_v = 1;// 4;//
   int nplanes_v = 10;
   double d0_dummy_v = 6.8;
   string prefix_v = "g4sbs_fpp.";
@@ -226,7 +226,7 @@ int main( int argc, const char** argv )
   bool validfile = false;
   if(strcmp(infile.c_str(), "db_g4sbs_ft.dat")==0){
     crate_offset_v = 0;
-    nsect_v = 1;
+    nsect_v = 1;// 3;//
     nplanes_v = 6;
     d0_dummy_v = 1.6;
     prefix_v = "g4sbs_ft.";
@@ -235,7 +235,7 @@ int main( int argc, const char** argv )
   }
   if(strcmp(infile.c_str(), "db_g4sbs_bbgem.dat")==0){
     crate_offset_v = 0;
-    nsect_v = 3;
+    nsect_v = 1;// 3;
     nplanes_v = 5;
     d0_dummy_v = 1.853320; 
     prefix_v = "g4sbs_bbgem.";
