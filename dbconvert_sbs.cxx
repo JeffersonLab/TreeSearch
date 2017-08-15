@@ -107,7 +107,8 @@ void print_req( const DBRequest* req )
 // Parameters for one GEM chamber (two readout coordinates)
 struct ValueSet_t {
   // Values read from source file
-  double dmag, d0, xoff, dx, dy, thetaH, thetaV, depth;
+  double dmag, d0, xoff, dx, dy, //thetaH, 
+    thetaV, depth;
   double xangle, xpitch, yangle, ypitch;
   // Computed/converted quantities
   double angle[2], start[2], pitch[2];  // angle is that of the axis!
@@ -211,7 +212,7 @@ int main( int argc, const char** argv )
   getargs(argc,argv);
   
   int crate_offset_v = 0;
-  int nsect_v = 4;
+  int nsect_v = 1;
   int nplanes_v = 10;
   double d0_dummy_v = 6.8;
   string prefix_v = "g4sbs_fpp.";
@@ -225,7 +226,7 @@ int main( int argc, const char** argv )
   bool validfile = false;
   if(strcmp(infile.c_str(), "db_g4sbs_ft.dat")==0){
     crate_offset_v = 0;
-    nsect_v = 3;
+    nsect_v = 1;
     nplanes_v = 6;
     d0_dummy_v = 1.6;
     prefix_v = "g4sbs_ft.";
@@ -234,7 +235,7 @@ int main( int argc, const char** argv )
   }
   if(strcmp(infile.c_str(), "db_g4sbs_bbgem.dat")==0){
     crate_offset_v = 0;
-    nsect_v = 1;
+    nsect_v = 3;
     nplanes_v = 5;
     d0_dummy_v = 1.853320; 
     prefix_v = "g4sbs_bbgem.";
@@ -288,7 +289,7 @@ int main( int argc, const char** argv )
 	{"xoffset",     &vals.xoff   },
 	{"dx",          &vals.dx     },
 	{"dy",          &vals.dy     },
-	{"thetaH",      &vals.thetaH },
+	//{"thetaH",      &vals.thetaH },
 	{"thetaV",      &vals.thetaV },
 	{"depth",       &vals.depth  },
 	{ 0 }
@@ -443,7 +444,7 @@ int main( int argc, const char** argv )
   vector<double> proj_angle(nproj,-1e10);
   vector<double> sect_dmag(nsect,-1e10);
   vector<double> sect_xoff(nsect,-1e10);
-  vector<double> sect_thetaH(nsect,-1e10);
+  //vector<double> sect_thetaH(nsect,-1e10);
   vector<double> sect_thetaV(nsect,-1e10);
   for( vector<ValueSet_t>::size_type i = 0; i < values.size(); ++i ) {
     ValueSet_t& v = values[i];
@@ -480,16 +481,16 @@ int main( int argc, const char** argv )
 	   << "Expected " << sect_xoff[is] << endl;
       exit(4);
     }
-    if( sect_thetaH[is] < -1e9 ) {
-      sect_thetaH[is] = v.thetaH;
-    }else if( sect_thetaH[is] != v.thetaH ) {
-      cerr << "Error: inconsistent sector thetaH = " << v.thetaH
-	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
-	   << "/" << (v.isector-1)*nplanes + v.iplane-1
-	   << endl
-    	   << "Expected " << sect_thetaH[is] << endl;
-      exit(4);
-    }
+    // if( sect_thetaH[is] < -1e9 ) {
+    //   sect_thetaH[is] = v.thetaH;
+    // }else if( sect_thetaH[is] != v.thetaH ) {
+    //   cerr << "Error: inconsistent sector thetaH = " << v.thetaH
+    // 	   << " in sector/plane/index = " << v.isector-1 << "/" << v.iplane-1
+    // 	   << "/" << (v.isector-1)*nplanes + v.iplane-1
+    // 	   << endl
+    // 	   << "Expected " << sect_thetaH[is] << endl;
+    //   exit(4);
+    // }
     if( sect_thetaV[is] < -1e9 ) {
       sect_thetaV[is] = v.thetaV;
     }else if( sect_thetaV[is] != v.thetaV ) {
@@ -687,7 +688,7 @@ int main( int argc, const char** argv )
   for( int is = 0; is < nsect; ++is ) {
     outp << out_prefix << is+1 << ".dmag = " << sect_dmag[is] << endl;
     outp << out_prefix << is+1 << ".xoff = " << sect_xoff[is] << endl;
-    outp << out_prefix << is+1 << ".thetaH = " << sect_thetaH[is] << endl;
+    //outp << out_prefix << is+1 << ".thetaH = " << sect_thetaH[is] << endl;
     outp << out_prefix << is+1 << ".thetaV = " << sect_thetaV[is] << endl;
   }
   outp << endl;

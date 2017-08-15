@@ -202,9 +202,7 @@ static StripData_t ChargeDep( const vector<Float_t>& amp )
   const Float_t Tp      = 50.0; // RC filter time constant (ns)
 
   assert( amp.size() >= 3 );
-
   Float_t adcraw = delta_t*(amp[0]+amp[1]+amp[2]);
-
   // Weight factors calculated based on the response of the silicon microstrip
   // detector:
   // v(t) = (delta_t/Tp)*exp(-delta_t/Tp)
@@ -227,7 +225,6 @@ static StripData_t ChargeDep( const vector<Float_t>& amp )
 
   Float_t adc    = delta_t*(sig[0]+sig[1]+sig[2]);
   Float_t time   = 0;     // TODO
-
   Bool_t pass;
   // Calculate ratios for 3 samples and check for bad signals
   if( amp[2] > 0 ) {
@@ -236,7 +233,7 @@ static StripData_t ChargeDep( const vector<Float_t>& amp )
     pass = (r1 < 1.0 and r2 < 1.0 and r1 < r2);
   } else
     pass = false;
-
+  //printf("adcraw = %1.2f, sig[0, 1, 2] = %1.2f, %1.2f, %1.2f, adc = %1.2f \n", adcraw, sig[0], sig[1], sig[2], adc);
   return StripData_t(adcraw,adc,time,pass);
 }
 
@@ -315,7 +312,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     for( Int_t ichan = 0; ichan < nchan; ++ichan ) {
       Int_t chan = evData.GetNextChan( d->crate, d->slot, ichan );
       if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
-
+      
       // Map channel number to strip number
       Int_t istrip =
 	MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
@@ -337,6 +334,13 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       // For the APV25 analog pipeline, multiple "hits" on a decoder channel
       // correspond to time samples 25 ns apart
       Int_t nsamp = evData.GetNumHits( d->crate, d->slot, chan );
+      // printf(" crate = %d, slot = %d, chan = %d \n", d->crate, d->slot, chan );
+      // for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
+      // 	Float_t fsamp = static_cast<Float_t>
+      // 	  ( evData.GetData(d->crate, d->slot, chan, isamp) );
+      // 	printf( " %1.0f ", fsamp );
+      // }
+      // printf("\n");
       assert( nsamp > 0 );
       ++fNrawStrips;
       nsamp = TMath::Min( nsamp, static_cast<Int_t>(fMaxSamp) );
@@ -349,7 +353,9 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	  Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
 	  samples.push_back( fsamp );
+	  //printf( " %1.0f ", fsamp );
 	}
+	//printf("\n");
 	// Analyze the pulse shape
 	stripdata = ChargeDep(samples);
       }
@@ -362,6 +368,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       // Skip null data
       if( stripdata.adcraw == 0 )
 	continue;
+      //printf(" crate %d, slot %d, chan %d \n", d->crate, d->slot, ichan);
 
       // Save results for cluster finding later
       fADCraw[istrip]  = stripdata.adcraw;
@@ -553,6 +560,8 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	if( mctrack == 0 ) {
 	  if( mc.fMCTrack > 0 ) {
 	    // If the cluster contains a signal hit, save its info and be done
+	    //printf("istrip = %d, pos = %1.3f, ADC = %1.3f\n", istrip, pos, adc);
+	    //printf("mc.fMCTtime = %1.3f\n", mc.fMCTime);
 	    mctrack = mc.fMCTrack;
 	    mcpos   = mc.fMCPos;
 	    mctime  = mc.fMCTime;
@@ -561,6 +570,13 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	    // If background hits only, compute position average
 	    mcpos  += mc.fMCPos;
 	    mctime  = TMath::Min( mctime, mc.fMCTime );
+	    // if(-50.0<= mc.fMCTime && mc.fMCTime<=25.0){
+	    //   mctime = -500.0;
+	    // // if(mc.fMCPos==0.0){
+	    // //   printf("istrip = %d, mc.fMCTime =  %f\n", istrip, mc.fMCTime);
+	    // //   //printf("mctime = %1.3f, mc.fMCTime = %1.3f\n", mctime, mc.fMCTime);
+	    // //   //printf("mcpos = %1.3f, mc.fMCpos = %1.3f\n", mcpos, mc.fMCPos);
+	    // }
 	  }
 	}
       }
@@ -608,6 +624,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 					 resolution,
 					 this
 					 );
+
 #ifdef MCDATA
     } else {
       // Monte Carlo data
@@ -625,6 +642,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 					   mctime,
 					   num_bg
 					   );
+      //printf("hit pos = %1.3f, time = %1.3f, size = %d\n", pos, mctime, size);
     }
 #endif // MCDATA
 #ifndef NDEBUG
