@@ -751,7 +751,7 @@ int main( int argc, const char** argv )
 
   outp << out_prefix << "xp.res = " << 9e-5 << endl;
   outp << out_prefix << "maxclustsiz = " << 4 << endl;
-  outp << out_prefix << "adc.min = " << 80 << endl;
+  outp << out_prefix << "adc.min = " << 1500 << endl;
   outp << out_prefix << "split.frac = " << 0.1 << endl;
   outp << out_prefix << "maxhits = " << 1000 << endl;
   outp << out_prefix << "maxsamp = " << 3 << endl;
