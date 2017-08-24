@@ -358,9 +358,6 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	//printf("\n");
 	// Analyze the pulse shape
 	stripdata = ChargeDep(samples);
-#ifdef MCDATA
-	stripdata.time = ;
-#endif
       }
       else {
 	stripdata.adcraw = stripdata.adc =
