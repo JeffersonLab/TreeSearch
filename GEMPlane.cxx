@@ -358,6 +358,9 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	//printf("\n");
 	// Analyze the pulse shape
 	stripdata = ChargeDep(samples);
+#ifdef MCDATA
+	stripdata.time = ;
+#endif
       }
       else {
 	stripdata.adcraw = stripdata.adc =
@@ -365,9 +368,10 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	stripdata.time = 0;
 	stripdata.pass = true;
       }
+      
       // Skip null data
       if( stripdata.adcraw == 0 )
-	continue;
+      	continue;
       //printf(" crate %d, slot %d, chan %d \n", d->crate, d->slot, ichan);
 
       // Save results for cluster finding later
@@ -400,7 +404,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       // If doing MC data, save the truth information for each strip
       if( mc_data ) {
 	fMCHitList.push_back(istrip);
-	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
+  	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
       }
 #endif
     }  // chans
@@ -711,7 +715,6 @@ Hit* GEMPlane::AddHitImpl( Double_t pos )
 Int_t GEMPlane::Decode( const THaEvData& evData )
 {
   // Convert evData to hits
-
   if( IsDummy() )
     // Special "decoding" for dummy planes
     return DummyDecode( evData );
