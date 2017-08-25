@@ -370,7 +370,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       if( stripdata.adcraw == 0 )
       	continue;
       //printf(" crate %d, slot %d, chan %d \n", d->crate, d->slot, ichan);
-
+      
       // Save results for cluster finding later
       fADCraw[istrip]  = stripdata.adcraw;
       fADC[istrip]     = stripdata.adc;
@@ -402,6 +402,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       if( mc_data ) {
 	fMCHitList.push_back(istrip);
   	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
+	//fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
       }
 #endif
     }  // chans
@@ -571,6 +572,10 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	    // If background hits only, compute position average
 	    mcpos  += mc.fMCPos;
 	    mctime  = TMath::Min( mctime, mc.fMCTime );
+	    // if(mc.fMCTime>=50.0){
+	    //   printf("istrip = %d, mc.fMCTime =  %f\n", istrip, mc.fMCTime);
+	    //   printf("mctime = %1.3f, mc.fMCTime = %1.3f\n", mctime, mc.fMCTime);
+	    // }
 	    // if(-50.0<= mc.fMCTime && mc.fMCTime<=25.0){
 	    //   mctime = -500.0;
 	    // // if(mc.fMCPos==0.0){
