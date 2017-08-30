@@ -114,7 +114,6 @@ namespace TreeSearch {
       bool operator() ( const Plane* a, const Plane* b ) const
       {
 	assert( a && b );
-	assert( a->GetDefinedNum() != b->GetDefinedNum() );
 	return ( a->GetZ() != b->GetZ() ) ?
 	  (a->GetZ() < b->GetZ()) : (a->GetDefinedNum() < b->GetDefinedNum());
       }
