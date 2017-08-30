@@ -69,7 +69,7 @@ UInt_t GetOuterBits( UInt_t p )
   };
   UInt_t ret = 0;
   if( p != 0 ) {
-    register UInt_t t, tt;
+    UInt_t t, tt;
     if( (tt = p >> 16) )
       ret = 1U << ((t = tt >> 8) ? 24 + LogTable256[t] : 16 + LogTable256[tt]);
     else
@@ -779,8 +779,8 @@ Bool_t Road::Fit()
     UInt_t mcpat = 0, nmcplanes = 0;
 #endif
     for( Pvec_t::size_type j = 0; j < npts; j++) {
-      register Point* p = selected[j];
-      register Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
+      Point* p = selected[j];
+      Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
       S11 += r;
       S12 += p->z * r;
       S22 += p->z * p->z * r;
@@ -794,7 +794,7 @@ Bool_t Road::Fit()
     // Covariance matrix of the fitted parameters
     Double_t V[3] = { S22*iD, -S12*iD, S11*iD };
     for( Pvec_t::size_type j = 0; j < npts; j++) {
-      register Point* p = selected[j];
+      Point* p = selected[j];
       Double_t d = a1 + a2*p->z - p->x;
       chi2 += d*d * w[j];
       // Must never use two points in the same plane
