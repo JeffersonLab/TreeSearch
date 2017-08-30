@@ -281,7 +281,7 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
     cout << "Filling tree..." << flush;
     NodeVisitor::ETreeOp ret = walk( &root_link, copy );
     cout << "done" << endl;
-    if( ret == kError ) {
+    if( ret == NodeVisitor::kError ) {
       ::Error( here, "Unable to create PatternTree structure" );
       delete tree;
       return 0;
