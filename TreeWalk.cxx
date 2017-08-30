@@ -127,7 +127,7 @@ NodeVisitor::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
   // http://www.parashift.com/c++-faq-lite/serialization.html#faq-36.11
 
   if( !os )
-    return kError;
+    return NodeVisitor::kError;
   Pattern* node = nd.link->GetPattern();
   map<Pattern*,Int_t>::iterator idx = fMap.find(node);
   if( idx == fMap.end() ) {
@@ -135,13 +135,13 @@ NodeVisitor::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
     fMap[node] = n;
     // Header for new pattern: link type + 128 (=128-130)
     os->put( nd.link->Type() | 0x80 );
-    if( os->fail() ) return kError;
+    if( os->fail() ) return NodeVisitor::kError;
     // Pattern data. NB: fBits[0] is always 0, so we can skip it
     swapped_binary_write( *os, node->GetBits()[1], node->GetNbits()-1 );
     // Child node count
     UShort_t nchild = node->GetNchildren();
     swapped_binary_write( *os, nchild );
-    if( os->fail() ) return kError;
+    if( os->fail() ) return NodeVisitor::kError;
     // Write child nodes regardless of depth
     return kRecurseUncond;
   } else {
@@ -149,7 +149,7 @@ NodeVisitor::ETreeOp WritePattern::operator() ( const NodeDescriptor& nd )
     os->put( nd.link->Type() );
     // Reference index
     swapped_binary_write( *os, idx->second, 1, sizeof(Int_t)-fIdxSiz );
-    if( os->fail() ) return kError;
+    if( os->fail() ) return NodeVisitor::kError;
     // Don't write child nodes
     return kSkipChildNodes;
   }

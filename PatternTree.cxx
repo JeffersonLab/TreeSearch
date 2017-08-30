@@ -188,7 +188,7 @@ Int_t PatternTree::Write( const char* filename )
   WritePattern write(filename,index_size);
   TreeWalk walk( GetNlevels() );
   Int_t ret = walk( GetRoot(), write );
-  if( ret != kError )
+  if( ret != NodeVisitor::kError )
     ret = 0;
   return ret;
 }
@@ -285,7 +285,7 @@ catch ( out_of_range ) {
     << fTree->fNlnk << " " << fTree->fNbit
     << "(internal logic error). Tree not copied. Call expert.";
   ::Error( "TreeSearch::CopyPattern", "%s", s.str().c_str() );
-  return kError;
+  return NodeVisitor::kError;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
