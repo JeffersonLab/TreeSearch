@@ -261,10 +261,10 @@ Road& Road::operator=( const Road& rhs )
     CopyPointData( rhs );
     fPlanePattern = rhs.fPlanePattern;
 #ifdef MCDATA
-    fNMCTrackHits = fNMCTrackHits;
-    fMCTrackPlanePattern = fMCTrackPlanePattern;
-    fNMCTrackHitsFit = fNMCTrackHitsFit;
-    fMCTrackPlanePatternFit = fMCTrackPlanePatternFit;
+    fNMCTrackHits = rhs.fNMCTrackHits;
+    fMCTrackPlanePattern = rhs.fMCTrackPlanePattern;
+    fNMCTrackHitsFit = rhs.fNMCTrackHitsFit;
+    fMCTrackPlanePatternFit = rhs.fMCTrackPlanePatternFit;
 #endif
 
     delete fBuild;
