@@ -5,6 +5,7 @@ lib*.so*
 # Generated files
 *Dict.h
 *Dict.cxx
+*.pcm
 
 # Internal documentation
 TODO
