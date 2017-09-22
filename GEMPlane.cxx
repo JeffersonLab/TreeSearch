@@ -372,7 +372,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       
       // Skip null data
       if( stripdata.adcraw == 0 )
-      	continue;
+	continue;
       //printf(" crate %d, slot %d, chan %d \n", d->crate, d->slot, ichan);
       
       // Save results for cluster finding later
@@ -406,6 +406,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       if( mc_data ) {
 	fMCHitList.push_back(istrip);
   	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
+	//For the time being, adding the dtrip MC time.
 	fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
       }
 #endif
