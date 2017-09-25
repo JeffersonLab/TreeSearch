@@ -561,6 +561,8 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       Double_t adc = fADCcor[istrip];
       xsum   += pos * adc;
       adcsum += adc;
+      //For the time being, we calculate the time with the same method as the MC time.
+      time  = TMath::Min( time, fHitTime[istrip] );
 #ifdef MCDATA
       // If doing MC data, analyze the strip truth information
       if( mc_data ) {
@@ -805,6 +807,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
     // Non-Monte Carlo hit data
     RVarDef nonmcvars[] = {
       { "hit.pos",  "Hit centroid (m)",      "fHits.TreeSearch::GEMHit.fPos" },
+      { "hit.time", "Hit reconstructed time","fHits.TreeSearch::GEMHit.fTime" },
       { "hit.adc",  "Hit ADC sum",           "fHits.TreeSearch::GEMHit.fADCsum" },
       { "hit.size", "Num strips ",           "fHits.TreeSearch::GEMHit.fSize" },
       { "hit.type", "Hit analysis result",   "fHits.TreeSearch::GEMHit.fType" },
@@ -819,6 +822,7 @@ Int_t GEMPlane::DefineVariables( EMode mode )
     // of classes under multiple inheritance might be implemetation-dependent
     RVarDef mcvars[] = {
       { "hit.pos",   "Hit centroid (m)",      "fHits.TreeSearch::MCGEMHit.fPos" },
+      { "hit.time",  "Hit reconstructed time","fHits.TreeSearch::GEMHit.fTime" },
       { "hit.adc",   "Hit ADC sum",           "fHits.TreeSearch::MCGEMHit.fADCsum" },
       { "hit.size",  "Num strips ",           "fHits.TreeSearch::MCGEMHit.fSize" },
       { "hit.type",  "Hit analysis result",   "fHits.TreeSearch::MCGEMHit.fType" },
