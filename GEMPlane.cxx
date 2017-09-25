@@ -544,7 +544,8 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     // Compute weighted position average. Again, a crude (but fast) substitute
     // for fitting the centroid of the peak.
     //printf("cluster number %d \n", *cur);
-    Double_t xsum = 0.0, adcsum = 0.0, time = 0.0;
+    Double_t xsum = 0.0, adcsum = 0.0, time = kBig;
+    double tsum = 0.0;// time calculation by weighted sum
 #ifdef MCDATA
     Double_t mcpos = 0.0, mctime = kBig;
     Int_t mctrack = 0, num_bg = 0;
@@ -561,8 +562,8 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       Double_t adc = fADCcor[istrip];
       xsum   += pos * adc;
       adcsum += adc;
-      //For the time being, we calculate the time with the same method as the MC time.
-      time  = TMath::Min( time, fHitTime[istrip] );
+      //time  = TMath::Min( time, fHitTime[istrip] ); //same method as the MC time.
+      tsum   += pos * adc; // time calculation by weighted sum
 #ifdef MCDATA
       // If doing MC data, analyze the strip truth information
       if( mc_data ) {
@@ -625,6 +626,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     
     assert( adcsum > 0.0 );
     Double_t pos = xsum/adcsum;
+    time = tsum/adcsum;
     
 #ifdef MCDATA
     if( mc_data && mctrack == 0 ) {
