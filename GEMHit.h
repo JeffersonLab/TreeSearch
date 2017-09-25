@@ -21,19 +21,21 @@ namespace TreeSearch {
 
   public:
     GEMHit() {}
-    GEMHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
+    GEMHit( Double_t pos, Double_t time, Double_t adc_sum, UInt_t num_strips, Int_t type,
 	    Double_t res, GEMPlane* pl ) :
-      Hit(pos, res, static_cast<Plane*>(pl)), fADCsum(adc_sum),
+      Hit(pos, res, static_cast<Plane*>(pl)), fTime(time), fADCsum(adc_sum),
       fSize(num_strips), fType(type) {}
     virtual ~GEMHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
 
     Double_t GetADCsum()     const { return fADCsum; }
+    UInt_t   GetTime()       const { return fTime; }
     UInt_t   GetSize()       const { return fSize; }
     Int_t    GetType()       const { return fType; }
 
   protected:
+    Double_t fTime;        // Hit reconstructed time
     Double_t fADCsum;      // Sum of ADC values of active strips
     UInt_t   fSize;        // Number of active strips
     Int_t    fType;        // Result code of cluster analysis
@@ -49,10 +51,10 @@ namespace TreeSearch {
 
   public:
     MCGEMHit() {}
-    MCGEMHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
+    MCGEMHit( Double_t pos, Double_t time, Double_t adc_sum, UInt_t num_strips, Int_t type,
 	      Double_t res, GEMPlane* pl, Int_t mctrk, Double_t mcpos,
 	      Double_t mctime, Int_t num_bg_strips )
-      : GEMHit(pos, adc_sum, num_strips, type, res, pl),
+      : GEMHit(pos, time, adc_sum, num_strips, type, res, pl),
 	MCHitInfo(mctrk, mcpos, mctime, num_bg_strips) {}
     virtual ~MCGEMHit() {}
 
