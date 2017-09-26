@@ -57,7 +57,8 @@ GEMPlane::GEMPlane( const char* name, const char* description,
 		    THaDetectorBase* parent )
   : Plane(name,description,parent),
     fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
-    fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0),
+    fMaxSamp(1), fTimeCutC(0), fTimeCutHW(0),
+    fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0),
     fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
     fOccupancy(0), fADCMap(0), fHitStripTime(0)
 {
@@ -649,7 +650,8 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 //       // Again, this is a guess, to be quantified with Monte Carlo
 //       resolution = 1.2*fResolution;
     }
-
+    
+    //if(-50.0<=time && time<=+50.0){// !!! TEST !!! make a timing cut 
     // Make a new hit
 #ifndef NDEBUG
     GEMHit* theHit = 0;
@@ -695,6 +697,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
     prevHit = theHit;
 #endif
+    //}//end timing cut 
   }
 
   // Undo amplitude splitting, if any, so fADCcor contains correct ADC values

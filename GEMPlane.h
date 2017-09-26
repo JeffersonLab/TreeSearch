@@ -53,7 +53,9 @@ namespace TreeSearch {
     Double_t      fSplitFrac;   // Percentage of amplitude swing necessary
                                 // for detecting cluster maximum/minimum
     UInt_t        fMaxSamp;     // Maximum # ADC samples per channel
-
+    Double_t      fTimeCutC;    // central value of hit time cut window
+    Double_t      fTimeCutHW;   // Half width of hit time cut window
+    
     Vflt_t        fPed;         // [fNelem] Per-channel pedestal values
     TBits         fBadChan;     // Bad channel map
     Double_t      fAmplSigma;   // Sigma of hit amplitude distribution
