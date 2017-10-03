@@ -79,6 +79,8 @@ namespace TreeSearch {
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
     TH2*          fHitStripTime;      // Histogram of Hit time Vs Time of strips in the Hit
     std::vector<double> StripsTime;
+    TH1*          fADCsamp_sig;      // Histogram of ADC samples for signal strips
+    TH2*          fADCsampVsStripTime_bkgd;      // Histogram of ADC samples for background strips
     
     void          AddStrip( Int_t istrip );
 
