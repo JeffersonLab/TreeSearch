@@ -427,7 +427,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	fMCHitList.push_back(istrip);
   	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
 	//For the time being, adding the dtrip MC time.
-	fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
+	//fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
 	
 	if(fMCHitInfo[istrip].fMCTrack > 0){
 	  for(int i_ = 0; i_<samples.size(); i_++)
