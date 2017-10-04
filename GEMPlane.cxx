@@ -237,6 +237,18 @@ static StripData_t ChargeDep( const vector<Float_t>& amp )
 
   Float_t adc    = delta_t*(sig[0]+sig[1]+sig[2]);
   Float_t time   = 0;     // TODO
+  if(amp.size()>=6){
+    //search max: temporary!!!
+    int i_sampmax = 0;
+    double max = 0;
+    for(int i = 0; i<6; i++){
+      if(amp[i]>max){
+	max = amp[i];
+	i_sampmax = i;
+      }
+    }
+    time = 25.0*(i_sampmax+0.5);
+  }
   Bool_t pass;
   // Calculate ratios for 3 samples and check for bad signals
   if( amp[2] > 0 ) {
