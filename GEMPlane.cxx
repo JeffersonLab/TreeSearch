@@ -270,8 +270,9 @@ void GEMPlane::AddStrip( Int_t istrip )
   Float_t adc = fADCcor[istrip];
   if( adc > 0 )
     ++fNhitStrips;
-  if( fGoodHit[istrip] and adc >= fMinAmpl ) {
-    fSigStrips.push_back(istrip);
+  if( fGoodHit[istrip] and adc >= fMinAmpl) {
+    if(fTimeCutHW==0 || (fTimeCutCV-fTimeCutHW<=fHitTime[istrip] && fHitTime[istrip]<=fTimeCutCV+fTimeCutHW) )
+      fSigStrips.push_back(istrip);
   }
 #ifdef TESTCODE
   if( TestBit(kDoHistos) ) {
@@ -678,7 +679,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 //       resolution = 1.2*fResolution;
     }
     
-    if(fTimeCutHW==0 || (fTimeCutCV-fTimeCutHW<=time && time<=fTimeCutCV+fTimeCutHW) ){
+    //if(fTimeCutHW==0 || (fTimeCutCV-fTimeCutHW<=time && time<=fTimeCutCV+fTimeCutHW) ){
     // Make a new hit
 #ifndef NDEBUG
     GEMHit* theHit = 0;
@@ -724,7 +725,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
     prevHit = theHit;
 #endif
-    }//end timing cut 
+    //}//end timing cut 
   }
 
   // Undo amplitude splitting, if any, so fADCcor contains correct ADC values
