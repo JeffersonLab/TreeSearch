@@ -84,7 +84,7 @@ ifndef ANALYZER
 endif
 
 INCDIRS  = $(wildcard $(addprefix $(ANALYZER)/, include src hana_decode hana_scaler))
-
+INCDIRS  +=${LIBSBSGEM}
 ifdef EVIO_INCDIR
   INCDIRS += ${EVIO_INCDIR}
 else ifdef EVIO

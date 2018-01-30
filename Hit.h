@@ -220,7 +220,7 @@ namespace TreeSearch {
     const Hit* rhs = static_cast<const Hit*>(obj);
     assert( fPlane == rhs->fPlane );
 
-    if( fPos  < rhs->fPos )  return -1;
+    if( fPos  < rhs->fPos )  return  -1;
     if( fPos  > rhs->fPos )  return  1;
     return 0;
   }

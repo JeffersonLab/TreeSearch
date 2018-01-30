@@ -320,7 +320,8 @@ Int_t Plane::ReadDatabaseCommon( const TDatime& date )
       status = LoadDB( file, date, request, fPrefix );
 
       if( status == kOK ) {
-	UInt_t flags = TestBit(kHaveRefChans) ? THaDetMap::kFillRefChan : 0;
+	UInt_t flags = THaDetMap::kFillPlane;//TestBit(kHaveRefChans) ? THaDetMap::kFillRefChan : 0;
+	cout<<"asd################asda"<<flags<<endl;
 	// Parse the detector map of the data channels
 	if( FillDetMap( *detmap, flags, here ) <= 0 )
 	  status = kInitError;

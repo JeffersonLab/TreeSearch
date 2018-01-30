@@ -24,7 +24,8 @@
 #include <algorithm>
 
 using namespace std;
-
+Double_t      fpulsex[20];
+Double_t      fpulsey[20];
 namespace TreeSearch {
 
 typedef vector<Plane*>::size_type vrsiz_t;

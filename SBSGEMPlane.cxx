@@ -15,6 +15,9 @@
 #include "SBSGEMPlane.h"
 #include "SBSGEMTracker.h"
 
+
+
+
 using namespace std;
 
 namespace SBS {
@@ -60,6 +63,8 @@ GEMPlane::~GEMPlane()
 //   return TreeSearch::GEMPlane::Decode( evData );
 // }
 
+
+
 //_____________________________________________________________________________
 // Int_t GEMPlane::DefineVariables( EMode mode )
 // {
@@ -72,20 +77,23 @@ GEMPlane::~GEMPlane()
 // }
 
 //_____________________________________________________________________________
-// Int_t GEMPlane::ReadDatabase( const TDatime& date )
-// {
-//   // Read database
+  Int_t GEMPlane::ReadDatabase( const TDatime& date )
+ {
+   // Read database
 
-//   //  static const char* const here = "ReadDatabase";
+   //  static const char* const here = "ReadDatabase";
 
-//   // Read the database for the base class, quit if error
-//   Int_t status = TreeSearch::GEMPlane::ReadDatabase(date);
-//   if( status != kOK )
-//     return status;
+   // Read the database for the base class, quit if error
+   Int_t status = TreeSearch::GEMPlane::ReadDatabase(date);
+   if( status != kOK )
+     return status;
 
-//   fIsInit = true;
-//   return kOK;
-// }
+   fIsInit = true;
+   return kOK;
+   //add subGEMPlane here
+   //newModule = new SBS::GEMModule(name, description, parent);
+   //fModules.push_back(newModule); //needs only Geo information, can just be an struct/map
+ }
 
 //___________________________________________________________________________
 Bool_t GEMPlane::Contains( Double_t x, Double_t y ) const
@@ -140,11 +148,30 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
     {"dx",          &fDX,           kDouble, 0, 1},
     {"dy",          &fDY,           kDouble, 0, 1},
     {"dz",          &depth,         kDouble, 0, 1},
+    {"nmodule",     &nModule,       kInt,    0, 1},
     { 0 }
   };
+
   Int_t err = LoadDB( file, date, request, fPrefix );
   if( err )
     return err;
+  
+
+  for (int j=1; j<nModule+1; j++){
+    mOffsets[j]=0;
+    Double_t offset_temp;
+    DBRequest module_request[] = {
+      {"offset",          &offset_temp,           kDouble, 0, 1},
+      { 0 }
+    };
+    ostringstream module_prefix(fPrefix, ios_base::ate);
+    module_prefix<<j<<".";
+    cout<<module_prefix.str().c_str()<<endl;
+    int err = LoadDB( file, date, module_request, module_prefix.str().c_str());
+    if( err ) exit(2);
+    mOffsets[j-1] = offset_temp;
+    //cout<<offset_temp<<" "<<mOffsets[j]<<endl;getchar();     
+  }
 
   // Sanity checks
   if( fDX < 0 or fDY < 0 ) {
@@ -171,7 +198,7 @@ Int_t GEMPlane::ReadGeometry( FILE* file, const TDatime& date,
   fSize[0] = fDX;
   fSize[1] = fDY;
   fSize[2] = depth;
-  
+  cout<<"SBS:GEMPlane readgeo done"<<endl;
   return kOK;
 }
 

@@ -632,7 +632,7 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
     Double_t anyHitPos, mcHitPos;
     Hit* anyHit = pl->FindNearestHitAndPos( x, anyHitPos );
     Hit* mcHit  = pl->FindNearestMCHitAndPos( x, pt->fMCTrack, mcHitPos );
-
+    // cout<<x<<" "<<anyHitPos<<" "<<mcHitPos<<endl;
     // Sanity checks
     assert( not mcHit or anyHit ); // mcHit implies anyHit
     assert( nfound == 0 or  // nfound > 0 implies anyHit and pos within window
@@ -2063,13 +2063,14 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   status = PartnerPlanes();
   if( status )
     return fStatus = status;
-
+  cout<<"going to "<<endl;
   // Set up the projections based on which plane types are defined
   assert( fProj.empty() );
   for( vrsiz_t iplane = 0; iplane < fPlanes.size(); ++iplane ) {
     Plane* thePlane = fPlanes[iplane];
     assert( !thePlane->GetProjection() );
     EProjType type = thePlane->GetType();
+    cout<<fProj.size()<<" plane type: "<<type<<endl;
     vpiter_t it = find_if( ALL(fProj), Projection::TypeEquals(type) );
     Projection* proj;
     if( it != fProj.end() ) {
@@ -2109,17 +2110,18 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     else
       proj->AddPlane( thePlane );
   }
+
   if( fDebug > 0 )
     Info( Here(here), "Set up %u projections", (UInt_t)fProj.size() );
 
   // Sort projections by ascending EProjType
   sort( ALL(fProj), Projection::ByType() );
-
+  
   // Initialize the projections. This will read the database and set
   // the projections' angle, width and maxslope
   try {
-    for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
-      status = (*it)->Init(date);
+    for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) { 
+      status = (*it)->Init(date);  
       if( status )
 	return fStatus = status;
     }

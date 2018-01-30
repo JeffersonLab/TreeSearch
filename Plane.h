@@ -15,6 +15,7 @@
 #include "TVector2.h"
 #include "TMath.h"
 #include "TString.h"
+#include "TSBSSimDecoder.h"
 #include <vector>
 #include <cassert>
 #include <functional>
@@ -160,6 +161,7 @@ namespace TreeSearch {
 
     // Event data, hits etc.
     TClonesArray* fHits;        // Cluster data (groups of hits)
+    void SortHits();            // sort fHits by position
     TClonesArray* fFitCoords;   // Cluster coordinates used by good road fits
 
     Int_t ReadDatabaseCommon( const TDatime& date );
@@ -173,7 +175,7 @@ namespace TreeSearch {
 #ifdef MCDATA
     // Only set when analyzing simulation data
     Vint_t            fMCHitList;  // Elements in fMCHitInfo with data
-    Podd::MCHitInfo*  fMCHitInfo;  // [fNelem] MC truth data for fHits
+    TSBSMCHitInfo*  fMCHitInfo;  // [fNelem] MC truth data for fHits
 #endif
 
     // Support functions for dummy planes

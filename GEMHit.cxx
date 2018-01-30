@@ -40,7 +40,13 @@ void MCGEMHit::Print( Option_t* ) const
   GEMHit::Print("C");
   MCPrint();
 }
+  // Int_t MCGEMHit::Compare(const TObject *obj) const
+  // {
+  //    if(((MCGEMHit*)obj)->GetPos()==GetPos()) return 0;
+  //  }
 #endif
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 

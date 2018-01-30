@@ -11,8 +11,26 @@
 
 #include "Plane.h"
 #include "TBits.h"
+#include <vector>
+#include <map>
+#include "SimDecoder.h"
+//#include "GEMHit.h"
 
 namespace TreeSearch {
+
+
+
+  struct StripData_t {
+    Float_t maxAdc;
+    Float_t adcSum;
+    Int_t maxTimeSample=-1;
+    Double_t peaktime = 0;
+    std::vector<Float_t> vADC;
+    Bool_t  pass;
+    StripData_t() {}
+  StripData_t( Float_t _raw, Float_t _adc, Int_t max_bin, Double_t _time, Bool_t _pass, std::vector<Float_t> _vADC )
+  : maxAdc(_raw), adcSum(_adc), maxTimeSample(max_bin), peaktime(_time), pass(_pass), vADC(_vADC) {}
+  };
 
   class GEMPlane : public Plane {
   public:
@@ -33,6 +51,7 @@ namespace TreeSearch {
     Double_t        GetHitOcc()      const { return fHitOcc; }
     Double_t        GetOccupancy()   const { return fOccupancy; }
     Int_t           GetNsigStrips()  const { return fSigStrips.size(); }
+    StripData_t GEMChargeDep( const vector<Float_t>& amp );
 
   protected:
     typedef std::vector<bool>  Vbool_t;
@@ -53,6 +72,7 @@ namespace TreeSearch {
     UInt_t        fMaxSamp;     // Maximum # ADC samples per channel
 
     Vflt_t        fPed;         // [fNelem] Per-channel pedestal values
+    Int_t         fcModeSize;   // Number of strips in same common mode group
     TBits         fBadChan;     // Bad channel map
     Double_t      fAmplSigma;   // Sigma of hit amplitude distribution
 
@@ -61,24 +81,33 @@ namespace TreeSearch {
     Float_t*      fADC;         // [fNelem] Integral of deconvoluted ADC samples
     Float_t*      fHitTime;     // [fNelem] Leading-edge time of deconv signal (ns)
     Float_t*      fADCcor;      // [fNelem] fADC corrected for pedestal & noise
+    Float_t*      fMCCharge;    // storage for mc charge
     Byte_t*       fGoodHit;     // [fNelem] Strip data passed pulse shape test
     Double_t      fDnoise;      // Event-by-event noise (avg below fMinAmpl)
     Vint_t        fSigStrips;   // Ordered strip numbers with signal (adccor > minampl)
+    std::map<Int_t, Int_t> fmStripModule; // Module ID of the strip;
     Vbool_t       fStripsSeen;  // Flags for duplicate strip number detection
 
     UInt_t        fNrawStrips;  // Statistics: strips with any data
     UInt_t        fNhitStrips;  // Statistics: strips > 0
     Double_t      fHitOcc;      // Statistics: hit occupancy fNhitStrips/fNelem
     Double_t      fOccupancy;   // Statistics: occupancy GetNsigStrips/fNelem
+    // pulse fit---temprary need to find better ways
+    //Int_t         fMaxPulsePoints = 20;
+    
+
+    std::map<Int_t,StripData_t> mStrip; //strips passed zero suppression.
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
 
-    void          AddStrip( Int_t istrip );
+    void          AddStrip( Int_t istrip, Int_t module );
 
     // Support functions for dummy planes
     virtual Hit*  AddHitImpl( Double_t x );
     virtual Int_t GEMDecode( const THaEvData& );
+    void ValueCmp(TClonesArray* f);
+    virtual Double_t GetModuleOffsets(Int_t module){return 0;};
 
     // Podd interface
     virtual Int_t ReadDatabase( const TDatime& date );

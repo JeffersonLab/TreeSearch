@@ -10,6 +10,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "GEMPlane.h"
+#include <map>
+#include <sstream>
 
 namespace SBS {
 
@@ -26,11 +28,11 @@ namespace SBS {
     // virtual void    Print( Option_t* opt="" ) const;
     
     virtual Bool_t  Contains( Double_t x, Double_t y ) const;
-
+    virtual Double_t GetModuleOffsets(Int_t module) {return mOffsets[module];};
   protected:
 
     // Podd interface
-    //    virtual Int_t ReadDatabase( const TDatime& date );
+    virtual Int_t ReadDatabase( const TDatime& date );
     virtual Int_t ReadGeometry( FILE* file, const TDatime& date,
 				Bool_t required = kTRUE );
     //    virtual Int_t DefineVariables( EMode mode = kDefine );
@@ -39,6 +41,8 @@ namespace SBS {
     Double_t  fD0;         // distance of Plane from spectrometer "Zero"
     Double_t  fDX;      // Coverage in X_T
     Double_t  fDY;      // Coverage in Y_T
+    Int_t  nModule;  //number of modules in this Plane
+    std::map<Int_t, Double_t> mOffsets; //map of module offsets
 
     ClassDef(GEMPlane,0)     // GEM readout plane in cylindrical coordinates
   };
