@@ -651,7 +651,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 //       resolution = 1.2*fResolution;
     }
     
-    if(fTimeCutHW==0 || (fTimeCutC-fTimeCutHW<=time && time<=fTimeCutC+fTimeCutHW) ){
+    //if(-50.0<=time && time<=+50.0){// !!! TEST !!! make a timing cut 
     // Make a new hit
 #ifndef NDEBUG
     GEMHit* theHit = 0;
@@ -697,7 +697,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
     prevHit = theHit;
 #endif
-    }//end timing cut 
+    //}//end timing cut 
   }
 
   // Undo amplitude splitting, if any, so fADCcor contains correct ADC values
