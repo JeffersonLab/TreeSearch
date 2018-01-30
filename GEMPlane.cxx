@@ -17,7 +17,6 @@
 #include "THaDetMap.h"
 #include "TClonesArray.h"
 #include "TH1.h"
-#include "TH2.h"
 #include "TError.h"
 #include "TString.h"
 
@@ -59,7 +58,7 @@ GEMPlane::GEMPlane( const char* name, const char* description,
     fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
     fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0),
     fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
-    fOccupancy(0), fADCMap(0), fHitStripTime(0)
+    fOccupancy(0), fADCMap(0)
 {
   // Constructor
 
@@ -115,9 +114,6 @@ Int_t GEMPlane::Begin( THaRunBase* run )
     string hname(fPrefix);
     hname.append("adcmap");
     fADCMap = new TH1F( hname.c_str(), hname.c_str(), fNelem, 0, fNelem );
-    string hname_2D(fPrefix);
-    hname_2D.append("HitVsStripTime");
-    fHitStripTime = new TH2F( hname_2D.c_str(), hname_2D.c_str(), 350, -250, +100, 350, -250, +100);
   }
 #endif
   return 0;
@@ -280,7 +276,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 
 #ifdef TESTCODE
   if( TestBit(kDoHistos) )
-    assert( fHitMap != 0 and fADCMap != 0 and fHitStripTime != 0 );
+    assert( fHitMap != 0 and fADCMap != 0 );
 #endif
   assert( fPed.empty() or
 	  fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
@@ -406,7 +402,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       if( mc_data ) {
 	fMCHitList.push_back(istrip);
   	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
-	fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
+	//fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
       }
 #endif
     }  // chans
@@ -542,17 +538,10 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     assert( size > 0 );
     // Compute weighted position average. Again, a crude (but fast) substitute
     // for fitting the centroid of the peak.
-    //printf("cluster number %d \n", *cur);
     Double_t xsum = 0.0, adcsum = 0.0;
 #ifdef MCDATA
     Double_t mcpos = 0.0, mctime = kBig;
     Int_t mctrack = 0, num_bg = 0;
-#endif
-
-#ifdef TESTCODE
-    if( TestBit(kDoHistos) ){
-      StripsTime.clear();
-    }
 #endif
     for( ; start != next; ++start ) {
       Int_t istrip = *start;
@@ -578,21 +567,11 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 	    mctrack = mc.fMCTrack;
 	    mcpos   = mc.fMCPos;
 	    mctime  = mc.fMCTime;
-#ifdef TESTCODE
-	    if( TestBit(kDoHistos) ){
-	      StripsTime.push_back(mc.fMCTime);
-	    }
-#endif
 	  }
 	  else {
 	    // If background hits only, compute position average
 	    mcpos  += mc.fMCPos;
 	    mctime  = TMath::Min( mctime, mc.fMCTime );
-#ifdef TESTCODE
-	    if( TestBit(kDoHistos) ){
-	      StripsTime.push_back(mc.fMCTime);
-	    }
-#endif
 	    // if(mc.fMCTime>=50.0){
 	    //   printf("istrip = %d, mc.fMCTime =  %f\n", istrip, mc.fMCTime);
 	    //   printf("mctime = %1.3f, mc.fMCTime = %1.3f\n", mctime, mc.fMCTime);
@@ -609,20 +588,9 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       }
 #endif // MCDATA
     }
-    
-#ifdef TESTCODE
-    if( TestBit(kDoHistos) ) {
-      for(int i_ = 0; i_<StripsTime.size(); i_++){
-	fHitStripTime->Fill(mctime, StripsTime.at(i_));
-      }
-      StripsTime.clear();
-    }
-#endif
-    
-    
     assert( adcsum > 0.0 );
     Double_t pos = xsum/adcsum;
-    
+
 #ifdef MCDATA
     if( mc_data && mctrack == 0 ) {
       mcpos /= static_cast<Double_t>(size);
@@ -698,7 +666,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
   // Negative return value indicates potential problem
   if( nHits > fMaxHits )
     nHits = -nHits;
-  
+
   return nHits;
 }
 
@@ -840,8 +808,6 @@ Int_t GEMPlane::End( THaRunBase* run )
   if( TestBit(kDoHistos) ) {
     assert( fADCMap );
     fADCMap->Write();
-    assert( fHitStripTime );
-    fHitStripTime->Write();
   }
 #endif
   return 0;

@@ -12,8 +12,6 @@
 #include "Plane.h"
 #include "TBits.h"
 
-class TH2;
-
 namespace TreeSearch {
 
   class GEMPlane : public Plane {
@@ -75,9 +73,7 @@ namespace TreeSearch {
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
-    TH2*          fHitStripTime;      // Histogram of Hit time Vs Time of strips in the Hit
-    std::vector<double> StripsTime;
-    
+
     void          AddStrip( Int_t istrip );
 
     // Support functions for dummy planes
