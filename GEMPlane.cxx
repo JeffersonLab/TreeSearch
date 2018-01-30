@@ -60,7 +60,7 @@ GEMPlane::GEMPlane( const char* name, const char* description,
     fMaxSamp(1), fTimeCutCV(0), fTimeCutHW(0),
     fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0),
     fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
-    fOccupancy(0), fADCMap(0), fHitStripTime(0), fADCsamp_sig(0), fADCsampVsStripTime_bkgd(0)
+    fOccupancy(0), fADCMap(0), fHitStripTime(0)
 {
   // Constructor
 
@@ -119,13 +119,6 @@ Int_t GEMPlane::Begin( THaRunBase* run )
     string hname_2D(fPrefix);
     hname_2D.append("HitVsStripTime");
     fHitStripTime = new TH2F( hname_2D.c_str(), hname_2D.c_str(), 350, -250, +100, 350, -250, +100);
-    hname = fPrefix;
-    hname.append("ADCsamp_sig");
-    fADCsamp_sig = new TH1F( hname.c_str(), hname.c_str(), fMaxSamp, 0, fMaxSamp);
-    hname_2D = fPrefix;
-    hname_2D.append("ADCsampVsStripTime_bkgd");
-    fADCsampVsStripTime_bkgd = new TH2F( hname_2D.c_str(), hname_2D.c_str(), 14, -250, +100, fMaxSamp, 0, fMaxSamp);
-   
   }
 #endif
   return 0;
@@ -288,7 +281,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 
 #ifdef TESTCODE
   if( TestBit(kDoHistos) )
-    assert( fHitMap != 0 and fADCMap != 0 and fHitStripTime != 0 and fADCsamp_sig != 0 and fADCsampVsStripTime_bkgd != 0);
+    assert( fHitMap != 0 and fADCMap != 0 and fHitStripTime != 0 );
 #endif
   assert( fPed.empty() or
 	  fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
@@ -416,14 +409,6 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
   	fMCHitInfo[istrip] = simdata->GetMCHitInfo(d->crate,d->slot,chan);
 	//For the time being, adding the dtrip MC time.
 	fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
-	
-	if(fMCHitInfo[istrip].fMCTrack > 0){
-	  for(int i_ = 0; i_<samples.size(); i_++)
-	    fADCsamp_sig->Fill(i_, samples.at(i_));
-	}else{
-	  for(int i_ = 0; i_<samples.size(); i_++)
-	    fADCsampVsStripTime_bkgd->Fill(fHitTime[istrip], i_, samples.at(i_));
-	}
       }
 #endif
     }  // chans
@@ -871,10 +856,6 @@ Int_t GEMPlane::End( THaRunBase* run )
     fADCMap->Write();
     assert( fHitStripTime );
     fHitStripTime->Write();
-    assert( fADCsamp_sig );
-    fADCsamp_sig->Write();
-    assert( fADCsampVsStripTime_bkgd );
-    fADCsampVsStripTime_bkgd->Write();
   }
 #endif
   return 0;
