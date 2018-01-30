@@ -544,7 +544,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
     // Compute weighted position average. Again, a crude (but fast) substitute
     // for fitting the centroid of the peak.
     //printf("cluster number %d \n", *cur);
-    Double_t xsum = 0.0, adcsum = 0.0, time = 0.0;
+    Double_t xsum = 0.0, adcsum = 0.0;
 #ifdef MCDATA
     Double_t mcpos = 0.0, mctime = kBig;
     Int_t mctrack = 0, num_bg = 0;
@@ -657,7 +657,6 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       theHit =
 #endif
 	new( (*fHits)[nHits++] ) GEMHit( pos,
-					 time,
 					 adcsum,
 					 size,
 					 type,
@@ -672,7 +671,6 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       theHit =
 #endif
 	new( (*fHits)[nHits++] ) MCGEMHit( pos,
-					   time,
 					   adcsum,
 					   size,
 					   type,
@@ -717,7 +715,7 @@ Hit* GEMPlane::AddHitImpl( Double_t pos )
 
   // Emulate parameters for dummy hits
   const UInt_t size = 1, type = 0;
-  const Double_t adcsum = 10.*fMinAmpl, resolution = fResolution, time = 0.0;
+  const Double_t adcsum = 10.*fMinAmpl, resolution = fResolution;
   
 #ifdef MCDATA
   const Int_t mctrack = 1, num_bg = 0;
@@ -726,7 +724,6 @@ Hit* GEMPlane::AddHitImpl( Double_t pos )
   if( mc_data )
     // Monte Carlo data
     theHit = new( (*fHits)[GetNhits()] ) MCGEMHit( pos,
-						   time,
 						   adcsum,
 						   size,
 						   type,
@@ -740,7 +737,6 @@ Hit* GEMPlane::AddHitImpl( Double_t pos )
     else
 #endif
       theHit = new( (*fHits)[GetNhits()] ) GEMHit( pos,
-						   time,
 						   adcsum,
 						   size,
 						   type,

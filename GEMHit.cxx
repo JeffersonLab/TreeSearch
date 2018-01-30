@@ -25,9 +25,7 @@ void GEMHit::Print( Option_t* opt ) const
   // Print hit info
 
   Hit::Print("C");
-  cout << " adc sum = "  << GetADCsum()
-       << " time ="  << GetTime()
-       << " size="  << GetSize()
+  cout << " size="  << GetSize()
        << " type="  << GetType();
   if( *opt != 'C' )
     cout << endl;
