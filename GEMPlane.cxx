@@ -563,7 +563,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       xsum   += pos * adc;
       adcsum += adc;
       //time  = TMath::Min( time, fHitTime[istrip] ); //same method as the MC time.
-      tsum   += fHitTime[istrip] * adc; // time calculation by weighted sum
+      tsum   += pos * adc; // time calculation by weighted sum
 #ifdef MCDATA
       // If doing MC data, analyze the strip truth information
       if( mc_data ) {
