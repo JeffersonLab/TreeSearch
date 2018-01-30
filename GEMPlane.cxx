@@ -57,7 +57,7 @@ GEMPlane::GEMPlane( const char* name, const char* description,
 		    THaDetectorBase* parent )
   : Plane(name,description,parent),
     fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
-    fMaxSamp(1), fTimeCutCV(0), fTimeCutHW(0),
+    fMaxSamp(1), fTimeCutC(0), fTimeCutHW(0),
     fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0),
     fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
     fOccupancy(0), fADCMap(0), fHitStripTime(0)
@@ -651,7 +651,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 //       resolution = 1.2*fResolution;
     }
     
-    if(fTimeCutHW==0 || (fTimeCutCV-fTimeCutHW<=time && time<=fTimeCutCV+fTimeCutHW) ){
+    if(fTimeCutHW==0 || (fTimeCutC-fTimeCutHW<=time && time<=fTimeCutC+fTimeCutHW) ){
     // Make a new hit
 #ifndef NDEBUG
     GEMHit* theHit = 0;
@@ -898,8 +898,6 @@ Int_t GEMPlane::ReadDatabase( const TDatime& date )
       { "maxclustsiz",    &fMaxClusterSize, kUInt,    0, 1, gbl },
       { "maxsamp",        &fMaxSamp,        kUInt,    0, 1, gbl },
       { "adc.min",        &fMinAmpl,        kDouble,  0, 1, gbl },
-      { "timecut.cv",     &fTimeCutCV,      kDouble,  0, 1, gbl },
-      { "timecut.hw",     &fTimeCutHW,      kDouble,  0, 1, gbl },
       { "split.frac",     &fSplitFrac,      kDouble,  0, 1, gbl },
       { "mapping",        &mapping,         kTString, 0, 1, gbl },
       { "chanmap",        &fChanMap,        kIntV,    0, 1, gbl },
