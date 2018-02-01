@@ -51,8 +51,8 @@ namespace TreeSearch {
     Double_t        GetHitOcc()      const { return fHitOcc; }
     Double_t        GetOccupancy()   const { return fOccupancy; }
     Int_t           GetNsigStrips()  const { return fSigStrips.size(); }
-    StripData_t GEMChargeDep( const vector<Float_t>& amp );
-
+    //StripData_t GEMChargeDep( const vector<Float_t>& amp );
+    bool            AnalyzeStrip(const vector<Float_t>& amp, StripData_t &stripdata);
   protected:
     typedef std::vector<bool>  Vbool_t;
 
@@ -75,6 +75,11 @@ namespace TreeSearch {
     Int_t         fcModeSize;   // Number of strips in same common mode group
     TBits         fBadChan;     // Bad channel map
     Double_t      fAmplSigma;   // Sigma of hit amplitude distribution
+    Int_t         fpedestal_sigma;
+    Int_t         ftmp_pedestal_rms;
+    Int_t         ftmp_comm_range;
+
+
 
     // Event data, hits etc.
     Float_t*      fADCraw;      // [fNelem] Integral of raw ADC samples
@@ -106,6 +111,9 @@ namespace TreeSearch {
     // Support functions for dummy planes
     virtual Hit*  AddHitImpl( Double_t x );
     virtual Int_t GEMDecode( const THaEvData& );
+
+    void DoClustering();//from mStrip to fhit TODO
+
     void ValueCmp(TClonesArray* f);
     virtual Double_t GetModuleOffsets(Int_t module){return 0;};
 

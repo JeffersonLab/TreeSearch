@@ -357,7 +357,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
   }
 
   //_____________________________________________________________________________
-  StripData_t GEMPlane::GEMChargeDep( const vector<Float_t>& amp )
+  bool GEMPlane::AnalyzeStrip( const vector<Float_t>& amp, StripData_t &stripdata )
   {
     //Deconvolution method is not proper for GEM signals since the "zero" time isn't fixed to a certain sample,
     //Especially with APV-25 chip, no syncronization between 40MHz clock and trigger, 
@@ -387,18 +387,27 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     //if(adcSum<=0){cout<<" AA "<<endl;getchar();}
     
 
-    if(adcAvg>5*10)
+    if(adcAvg>fpedestal_sigma*ftmp_pedestal_rms)// pedestal parameters to be put in data base
       {
+	++fNhitStrips;
 	if(maxTimeSample==0||maxTimeSample==(Nsample-1))
 	  pass = true;
 	else{
 	  pass  = true;
 	  FitPulse(sampleAdc,Nsample, shapingtime, peaktime, adcmax_fit);
 	}
+	//	stripdata =   StripData_t(maxAdc,adcSum,maxTimeSample,peaktime,pass,amp);
+	stripdata.maxAdc = maxAdc;
+	stripdata.adcSum = adcSum;
+	stripdata.maxTimeSample = maxTimeSample;
+	stripdata.peaktime = peaktime;
+	stripdata.pass = pass;
+	stripdata.vADC = amp;
+	return true;
       }
     // if(pass){cout<<adcAvg<<" time: "<<peaktime<<endl;getchar();}
-    return StripData_t(maxAdc,adcSum,maxTimeSample,peaktime,pass,amp);
-
+    // return StripData_t(maxAdc,adcSum,maxTimeSample,peaktime,pass,amp);
+    return false;
   }
 
 
@@ -410,8 +419,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // Utility function used by Decode.
 
     Float_t adc = mStrip[istrip].maxAdc;
-    if( adc > 0 )
-      ++fNhitStrips;
+
     if( fGoodHit[istrip] and mStrip[istrip].pass ) {
       fSigStrips.push_back(istrip);
       fmStripModule[istrip] = module;
@@ -423,6 +431,13 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     }
 #endif
   }
+
+//_____________________________________________________________________________
+  void GEMPlane::DoClustering(){ // aim to be able to seperate cluster in high occupancy case by using strip timing information
+
+
+}
+
 
   //_____________________________________________________________________________
   Int_t GEMPlane::GEMDecode( const THaEvData& evData )
@@ -472,14 +487,17 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       // GEM module ID
       Int_t moduleID = d->plane; //0 1 2....
       //Common mode storage
-      Int_t Napvs = (d->hi-d->lo)/fcModeSize+1; // Number of groups of 128 strips
+      assert((d->hi-d->lo+1)%fcModeSize==0);
+      Int_t Napvs = (d->hi-d->lo+1)/fcModeSize; // Number of groups of 128 strips
       vector<Float_t> commonMode[Napvs][fMaxSamp]; // storing value for calculating common mode
       Float_t cMode[Napvs][fMaxSamp]; //common mode value of each group of 128 channels and each sample
 
       // Read the all channels in current DAQ-module
       Int_t nchan = evData.GetNumChan( d->crate, d->slot ); //
+
       for( Int_t ichan = 0; ichan < nchan; ++ichan ) {
 	Int_t chan = evData.GetNextChan( d->crate, d->slot, ichan );
+	//	cout<<chan<<"  "<<ichan<<endl;
 	if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
       
 	// Map channel number to strip number
@@ -495,7 +513,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  continue;
 	}
 	fStripsSeen[istrip] = true;
-
+	//cout<<istrip<<endl;
 	// For the APV25 analog pipeline, multiple "hits" on a decoder channel
 	// correspond to time samples 25 ns apart
 	
@@ -505,7 +523,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	++fNrawStrips;
 	nsamp = TMath::Min( nsamp, static_cast<Int_t>(fMaxSamp) );  
 
-	// populate vector commonMode[][]  
+	// populate vector commonMode[][], all information from data is here
 	for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
 	  Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
@@ -528,7 +546,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       }  // end of loop on chans
 
       // Calculating common mode from vector commonMode[][] and store in Int cMode[][]
-      // 1 loop check adc range
+      // 1 loop check adc range, could add more loop to get more precise commonMode, this will be O(n), better than sorting O(nlogn)/O(n^2), time matters for online processing
       for(int iapv=0; iapv<Napvs;iapv++)
 	{
 	  //	  cout<<d->crate<<" "<<d->slot<<" apv: "<<iapv<<endl;
@@ -540,7 +558,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	      for(int is=0;is<Commsize;is++)
 		{
 		  Float_t tempADC = commonMode[iapv][isamp][is];
-		  if(tempADC>200||tempADC<-200)continue; // constant 200 to be put in database
+		  if(tempADC>ftmp_comm_range||tempADC<-ftmp_comm_range)continue; // constant 200 to be put in database, this number should come from a clean, no signal run, and be determined by evaluating the common mode distribution.
 		  tempcMode+=tempADC;
 		  NcommMode++;
 		}
@@ -574,12 +592,15 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	    samples.push_back( fsamp );
 	  }
 
-	// Analyze the pulse shape
-	stripdata = GEMChargeDep(samples);
-	// Save strip information for cluster finding
+	// Do zero suppression and Analyze the pulse shape
+	if(!AnalyzeStrip(samples, stripdata))
+	  continue;// Do nothing for strips not passing zero suppression
+
+	// Save strip information for cluster finding, this struct have all information, in principle we don't need the following fADCraw[], fADC[].......
 	mStrip[istrip] = stripdata;
       
 	// Save results for cluster finding later
+	// not necessary anymore, still here because some histograms needs it.
 	fADCraw[istrip]  = stripdata.maxAdc;
 	fADC[istrip]     = stripdata.adcSum;
 	fHitTime[istrip] = stripdata.peaktime;
@@ -594,6 +615,19 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 
     fHitOcc    = static_cast<Double_t>(fNhitStrips) / fNelem;
     fOccupancy = static_cast<Double_t>(GetNsigStrips()) / fNelem;
+
+    //
+    // DoClustering();
+    //
+
+
+
+
+
+
+
+
+
 
     // Find and analyze clusters. Clusters of active strips are considered
     // a "Hit".
@@ -1143,6 +1177,9 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	{ "do_noise",       &do_noise,        kInt,     0, 1, gbl },
 	{ "adc.sigma",      &fAmplSigma,      kDouble,  0, 1, gbl },
 	{ "check_pulse_shape",&check_pulse_shape, kInt, 0, 1, gbl },
+	{ "pedestal_sigma", &fpedestal_sigma,      kInt,0, 1, gbl },
+	{ "tmp_pedestal_rms",&ftmp_pedestal_rms,  kInt, 0, 1, gbl },
+	{ "tmp_comm_range", &ftmp_comm_range,  kInt,    0, 1, gbl },
 	{ "commonmode_groupsize", &fcModeSize,kInt,     0, 1, gbl },
 	{ 0 }
       };
