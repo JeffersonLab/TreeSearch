@@ -23,11 +23,12 @@
 
 class TH1;
 class THaTrack;
-namespace Podd {
-  class MCHitInfo;
-}
+//namespace Podd {
+//  class MCHitInfo;
+//}
 
 namespace TreeSearch {
+
 
   class Projection;
   class Tracker;

@@ -84,7 +84,7 @@ ifndef ANALYZER
 endif
 
 INCDIRS  = $(wildcard $(addprefix $(ANALYZER)/, include src hana_decode hana_scaler))
-INCDIRS  +=${LIBSBSGEM}
+INCDIRS  +=${LIBSBSGEM}/src
 ifdef EVIO_INCDIR
   INCDIRS += ${EVIO_INCDIR}
 else ifdef EVIO
@@ -114,12 +114,12 @@ GLIBS         =
 ifeq ($(ARCH),linux)
 # Linux with gcc (RedHat)
 ifdef DEBUG
-  CXXFLAGS    = -g -O0
-  LDFLAGS     = -g -O0
+  CXXFLAGS    =  -g -O0 #-pthread -std=c++11 -m64 -I/home/danning/cernroot/root6/include
+  LDFLAGS     =  -g -O0 #-pthread -std=c++11 -m64 -I/home/danning/cernroot/root6/include
   DEFINES     =
 else
-  CXXFLAGS    = -O2 -g #-march=pentium4
-  LDFLAGS     = -O -g
+  CXXFLAGS    =  -O2 -g  #-pthread -std=c++11 -m64 -I/home/danning/cernroot/root6/include
+  LDFLAGS     =  -O -g #-pthread -std=c++11 -m64 -I/home/danning/cernroot/root6/include
 #  DEFINES     = -DNDEBUG
 endif
 DEFINES      += -DLINUXVERS -DHAS_SSTREAM
@@ -133,7 +133,7 @@ CXXFLAGS     += -Wextra -Wno-missing-field-initializers
 DICTCXXFLG   := -Wno-strict-aliasing 
 endif
 endif
-SOFLAGS       = -shared
+SOFLAGS       = -std=c++11 -shared
 ifdef I387MATH
 CXXFLAGS     += -mfpmath=387
 else
@@ -172,7 +172,7 @@ CXXFLAGS     += $(DEFINES) $(ROOTCFLAGS) $(ROOTCFLAGS) $(PKGINCLUDES)
 LIBS         += $(ROOTLIBS) $(SYSLIBS)
 GLIBS        += $(ROOTGLIBS) $(SYSLIBS)
 
-MAKEDEPEND    = gcc
+MAKEDEPEND    = g++ -std=c++11
 
 ifndef PKG
 PKG           = lib$(CORE)

@@ -183,12 +183,31 @@ Int_t Projection::Decode( const THaEvData& evdata )
   for( vplsiz_t i = 0; i < GetNallPlanes(); ++i ) {
     Plane* pl = fAllPlanes[i];
     Int_t nhits = pl->Decode( evdata );
+    // cout<<"   "<<pl->GetName()<<": "<<nhits<<endl;
     if( nhits < 0 ) {
       err = true;
       sum -= nhits;
     } else
       sum += nhits;
   }
+  /*/Test code---------------
+  bool checkflag = true;
+  for( vplsiz_t i = 0; i < GetNallPlanes(); ++i ) {
+    Plane* pl = fAllPlanes[i];
+    Int_t nhits = pl->GetNhits();
+    if(nhits!=1){checkflag = false;break;} 
+    //cout<<"   "<<pl->GetName()<<": "<<nhits<<endl;
+    TIterator* it = pl->GetHits()->MakeIterator();
+    Hit* phit = 0;
+    while( (phit = static_cast<Hit*>(it->Next())) ) {
+     
+    }
+    delete it;
+  }
+
+
+  */
+
   if( err )
     return -sum;
 
@@ -339,9 +358,14 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
     Double_t lo = s - 0.5*d;
     Double_t hi = s + (n-0.5)*d;
-    Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
+    Double_t w = TMath::Abs(lo);//
+    // Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
     if( w > fWidth )
       fWidth = w;
+    /*  cout<<"start: "<<s<<endl;
+    cout<<"pitch: "<<d<<endl;
+    cout<<"n: "<<n<<endl;
+    cout<<"width: "<<w<<endl;getchar();*/
   }
   fWidth *= 2.0;
   if( fWidth < 0.01 ) {
@@ -438,6 +462,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     if( !fHitpattern || fHitpattern->IsError() )
       return fStatus = kInitError;
     assert( GetNallPlanes() == fHitpattern->GetNplanes() );
+
+    cout<<fHitpattern->GetBinWidth()<<endl;getchar();
 
     // Determine maximum search distance (in bins) for combining patterns,
     // separately for front and back planes since they can have different
@@ -717,6 +743,7 @@ Int_t Projection::FillHitpattern()
   n_binhits = fHitpattern->GetNhits();
   maxhits_bin = fHitpattern->GetMaxhitBin();
 #endif
+  cout<<"DD: Number of Hits in Projection "<<" : "<<ntot<<endl;
   return ntot;
 }
 
@@ -769,6 +796,7 @@ Int_t Projection::Track()
   timer.Start();
 #endif
 
+  cout<<"DD: Number of patterns in projection "<<this->fName<<" : "<<(UInt_t)fPatternsFound.size()<<endl;
   if( fPatternsFound.empty() ) {
     fTrkStat = kNoPatterns;
     goto quit;
@@ -776,14 +804,24 @@ Int_t Projection::Track()
   // Die if too many patterns - noisy event
   if( (UInt_t)fPatternsFound.size() > fMaxPat ) {
     // TODO: keep statistics
+    cout<<" Too many patterns: "<<(UInt_t)fPatternsFound.size()<<", giving up..."<<endl;
     fTrkStat = kTooManyPatterns;
     ret = -1;
     goto quit;
   }
 
+
+  //DD: Need to remove invalid patterns in Y due to impossible module order
+  //After FitRoads(), one can apply InElasticDomain Cut and Calo position Cut(Or better move this to dummy plane)
+
+
+
+
+
+
   // Combine patterns with common sets of hits into Roads
   MakeRoads();
-
+  cout<<"DD: Number of roads in projection "<<" : "<<(UInt_t)GetNroads()<<endl;
 #ifdef VERBOSE
   if( fDebug > 0 ) {
     if( !fRoads->IsEmpty() ) {
@@ -956,12 +994,15 @@ Int_t Projection::MakeRoads()
   // These tend to yield the best track candidates.
   for( NodeVec_t::iterator it = fPatternsFound.begin(); it !=
 	 fPatternsFound.end(); ++it ) {
+
+    
+
     const Node_t& nd1 = **it;
 
     if( nd1.second.used )
       continue;
 
-    // Start a new road with next unused pattern
+    // Start a new road with next unused pattern 
     Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
 
     // Try to add similar patterns to this road (cf. HitSet::IsSimilarTo)
@@ -1024,6 +1065,7 @@ Int_t Projection::MakeRoads()
     }
   }
   assert( nodelookup.empty() );
+
 
 #ifdef VERBOSE
   if( fDebug > 2 ) {

@@ -41,6 +41,8 @@ using namespace std;
 using namespace Podd;
 
 //#define PRINTCLUSTER
+//#define PRINT_CLUSTER_DETAIL
+#define TIME_SPLIT
 
 #define ALL(c) (c).begin(), (c).end()
 
@@ -66,6 +68,8 @@ namespace TreeSearch {
     // Constructor
 
     static const char* const here = "GEMPlane";
+
+    // c1 = new TCanvas(name,name,800,600); 
 
     assert( dynamic_cast<GEMTracker*>(fTracker) );
 
@@ -365,7 +369,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     //Danning Di --Oct 2017
 
     //This routine takes the maximum charge in the samples
-    Float_t maxAdc=0, adcSum=0;
+    Float_t maxAdc=0, maxAdc_t=0, adcSum=0;
     Int_t maxTimeSample=0;
     Bool_t pass = false;
     Double_t shapingtime=0, peaktime=0, adcmax_fit=0;
@@ -375,11 +379,20 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     for(Int_t isamp=0;isamp<Nsample;isamp++)
       {
 	sampleAdc[isamp] = amp[isamp];
+	//if(isamp>0&&isamp<4){
 	if(maxAdc<amp[isamp]) 
 	  {
 	    maxAdc=amp[isamp];
 	    maxTimeSample=isamp;
 	  }
+	if(isamp>0&&isamp<4){
+	  if(maxAdc_t<amp[isamp]) 
+	    {
+	      maxAdc_t=amp[isamp];
+	      
+	    }
+	}
+	//}
 	adcSum+=amp[isamp];
 	//	cout<<adcSum<<" "<<amp[isamp]<<endl;
       }
@@ -396,8 +409,18 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  pass  = true;
 	  FitPulse(sampleAdc,Nsample, shapingtime, peaktime, adcmax_fit);
 	}
+
+#ifdef TIME_SPLIT
+	
+	if(peaktime<=0 || peaktime>=150 || maxAdc_t<100){
+	  pass = false;
+	  return false;
+	}
+
+#endif
+
 	//	stripdata =   StripData_t(maxAdc,adcSum,maxTimeSample,peaktime,pass,amp);
-	stripdata.maxAdc = maxAdc;
+	stripdata.maxAdc = maxAdc_t;
 	stripdata.adcSum = adcSum;
 	stripdata.maxTimeSample = maxTimeSample;
 	stripdata.peaktime = peaktime;
@@ -447,8 +470,13 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // This routine decodes the front-end readout data.
     // Finds clusters of active strips (=above software threshold) and
     // computes weighted average of position. Each such cluster makes one "Hit".
+    
+    int flagt=0,flagc=0;// to be removed
 
     const char* const here = "GEMPlane::Decode";
+#ifdef PRINTCLUSTER
+    cout<<"Decode Plane: "<<this->GetName()<<endl;
+#endif
 
 #ifdef MCDATA
     bool mc_data = fTracker->TestBit(Tracker::kMCdata);
@@ -479,7 +507,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     }
 #endif
 
-
+    
     // Decode data
     // Each DetMap->Module stands for a MPD
     for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
@@ -487,7 +515,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       // GEM module ID
       Int_t moduleID = d->plane; //0 1 2....
       //Common mode storage
-      assert((d->hi-d->lo+1)%fcModeSize==0);
+      assert((d->hi-d->lo+1)%fcModeSize==0);// checking total channels is 128*n
       Int_t Napvs = (d->hi-d->lo+1)/fcModeSize; // Number of groups of 128 strips
       vector<Float_t> commonMode[Napvs][fMaxSamp]; // storing value for calculating common mode
       Float_t cMode[Napvs][fMaxSamp]; //common mode value of each group of 128 channels and each sample
@@ -500,12 +528,9 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	//	cout<<chan<<"  "<<ichan<<endl;
 	if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
       
-	// Map channel number to strip number
-	Int_t istrip =
-	  MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
+	Int_t istrip = MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) ); // Map channel number to strip number
 	// Test for duplicate istrip, if found, warn and skip
 	assert( istrip >= 0 and istrip < fNelem );
-
 	if( fStripsSeen[istrip] ) {
 	  Warning( Here(here), "Duplicate strip number %d in plane %s, event %d. "
 		   "Ignorning it. Fix your detector crate slot map.",
@@ -513,11 +538,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  continue;
 	}
 	fStripsSeen[istrip] = true;
-	//cout<<istrip<<endl;
 	// For the APV25 analog pipeline, multiple "hits" on a decoder channel
 	// correspond to time samples 25 ns apart
-	
-
 	Int_t nsamp = evData.GetNumHits( d->crate, d->slot, chan );
 	assert( nsamp > 0 );
 	++fNrawStrips;
@@ -525,8 +547,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 
 	// populate vector commonMode[][], all information from data is here
 	for( Int_t isamp = 0; isamp < nsamp; ++isamp ) {
-	  Float_t fsamp = static_cast<Float_t>
-	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
+	  Float_t fsamp = static_cast<Float_t> ( evData.GetData(d->crate, d->slot, chan, isamp) );
+	  //  cout<<fsamp<<endl;
 	  commonMode[(int)(ichan/fcModeSize)][isamp].push_back(fsamp);
 	}
 
@@ -549,23 +571,23 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       // 1 loop check adc range, could add more loop to get more precise commonMode, this will be O(n), better than sorting O(nlogn)/O(n^2), time matters for online processing
       for(int iapv=0; iapv<Napvs;iapv++)
 	{
-	  //	  cout<<d->crate<<" "<<d->slot<<" apv: "<<iapv<<endl;
+	  // cout<<d->crate<<" "<<d->slot<<" apv: "<<iapv<<endl;
 	  for(int isamp=0; isamp<fMaxSamp; isamp++)
 	    {
 	      int Commsize = commonMode[iapv][isamp].size();
-	      int NcommMode = 0;
+     	      int NcommMode = 0;
 	      Float_t tempcMode = 0;
 	      for(int is=0;is<Commsize;is++)
 		{
 		  Float_t tempADC = commonMode[iapv][isamp][is];
-		  if(tempADC>ftmp_comm_range||tempADC<-ftmp_comm_range)continue; // constant 200 to be put in database, this number should come from a clean, no signal run, and be determined by evaluating the common mode distribution.
+		  if(tempADC>(ftmp_comm_range)||tempADC<-ftmp_comm_range)continue; // constant 200 to be put in database, this number should come from a clean, no signal run, and be determined by evaluating the common mode distribution.
 		  tempcMode+=tempADC;
 		  NcommMode++;
 		}
 	      cMode[iapv][isamp]=tempcMode/NcommMode;
-	      //	        cout<<cMode[iapv][isamp]<<" ";
+	      //if(NcommMode<120){cout<<cMode[iapv][isamp]<<" # "<<NcommMode<<"        ";getchar();}
 	    }
-	  //	  cout<<endl;getchar();
+	  //	  cout<<endl;
 	}
 
 
@@ -588,7 +610,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  {
 	    Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
-	    fsamp-=cMode[ichan/fcModeSize][isamp];
+	    // fsamp-=cMode[ichan/fcModeSize][isamp];
 	    samples.push_back( fsamp );
 	  }
 
@@ -620,10 +642,28 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // DoClustering();
     //
 
+    //Draw strips hit from mStrip
+    //  cout<<" ### "<<endl;
+    TH2F *histo = new TH2F("h2","h2",6000,0,6000,6,0,6);
+    histo->Fill(1,1,0.1);
+    for(std::map<Int_t,StripData_t>::iterator it=mStrip.begin();it!=mStrip.end();it++){
+      int samplesize = (*it).second.vADC.size();
+      for(int its=0;its<samplesize;its++){
+	histo->Fill((*it).first, its, (*it).second.vADC[its]);
+      }
+    }
+    //   c1->cd();
+       //   histo->Draw("LEGO1");
+    //histo->Draw("colz");
+    //   c1->Draw();
+    //  c1->Modified();
+    //   c1->Update();
+    //  cout<<histo->GetEntries();
+    //   getchar();
 
-
-
-
+    // c1->Delete();
+     histo->Delete();
+    //
 
 
 
@@ -666,7 +706,12 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     typedef Vint_t::iterator viter_t;
     Vint_t splits;  // Strips with ampl split between 2 clusters
     viter_t next = fSigStrips.begin();
+    //strip no of last type 3
+    Int_t t3_nb = -1;
+    //type3Flag;
+    //cout<<this->GetName()<<" nstrips fired:  "<<fNhitStrips<<endl;
     while( next != fSigStrips.end() ) {
+      
       viter_t start = next, cur = next;
       ++next;
       Int_t moduleID = fmStripModule[*start];
@@ -734,6 +779,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  // the strip with the minimum amplitude is shared between both clusters
 	  cur  = minpos;
 	  next = minpos;
+	  t3_nb = *minpos;
 	  // In order not to double-count amplitude, we split the signal height
 	  // of that strip evenly between the two clusters. This is a very
 	  // crude way of doing what we really should be doing: "fitting" a peak
@@ -748,7 +794,30 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       assert( size > 0 );
       // Compute weighted position average. Again, a crude (but fast) substitute
       // for fitting the centroid of the peak.
-      Double_t xsum[fMaxSamp] , adcsum = 0.0, adcmax_fit=0.0, shapingtime=0, peaktime=0, amp_fit=0;
+      Double_t xsum[fMaxSamp], x_sum=0, adcsum = 0.0, adcmax_fit=0.0, shapingtime=0, peaktime=0, prim_ratio=0, p_over_total=0, b_over_total=0, p_over_total_r=0, b_over_total_r=0, p_over_total_o=1, ncross_talk=0, amp_fit=0, pos_sigma=0.0, time_sigma=0.0, adc_sigma=0.0;
+      bool prim_registered = false;
+      Double_t pos_prim_tmp, time_prim_tmp, adc_prim_tmp;
+      map<int,int> bg_registered;
+      Int_t stripl = *start, striph = *(cur-1);
+      viter_t strip_left = start; 
+      viter_t strip_right = cur;
+ 
+      while( *strip_left <= *strip_right ) {
+	if(*strip_left == *strip_right || *strip_left == *strip_right-1){
+	  shapingtime = 56.0; 
+	  peaktime = (fHitTime[ *strip_left] + fHitTime[ *strip_right ])/2;
+	  //  cout<<"apeakTime: "<<peaktime<<endl;
+	  //	  if(peaktime>90 ||peaktime<30)
+	  // getchar();
+	  adcmax_fit = fADCraw[ *strip_left ] > fADCraw[ *strip_right ] ? fADCraw[ *strip_left ] : fADCraw[ *strip_right ];
+	  break;
+	}else{
+	  strip_left++;
+	  strip_right--;
+	}
+      }
+
+      //cout<<stripl<<" "<<striph<<"  = "<<size<<endl;getchar();
       Double_t sampleAdc[fMaxSamp];
       for(Int_t i_sampleAdc=0;i_sampleAdc<fMaxSamp;i_sampleAdc++)
 	{
@@ -762,27 +831,33 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       Int_t mctrack = 0, num_bg = 0;
 #endif
 #ifdef PRINTCLUSTER
-      cout<<endl;
+      // cout<<"new Cluster"<<endl;
 #endif
+
+      if(*start == t3_nb)
+	type = 3;
+      
+
       for( ; start != next; ++start ) {
+	
 	Int_t istrip = *start;
 	Double_t pos = GetStart() + GetPitch()*(istrip -fDetMap->GetModule(fmStripModule[istrip])->first)+GetModuleOffsets(fmStripModule[istrip]);
-
+	//	cout<<"##@@"<<pos<<endl;
 	//	cout<<GetType()<<" "<<fDetMap->GetModule(0)->first<<"= = = "<<(GetPitch()*(fDetMap->GetModule(fmStripModule[istrip])->first)-GetModuleOffsets(fmStripModule[istrip]))<<endl;//getchar();
 	//	static_cast<const SimDecoder*>(&evData)
 
 
 	Double_t adc = fADCraw[istrip];
 	//cout<<"STRIP: "<<istrip<<" cc: "<<fMCHitInfo[istrip].fMCCharge<<" : "<<adc<<" : time: "<<fMCHitInfo[istrip].fMCTime<<endl;
-	//xsum   += pos * adc;
+	x_sum   += pos * adc;
 	adcsum += adc;
 	nsample = mStrip[istrip].vADC.size();
-#ifdef PRINTCLUSTER
+#ifdef PRINT_CLUSTER_DETAIL
 	cout<<setw(5)<<istrip<<" maxadc: "<<setw(6)<<(Int_t)mStrip[istrip].maxAdc<<" pktime: "<<(Int_t)mStrip[istrip].peaktime<<" sampleADC: ";
 #endif
 	for(Int_t i_ts=0;i_ts<nsample;i_ts++)
 	  {
-#ifdef PRINTCLUSTER
+#ifdef PRINT_CLUSTER_DETAIL
 	    cout<<setw(6)<<(Int_t)mStrip[istrip].vADC[i_ts]<<"  ";
 #endif
 	    sampleAdc[i_ts]+=mStrip[istrip].vADC[i_ts];
@@ -790,11 +865,14 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	    xsum[i_ts]     +=mStrip[istrip].vADC[i_ts]*pos;
 	    //   cout<<" xsum "<<xsum[i_ts]<<" ";
 	  }
-#ifdef PRINTCLUSTER
+#ifdef PRINT_CLUSTER_DETAIL
+	cout<<endl;
+#endif
+#ifdef PRINT_CLUSTER_DETAIL
 	cout<<setw(6)<<(Int_t)fADC[istrip]<<"  ";
 	cout<<" maxTs: "<<mStrip[istrip].maxTimeSample<<" SigType: "<<fMCHitInfo[istrip].fSigType
 	    <<" = ";
-	if(fMCHitInfo[istrip].fSigType&0x1)cout<<"P ";
+	if(fMCHitInfo[istrip].fSigType&0x1){	  cout<<"P "; getchar();	}
 	if(fMCHitInfo[istrip].fSigType&0x2)cout<<"S ";
 	if(fMCHitInfo[istrip].fSigType&0x4)cout<<"C ";
 	cout<<endl;
@@ -810,7 +888,99 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  }
 	cout<<endl;
 #endif
+	if(fMCHitInfo[istrip].fSigType&0x4 ) 
+	  ncross_talk++;
+	//need to add 1). (pos_prim-pos_bg)^2,
+	//            2). (time_prim-time_bg)^2
+	//            3). (adc_prim-adc_bg)^2
+	// These need to be from big enough bg hit,need threshhold, -----this is one way to do it, we can also include all, which can be used to see for instance
+	// b_over_total-vs-pos_sigma  gets better with space p-v-p finding split, not very accurate tho, in case 2bg+1prim and 1 of the bg has same pos as prim. the other off 
+	if(fMCHitInfo[istrip].fSigType&0x1 ){// do following only for strip with primary hit
+	  for(int ts=0;ts<nsample;ts++){
+	    p_over_total_o += mStrip[istrip].vADC[ts];
+	  }
+	  Double_t pos_prim_tmp, time_prim_tmp, adc_prim_tmp;
+	  for(int i_c=0;i_c<fMCHitInfo[istrip].vClusterID.size();i_c++)//i_c<1,i_c=0 means primary hit....the first digitized cluster...bad
+	    {
+	      //
+	      
+	      if(fMCHitInfo[istrip].vClusterType[i_c]==0){// if primary(from signal file) hit
+		prim_ratio+=fMCHitInfo[istrip].vClusterStripWeight[i_c];  
+		for(int i_ts=0;i_ts<nsample;i_ts++){
+		  p_over_total_r += fMCHitInfo[istrip].vClusterADC[i_ts][i_c];
+		}
+		//following line assumed prim hit doesn't overlap()
+		if(!prim_registered){//if prim havn't been registered
+		  //string st_tmp = this->fName;
+		  if(this->fName[2]=='x')
+		    {  pos_prim_tmp = fMCHitInfo[istrip].vClusterPos[i_c].X();
+		  
+		    }
+		  else if(this->fName[2]=='y')
+		    pos_prim_tmp = fMCHitInfo[istrip].vClusterPos[i_c].Y();
+		  else
+		    cout<<"ERROR in plane name!"<<endl;
+		  time_prim_tmp = fMCHitInfo[istrip].vClusterPeakTime[i_c];
+		  adc_prim_tmp = fMCHitInfo[istrip].vClusterCharge[i_c];
+		  prim_registered = true;
+		}
+	      }else{//if secondary(from background file) hit
+		for(int i_ts=0;i_ts<nsample;i_ts++){
+		  b_over_total_r += fMCHitInfo[istrip].vClusterADC[i_ts][i_c];
+		}
+	      }
+	    }
 	
+	  for(int i_c=0;i_c<fMCHitInfo[istrip].vClusterID.size();i_c++)//i_c<1,i_c=0 means primary hit....the first digitized cluster...bad
+	    {
+	      //  cout<<"type: "<<fMCHitInfo[istrip].vClusterType[i_c]<<endl;getchar();
+	      if(fMCHitInfo[istrip].vClusterType[i_c]>0){//if bg
+		//	cout<<this->fName<<endl;
+		//	cout<<fMCHitInfo[istrip].vClusterPos[i_c].X()<<" "
+		//	    <<fMCHitInfo[istrip].vClusterPos[i_c].Y()<<" "
+		  //	    <<fMCHitInfo[istrip].vClusterPos[i_c].Z()<<" "
+		//	cout<<this->fName[2]<<endl;
+		//getchar();
+
+		int cluster_id_tmp = fMCHitInfo[istrip].vClusterID[i_c];
+		if(bg_registered.find(cluster_id_tmp) == bg_registered.end()){// if this bg not registered
+		  Double_t pos_tmp;
+		  if(this->fName[2]=='x')
+		    { 
+		      pos_tmp = fMCHitInfo[istrip].vClusterPos[i_c].X();
+		      //cout<<fMCHitInfo[istrip].vClusterPos[i_c].X()<<endl;
+		    }
+		  else if(this->fName[2]=='y')
+		    pos_tmp = fMCHitInfo[istrip].vClusterPos[i_c].Y();
+		  else
+		    cout<<"ERROR in plane name!"<<endl;
+		
+		  pos_sigma += pow((pos_tmp-pos_prim_tmp), 2);
+		  time_sigma += pow((fMCHitInfo[istrip].vClusterPeakTime[i_c]-time_prim_tmp), 2);
+		  adc_sigma += pow((fMCHitInfo[istrip].vClusterCharge[i_c]-adc_prim_tmp), 2);
+		  bg_registered[cluster_id_tmp] = 0;
+		}
+	      }
+	    }
+	  // cout<< bg_registered.size()<<endl; getchar();
+	  //TODO tomorrow,friday,    1) add these "sigma" into mchit, then write it to txt
+	  //                         2) see the difference the space split made in these sigma-vs-b_over_total
+	  //                         3) this tricky! and important to know how to split in time! check all the strip time distribution in a reconstructed cluster, clean hit, and clean hit with background
+	  //                         4) see the difference the time split made! The time split has two level? 1. for some overlaped cluster, side strips will not be overlaped,                                                                                                                2. some totally overlaped in space, have to try treat in time, only 6 time sample....hard...:( de-convolution? no.t likely.. 
+
+	}
+
+	if(fMCHitInfo[istrip].fSigType&0x1){
+	  
+	  if(!flagt){fTotalPriHit++;flagt=1;}
+	  //find out how many "valuable" strips covered by noticable background
+	  if(fMCHitInfo[istrip].vClusterStripWeight[0]>0.1){
+	    for(int i_ts=0;i_ts<nsample;i_ts++)
+	      if(fMCHitInfo[istrip].vClusterADC[i_ts][0]/mStrip[istrip].vADC[i_ts]<0.8){
+		if(!flagc){fCoveredPriHit++;flagc=1;}
+	      }
+	  }
+	}
 
 
 #ifdef MCDATA
@@ -840,17 +1010,6 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	      // If background hits only, compute position average
 	      mcpos  += mc.fMCPos;
 	      mctime  = TMath::Min( mctime, mc.fMCTime );
-	      // if(mc.fMCTime>=50.0){
-	      //   printf("istrip = %d, mc.fMCTime =  %f\n", istrip, mc.fMCTime);
-	      //   printf("mctime = %1.3f, mc.fMCTime = %1.3f\n", mctime, mc.fMCTime);
-	      // }
-	      // if(-50.0<= mc.fMCTime && mc.fMCTime<=25.0){
-	      //   mctime = -500.0;
-	      // // if(mc.fMCPos==0.0){
-	      // //   printf("istrip = %d, mc.fMCTime =  %f\n", istrip, mc.fMCTime);
-	      // //   //printf("mctime = %1.3f, mc.fMCTime = %1.3f\n", mctime, mc.fMCTime);
-	      // //   //printf("mcpos = %1.3f, mc.fMCpos = %1.3f\n", mcpos, mc.fMCPos);
-	      // }
 	    }
 	  }
 	}
@@ -862,10 +1021,28 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       for(Int_t i_ts=0;i_ts<nsample;i_ts++)
 	{	
 	  sPos[i_ts] = xsum[i_ts]/sampleAdc[i_ts];
-	  //	  cout<<100*sPos[i_ts]<<" ";
+	  //	  	  cout<<100*sPos[i_ts]<<" ";
+       
 	}
+      pos=x_sum/adcsum;
+      p_over_total = p_over_total_r/p_over_total_o;
+      b_over_total = b_over_total_r/p_over_total_o;
+      int number_of_bg = bg_registered.size();
+      // cout<<"dd: "<<pos_sigma<<" "<<time_sigma<<" "<<adc_sigma<<endl;
+      if(number_of_bg!=0){
+	pos_sigma = sqrt(pos_sigma/number_of_bg);
+	time_sigma = sqrt(time_sigma/number_of_bg);
+	adc_sigma = sqrt(adc_sigma/number_of_bg);
+      }
+      //	cout<<"pos: "<<pos<<endl;
       //   cout<<"\n##########################"<<endl;getchar();
-      FitPulse(sampleAdc,nsample, shapingtime, peaktime, adcmax_fit);
+      
+      //FitPulse(sampleAdc,nsample, shapingtime, peaktime, adcmax_fit);
+      //cout<<"peakTime: "<<peaktime<<endl;
+      if(peaktime>90 ||peaktime<30)
+	//getchar();
+      
+
       //  cout<<"shapingtime: "<<shapingtime<<" peaktime: "<<peaktime<<" amp: "<<amp_fit<<endl;
       //    cout<<"mctime-peaktime: "<<mctime-peaktime<<endl;
       //  cout<<"adcmax/ampfit: "<<adcsum<<" : "<<amp_fit<<endl;
@@ -892,6 +1069,18 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       }
 
       // Make a new hit
+
+      if(peaktime<30 || peaktime>90){
+	continue;
+      }
+#ifdef PRINT_CLUSTER_DETAIL
+      if(p_over_total!=0 && b_over_total>0.3){
+	cout<<"Writing a new cluster, prim ratio: "<<prim_ratio<<"  p_over_total: "<<p_over_total<<" bg: "<<b_over_total<<endl;
+	getchar();
+      }
+      cout<<"####################bg: "<<b_over_total<<endl;
+#endif
+
 #ifndef NDEBUG
       GEMHit* theHit = 0;
 #endif
@@ -923,8 +1112,17 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 					     pos,
 					     adcsum,
 					     adcmax_fit,
+					     prim_ratio,
+					     p_over_total,
+					     b_over_total,
+					     pos_sigma,
+					     time_sigma,
+					     adc_sigma,
+					     bg_registered.size(),
 					     peaktime,
 					     size,
+					     stripl,
+					     striph,
 					     type,
 					     resolution,
 					     this,
@@ -934,9 +1132,22 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 					     mctime,
 					     num_bg
 					     );
+
 	//	cout<<pos<<" ### "<<mcpos<<" type: "<<type<<"charge: "<<adcmax_fit<<" "<<GetType()<<" "<<moduleID<<endl;
 	//cout<<"cluster charge: "<<mccharge<<" adcSum:"<<adcsum<<endl;
 	//printf("hit pos = %1.3f, time = %1.3f, size = %d\n", pos, mctime, size);
+#define PRINTCLUSTER_TO_FILE
+#ifdef PRINTCLUSTER_TO_FILE
+	if(prim_ratio!=0){
+	  std::ofstream outfile;
+	  outfile.open("Cluster_with_priHit.txt",ios::app);
+	  outfile<<moduleID<<" "<<pos<<" "<<adcsum<<" "<<size<<" "<<prim_ratio<<" "<<p_over_total<<" "<<b_over_total<<" "<<type<<" "<<ncross_talk<<" "<<peaktime<<endl;
+	  outfile.close();
+	}
+#endif
+#ifdef PRINTCLUSTER
+	cout<<"pos: "<<pos<<" adcsum: "<<adcsum<<" peaktime: "<<peaktime<<" size: "<<size<<endl;
+#endif
       }
 #endif // MCDATA
 #ifndef NDEBUG
@@ -958,7 +1169,11 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     fHits->Sort(fHits->GetEntriesFast());
     //ValueCmp(fHits);
     //  sort(*fHits,(*fHits).end());
+    // cout<<"#########: "<<fCoveredPriHit<<"  "<<fTotalPriHit<<"  "<<(Double_t)(fCoveredPriHit)/fTotalPriHit<<endl;//getchar();
+    
+    cout<<"DD: Number of hits in plane "<<" : "<<nHits<<endl;
     return nHits;
+   
   }
   /*
   void GEMPlane::ValueCmp(TClonesArray* f)
@@ -991,7 +1206,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // Emulate parameters for dummy hits
     const UInt_t size = 1, type = 0;
     const Int_t moduleID = 0;
-    const Double_t adcsum = 10.*fMinAmpl, adcmax_fit=adcsum/2, peaktime=0, resolution = fResolution;
+    const Double_t adcsum = 10.*fMinAmpl, adcmax_fit=adcsum/2, prim_ratio=0, p_over_total=0, b_over_total=0, peaktime=0, resolution = fResolution;
+    Int_t stripl = 0, striph = 0;
   
 #ifdef MCDATA
     const Int_t mctrack = 1, num_bg = 0;
@@ -1003,8 +1219,17 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 						     pos,
 						     adcsum,
 						     adcmax_fit,
+						     prim_ratio,
+						     p_over_total,
+						     b_over_total,
+						     0,
+						     0,
+						     0,
+						     0,
 						     peaktime,
 						     size,
+						     stripl,
+						     striph,
 						     type,
 						     resolution,
 						     this,
