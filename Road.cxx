@@ -349,32 +349,41 @@ Bool_t Road::CheckMatch( const Hset_t& hits ) const
 
 //_____________________________________________________________________________
 inline
-Bool_t Road::IsInBackRange( const NodeDescriptor& nd ) const
+Bool_t Road::IsInBackRange( const Node_t& nd ) const
 {
   UInt_t last  = fProjection->GetLastPlaneNum();
   UInt_t bdist = fProjection->GetBinMaxDistB();
 
   assert( fBuild && !fBuild->fLimits.empty() );
-  assert( last < nd.link->GetPattern()->GetNbits() );
+  assert( last < nd.first.link->GetPattern()->GetNbits() );
   assert( not TESTBIT(fProjection->GetDummyPlanePattern(), last) );
 
-  return ( nd[last] + bdist >= fBuild->fLimits.back().first and
-	   nd[last]         <  fBuild->fLimits.back().second + bdist );
+  // If there is no actual hit in the back plane, assume the pattern is in range.
+  // Missing hits match a hard-to-predict range of bin numbers at the edges.
+  if( !TESTBIT(nd.second.plane_pattern, last) )
+    return true;
+
+  return ( nd.first[last] + bdist >= fBuild->fLimits.back().first and
+	   nd.first[last]         <  fBuild->fLimits.back().second + bdist );
 }
 
 //_____________________________________________________________________________
 //inline
-Bool_t Road::IsInFrontRange( const NodeDescriptor& nd ) const
+Bool_t Road::IsInFrontRange( const Node_t& nd ) const
 {
   UInt_t first = fProjection->GetFirstPlaneNum();
   UInt_t fdist = fProjection->GetBinMaxDistF();
 
   assert( fBuild && !fBuild->fLimits.empty() );
-  assert( first < nd.link->GetPattern()->GetNbits() );
+  assert( first < nd.first.link->GetPattern()->GetNbits() );
   assert( not TESTBIT(fProjection->GetDummyPlanePattern(), first) );
 
-  return ( nd[first] + fdist >= fBuild->fLimits.front().first and
-	   nd[first]         <  fBuild->fLimits.front().second + fdist );
+  // See comment above. If there is no front hit, assume the pattern is in range.
+  if( !TESTBIT(nd.second.plane_pattern, first) )
+    return true;
+
+  return ( nd.first[first] + fdist >= fBuild->fLimits.front().first and
+	   nd.first[first]         <  fBuild->fLimits.front().second + fdist );
 }
 
 //_____________________________________________________________________________
@@ -388,7 +397,7 @@ Bool_t Road::Add( const Node_t& nd )
   // Adding can only be done so long as the road is not yet finished
 
   assert(fBuild);  // Add() after Finish() not allowed
-  assert( fPatterns.empty() || IsInFrontRange(nd.first) );
+  assert( fPatterns.empty() || IsInFrontRange(nd) );
 
   const HitSet& new_set  = nd.second;
   const Hset_t& new_hits = nd.second.hits;
@@ -420,7 +429,7 @@ Bool_t Road::Add( const Node_t& nd )
     }
 #endif
   }
-  else if( IsInBackRange(nd.first) and
+  else if( IsInBackRange(nd) and
 	   fBuild->fCluster.IsSimilarTo(new_set,hitdist) ) {
     // Accept this pattern if and only if it is a subset of the cluster
     // NB: IsSimilarTo() is a looser match than std::includes(). The new
