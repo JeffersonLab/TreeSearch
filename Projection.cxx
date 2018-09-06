@@ -467,15 +467,13 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
 
     // Determine maximum search distance (in bins) for combining patterns,
     // separately for front and back planes since they can have different
-    // parameters.
-    // This is the max distance of bins that can belong to the same hit
-    // plus an allowance for extra slope of a pattern if a front/back hit
-    // is missing
+    // parameters. This is the max distance of bins that can belong to the
+    // same hit, provided a hit is present in the plane.
     Plane *front_plane = fPlanes.front(), *back_plane = fPlanes.back();
     Double_t dxf= front_plane->GetMaxLRdist() + 2.0*front_plane->GetResolution();
     Double_t dxb= back_plane->GetMaxLRdist()  + 2.0*back_plane->GetResolution();
-    fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() ) + 2;
-    fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() ) + 2;
+    fFrontMaxBinDist = TMath::CeilNint( dxf * fHitpattern->GetBinScale() );
+    fBackMaxBinDist  = TMath::CeilNint( dxb * fHitpattern->GetBinScale() );
 
   } // doing_tracking
 
@@ -873,7 +871,7 @@ Int_t Projection::Track()
     if( !fRoads->IsEmpty() ) {
       Int_t nroads = GetNgoodRoads();
       cout << nroads << " road";
-      if( nroads>1 ) cout << "s";
+      if( nroads!=1 ) cout << "s";
       cout << " successfully fit" << endl;
     }
   }
@@ -1022,7 +1020,7 @@ Int_t Projection::MakeRoads()
       BinOrdNodes_t::iterator jr(jt);
       if( jt != nodelookup.begin() ) {
 	--jr;
-	while( rd->IsInFrontRange((*jr)->first) ) {
+	while( rd->IsInFrontRange(**jr) ) {
 	  if( rd->Add(**jr) ) {
 	    // Pattern successfully added
 	    // Erase used patterns from the lookup index
@@ -1045,7 +1043,7 @@ Int_t Projection::MakeRoads()
       rd->ClearGrow();
       BinOrdNodes_t::iterator jf(jt);
       ++jf;
-      while( jf != nodelookup.end() and rd->IsInFrontRange((*jf)->first) ) {
+      while( jf != nodelookup.end() and rd->IsInFrontRange(**jf) ) {
 	if( rd->Add(**jf) )
 	  nodelookup.erase( jf++ );
 	else

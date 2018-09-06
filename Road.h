@@ -94,7 +94,9 @@ namespace TreeSearch {
     Bool_t         Include( const Road* other );
     TVector2       Intersect( const Road* other, Double_t z ) const;
     Bool_t         IsGood()     const { return fGood; }
-    Bool_t         IsInFrontRange( const NodeDescriptor& nd ) const;
+    Bool_t         IsInBackRange( const Node_t& nd ) const;
+    Bool_t         IsInFrontRange( const Node_t& nd ) const;
+    Bool_t         IsInRange( const Node_t& nd ) const;
     virtual Bool_t IsSortable() const { return kTRUE; }
     Bool_t         IsVoid()     const { return !fGood; }
     virtual void   Print( Option_t* opt="" ) const;
@@ -173,8 +175,6 @@ namespace TreeSearch {
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();
-    Bool_t   IsInBackRange( const NodeDescriptor& nd ) const;
-    Bool_t   IsInRange( const NodeDescriptor& nd ) const;
 
   private:
     void     CopyPointData( const Road& orig );
@@ -210,7 +210,7 @@ namespace TreeSearch {
 
   //---------------------------------------------------------------------------
   inline
-  Bool_t Road::IsInRange( const NodeDescriptor& nd ) const
+  Bool_t Road::IsInRange( const Node_t& nd ) const
   {
     // Test if given pattern is within the allowed maximum distance from the
     // current front and back bin ranges of the cluster
