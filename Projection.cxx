@@ -860,19 +860,18 @@ static void PrintNode( const Node_t& node )
 {
   const HitSet& hs = node.second;
   cout << " npl/nhits= " << hs.nplanes << "/" << hs.hits.size()
-       << "  wnums= ";
+       << "  hitpos= ";
   UInt_t ipl = 0;
   for( Hset_t::iterator ihit = hs.hits.begin(); ihit != hs.hits.end(); ) {
     assert( (*ihit)->GetPlaneNum() != kMaxUInt );
     while( ipl < (*ihit)->GetPlaneNum() ) { cout << "--/"; ++ipl; }
     bool seq = false;
     do {
+      assert( (*ihit)->GetPlaneNum() != kMaxUInt );
       if( seq )  cout << " ";
       cout << (*ihit)->GetPos();
       seq = true;
-      ++ihit;
-      assert( (*ihit)->GetPlaneNum() != kMaxUInt );
-    } while( ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
+    } while( ++ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
     if( ipl != node.first.link->GetPattern()->GetNbits()-1 ) {
       cout << "/";
       if( ihit == hs.hits.end() )
