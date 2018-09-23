@@ -36,6 +36,7 @@
 #include "TClass.h"
 
 #include <iostream>
+#include <iomanip>
 #include <algorithm>
 #include <numeric>
 #include <map>
@@ -48,6 +49,7 @@
 #endif
 #ifdef MCDATA
 #include "Hit.h"
+#include "GEMHit.h"
 #endif
 
 using namespace std;
@@ -490,7 +492,8 @@ Int_t Tracker::Decode( const THaEvData& evdata )
   //TODO: multithread?
   for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
     Projection* theProj = *it;
-    Int_t nhits = theProj->Decode( evdata );
+     Int_t nhits = theProj->Decode( evdata );
+    //  cout<<theProj->GetName()<<": "<<nhits<<endl;//getchar();
 #ifdef MCDATA
     if( mcdata )
       mchitcount[theProj->GetType()].min = theProj->GetMinFitPlanes();
@@ -504,6 +507,273 @@ Int_t Tracker::Decode( const THaEvData& evdata )
     if( TestBit(kDoCoarse) )
       theProj->FillHitpattern();
   }
+
+#ifdef MCDATA
+  const TSBSSimDecoder* simdata = 0;
+  assert((&evdata) );
+  assert( dynamic_cast<const TSBSSimDecoder*>(&evdata) );
+  simdata = static_cast<const TSBSSimDecoder*>(&evdata);
+  std::vector<std::vector<Double_t>> mchits = simdata->GetAllMCHits();//get all mchits from signal files, excluding mchits from background files
+
+  std::ofstream ofTrack;
+  ofTrack.open("trackingInput.txt",ios::app);
+  
+  if( simdata->GetNMCTracks() > 0 ) {
+    assert( dynamic_cast<TSBSSimTrack*>(simdata->GetMCTrack(0)) );
+    TSBSSimTrack* trk = static_cast<TSBSSimTrack*>( simdata->GetMCTrack(0) );
+    //cout<<trk->VX()<<"  "<<trk->VY()<<"  "<<trk->VZ()<<"    in mm"<<endl;
+    //cout<<trk->fMomentum.X()<<"  "<<trk->fMomentum.Y()<<"  "<<trk->fMomentum.Z()<<"    in MeV"<<endl;
+
+    int hitType = 2; //mc tracks
+    double track_dx = trk->fMomentum.X()/trk->fMomentum.Z();
+    double track_dy = trk->fMomentum.Y()/trk->fMomentum.Z();
+    ofTrack<<hitType<<" "
+	   <<trk->VX()<<" "
+	   <<trk->VY()<<" "
+	   <<trk->VZ()<<" "
+	   <<track_dx<<" "
+	   <<track_dy<<" "
+	   <<trk->vertex_target.X()<<" "
+	   <<trk->vertex_target.Y()<<" "
+	   <<trk->vertex_target.Z()<<" "
+	   <<trk->momentum_target.X()<<" "
+	   <<trk->momentum_target.Y()<<" "
+	   <<trk->momentum_target.Z()<<" "
+	   <<sqrt( trk->fMomentum.X()*trk->fMomentum.X() + trk->fMomentum.Y()*trk->fMomentum.Y() + trk->fMomentum.Z()*trk->fMomentum.Z() )<<" "
+	   <<endl;
+    
+    
+    /*  cout<<" track projection on 5 planes in x: "
+	<<trk->VX() + track_dx * 50<<"  "
+	<<trk->VX() + track_dx * 200<<"  "
+	<<trk->VX() + track_dx * 350<<"  "
+	<<trk->VX() + track_dx * 500<<"  "
+	<<trk->VX() + track_dx * 1530<<"  "
+	<<endl;
+    cout<<" slope: "<<track_dx<<endl;
+    */
+    
+    assert(trk);
+  }
+  
+  for(auto& cluster:mchits){
+    int hitType = 0;//type = 0 for MC hits, 1 for reconstructed
+    int planeid = cluster[3];
+    int moduleid= cluster[4];
+    double charge = cluster[2];
+    double time = cluster[5];
+    double xPos = cluster[0];
+    double yPos = cluster[1];
+    ofTrack<<hitType<<" "
+	   <<planeid<<" "
+	   <<moduleid<<" "
+	   <<charge<<" "
+	   <<time<<" "
+	   <<xPos<<" "
+	   <<yPos<<" "
+	   <<endl;
+    //  cout<<planeid<<"  :  "<<xPos*1e3<<endl;getchar();
+  }
+  for(int planeid=0;planeid<5;planeid++)
+    {
+      Projection *projX = fProj[0];
+      Projection *projY = fProj[1];
+      Plane* plx = projX->GetPlane(planeid);
+      Plane* ply = projY->GetPlane(planeid);
+      TIterator* it;
+      MCGEMHit* phit = 0;
+      int hitType = 1;
+      int projection;
+      projection = 0;
+      it = plx->GetHits()->MakeIterator();
+      while( (phit = static_cast<MCGEMHit*>(it->Next())) ) {
+	ofTrack<<hitType<<" "
+	       <<planeid<<" "
+	       <<phit->GetModule()<<" "
+	       <<projection<<" "
+	       <<phit->GetADCmax()<<" "
+	       <<phit->GetPos()<<" "
+	       <<phit->Getprim_ratio()<<" "
+	       <<phit->GetPeaktime()<<" "
+	       <<endl;
+      }
+      projection = 1;
+      it = ply->GetHits()->MakeIterator();
+      while( (phit = static_cast<MCGEMHit*>(it->Next())) ) {
+	ofTrack<<hitType<<" "
+	       <<planeid<<" "
+	       <<phit->GetModule()<<" "
+	       <<projection<<" "
+	       <<phit->GetADCmax()<<" "
+	       <<phit->GetPos()<<" "
+	       <<phit->Getprim_ratio()<<" "
+	       <<phit->GetPeaktime()<<" "
+	       <<endl;
+      }
+    }
+  int evtEndType = -1;
+  ofTrack<<evtEndType<<endl;
+  ofTrack.close();
+
+  bool checkflag = true, checkflag0 = true;
+  std::map<int,int> mp;
+  //if mchits gives more than 1 primary hit in any plane, drop this event
+  for(auto& cluster:mchits){
+    int planeid = cluster[3];
+    if(mp.find(planeid)==mp.end()){
+      mp[planeid] = 1;
+    }else{
+      checkflag = false;
+      checkflag0 = false;
+      break;
+    }
+  }
+  //at most 1 hit exists in all plane
+  if(checkflag){
+    std::ofstream outfile0;
+    outfile0.open("cleanCluster_nhits.txt",ios::app);
+    for(auto& cluster:mchits){
+     
+      int planeid = cluster[3];
+      int moduleid= cluster[4];
+      double& xpos = cluster[0];
+      double& ypos = cluster[1];
+      double& charge = cluster[2];
+      Projection *projX = fProj[0];
+      Projection *projY = fProj[1];
+      Plane* plx = projX->GetPlane(planeid);
+      Plane* ply = projY->GetPlane(planeid);
+
+      TIterator* it;
+      MCGEMHit* phit = 0;
+      MCGEMHit* phitToWrite = 0;
+      Double_t max_prim_ratio = 0.0;
+      int nx=0,ny=0;
+      int nbkgdPassTimeCut=0;
+
+      // hitNo++;//
+      it = plx->GetHits()->MakeIterator();
+      while( (phit = static_cast<MCGEMHit*>(it->Next())) ) {
+	Double_t tmp = phit->Getprim_ratio();
+	if(phit->GetPeaktime()>30 && phit->GetPeaktime()<90)
+	  nbkgdPassTimeCut++;
+	if(tmp>max_prim_ratio){
+	  max_prim_ratio = phit->Getprim_ratio();
+	  phitToWrite = phit;
+	}
+      }
+      //cout<<"plane: "<< planeid<<" moduleid: "<<moduleid<<" charge: "<<charge<<endl;
+      if(max_prim_ratio>0) {
+	outfile0<<planeid<<" "
+		<<moduleid<<" "
+		<<1e6*xpos<<" "
+		<<1e6*phitToWrite->GetPos()<<" "
+		<<phitToWrite->Getprim_ratio()<<" "
+		<<phitToWrite->Getp_over_total()<<" "
+		<<phitToWrite->Getb_over_total()<<" "
+		<<phitToWrite->GetType()<<" "
+		<<phitToWrite->GetSize()<<" "
+		<<phitToWrite->GetPeaktime()<<" "
+		<<phitToWrite->Getpos_sigma()<<" "
+		<<phitToWrite->Gettime_sigma()<<" "
+		<<phitToWrite->Getadc_sigma()<<" "
+		<<phitToWrite->Getnb_bg()<<" "
+		<<nbkgdPassTimeCut<<" "
+		<<plx->GetNhits()<<" "
+		<<endl;
+      }else{
+	outfile0<<planeid<<" "
+		<<moduleid<<" "
+		<<1e6*xpos<<" "
+		<<endl;
+      }
+
+      // hitNo++;
+      nbkgdPassTimeCut = 0;
+      max_prim_ratio = 0.0;
+      it = ply->GetHits()->MakeIterator();
+      while( (phit = static_cast<MCGEMHit*>(it->Next())) ) {
+	if(phit->GetPeaktime()>30 && phit->GetPeaktime()<90)
+	  nbkgdPassTimeCut++;
+	if(phit->Getprim_ratio()>max_prim_ratio){
+	  max_prim_ratio = phit->Getprim_ratio();
+	  phitToWrite = phit;
+	}
+      }
+    
+      if(max_prim_ratio>0) {
+	outfile0<<planeid<<" "
+		<<moduleid<<" "
+		<<1e6*ypos<<" "
+		<<1e6*phitToWrite->GetPos()<<" "
+		<<phitToWrite->Getprim_ratio()<<" "
+		<<phitToWrite->Getp_over_total()<<" "
+		<<phitToWrite->Getb_over_total()<<" "
+		<<phitToWrite->GetType()<<" "
+		<<phitToWrite->GetSize()<<" "
+		<<phitToWrite->GetPeaktime()<<" "
+		<<phitToWrite->Getpos_sigma()<<" "
+		<<phitToWrite->Gettime_sigma()<<" "
+		<<phitToWrite->Getadc_sigma()<<" "
+		<<phitToWrite->Getnb_bg()<<" "
+		<<nbkgdPassTimeCut<<" "
+		<<ply->GetNhits()<<" "
+		<<endl;
+      }else{
+	outfile0<<planeid<<" "
+		<<moduleid<<" "
+		<<1e6*xpos<<" "
+		<<endl;
+      }
+
+      delete it;
+      //outfile0<<nx<<" "<<ny<<endl;
+      //getchar();
+      if(plx->GetNhits()!=1 || ply->GetNhits()!=1){
+	checkflag0 = false;
+      }
+
+    }
+    outfile0.close();
+  }
+  if(checkflag0){// all planes have only 1 hits in both data and mc
+    std::ofstream outfile;
+    outfile.open("cleanCluster.txt",ios::app);
+    for(auto& cluster:mchits){
+      int planeid = cluster[3];
+      double& xpos = cluster[0];
+      double& ypos = cluster[1];
+      double& charge = cluster[2];
+     
+      Projection *projX = fProj[0];
+      Projection *projY = fProj[1];
+      Plane* plx = projX->GetPlane(planeid);
+      Plane* ply = projY->GetPlane(planeid);
+      //    if(plx->GetNhits()!=1 || ply->GetNhits()!=1){
+	
+      //   }
+      TIterator* it;
+      GEMHit* phit = 0;
+      //cout<<plx->GetNhits()<<" <-x:y-> "<<ply->GetNhits()<<endl;
+      it = plx->GetHits()->MakeIterator();
+      while( (phit = static_cast<GEMHit*>(it->Next())) ) {
+	outfile<<planeid<<" "<<1e6*(phit->GetPos()-xpos)<<" "<<charge/phit->GetADCsum()
+	       <<" "<<phit->GetPeaktime();
+      }
+      it = ply->GetHits()->MakeIterator();
+      while( (phit = static_cast<GEMHit*>(it->Next())) ) {
+	outfile<<" "<<1e6*(phit->GetPos()-ypos)<<" "<<charge/phit->GetADCsum()
+	       <<" "<<phit->GetPeaktime()<<endl;
+      }
+      delete it;
+    }
+    outfile.close();
+    
+  }
+  
+
+
+#endif
 
 #ifdef MCDATA
   // For MCdata, check which MC track points were detected
@@ -1732,6 +2002,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
     EProjType type = proj->GetType();
 
     Int_t nrd = proj->GetNgoodRoads();
+    // cout<<nrd<<" goodroads "<<endl;
     if( nrd > 0 ) {
       // Count number of projections with at least one road
       ++nproj;
@@ -1760,8 +2031,12 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
     // Set of the unique roads occurring in the road_combos elements
     Rset_t unique_found;
 
+
+
+
     // Find matching combinations of roads
     UInt_t nfits = MatchRoads( roads, road_combos, unique_found );
+    // cout<<"##@@ nfits: "<<nfits<<endl;
 
 #ifdef TESTCODE
     t_3dmatch = 1e6*timer.RealTime();
@@ -1834,6 +2109,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 
 	if( best_roads.empty() )
 	  fTrkStat = kFailedOptimalN;
+
 
 	// Now each selected road tuple corresponds to a new track
 	for( vector<Rset_t>::iterator it = best_roads.begin(); it !=

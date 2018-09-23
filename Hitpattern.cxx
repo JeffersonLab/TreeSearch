@@ -290,6 +290,7 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
     SetPosition( phit->GetPos()+fOffset, phit->GetResolution(), plane,
 		 // Don't record the pseudo-hits in dummy planes
 		 pl->IsDummy() ? 0 : phit );
+   
 #ifndef NDEBUG
     assert( phit != prevHit );
     prevHit = phit;

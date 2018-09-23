@@ -14,6 +14,8 @@
 #include <vector>
 #include <map>
 #include "SimDecoder.h"
+#include "TH2.h"
+#include "TCanvas.h"
 //#include "GEMHit.h"
 
 namespace TreeSearch {
@@ -40,7 +42,7 @@ namespace TreeSearch {
     // For ROOT RTTI
     GEMPlane() : fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fGoodHit(0) {}
     virtual ~GEMPlane();
-
+    // TCanvas *c1;
     virtual void    Clear( Option_t* opt="" );
     virtual Int_t   Decode( const THaEvData& );
     virtual void    Print( Option_t* opt="" ) const;
@@ -61,6 +63,7 @@ namespace TreeSearch {
     enum EChanMapType { kOneToOne, kReverse, kGassiplexAdapter1,
 			kGassiplexAdapter2, kTable };
 
+    
     EChanMapType  fMapType;     // Type of hardware channel mapping to use
     Vint_t        fChanMap;     // [fNelem] Optional hardware channel mapping
     Int_t         MapChannel( Int_t idx ) const;
@@ -100,7 +103,8 @@ namespace TreeSearch {
     Double_t      fOccupancy;   // Statistics: occupancy GetNsigStrips/fNelem
     // pulse fit---temprary need to find better ways
     //Int_t         fMaxPulsePoints = 20;
-    
+    //temparary variable for test
+    UInt_t        fTotalPriHit=0,fCoveredPriHit=0;
 
     std::map<Int_t,StripData_t> mStrip; //strips passed zero suppression.
 
