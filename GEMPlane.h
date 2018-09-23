@@ -23,11 +23,12 @@ namespace TreeSearch {
   struct StripData_t {
     Float_t maxAdc;
     Float_t adcSum;
-    Int_t maxTimeSample=-1;
-    Double_t peaktime = 0;
+    Int_t maxTimeSample;//=-1;
+    Double_t peaktime;// = 0;
     std::vector<Float_t> vADC;
     Bool_t  pass;
-    StripData_t() {}
+  StripData_t() : maxAdc(0), adcSum(0), maxTimeSample(-1), peaktime(0), pass(false), vADC(0)
+ {}
   StripData_t( Float_t _raw, Float_t _adc, Int_t max_bin, Double_t _time, Bool_t _pass, std::vector<Float_t> _vADC )
   : maxAdc(_raw), adcSum(_adc), maxTimeSample(max_bin), peaktime(_time), pass(_pass), vADC(_vADC) {}
   };
