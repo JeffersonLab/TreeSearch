@@ -64,8 +64,9 @@ namespace TreeSearch {
 	      Double_t res, GEMPlane* pl, Int_t mctrk, Double_t mcpos, Double_t mccharge,
 	      Double_t mctime, Int_t num_bg_strips )
     : GEMHit(module, pos, adc_sum, adc_max, peaktime, num_strips, type, res, pl),
-      fprim_ratio(prim_ratio), fp_over_total(p_over_total), fb_over_total(b_over_total), fpos_sigma(pos_sigma), ftime_sigma(time_sigma), fadc_sigma(adc_sigma), fnb_bg(nb_bg), fstripl(stripl), fstriph(striph), 
-      TSBSMCHitInfo(mctrk, mcpos, mctime, mccharge, num_bg_strips) {}
+      TSBSMCHitInfo(mctrk, mcpos, mctime, mccharge, num_bg_strips), 
+      fprim_ratio(prim_ratio), fp_over_total(p_over_total), fb_over_total(b_over_total), fpos_sigma(pos_sigma), ftime_sigma(time_sigma), fadc_sigma(adc_sigma), fnb_bg(nb_bg), fstripl(stripl), fstriph(striph) {}
+    
     virtual ~MCGEMHit() {}
 
     virtual void Print( Option_t* opt="" ) const;
@@ -84,8 +85,8 @@ namespace TreeSearch {
     Double_t fprim_ratio;   // percentage of adcs of primary hit that this cluster includes 
     Double_t fp_over_total; // ratio of adc from primary hit to total adc of this cluster
     Double_t fb_over_total; // ratio of adc from background file hits to total adc of this cluster
-    Double_t ftime_sigma;
     Double_t fpos_sigma;
+    Double_t ftime_sigma;
     Double_t fadc_sigma;
     Int_t    fnb_bg;
     // Double_t

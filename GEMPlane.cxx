@@ -61,7 +61,7 @@ namespace TreeSearch {
 		      THaDetectorBase* parent )
     : Plane(name,description,parent),
       fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
-      fMaxSamp(1), fAmplSigma(0), fADCraw(0), fMCCharge(0), fADC(0), fHitTime(0), fADCcor(0),
+      fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fMCCharge(0), 
       fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
       fOccupancy(0), fADCMap(0)
   {
