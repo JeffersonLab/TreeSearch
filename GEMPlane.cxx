@@ -572,7 +572,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       for(int iapv=0; iapv<Napvs;iapv++)
 	{
 	  // cout<<d->crate<<" "<<d->slot<<" apv: "<<iapv<<endl;
-	  for(int isamp=0; isamp<fMaxSamp; isamp++)
+	  for(UInt_t isamp=0; isamp<fMaxSamp; isamp++)
 	    {
 	      int Commsize = commonMode[iapv][isamp].size();
      	      int NcommMode = 0;
@@ -606,7 +606,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	Int_t istrip =
 	  MapChannel( d->first + ((d->reverse) ? d->hi - ichan : ichan - d->lo) );
 	
-	for(int isamp=0; isamp<fMaxSamp; isamp++)
+	for(UInt_t isamp=0; isamp<fMaxSamp; isamp++)
 	  {
 	    Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );

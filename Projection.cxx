@@ -355,9 +355,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     // Of course, this will become inefficient for grotesque geometries.
     Double_t s = thePlane->GetStart();
     Double_t d = thePlane->GetPitch();
-    Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
+    //Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
     Double_t lo = s - 0.5*d;
-    Double_t hi = s + (n-0.5)*d;
+    //Double_t hi = s + (n-0.5)*d;
     Double_t w = TMath::Abs(lo);//
     // Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
     if( w > fWidth )

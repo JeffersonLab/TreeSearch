@@ -638,7 +638,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       int moduleid= cluster[4];
       double& xpos = cluster[0];
       double& ypos = cluster[1];
-      double& charge = cluster[2];
+      //double& charge = cluster[2];
       Projection *projX = fProj[0];
       Projection *projY = fProj[1];
       Plane* plx = projX->GetPlane(planeid);
@@ -648,7 +648,7 @@ Int_t Tracker::Decode( const THaEvData& evdata )
       MCGEMHit* phit = 0;
       MCGEMHit* phitToWrite = 0;
       Double_t max_prim_ratio = 0.0;
-      int nx=0,ny=0;
+      //int nx=0,ny=0;
       int nbkgdPassTimeCut=0;
 
       // hitNo++;//
