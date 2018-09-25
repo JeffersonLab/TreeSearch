@@ -203,7 +203,8 @@ BOBJ          = $(SBSSRC:.cxx=.o) $(SBSDICT).o
 BHDR          = $(SBSSRC:.cxx=.h)
 BDEP          = $(SBSSRC:.cxx=.d)
 
-all:		$(CORELIB) $(MWDCLIB) $(GEMLIB) $(SOLIDLIB) $(SBSLIB)
+#all:		$(CORELIB) $(MWDCLIB) $(GEMLIB) $(SOLIDLIB) $(SBSLIB)
+all:		$(CORELIB) $(GEMLIB) $(SOLIDLIB) $(SBSLIB)
 
 mwdc:		$(MWDCLIB)
 
@@ -217,9 +218,9 @@ $(CORELIB):	$(OBJ)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^
 		@echo "$@ done"
 
-$(MWDCLIB):	$(MOBJ) $(CORELIB)
-		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
-		@echo "$@ done"
+#$(MWDCLIB):	$(MOBJ) $(CORELIB)
+#		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)
+#		@echo "$@ done"
 
 $(GEMLIB):	$(GOBJ) $(CORELIB)
 		$(LD) $(LDFLAGS) $(SOFLAGS) -o $@ $^ $(CORELIB)

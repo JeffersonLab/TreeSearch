@@ -363,7 +363,11 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 
 	// Get ratio of hit amplitudes
 	assert( dynamic_cast<GEMHit*>(xp->hit) );
-	assert( dynamic_cast<GEMHit*>(yp->hit) );
+	assert( dynamic_cast<GEMHit*>(yp->hit) );	
+	Int_t xModuleID = (xp->hit)->GetModuleID();
+	Int_t yModuleID = (yp->hit)->GetModuleID();
+	
+	
 	Double_t xampl = static_cast<GEMHit*>(xp->hit)->GetADCsum();
 	Double_t yampl = static_cast<GEMHit*>(yp->hit)->GetADCsum();
 	assert( xampl > 0.0 and yampl > 0.0 ); // ensured in Decoder
@@ -389,7 +393,7 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	}
 #endif
 	// Count readout planes whose x/y-hit amplitudes match
-	if( TMath::Abs(asym) < cutoff ) {
+	if( xModuleID == yModuleID && TMath::Abs(asym) < cutoff ) {
 	  matchval += TMath::Abs(asym);  // not really used later (yet)
 	  ++nmatches;
 	}
