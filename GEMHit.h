@@ -25,7 +25,7 @@ namespace TreeSearch {
   GEMHit( Int_t module, Double_t pos, Double_t adc_sum, Double_t adc_max, Double_t peaktime, 
 	  UInt_t num_strips, Int_t type,
 	  Double_t res, GEMPlane* pl ) :
-    Hit(pos, res, static_cast<Plane*>(pl)), fModule(module),
+    Hit(pos, res, static_cast<Plane*>(pl), module),
       fADCsum(adc_sum), fADCmax(adc_max), fPeaktime(peaktime),
       fSize(num_strips), fType(type) {}
     virtual ~GEMHit() {}

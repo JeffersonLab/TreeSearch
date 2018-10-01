@@ -576,10 +576,17 @@ Int_t Projection::ReadDatabase( const TDatime& date )
   Int_t req1of2 = 0, disable_chi2 = 0;
 
   Int_t gbl = Plane::GetDBSearchLevel(fPrefix);
+  vector<Int_t> *moduleOrder = new vector<Int_t>;
   const DBRequest request[] = {
     { "angle",           &angle,         kDouble, 0, 1 },
     { "maxslope",        &fMaxSlope,     kDouble, 0, 1, gbl },
-    { "search_depth",    &fNlevels,      kUInt,   0, 0, gbl },
+    { "search_depth",    &fNlevels,      kUInt},//   0, 0, gbl },
+    {"CorrSlope",        &fCorrSlope,    kDouble},
+    {"CorrSlope_min",    &fCorrSlopeMin, kDouble},
+    {"CorrSlope_max",    &fCorrSlopeMax, kDouble},
+    {"CorrIntercept_high", &fCorrInterceptHigh, kDouble},
+    {"CorrIntercept_low",  &fCorrInterceptLow,  kDouble},
+    { "module_order",     moduleOrder,   kIntV,   0, 0, gbl},
     { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, gbl },
     { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, gbl },
     { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, gbl },
@@ -588,8 +595,13 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     { "disable_chi2",    &disable_chi2,  kInt,    0, 1, gbl },
     { 0 }
   };
-
   Int_t err = LoadDB( file, date, request, fPrefix );
+  
+  //cout<<"number of possible module order:"<<moduleOrder->size()<<endl;getchar();
+  for(auto &order : *moduleOrder){
+    fmoduleOrder[order] = 0;
+  }
+
   fclose(file);
   if( err )
     return kInitError;
@@ -810,6 +822,10 @@ Int_t Projection::Track()
 
 
   //DD: Need to remove invalid patterns in Y due to impossible module order
+  //if(GetType() == kYPlane){
+  //  CheckPatternModuleOrder();
+  //}
+
   //After FitRoads(), one can apply InElasticDomain Cut and Calo position Cut(Or better move this to dummy plane)
 
 
@@ -859,7 +875,10 @@ Int_t Projection::Track()
 #endif
 
   // Fit hit positions in the roads to straight lines
-  FitRoads();
+  FitRoads();//module order check included
+  cout<<"DD: Number of good roads in projection before "<<" : "<<(UInt_t)GetNgoodRoads()<<endl;
+  RemoveNonElasticTracks();
+  cout<<"DD: Number of good roads in projection after  "<<" : "<<(UInt_t)GetNgoodRoads()<<endl;
 
 #ifdef TESTCODE
   t_fit   = 1e6*timer.RealTime();
@@ -887,6 +906,25 @@ Int_t Projection::Track()
   }
 #endif
   return ret;
+}
+
+
+Int_t Projection::RemoveNonElasticTracks(){
+    for( UInt_t i = 0; i < GetNroads(); ++i ) {
+      Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
+      assert(rd);
+      if(rd -> IsVoid())
+	continue;
+      if(fCorrSlope * rd->GetSlope() + fCorrInterceptHigh < rd->GetPos()
+	 || fCorrSlope * rd->GetSlope() + fCorrInterceptLow > rd->GetPos()
+	 || rd->GetSlope() < fCorrSlopeMin
+	 || rd->GetSlope() > fCorrSlopeMax){      
+	rd -> Void();
+	fNgoodRoads--;
+      }
+    }
+  
+  return 0;
 }
 
 
@@ -1129,7 +1167,7 @@ Bool_t Projection::FitRoads()
   for( UInt_t i = 0; i < GetNroads(); ++i ) {
     Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
     assert(rd);
-    if( rd->Fit() )
+    if( rd->Fit(fmoduleOrder) )
       // Count good roads (not void and good fit)
       ++fNgoodRoads;
     else {

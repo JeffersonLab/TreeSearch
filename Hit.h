@@ -31,8 +31,8 @@ namespace TreeSearch {
 
   public:
     Hit() : fPlane(0) {}
-    Hit( Double_t pos, Double_t res, Plane* pl )
-      : fPos(pos), fResolution(res), fPlane(pl) { assert(fPlane); }
+  Hit( Double_t pos, Double_t res, Plane* pl, Int_t moduleID )
+    : fPos(pos), fResolution(res), fPlane(pl), fModuleID(moduleID) { assert(fPlane); }
     // Default copy and assignment are fine
     //    Hit( const Hit& );
     //    Hit& operator=( const Hit& );
@@ -53,6 +53,7 @@ namespace TreeSearch {
     Double_t GetZ()          const { return fPlane->GetZ(); }
 
     Plane*   GetPlane()      const { return fPlane; }
+    Int_t    GetModuleID()   const { return fModuleID; } 
     UInt_t   GetPlaneNum()   const { return fPlane->GetPlaneNum(); }
     UInt_t   GetAltPlaneNum() const { return fPlane->GetAltPlaneNum(); }
 
@@ -75,6 +76,7 @@ namespace TreeSearch {
     Double_t fPos;         // Hit position along plane coordinate axis (m)
     Double_t fResolution;  // Resolution of fPos (sigma, m)
     Plane*   fPlane;       //! Pointer to the plane obj where this hit occurred
+    Int_t    fModuleID;
 
     ClassDef(Hit,1)        // Generic tracker plane hit
   };

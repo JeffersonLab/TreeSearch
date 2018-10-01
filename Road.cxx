@@ -11,6 +11,7 @@
 #include "Projection.h"
 #include "Hitpattern.h"
 #include "Hit.h"
+#include "GEMHit.h"
 #include "Plane.h"
 #include "Helper.h"
 #ifdef MCDATA
@@ -711,7 +712,7 @@ Bool_t Road::CollectCoordinates()
 }
 
 //_____________________________________________________________________________
-Bool_t Road::Fit()
+  Bool_t Road::Fit(unordered_map<Int_t, Int_t> &moduleOrder)
 {
   // Collect hit positions within the Road limits and, if enough points
   // found, fit them to a straight line. If several points found in one
@@ -776,23 +777,35 @@ Bool_t Road::Fit()
     NthCombination( i, fPoints, selected );
     assert( selected.size() == npts );
 
+    //Here check module ID using selected[nplanes];
+
     // Do linear fit of the points, assuming uncorrelated measurements (x_i)
     // and different resolutions for each point.
     // We fit x = a1 + a2*z (z independent).
     // Notation from: Review of Particle Properties, PRD 50, 1277 (1994)
     Double_t S11 = 0, S12 = 0, S22 = 0, G1 = 0, G2 = 0, chi2 = 0;
     UInt_t pat = 0;
+    Int_t curModuleOrder = 0;
 #ifdef MCDATA
     UInt_t mcpat = 0, nmcplanes = 0;
 #endif
     for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
       register Double_t r = w[j] = 1.0 / ( p->res() * p->res() );
+      curModuleOrder +=  (p->hit)->GetModuleID()<<(2*(p->hit)->GetPlaneNum());
+      
+      //GEMHit* ap = new TreeSearch::GEMHit();
+      //cout<<p->hit->GetModuleID()<<" ### "<<(p->hit)->GetPlaneNum()<<endl;getchar();
+      
       S11 += r;
       S12 += p->z * r;
       S22 += p->z * p->z * r;
       G1  += p->x * r;
       G2  += p->x * p->z * r;
+    }
+    if(moduleOrder.find(curModuleOrder) == moduleOrder.end()){
+      // cout<<"module order not valid"<<endl; getchar();
+      continue;
     }
     Double_t D   = S11*S22 - S12*S12;
     Double_t iD  = 1.0/D;

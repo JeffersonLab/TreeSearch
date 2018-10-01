@@ -16,6 +16,7 @@
 #include <functional>
 #include <cassert>
 #include <cstring>
+#include <unordered_map>
 
 class THaTrack;
 
@@ -78,7 +79,7 @@ namespace TreeSearch {
     void           ClearGrow() { fGrown = false; }
     virtual Int_t  Compare( const TObject* obj ) const;
     void           Finish();
-    Bool_t         Fit();
+    Bool_t         Fit(unordered_map<Int_t, Int_t> &moduleOrder);
     Double_t       GetChi2()    const { return fChi2; }
     UInt_t         GetNdof()    const { return fDof; }
     const Hset_t&  GetHits()    const { return fHits; }

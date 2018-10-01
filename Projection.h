@@ -21,6 +21,7 @@
 #include <list>
 #include <exception>
 #include <string>
+#include <unordered_map>
 
 class THaDetectorBase;
 class TBits;
@@ -58,6 +59,7 @@ namespace TreeSearch {
     Int_t           FillHitpattern();
     Int_t           Track();
     Int_t           MakeRoads();
+    Int_t           RemoveNonElasticTracks(); //remove false tracks and non elasticTracks base on x(y)/x'(y') correlation
 
     static EProjType NameToType( const char* name );
 
@@ -153,6 +155,13 @@ namespace TreeSearch {
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
     Double_t         fWidth;         // Width of tracking region (m)
+    unordered_map<Int_t, Int_t>         fmoduleOrder;   // 
+    Double_t         fCorrSlope;
+    Double_t         fCorrSlopeMin;
+    Double_t         fCorrSlopeMax;
+    Double_t         fCorrInterceptHigh;
+    Double_t         fCorrInterceptLow;
+
     TVector2         fAxis;          // Projection axis, normal to strips
     THaDetectorBase* fDetector;      //! Parent detector
     PatternTree*     fPatternTree;   // Precomputed template database
