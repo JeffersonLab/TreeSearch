@@ -10,7 +10,6 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "GEMPlane.h"
-#include "SBSGEMPlane.h"
 #include "GEMHit.h"
 #include "GEMTracker.h"
 #include "Projection.h"
