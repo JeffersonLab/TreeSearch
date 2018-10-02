@@ -48,7 +48,7 @@ static const Double_t kAngleTolerance = 1.0 * TMath::DegToRad();
 Projection::Projection( EProjType type, const char* name, Double_t angle,
 			THaDetectorBase* parent )
   : THaAnalysisObject( name, name ), fType(type), fNlevels(0),
-    fMaxSlope(0.0), fWidth(0.0), fDetector(parent), fPatternTree(0),
+    fMaxSlope(0.0), fWidth(0.0), fDoElTrackSel(false), fDetector(parent), fPatternTree(0),
     fDummyPlanePattern(0), fFirstPlaneNum(kMaxUInt), fLastPlaneNum(0),
     fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
     fPlaneCombos(0), fAltPlaneCombos(0), fMaxPat(kMaxUInt),
@@ -581,11 +581,12 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     { "angle",           &angle,         kDouble, 0, 1 },
     { "maxslope",        &fMaxSlope,     kDouble, 0, 1, gbl },
     { "search_depth",    &fNlevels,      kUInt},//   0, 0, gbl },
-    {"CorrSlope",        &fCorrSlope,    kDouble},
-    {"CorrSlope_min",    &fCorrSlopeMin, kDouble},
-    {"CorrSlope_max",    &fCorrSlopeMax, kDouble},
-    {"CorrIntercept_high", &fCorrInterceptHigh, kDouble},
-    {"CorrIntercept_low",  &fCorrInterceptLow,  kDouble},
+    { "do_eltracksel",   &fDoElTrackSel, kInt,    0, 1, gbl },
+    // {"CorrSlope",        &fCorrSlope,    kDouble},
+    // {"CorrSlope_min",    &fCorrSlopeMin, kDouble},
+    // {"CorrSlope_max",    &fCorrSlopeMax, kDouble},
+    // {"CorrIntercept_high", &fCorrInterceptHigh, kDouble},
+    // {"CorrIntercept_low",  &fCorrInterceptLow,  kDouble},
     { "module_order",     moduleOrder,   kIntV,   0, 0, gbl},
     { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, gbl },
     { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, gbl },
@@ -596,6 +597,27 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     { 0 }
   };
   Int_t err = LoadDB( file, date, request, fPrefix );
+  if( err ){
+    fclose(file);
+    return kInitError;
+  }
+  
+  if(fDoElTrackSel){
+    cout << "request additional variables for elastic track selection" << endl;
+    const DBRequest request_2[] = {
+      {"CorrSlope",        &fCorrSlope,    kDouble},
+      {"CorrSlope_min",    &fCorrSlopeMin, kDouble},
+      {"CorrSlope_max",    &fCorrSlopeMax, kDouble},
+      {"CorrIntercept_high", &fCorrInterceptHigh, kDouble},
+      {"CorrIntercept_low",  &fCorrInterceptLow,  kDouble},
+      { 0 }
+    };
+    err = LoadDB( file, date, request_2, fPrefix );
+    if( err ){
+      fclose(file);
+      return kInitError;
+    }
+  }
   
   //cout<<"number of possible module order:"<<moduleOrder->size()<<endl;getchar();
   for(auto &order : *moduleOrder){
@@ -877,7 +899,7 @@ Int_t Projection::Track()
   // Fit hit positions in the roads to straight lines
   FitRoads();//module order check included
   cout<<"DD: Number of good roads in projection before "<<" : "<<(UInt_t)GetNgoodRoads()<<endl;
-  RemoveNonElasticTracks();
+  if(fDoElTrackSel)RemoveNonElasticTracks();
   cout<<"DD: Number of good roads in projection after  "<<" : "<<(UInt_t)GetNgoodRoads()<<endl;
 
 #ifdef TESTCODE
