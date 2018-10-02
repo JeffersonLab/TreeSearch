@@ -71,6 +71,7 @@ namespace TreeSearch {
     // c1 = new TCanvas(name,name,800,600); 
 
     assert( dynamic_cast<GEMTracker*>(fTracker) );
+    fTotalPriHit = 0, fCoveredPriHit = 0;
 
     try {
 #ifdef MCDATA
@@ -471,7 +472,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // computes weighted average of position. Each such cluster makes one "Hit".
     
     int flagt=0,flagc=0;// to be removed
-
+    
     const char* const here = "GEMPlane::Decode";
 #ifdef PRINTCLUSTER
     cout<<"Decode Plane: "<<this->GetName()<<endl;

@@ -28,7 +28,10 @@ namespace SBS {
     // virtual void    Print( Option_t* opt="" ) const;
     
     virtual Bool_t  Contains( Double_t x, Double_t y ) const;
-    virtual Double_t GetModuleOffsets(Int_t module) {return mOffsets[module];};
+    virtual Double_t GetModuleOffsets(Int_t module) {
+      return mOffsets.find(module)->second;//mOffsets[module];
+      //might not matter, but who knows
+    };
   protected:
 
     // Podd interface

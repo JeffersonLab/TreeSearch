@@ -104,7 +104,9 @@ namespace TreeSearch {
     // pulse fit---temprary need to find better ways
     //Int_t         fMaxPulsePoints = 20;
     //temparary variable for test
-    UInt_t        fTotalPriHit=0,fCoveredPriHit=0;
+    //UInt_t        fTotalPriHit=0,fCoveredPriHit=0;
+    UInt_t        fTotalPriHit;
+    UInt_t        fCoveredPriHit;
 
     std::map<Int_t,StripData_t> mStrip; //strips passed zero suppression.
 
