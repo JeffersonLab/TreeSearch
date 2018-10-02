@@ -155,7 +155,7 @@ namespace TreeSearch {
     UInt_t           fNlevels;       // Number of levels of search tree
     Double_t         fMaxSlope;      // Maximum physical track slope (0=perp)
     Double_t         fWidth;         // Width of tracking region (m)
-    unordered_map<Int_t, Int_t>         fmoduleOrder;   // 
+    std::unordered_map<Int_t, Int_t>         fmoduleOrder;   // 
     Double_t         fCorrSlope;
     Double_t         fCorrSlopeMin;
     Double_t         fCorrSlopeMax;
