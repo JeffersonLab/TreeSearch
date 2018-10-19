@@ -135,8 +135,8 @@ Int_t HitpatternLR::ScanHits( Plane* A, Plane* B )
   while( it ) {
     // At least one hit found
     nhits++;
-    assert( !(*it).first  || dynamic_cast<WireHit*>((*it).first)  );
-    assert( !(*it).second || dynamic_cast<WireHit*>((*it).second) );
+    assert( !(*it).first  || dynamic_cast<WireHit*>((*it).first)  ); // @suppress("Field cannot be resolved")
+    assert( !(*it).second || dynamic_cast<WireHit*>((*it).second) ); // @suppress("Field cannot be resolved")
     WireHit* hitA = static_cast<WireHit*>((*it).first);
     WireHit* hitB = static_cast<WireHit*>((*it).second);
     assert( hitA || hitB );

@@ -58,7 +58,7 @@ Plane::Plane( const char* name, const char* description,
   try {
     fFitCoords = new TClonesArray("TreeSearch::FitCoord", 20 );
   }
-  catch( std::bad_alloc ) {
+  catch( std::bad_alloc& ) {
     Error( Here(here), "Out of memory constructing plane %s. ", name );
     delete fFitCoords; fFitCoords = 0;
     MakeZombie();
@@ -200,7 +200,7 @@ Int_t Plane::DummyDecode( const THaEvData& evData )
 #endif
     // Dummy detectors have always exactly one module with exactly one channel
     // (assured in ReadDatabase)
-    assert( fDetMap->GetSize() == 1 and fDetMap->GetTotNumChan() == 1 );
+    assert( (fDetMap->GetSize() == 1) and (fDetMap->GetTotNumChan() == 1) );
 
     // Decode data
     THaDetMap::Module* d = fDetMap->GetModule(0);

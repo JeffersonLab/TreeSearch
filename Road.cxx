@@ -71,9 +71,9 @@ UInt_t GetOuterBits( UInt_t p )
   if( p != 0 ) {
     UInt_t t, tt;
     if( (tt = p >> 16) )
-      ret = 1U << ((t = tt >> 8) ? 24 + LogTable256[t] : 16 + LogTable256[tt]);
+      ret = 1U << ((t = tt >> 8) != 0 ? 24 + LogTable256[t] : 16 + LogTable256[tt]);
     else
-      ret = 1U << ((t = p >> 8) ? 8 + LogTable256[t] : LogTable256[p]);
+      ret = 1U << ((t = p >> 8) != 0 ? 8 + LogTable256[t] : LogTable256[p]);
 
     t = 1;
     while( (p & t) == 0 )
@@ -101,7 +101,7 @@ struct BuildInfo_t {
     const NodeDescriptor& nd = node.first;
     UInt_t last  = fProjection->GetLastPlaneNum()+1;
     UInt_t dmpat = fProjection->GetDummyPlanePattern();
-    assert( fCluster.plane_pattern > 0 and fCluster.nplanes > 0 );
+    assert( (fCluster.plane_pattern > 0) and (fCluster.nplanes > 0) );
     assert( last <= nd.link->GetPattern()->GetNbits() );
     assert( last-1 >= fProjection->GetFirstPlaneNum() );
     fLimits.reserve( fProjection->GetNplanes() );
@@ -439,9 +439,10 @@ Bool_t Road::Add( const Node_t& nd )
     if( hitdist > 0 ) {
       UInt_t outer_bits = fBuild->fOuterBits;
       for( siter_t it = new_hits.begin(); it != new_hits.end(); ++it ) {
-	pair< siter_t, bool > ins = fBuild->fCluster.hits.insert(*it);
-	assert( !ins.second or (*it)->GetPlaneNum() != kMaxUInt );
-	if( ins.second and TESTBIT(outer_bits,(*it)->GetPlaneNum()) )
+        Hit* hit = *it;
+	pair< siter_t, bool > ins = fBuild->fCluster.hits.insert(hit);
+	assert( !ins.second or hit->GetPlaneNum() != kMaxUInt );
+	if( ins.second and TESTBIT(outer_bits,hit->GetPlaneNum()) )
 	  fGrown = true;
       }
       // Growing clusters are expanded even for lower match levels
@@ -684,20 +685,21 @@ Bool_t Road::CollectCoordinates()
     vector<Pvec_t>::reverse_iterator ipl = fPoints.rbegin();
     for( UInt_t i = fProjection->GetNplanes(); i--; ) {
       cout << " pl= " << i;
-      assert( ipl == fPoints.rend() or !(*ipl).empty() );
+      assert( ipl == fPoints.rend() or !ipl->empty() );
       if( ipl == fPoints.rend()
-	  or i != (*ipl).front()->hit->GetPlaneNum() ) {
+	  or i != ipl->front()->hit->GetPlaneNum() ) {
 	if( fProjection->GetPlane(i)->IsCalibrating() )
 	  cout << " calibrating";
 	else
 	  cout << " missing";
       }
       else {
-	Double_t z = (*ipl).front()->z;
+	Double_t z = ipl->front()->z;
 	cout << " z=" << z << "\t x=";
-	for( Pvec_t::iterator it = (*ipl).begin(); it != (*ipl).end(); ++it ) {
-	  cout << " " << (*it)->x;
-	  assert( (*it)->z == z );
+	for( Pvec_t::iterator it = (*ipl).begin(); it != ipl->end(); ++it ) {
+	  Road::Point* pt = *it;
+	  cout << " " << pt->x;
+	  assert( pt->z == z );
 	}
 	++ipl;
       }
@@ -752,7 +754,7 @@ Bool_t Road::Fit()
     n_combinations = accumulate( ALL(fPoints),
 				 (UInt_t)1, SizeMul<Pvec_t>() );
   }
-  catch( overflow_error ) {
+  catch( overflow_error& ) {
     fTrkStat = kTooManyHitCombos;
     return false;
   }

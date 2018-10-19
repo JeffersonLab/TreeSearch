@@ -345,10 +345,11 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	if( not ybits.TestBitNumber(xnum) )
 	  continue;
 	// Move y-iterator forward until it gets to the same plane
-	assert( ityp == ypoints.end() or
-		(*ityp)->hit->GetPlaneNum() != kMaxUInt );
-	while( ityp != ypoints.end() and
-	       (*ityp)->hit->GetPlaneNum() != xnum ) {
+	const Road::Point* rtyp = *ityp;
+	assert( (ityp == ypoints.end()) or
+		(rtyp->hit->GetPlaneNum() != kMaxUInt) );
+	while( (ityp != ypoints.end()) and (rtyp = *ityp) and
+	       rtyp->hit->GetPlaneNum() != xnum ) {
 	  ++ityp;
 	}
 	// Must find a corresponding hit here, else bug in ybits test
@@ -365,7 +366,7 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	assert( dynamic_cast<GEMHit*>(yp->hit) );
 	Double_t xampl = static_cast<GEMHit*>(xp->hit)->GetADCsum();
 	Double_t yampl = static_cast<GEMHit*>(yp->hit)->GetADCsum();
-	assert( xampl > 0.0 and yampl > 0.0 ); // ensured in Decoder
+	assert( (xampl > 0.0) and (yampl > 0.0) ); // ensured in Decoder
 	if( xampl < 1.0 or yampl < 1.0 )
 	  continue;
 	Double_t ratio = xampl/yampl;
@@ -436,7 +437,7 @@ UInt_t GEMTracker::MatchRoadsImpl( vector<Rvec_t>& roads, UInt_t ncombos,
     return 0;
 
   // Limitation: amplitude correlation algo only implemented for 2 projections
-  assert( nproj == 2 or not correlate_amplitudes ); // else bug in Init
+  assert( (nproj == 2) or not correlate_amplitudes ); // else bug in Init
 
   // Fast 3D matching and amplitude correlation are mutually exclusive
   assert( not (fast_3d and correlate_amplitudes) );

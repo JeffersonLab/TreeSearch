@@ -269,7 +269,7 @@ PatternTree* PatternGenerator::Generate( TreeParam_t parameters )
   try {
     tree = new PatternTree( parameters, fStats.nPatterns, fStats.nLinks );
   }
-  catch( bad_alloc ) {
+  catch( bad_alloc& ) {
     delete tree;
     tree = 0;
   }

@@ -21,7 +21,10 @@ namespace TreeSearch {
   public:
     WirePlane( const char* name, const char* description = "",
 	       THaDetectorBase* parent = 0 );
-    WirePlane() {} // For ROOT RTTI
+    WirePlane()
+      : fMinTime(0), fMaxTime(0), fTTDConv(0),
+        fNmiss(0), fNrej(0), fWasSorted(0), fNhitwires(0), fNmultihit(0),
+        fNmaxmul(0), fNcl(0), fNdbl(0), fClsiz(0) {} // For ROOT RTTI
     virtual ~WirePlane();
 
     virtual void     Clear( Option_t* opt="" );
@@ -42,8 +45,8 @@ namespace TreeSearch {
 
     // Parameters, calibration, flags
 
-    Double_t    fMinTime;      // Minimum drift time for a hit (s)
-    Double_t    fMaxTime;      // Maximum drift time for a hit (s)
+    Double_t        fMinTime;   // Minimum drift time for a hit (s)
+    Double_t        fMaxTime;   // Maximum drift time for a hit (s)
 
     TimeToDistConv* fTTDConv;   // Drift time->distance converter
     Vflt_t          fTDCOffset; // [fNelem] TDC offsets for each wire

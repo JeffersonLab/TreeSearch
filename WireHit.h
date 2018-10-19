@@ -20,7 +20,9 @@ namespace TreeSearch {
   class WireHit : public Hit {
 
   public:
-    WireHit() {}
+    WireHit()
+      : fWireNum(0), fRawTDC(0), fTime(9), fPosL(0), fPosR(0), fCl(0),
+        fMulti(0), fTdiff(0.0) {}
     WireHit( Int_t wnum, Double_t pos, Int_t tdc, Double_t time, Double_t res,
 	     WirePlane* wp ) :
       Hit(pos, res, static_cast<Plane*>(wp)), fWireNum(wnum), fRawTDC(tdc),

@@ -30,7 +30,7 @@ namespace TreeSearch {
   class Hit : public TObject {
 
   public:
-    Hit() : fPlane(0) {}
+    Hit() : fPos(0), fResolution(0), fPlane(0) {}
     Hit( Double_t pos, Double_t res, Plane* pl )
       : fPos(pos), fResolution(res), fPlane(pl) { assert(fPlane); }
     // Default copy and assignment are fine
@@ -48,12 +48,12 @@ namespace TreeSearch {
     virtual UInt_t   GetNumPos()         const;
     virtual Double_t GetPosI( UInt_t i ) const;
 
-    Double_t GetPos()        const { return fPos; }
-    Double_t GetResolution() const { return fResolution; }
-    Double_t GetZ()          const { return fPlane->GetZ(); }
+    Double_t GetPos()         const { return fPos; }
+    Double_t GetResolution()  const { return fResolution; }
+    Double_t GetZ()           const { return fPlane->GetZ(); }
 
-    Plane*   GetPlane()      const { return fPlane; }
-    UInt_t   GetPlaneNum()   const { return fPlane->GetPlaneNum(); }
+    Plane*   GetPlane()       const { return fPlane; }
+    UInt_t   GetPlaneNum()    const { return fPlane->GetPlaneNum(); }
     UInt_t   GetAltPlaneNum() const { return fPlane->GetAltPlaneNum(); }
 
     // Functor for ordering hits in sets
@@ -150,7 +150,9 @@ namespace TreeSearch {
 	      Double_t trkpos, Double_t trkslope )
       : fHit(hit), fRoad(road), fPos(pos), fTrackPos(trkpos2d),
 	fTrackSlope(trkslope2d), f3DTrkPos(trkpos), f3DTrkSlope(trkslope) {}
-    FitCoord() : fHit(0), fRoad(0) {} // For ROOT RTTI
+    FitCoord()
+      : fHit(0), fRoad(0), fPos(0), fTrackPos(0), fTrackSlope(0),
+        f3DTrkPos(0), f3DTrkSlope(0) {} // For ROOT RTTI
     virtual ~FitCoord() {}
 
     Double_t  GetChi2()       const;

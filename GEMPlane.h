@@ -19,7 +19,12 @@ namespace TreeSearch {
     GEMPlane( const char* name, const char* description = "",
 	      THaDetectorBase* parent = 0 );
     // For ROOT RTTI
-    GEMPlane() : fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fGoodHit(0) {}
+    GEMPlane()
+      : fMapType(kOneToOne), fMaxClusterSize(kMaxUInt), fMinAmpl(0),
+        fSplitFrac(0.5), fMaxSamp(10), fAmplSigma(1),
+        fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fGoodHit(0),
+        fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0), fOccupancy(0),
+        fADCMap(0) {}
     virtual ~GEMPlane();
 
     virtual void    Clear( Option_t* opt="" );

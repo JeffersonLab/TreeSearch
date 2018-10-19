@@ -60,7 +60,7 @@ namespace TreeSearch {
     virtual Int_t   CoarseTrack( TClonesArray& tracks );
     virtual Int_t   FineTrack( TClonesArray& tracks );
     virtual Int_t   DefineVariables( EMode mode = kDefine );
-    virtual void    Print(const Option_t* opt) const;
+    virtual void    Print( Option_t* opt="" ) const;
     virtual void    SetDebug( Int_t level );
 
     virtual Int_t   Begin( THaRunBase* r=0 );
@@ -126,7 +126,7 @@ namespace TreeSearch {
       Double_t chi2;
       Int_t    ndof;
       Rvec_t*  roads;
-      FitRes_t() : roads(0) {}
+      FitRes_t() : matchval(0), chi2(0), ndof(0), roads(0) {}
     };
 
     typedef std::vector<Plane*>  Rpvec_t;

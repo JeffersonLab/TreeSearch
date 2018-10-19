@@ -43,8 +43,16 @@ namespace TreeSearch {
     Plane( const char* name, const char* description = "",
 	   THaDetectorBase* parent = 0 );
     // For ROOT RTTI
-    Plane() : fPartner(0), fProjection(0), fHits(0), fFitCoords(0),
-	      fHitMap(0) {}
+    Plane()
+      : fPlaneNum(0), fAltPlaneNum(0), fDefinedNum(0), fType(kUndefinedType),
+        fStart(0), fPitch(0), fCoordOffset(0),
+        fPartner(0), fProjection(0), fTracker(0),
+        fResolution(0), fMaxHits(kMaxUInt), fHits(0), fFitCoords(0),
+        fHitMap(0)
+#ifdef MCDATA
+      , fMCHitInfo(0)
+#endif
+      {}
     virtual ~Plane();
 
     virtual void    Clear( Option_t* opt="" );

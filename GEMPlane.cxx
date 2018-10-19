@@ -43,7 +43,7 @@ struct StripData_t {
   Float_t adc;
   Float_t time;
   Bool_t  pass;
-  StripData_t() {}
+  StripData_t() : adcraw(0), adc(0), time(0), pass(false) {}
   StripData_t( Float_t _raw, Float_t _adc, Float_t _time, Bool_t _pass )
     : adcraw(_raw), adc(_adc), time(_time), pass(_pass) {}
 };
@@ -74,7 +74,7 @@ GEMPlane::GEMPlane( const char* name, const char* description,
 #endif
       fHits = new TClonesArray("TreeSearch::GEMHit", 200);
   }
-  catch( std::bad_alloc ) {
+  catch( std::bad_alloc& ) {
     Error( Here(here), "Out of memory allocating hit array for readout "
 	   "plane %s. Call expert.", name );
     MakeZombie();
@@ -147,7 +147,7 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
   // Map hardware channel number to logical strip number based on mapping
   // prescription from database
 
-  assert( idx >= 0 and idx < fNelem );
+  assert( (idx >= 0) and (idx < fNelem) );
 
   Int_t ret = 0;
   switch( fMapType ) {
@@ -185,7 +185,7 @@ Int_t GEMPlane::MapChannel( Int_t idx ) const
     ret = fChanMap[idx];
     break;
   }
-  assert( ret >= 0 and ret < fNelem );
+  assert( (ret >= 0) and (ret < fNelem) );
   return ret;
 }
 
@@ -279,7 +279,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 
 #ifdef TESTCODE
   if( TestBit(kDoHistos) )
-    assert( fHitMap != 0 and fADCMap != 0 );
+    assert( (fHitMap != 0) and (fADCMap != 0) );
 #endif
   assert( fPed.empty() or
 	  fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
@@ -320,7 +320,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
       Int_t istrip =
 	MapChannel( d->first + ((d->reverse) ? d->hi - chan : chan - d->lo) );
       // Test for duplicate istrip, if found, warn and skip
-      assert( istrip >= 0 and istrip < fNelem );
+      assert( (istrip >= 0) and (istrip < fNelem) );
       if( fStripsSeen[istrip] ) {
 	const char* inp_source = "DAQ";
 #ifdef MCDATA
@@ -629,7 +629,7 @@ Int_t GEMPlane::GEMDecode( const THaEvData& evData )
 #endif // MCDATA
 #ifndef NDEBUG
     // Ensure hits are ordered by position (should be guaranteed by std::map)
-    assert( prevHit == 0 or theHit->Compare(prevHit) > 0 );
+    assert( (prevHit == 0) or (theHit->Compare(prevHit) > 0) );
     prevHit = theHit;
 #endif
   }

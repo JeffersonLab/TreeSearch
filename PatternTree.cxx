@@ -57,7 +57,7 @@ PatternTree* PatternTree::Read( const char* filename, const TreeParam_t& tp )
 
     // TODO: implement
   }
-  catch ( bad_alloc ) {
+  catch ( bad_alloc& ) {
     ::Error( "PatternTree::Read", "Out of memory trying to read "
 	     "%u patterns, %u links", 0,0 );
     // TODO: clean up

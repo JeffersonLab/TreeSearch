@@ -32,7 +32,7 @@ namespace TreeSearch {
     //_________________________________________________________________________
     // Coordinates of hit positions, for track fitting
     struct Point {
-      Point() : x(0), hit(0) {}
+      Point() : x(0), z(0), hit(0) {}
       Point( Double_t _x, Double_t _z, Hit* _hit )
 	: x(_x), z(_z), hit(_hit) { assert(hit); }
       virtual ~Point() {}
@@ -54,7 +54,8 @@ namespace TreeSearch {
       explicit Corners( Road* rd )
 	: fXLL(rd->fCornerX[0]), fXLR(rd->fCornerX[1]), fZL(rd->fZL),
 	  fXUL(rd->fCornerX[3]), fXUR(rd->fCornerX[2]), fZU(rd->fZU) {}
-      Corners() {}  // For ROOT RTTI
+      Corners()
+        : fXLL(0), fXLR(0), fZL(0), fXUL(0), fXUR(0), fZU(0) {}  // For ROOT RTTI
       virtual ~Corners() {}
     private:
       Double_t fXLL;  // Lower left corner x coord
@@ -69,7 +70,14 @@ namespace TreeSearch {
     //_________________________________________________________________________
     explicit Road( const Projection* proj );
     Road( const Node_t& nd, const Projection* proj );
-    Road() : fProjection(0), fTrack(0), fBuild(0) {} // For internal ROOT use
+    Road()
+      : fPlanePattern(0), fProjection(0), fZL(0), fZU(0),
+#ifdef MCDATA
+        fNMCTrackHits(0), fMCTrackPlanePattern(0), fNMCTrackHitsFit(0),
+        fMCTrackPlanePatternFit(0),
+#endif
+        fPos(0), fSlope(0), fChi2(0), fDof(0), fGood(false), fTrack(0),
+        fBuild(0), fGrown(false), fTrkStat(kTrackOK), fNfits(0) {} // For internal ROOT use
     Road( const Road& );
     Road& operator=( const Road& );
     virtual ~Road();

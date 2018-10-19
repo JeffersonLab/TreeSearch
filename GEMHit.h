@@ -20,7 +20,7 @@ namespace TreeSearch {
   class GEMHit : public Hit {
 
   public:
-    GEMHit() {}
+    GEMHit() : fADCsum(0), fSize(0), fType(0) {}
     GEMHit( Double_t pos, Double_t adc_sum, UInt_t num_strips, Int_t type,
 	    Double_t res, GEMPlane* pl ) :
       Hit(pos, res, static_cast<Plane*>(pl)), fADCsum(adc_sum),

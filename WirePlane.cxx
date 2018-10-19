@@ -58,7 +58,7 @@ WirePlane::WirePlane( const char* name, const char* description,
 #endif
       fHits = new TClonesArray("TreeSearch::WireHit", 200);
   }
-  catch( std::bad_alloc ) {
+  catch( std::bad_alloc& ) {
     Error( Here(here), "Out of memory allocating hit array for wire plane %s. "
 	   "Call expert.", name );
     MakeZombie();

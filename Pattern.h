@@ -16,6 +16,7 @@ namespace TreeSearch {
 
   class Pattern;
 
+  //___________________________________________________________________________
   class Link {
     friend class NodeVisitor;
   private:
@@ -32,6 +33,7 @@ namespace TreeSearch {
     UInt_t     Shift()      const { return (fOp & 1); }
   }; // end class Link
 
+  //___________________________________________________________________________
   class Pattern {
     friend class PatternGenerator;
     friend class NodeVisitor;

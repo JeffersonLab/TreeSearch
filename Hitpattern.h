@@ -18,16 +18,19 @@
 #include <vector>
 #include <utility>
 
+//#define HITPAT_TESTFUNC
+
 namespace TreeSearch {
 
+  //___________________________________________________________________________
   // Extended version of TBits that supports setting and resetting bit ranges
   class Bits : public TBits {
   public:
-    Bits( UInt_t nbits = 8 ) : TBits(nbits) {}
-    Bits( const TBits& orig ) : TBits(orig) {}
-    Bits& operator=( const TBits& rhs ) {
-      TBits::operator=(rhs); return *this;
-    }
+    explicit Bits( UInt_t nbits = 8 ) : TBits(nbits) {}
+    explicit Bits( const TBits& orig ) : TBits(orig) {}
+//    Bits& operator=( const TBits& rhs ) {
+//      TBits::operator=(rhs); return *this;
+//    }
     virtual ~Bits() {}
     void ResetBitRange( UInt_t lo, UInt_t hi );
     void SetBitRange( UInt_t lo, UInt_t hi );
@@ -39,6 +42,7 @@ namespace TreeSearch {
   class Plane;
   class Hit;
 
+  //___________________________________________________________________________
   class Hitpattern {
 
   public:
@@ -73,9 +77,10 @@ namespace TreeSearch {
     void     SetPosition( Double_t pos, Double_t res, UInt_t plane,
 			  Hit* hit )
     { SetPositionRange( pos-kNResSig*res, pos+kNResSig*res, plane, hit ); }
-    //Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
-    //Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
-
+#ifdef HITPAT_TESTFUNC
+    Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
+    Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
+#endif
     void     Clear( Option_t* opt="" );
     void     Print( Option_t* opt="" ) const;
 
@@ -130,34 +135,36 @@ namespace TreeSearch {
     ClassDef(Hitpattern,0)  // Tracker hitpattern at multiple resolutions
   };
 
+#ifdef HITPAT_TESTFUNC
   //___________________________________________________________________________
-//   inline
-//   Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane,
-// 					  UInt_t depth ) const
-//   {
-//     // Test if point is set at the given depth and plane.
+  inline
+   Bool_t TreeSearch::Hitpattern::TestBin( UInt_t bin, UInt_t plane,
+ 					  UInt_t depth ) const
+   {
+     // Test if point is set at the given depth and plane.
 
-//     assert( depth < fNlevels && plane < fNplanes );
-//     UInt_t offset = 1U<<depth;
-//     assert( bin < offset );
-//     return fPattern[plane]->TestBitNumber( bin + offset );
-//   }
+     assert( depth < fNlevels && plane < fNplanes );
+     UInt_t offset = 1U<<depth;
+     assert( bin < offset );
+     return fPattern[plane]->TestBitNumber( bin + offset );
+   }
 
   //___________________________________________________________________________
-//   inline
-//   Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane,
-// 				   UInt_t depth ) const
-//   {
-//     // Test if position 'pos' (in m) is marked in the hit pattern.
-//     // The pattern will be tested at the given depth.
+   inline
+   Bool_t Hitpattern::TestPosition( Double_t pos, UInt_t plane,
+ 				   UInt_t depth ) const
+   {
+     // Test if position 'pos' (in m) is marked in the hit pattern.
+     // The pattern will be tested at the given depth.
 
-//     assert( depth < fNlevels && plane < fNplanes );
-//     UInt_t bin = TMath::FloorNint( fScale*pos );
-//     if( bin < 0 || bin >= GetNbins() )
-//       return kFALSE;
-//     return
-//   fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
-//   }
+     assert( depth < fNlevels && plane < fNplanes );
+     UInt_t bin = TMath::FloorNint( fScale*pos );
+     if( bin < 0 || bin >= GetNbins() )
+       return kFALSE;
+     return
+   fPattern[plane]->TestBitNumber( (bin>>(fNlevels-depth-1))+(1U<<depth) );
+   }
+#endif
 
   //___________________________________________________________________________
   inline std::pair<UInt_t,UInt_t>

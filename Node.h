@@ -25,7 +25,7 @@ namespace TreeSearch {
 		    UChar_t dep )
       : link(ln), parent(p), shift(shft), mirrored(mir), depth(dep)
     { assert(ln && ln->GetPattern()); }
-    NodeDescriptor() {}
+    NodeDescriptor() : link(0), parent(0), shift(0), mirrored(0), depth(0) {}
     ~NodeDescriptor() {}
 
     UShort_t Start() const { return shift; }

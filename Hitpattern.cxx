@@ -76,7 +76,7 @@ void Hitpattern::Init( Double_t width )
       fPattern[i] = new Bits( nbins2 );
     fHits.resize( fNplanes*GetNbins() );
   }
-  catch ( std::bad_alloc ) {
+  catch ( std::bad_alloc& ) {
     ::Error( "Hitpattern::Hitpattern", "Out of memory trying to construct "
 	     "new Hitpattern object. Call expert." );
     throw;

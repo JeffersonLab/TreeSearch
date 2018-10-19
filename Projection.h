@@ -40,10 +40,18 @@ namespace TreeSearch {
   public:
 
     Projection( EProjType type, const char* name, Double_t angle,
-		THaDetectorBase* parent );
-    Projection() : fType(kUndefinedType), fDetector(0), fPatternTree(0),
-		   fPlaneCombos(0), fAltPlaneCombos(0), fHitpattern(0),
-		   fRoads(0), fRoadCorners(0) {} // ROOT RTTI
+                THaDetectorBase* parent );
+    Projection()
+      : fType(kUndefinedType), fNlevels(0), fMaxSlope(0), fWidth(0),
+        fDetector(0), fPatternTree(0), fDummyPlanePattern(0),
+        fFirstPlaneNum(0), fLastPlaneNum(0), fMinFitPlanes(0), fMaxMiss(0),
+        fRequire1of2(false), fPlaneCombos(0), fAltPlaneCombos(0),
+        fMaxPat(kMaxUInt), fFrontMaxBinDist(0), fBackMaxBinDist(0),
+        fHitMaxDist(0), fConfLevel(0.001), fHitpattern(0),
+        fRoads(0), fNgoodRoads(0), fRoadCorners(0), fTrkStat(kTrackOK),
+        n_hits(0), n_bins(0), n_binhits(0), maxhits_bin(0),
+        n_test(0), n_pat(0), n_roads(0), n_dupl(0), n_badfits(0),
+        t_treesearch(0), t_roads(0), t_fit(0), t_track(0) {} // ROOT RTTI
     virtual ~Projection();
 
     void            AddPlane( Plane* pl, Plane* partner = 0 );
