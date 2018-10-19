@@ -83,7 +83,7 @@ public:
 class DAQmodule : public CSpair {
 public:
   DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan )
-    : CSpair(crate, slot), fModel(model), fNchan(nchan),
+    : CSpair(crate, slot), fModel(model), fNchan(nchan), fResolution(0),
       fHasResolution(false) {}
   DAQmodule( UShort_t crate, UShort_t slot, UInt_t model, UInt_t nchan,
 	     Double_t res )
@@ -179,7 +179,8 @@ struct TrackThread {
   TCondition*  done;    // Condition indicating all tracking threads done
   TThread*     thread;  // The actual thread running with these arguments
   TrackThread()
-    : proj(0), status(0), running(0), start(0), done(0), thread(0) {}
+    : proj(0), status(0), running(0), start_m(0), done_m(0),
+      start(0), done(0), thread(0) {}
   ~TrackThread() {
     if( thread ) {
       TThread::Delete(thread);
@@ -218,9 +219,9 @@ public:
       fTrackToDo = 0;
       for( vector<TrackThread>::iterator it = fTrack.begin(); it !=
 	     fTrack.end(); ++it ) {
-	TThread* th = (*it).thread;
+	TThread* th = it->thread;
 	if( th and th->GetState() == TThread::kRunningState )
-	  SETBIT(fTrackToDo, (*it).proj->GetType());
+	  SETBIT(fTrackToDo, it->proj->GetType());
       }
       // MSB is termination flag
       SETBIT(fTrackToDo, kThreadTerminateBit);
@@ -261,7 +262,7 @@ public:
       fTrackToDo = 0;
       UInt_t n = 0;
       while( n < maxthreads and it != fTrack.end() ) {
-	SETBIT(fTrackToDo, (*it).proj->GetType());
+	SETBIT(fTrackToDo, it->proj->GetType());
 	++n;
 	++it;
       }
@@ -530,7 +531,8 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 	// If so, check if there are enough hits for each 2D fit, too
 	bool good = !fProj.empty();
 	for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
-	  const MCHitCount& mcnt = mchitcount[(*it)->GetType()];
+	  Projection* proj = *it;
+	  const MCHitCount& mcnt = mchitcount[proj->GetType()];
 	  assert( mcnt.min > 0 );
 	  if( mcnt.nfound < mcnt.min ) {
 	    good = false;
@@ -635,10 +637,10 @@ Hit* Tracker::FindHitForMCPoint( MCTrackPoint* pt,
 
     // Sanity checks
     assert( not mcHit or anyHit ); // mcHit implies anyHit
-    assert( nfound == 0 or  // nfound > 0 implies anyHit and pos within window
-	    (anyHit != 0 and TMath::Abs(x-anyHitPos) <= pt->fgWindowSize) );
-    assert( mcHit == 0 or   // mcHit, if any, cannot be closer than anyHit
-	    TMath::Abs(x-anyHitPos) <= TMath::Abs(x-mcHitPos) );
+    assert( (nfound == 0) or  // nfound > 0 implies anyHit and pos within window
+            ((anyHit != 0) and TMath::Abs(x-anyHitPos) <= pt->fgWindowSize) );
+    assert( (mcHit == 0) or   // mcHit, if any, cannot be closer than anyHit
+            TMath::Abs(x-anyHitPos) <= TMath::Abs(x-mcHitPos) );
 
     // Flag too-distant MC hits. In this case, nfound may or may not be zero
     if( mcHit and TMath::Abs(x-mcHitPos) > pt->fgWindowSize )
@@ -1379,13 +1381,14 @@ UInt_t Tracker::MatchRoadsGeneric( vector<Rvec_t>& roads, const UInt_t ncombos,
 	fctr += fxpts.back();
 	bctr += bxpts.back();
 #ifdef VERBOSE
+	Road *rd1 = *it1, *rd2 = *it2;
 	if( fDebug > 3 ) {
-	  cout << (*it1)->GetProjection()->GetName()
-	       << (*it2)->GetProjection()->GetName()
+	  cout << rd1->GetProjection()->GetName()
+	       << rd2->GetProjection()->GetName()
 	       << " front(" << fxpts.size() << ") = ";
 	  fxpts.back().Print();
-	  cout << (*it1)->GetProjection()->GetName()
-	       << (*it2)->GetProjection()->GetName()
+	  cout << rd1->GetProjection()->GetName()
+	       << rd2->GetProjection()->GetName()
 	       << " back (" << bxpts.size() << ") = ";
 	  bxpts.back().Print();
 	}
@@ -1440,7 +1443,7 @@ public:
     EProjType ta = a.front()->GetProjection()->GetType();
     EProjType tb = b.front()->GetProjection()->GetType();
     assert( ta != tb );
-    assert( fLookup[ta] < 3 and fLookup[tb] < 3 ); // else bug in Tracker::Init
+    assert( fLookup[ta] < 3 && fLookup[tb] < 3 ); // else bug in Tracker::Init
     return ( fLookup[ta] < fLookup[tb] );
   }
 private:
@@ -1461,7 +1464,7 @@ UInt_t Tracker::MatchRoadsFast3D( vector<Rvec_t>& roads, UInt_t /* ncombos */,
   // necessarily in order of ascending projection type.
 
   vector<Rvec_t>::size_type nproj = roads.size();
-  assert( nproj == 3 and fProj.size() == nproj );
+  assert( (nproj == 3) and (fProj.size() == nproj) );
   assert( f3dIdx.empty() or
 	  (Int_t)f3dIdx.size() > (Int_t)fProj.back()->GetType() );
 
@@ -1611,7 +1614,7 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
   try {
     ncombos = accumulate( ALL(roads), (UInt_t)1, SizeMul<Rvec_t>() );
   }
-  catch( overflow_error ) {
+  catch( overflow_error& ) {
     ncombos = 0;
     inrange = false;
   }
@@ -1795,8 +1798,8 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
       // Fit all combinations and sort the results by ascending chi2
       for( list< pair<Double_t,Rvec_t> >::iterator it = road_combos.begin();
 	   it != road_combos.end(); ++it ) {
-	fit_par.matchval    = (*it).first;
-	Rvec_t& these_roads = (*it).second;
+	fit_par.matchval    = it->first;
+	Rvec_t& these_roads = it->second;
 	fit_par.roads       = &these_roads;
 	fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
 	if( fit_par.ndof > 0 ) {
@@ -2082,11 +2085,11 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
 			       this
 			       );
       }
-      catch( bad_alloc ) {
+      catch( bad_alloc& ) {
 	Error( Here(here), "Out of memory creating projection \"%s\". "
 	       "Call expert.", kProjParam[type].name );
       }
-      catch( Projection::bad_angle ) {
+      catch( Projection::bad_angle& ) {
 	// Error message is printed by Projection constructor in this case
 	delete proj; proj = 0;
       }
@@ -2119,7 +2122,8 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
   // the projections' angle, width and maxslope
   try {
     for( vpiter_t it = fProj.begin(); it != fProj.end(); ++it ) {
-      status = (*it)->Init(date);
+      Projection* proj = *it;
+      status = proj->Init(date);
       if( status )
 	return fStatus = status;
     }
@@ -2195,7 +2199,7 @@ THaAnalysisObject::EStatus Tracker::Init( const TDatime& date )
     // must be (nearly) the same for the fast_3d algorithm to apply
     Double_t d1 = proj_angle.back().m_angle - proj_angle[1].m_angle;
     Double_t d2 = proj_angle[1].m_angle - proj_angle.front().m_angle;
-    assert( d1 > 0 and d2 > 0 ); // else not sorted correctly
+    assert( (d1 > 0) and (d2 > 0) ); // else not sorted correctly
     if( TMath::Abs(d1-d2) < 0.5*TMath::DegToRad() ) {
       SetBit(k3dFastMatch);
       Double_t tan = TMath::Tan( 0.5 * (TMath::Pi()-(d1+d2)) );

@@ -301,7 +301,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     try {
       fRoadCorners = new TClonesArray("TreeSearch::Road::Corners", 3);
     }
-    catch( bad_alloc ) { fRoadCorners = 0; }
+    catch( bad_alloc& ) { fRoadCorners = 0; }
     if( !fRoadCorners or fRoadCorners->IsZombie() ) {
       Error( Here(here), "Out of memory creating event display for "
 	     "projection \"%s\". Call expert.", GetName() );
@@ -434,7 +434,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     // Set up a hitpattern object with the parameters of this projection
     assert( fHitpattern == 0 );
     try { fHitpattern = MakeHitpattern( *fPatternTree ); }
-    catch( bad_alloc ) { fHitpattern = 0; }
+    catch( bad_alloc& ) { fHitpattern = 0; }
     if( !fHitpattern || fHitpattern->IsError() )
       return fStatus = kInitError;
     assert( GetNallPlanes() == fHitpattern->GetNplanes() );
@@ -861,15 +861,16 @@ static void PrintNode( const Node_t& node )
        << "  hitpos= ";
   UInt_t ipl = 0;
   for( Hset_t::iterator ihit = hs.hits.begin(); ihit != hs.hits.end(); ) {
-    assert( (*ihit)->GetPlaneNum() != kMaxUInt );
-    while( ipl < (*ihit)->GetPlaneNum() ) { cout << "--/"; ++ipl; }
+    Hit* hit = *ihit;
+    assert( hit->GetPlaneNum() != kMaxUInt );
+    while( ipl < hit->GetPlaneNum() ) { cout << "--/"; ++ipl; }
     bool seq = false;
     do {
-      assert( (*ihit)->GetPlaneNum() != kMaxUInt );
+      assert( hit->GetPlaneNum() != kMaxUInt );
       if( seq )  cout << " ";
-      cout << (*ihit)->GetPos();
+      cout << hit->GetPos();
       seq = true;
-    } while( ++ihit != hs.hits.end() and (*ihit)->GetPlaneNum() == ipl );
+    } while( ++ihit != hs.hits.end() and (hit = *ihit) and hit->GetPlaneNum() == ipl );
     if( ipl != node.first.link->GetPattern()->GetNbits()-1 ) {
       cout << "/";
       if( ihit == hs.hits.end() )
@@ -966,8 +967,10 @@ Int_t Projection::MakeRoads()
     // are candidates, search along the start bin index built above.
     BinOrdNodes_t::iterator jt = nodelookup.find( &nd1 );
     assert( jt != nodelookup.end() );
-    assert( (*jt)->first == nd1.first );
-
+#ifndef NDEBUG
+    Node_t* njt = *jt;
+    assert( njt->first == nd1.first );
+#endif
     // Test patterns in direction of decreasing front bin number index,
     // beginning with the road start pattern, until they are too far away.
 

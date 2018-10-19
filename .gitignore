@@ -24,3 +24,10 @@ ChangeLog
 *.png
 *.patch
 *.diff
+
+# Eclipse configuration files
+.project
+.cproject
+.pydevproject
+.settings/
+.tracecompass

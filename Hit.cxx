@@ -264,8 +264,10 @@ UInt_t HitSet::GetAltMatchValue( const Hset_t& hits )
   // plane pattern.
 
   UInt_t curpat = 0;
-  for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it )
-    curpat |= 1U << (*it)->GetPlane()->GetAltPlaneNum();
+  for( Hset_t::const_iterator it = hits.begin(); it != hits.end(); ++it ) {
+    Hit* hit = *it;
+    curpat |= 1U << hit->GetPlane()->GetAltPlaneNum();
+  }
 
   return curpat;
 }
@@ -312,7 +314,8 @@ Bool_t HitSet::IsSimilarTo( const HitSet& tryset, Int_t /* maxdist */ ) const
     else if( comp(*ihits, *itry) )
       ++ihits;
     else {
-      intersection_pattern |= 1U << (*itry)->GetPlaneNum();
+      Hit* hit = *itry;
+      intersection_pattern |= 1U << hit->GetPlaneNum();
       ++ihits;
       ++itry;
     }
