@@ -47,7 +47,8 @@ namespace TreeSearch {
 	if( depth < fMinDepth ) fMinDepth = depth;
       }
     public:
-      HashNode( Pattern* pat = 0 ) : fPattern(pat), fMinDepth(kMaxUInt) {}
+      explicit HashNode( Pattern* pat = 0 )
+        : fPattern(pat), fMinDepth(kMaxUInt) {}
       Pattern* GetPattern() const { return fPattern; }
     };
 

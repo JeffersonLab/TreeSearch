@@ -69,7 +69,8 @@ namespace TreeSearch {
     // that are at most fMaxDist apart are equivalent.
     struct WireDistLess : public std::binary_function< WireHit*, WireHit*, bool >
     {
-      WireDistLess( Int_t maxdist ) : fMaxDist(maxdist) { assert(maxdist>=0); }
+      explicit WireDistLess( Int_t maxdist )
+	: fMaxDist(maxdist) { assert(maxdist>=0); }
       bool operator() ( const WireHit* a, const WireHit* b ) const
       {
 	assert( a && b );

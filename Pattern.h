@@ -52,7 +52,7 @@ namespace TreeSearch {
   public:
     explicit Pattern( UInt_t size = 0 );
     Pattern( const Pattern& orig );
-    const Pattern& operator=( const Pattern& rhs );
+    Pattern& operator=( const Pattern& rhs );
     ~Pattern();
     bool operator==( const Pattern& rhs ) const {
       assert( fNbits == rhs.fNbits );

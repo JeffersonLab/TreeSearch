@@ -44,7 +44,7 @@ Pattern::Pattern( const Pattern& orig )
 }
 
 //_____________________________________________________________________________
-const Pattern& Pattern::operator=( const Pattern& rhs )
+Pattern& Pattern::operator=( const Pattern& rhs )
 {
   // Assignment. Copies only the bits, not the pointers to the children.
 

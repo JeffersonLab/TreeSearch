@@ -46,7 +46,7 @@ namespace TreeSearch {
   private:
     UInt_t   fNlevels;  // Number of levels in tree
   public:
-    TreeWalk( UInt_t nlevels = 0 ) : fNlevels(nlevels) {}
+    explicit TreeWalk( UInt_t nlevels = 0 ) : fNlevels(nlevels) {}
     virtual ~TreeWalk() {}
     void SetNlevels( UInt_t n ) { fNlevels = n; }
 

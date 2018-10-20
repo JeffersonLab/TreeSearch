@@ -34,7 +34,7 @@ private:
   Int_t     fCount;       // trial iterations left to do
   Int_t     fType;        // current pattern type (normal/shifted/mirrored)
 public:
-  ChildIter( const Pattern& parent )
+  explicit ChildIter( const Pattern& parent )
     : fParent(parent), fChild(parent), fType(0) { reset(); }
   ChildIter&      operator++();
   const ChildIter operator++(int) {

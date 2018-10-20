@@ -18,7 +18,7 @@ namespace TreeSearch {
   public:
     explicit HitpatternLR( const PatternTree& pt );  // preferred constructor
     HitpatternLR( UInt_t nlevels, UInt_t nplanes, Double_t width );
-    HitpatternLR( const Hitpattern& orig );
+    explicit HitpatternLR( const Hitpattern& orig );
     Hitpattern& operator=( const Hitpattern& rhs );
     virtual ~HitpatternLR();
 

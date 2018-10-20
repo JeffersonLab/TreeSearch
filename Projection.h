@@ -127,7 +127,7 @@ namespace TreeSearch {
     };
     class TypeEquals : public std::unary_function< Projection*, bool > {
     public:
-      TypeEquals( EProjType t ) : type(t) {}
+      explicit TypeEquals( EProjType t ) : type(t) {}
       bool operator() ( const Projection* p ) const
       { assert(p); return ( p->GetType() == type ); }
     private:
@@ -137,7 +137,7 @@ namespace TreeSearch {
     // Bad angle exception, may be thrown by SetAngle and constructors
     class bad_angle : public std::invalid_argument {
     public:
-      bad_angle( const std::string& what_arg )
+      explicit bad_angle( const std::string& what_arg )
 	: std::invalid_argument(what_arg) {}
     };
 

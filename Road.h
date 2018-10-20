@@ -125,7 +125,7 @@ namespace TreeSearch {
 
     class PosIsNear {
     public:
-      PosIsNear( Double_t tolerance ) : fTol(tolerance) {}
+      explicit PosIsNear( Double_t tolerance ) : fTol(tolerance) {}
       bool operator() ( const Road* rd, Double_t pos ) const
       { return ( rd->GetPos() + fTol < pos ); }
       bool operator() ( Double_t pos, const Road* rd ) const

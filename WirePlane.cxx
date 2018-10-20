@@ -106,7 +106,7 @@ void WirePlane::CheckCrosstalk()
   Int_t prev_iw = -(1<<16);
   WireHit* prev_hit = 0;
   for( Int_t i = 0; i < GetNhits(); ++i ) {
-    WireHit* hit = (WireHit*)fHits->At(i);
+    WireHit* hit = static_cast<WireHit*>(fHits->At(i));
     Int_t iw = hit->GetWireNum();
     Int_t dw = TMath::Abs(iw - prev_iw);
     if( dw == 0 ) {

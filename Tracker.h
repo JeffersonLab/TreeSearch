@@ -112,7 +112,7 @@ namespace TreeSearch {
     // Bad configuration exception, may be thrown by Decode
     class bad_config : public std::runtime_error {
     public:
-      bad_config( const std::string& what_arg )
+      explicit bad_config( const std::string& what_arg )
 	: std::runtime_error(what_arg) {}
     };
 #endif

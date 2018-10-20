@@ -148,7 +148,7 @@ enum EReconBits {
 // A projection angle along with a pointer to the corresponding projection,
 // sortable by angle
 struct ProjAngle_t {
-  ProjAngle_t( const Projection* p ) : m_proj(p) {
+  explicit ProjAngle_t( const Projection* p ) : m_proj(p) {
     assert(p);
     m_angle = p->GetAngle();
     assert( TMath::Abs(m_angle) <= TMath::Pi() ); // ensured in Projection::SetAngle
@@ -192,7 +192,7 @@ struct TrackThread {
 //_____________________________________________________________________________
 class ThreadCtrl {
 public:
-  ThreadCtrl( const vector<Projection*>& vp )
+  explicit ThreadCtrl( const vector<Projection*>& vp )
     : fTrackStatus(0), fTrackToDo(0),
       fTrackStartM(new TMutex), fTrackDoneM(new TMutex),
       fTrackStart(new TCondition(fTrackStartM)),
@@ -1183,7 +1183,7 @@ class CheckTypes : public unary_function<Road*,void>
   // Testing the object returns true if all types specified in the 'req'
   // argument to the constructor have been seen in all the roads tested.
 public:
-  CheckTypes( UInt_t req ) : fReq(req), fActive(0) {}
+  explicit CheckTypes( UInt_t req ) : fReq(req), fActive(0) {}
   void operator() ( const Road* rd )
   { fActive |= 1U << rd->GetProjection()->GetType(); }
   operator bool()       const { return (fActive & fReq) == fReq; }
@@ -1231,7 +1231,7 @@ class Tracker::TrackFitWeight
   // Object for sorting fits. The smaller a track's TrackFitWeight, the
   // "better" a track is considered to be.
 public:
-  TrackFitWeight( const Tracker::FitRes_t& fit_par ) :
+  explicit TrackFitWeight( const Tracker::FitRes_t& fit_par ) :
     fNdof(fit_par.ndof), fChi2(fit_par.chi2) { assert(fNdof); }
 
   bool operator<( const TrackFitWeight& rhs ) const
@@ -1436,7 +1436,8 @@ class ByProjTypeMap
   : public std::binary_function< Rvec_t, Rvec_t, bool >
 {
 public:
-  ByProjTypeMap( const vec_uint_t& lookup_table ) : fLookup(lookup_table) {}
+  explicit ByProjTypeMap( const vec_uint_t& lookup_table )
+    : fLookup(lookup_table) {}
   bool operator() ( const Rvec_t& a, const Rvec_t& b ) const
   {
     assert( !a.empty() and !b.empty() );
@@ -1601,9 +1602,6 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
   // The input vector 'roads' may be altered unpredictably.
   // Output in 'combos_found' and 'unique_found'
 
-  // The number of projections that we work with
-  vector<Rvec_t>::size_type nproj = roads.size();
-
   combos_found.clear();
   unique_found.clear();
 
@@ -1621,6 +1619,8 @@ UInt_t Tracker::MatchRoads( vector<Rvec_t>& roads,
 
 #ifdef VERBOSE
   if( fDebug > 0 ) {
+    // The number of projections that we work with
+    vector<Rvec_t>::size_type nproj = roads.size();
     if( inrange )
       cout << "Matching ";
     else
@@ -1874,7 +1874,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	  cout << "3D track:  x/y = " << tr->GetX() << "/" << tr->GetY()
 	       << " mx/my = " << tr->GetTheta() << "/" << tr->GetPhi()
 	       << " ndof = "  << tr->GetNDoF()
-	       << " rchi2 = " << tr->GetChi2()/(double)tr->GetNDoF()
+	       << " rchi2 = " << tr->GetChi2()/static_cast<double>(tr->GetNDoF())
 	       << endl;
 	}
       } else
@@ -2467,7 +2467,7 @@ Int_t Tracker::ReadDatabase( const TDatime& date )
 }
 
 //_____________________________________________________________________________
-void Tracker::Print(const Option_t* opt) const
+void Tracker::Print( Option_t* opt ) const
 {
   THaTrackingDetector::Print(opt);
 

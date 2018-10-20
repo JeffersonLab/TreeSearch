@@ -31,7 +31,7 @@ namespace TreeSearch {
 
   protected:
 
-    TimeToDistConv( UInt_t npar = 0 ) : fNparam(npar) {}
+    explicit TimeToDistConv( UInt_t npar = 0 ) : fNparam(npar) {}
     TimeToDistConv( const TimeToDistConv& rhs ) : fNparam(rhs.fNparam) {}
     TimeToDistConv& operator=( const TimeToDistConv& rhs )
     {

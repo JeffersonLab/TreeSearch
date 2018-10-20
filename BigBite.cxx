@@ -46,7 +46,7 @@ BigBite::~BigBite()
 //_____________________________________________________________________________
 Int_t BigBite::TrackCalc()
 {
-  // Additioal track calculations
+  // Additional track calculations
 
   // TODO
 

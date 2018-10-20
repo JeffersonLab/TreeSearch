@@ -60,7 +60,7 @@ namespace TreeSearch {
     // Copy an arbitrary tree into the PatternTree array structures
     class CopyPattern : public NodeVisitor {
     public:
-      CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
+      explicit CopyPattern( PatternTree* tree ) : fTree(tree) { assert(fTree); }
       virtual ETreeOp operator() ( const NodeDescriptor& nd );
 
     private:
