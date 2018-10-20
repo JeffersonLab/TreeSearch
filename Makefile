@@ -64,7 +64,7 @@ ifndef ANALYZER
   $(error $$ANALYZER environment variable not defined)
 endif
 
-INCDIRS  = $(wildcard $(addprefix $(ANALYZER)/, include src hana_decode hana_scaler))
+INCDIRS  = $(wildcard $(addprefix $(ANALYZER)/, include src hana_decode HallA Podd))
 
 ifdef EVIO_INCDIR
   INCDIRS += ${EVIO_INCDIR}
