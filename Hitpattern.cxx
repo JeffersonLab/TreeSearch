@@ -206,7 +206,8 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
       assert( proj );
     }
 #endif
-    ntot += ScanHits( plane );
+    //cout<<"hitpatterFilling: "<<plane->GetName()<<endl;
+  ntot += ScanHits( plane );
   }
 
   return ntot;
@@ -233,7 +234,7 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
   // between start and end (in m) in the given plane.
   // Positions may range from 0.0 to width.
   // Associate these bins with given hit
-
+  //cout<<"pattern start: "<<start<<"     pattern end: "<<end<<endl;
   assert( plane<fNplanes && start<=end );
   Int_t hi = TMath::FloorNint( fScale*end );
   if( hi < 0 ) return;
@@ -253,8 +254,7 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
     for( Int_t i = lo; i <= hi; ++i )
       AddHit( plane, i, hit );
   }
-
-  // Loop through the tree levels, starting at the highest resolution.
+    // Loop through the tree levels, starting at the highest resolution.
   // In practice, we usually have hi-lo <= 1 even at the highest resolution.
   while (true) {
     fPattern[plane]->SetBitRange( lo+nbins, hi+nbins );

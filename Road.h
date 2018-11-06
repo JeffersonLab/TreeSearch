@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cstring>
 #include <unordered_map>
+#include <utility>
 
 class THaTrack;
 
@@ -84,6 +85,7 @@ namespace TreeSearch {
     UInt_t         GetNdof()    const { return fDof; }
     const Hset_t&  GetHits()    const { return fHits; }
     const Pvec_t&  GetPoints()  const { return fFitCoord; }
+    const vector<std::pair<Pvec_t, Double_t>>& GetAllCandidatePoints() const { return fAllFitCoord; }
     Double_t       GetPos()     const { return fPos; }
     Double_t       GetPos( Double_t z ) const { return fPos + z*fSlope; }
     Double_t       GetPosErrsq( Double_t z ) const;
@@ -104,6 +106,7 @@ namespace TreeSearch {
     void           SetGrow() { fGrown = true; }
     void           SetTrack( THaTrack* track ) { fTrack = track; }
     void           Void() { fGood = false; }
+    Bool_t   UpdateFitCoord(const Pvec_t& fitCoord);
 
 #ifdef VERBOSE
     const NodeList_t& GetPatterns() const { return fPatterns; }
@@ -141,6 +144,7 @@ namespace TreeSearch {
     Hset_t         fHits;       // All hits linked to the patterns
     vector<Pvec_t> fPoints;     // All hit coordinates within road [nplanes][]
     Pvec_t         fFitCoord;   // fPoints used in best fit [nplanes]
+    vector<std::pair<Pvec_t, Double_t>> fAllFitCoord; // all valid fPoints combinations [nthCombination][nplanes]
     UInt_t         fPlanePattern; // Bitpattern of planes in best fit
 
     const Projection* fProjection; //! Projection that this Road belongs to
@@ -176,6 +180,7 @@ namespace TreeSearch {
 
     Bool_t   CheckMatch( const Hset_t& hits ) const;
     Bool_t   CollectCoordinates();
+    
 
   private:
     void     CopyPointData( const Road& orig );

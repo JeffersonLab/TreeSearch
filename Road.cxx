@@ -258,6 +258,7 @@ Road& Road::operator=( const Road& rhs )
     memcpy( &fProjection, &rhs.fProjection, nbytes );
 
     fFitCoord.clear();
+    fAllFitCoord.clear();
     DeleteContainerOfContainers( fPoints );
     CopyPointData( rhs );
     fPlanePattern = rhs.fPlanePattern;
@@ -638,6 +639,7 @@ Bool_t Road::CollectCoordinates()
     assert( i>0 );
     do {
       Double_t x = hit->GetPosI(--i);
+      
       if( TMath::IsInside( x, z, kNcorner, &fCornerX[0], zp )) {
 	if( np != last_np ) {
 	  // The hits are sorted by ascending plane number, so fPoints gets
@@ -712,6 +714,11 @@ Bool_t Road::CollectCoordinates()
 }
 
 //_____________________________________________________________________________
+  Bool_t Road::UpdateFitCoord(const Pvec_t& fitCoord){
+    fFitCoord = fitCoord;
+  }
+
+//_____________________________________________________________________________
   Bool_t Road::Fit(unordered_map<Int_t, Int_t> &moduleOrder)
 {
   // Collect hit positions within the Road limits and, if enough points
@@ -719,11 +726,13 @@ Bool_t Road::CollectCoordinates()
   // or more planes, fit all possible combinations of them.
   // Results of the best fit with acceptable chi2 (Projection::fChisqLimits)
   // are stored in the member variables
+  // cout<<"fit road: "<<endl;
 
   if( fFitCoord.empty() )
     assert( fChi2 == kBig );
   else {
     fFitCoord.clear();
+    fAllFitCoord.clear();
     fPlanePattern = 0;
 #ifdef MCDATA
     fMCTrackPlanePattern = fNMCTrackHits = 0;
@@ -742,9 +751,10 @@ Bool_t Road::CollectCoordinates()
   if( !CollectCoordinates() ) {
     fTrkStat = kTooFewPlanesWithHits;
     // TODO: keep statistics
+    //cout<<"few plane"<<endl;
     return false;
   }
-
+  //cout<<"numbe of points in road: "<<fPoints.size()<<endl;
   // Determine number of permutations
   UInt_t n_combinations;
   try {
@@ -755,6 +765,7 @@ Bool_t Road::CollectCoordinates()
     fTrkStat = kTooManyHitCombos;
     return false;
   }
+  
   if( n_combinations > kMaxNhitCombos ) {
     fTrkStat = kTooManyHitCombos;
     return false;
@@ -773,6 +784,10 @@ Bool_t Road::CollectCoordinates()
   if( fProjection->DoingChisqTest() )
     chi2_interval = fProjection->GetChisqLimits(fDof);
   vector<Double_t> w(npts);
+  
+  //ofstream fModuleOrder;
+  //fModuleOrder.open("moduleOrder.txt", ios::app);
+  // cout<<"n combination: "<<n_combinations<<endl;getchar();
   for( UInt_t i = 0; i < n_combinations; ++i ) {
     NthCombination( i, fPoints, selected );
     assert( selected.size() == npts );
@@ -803,8 +818,11 @@ Bool_t Road::CollectCoordinates()
       G1  += p->x * r;
       G2  += p->x * p->z * r;
     }
+   
+    // fModuleOrder << curModuleOrder<<" ";
+
     if(moduleOrder.find(curModuleOrder) == moduleOrder.end()){
-      // cout<<"module order not valid"<<endl; getchar();
+      //cout<<"module order not valid"<<endl; getchar();
       continue;
     }
     Double_t D   = S11*S22 - S12*S12;
@@ -844,6 +862,7 @@ Bool_t Road::CollectCoordinates()
 	   << endl;
 #endif
 
+    fAllFitCoord.push_back(make_pair(selected, chi2));
     // Save the fit results (good or bad)
     if( chi2 < fChi2 ) {
       fPos   = a1;
@@ -863,10 +882,11 @@ Bool_t Road::CollectCoordinates()
 	// Throw out Chi2's outside of selected confidence interval
 	// NB: Obviously, this requires accurate hit resolutions
 	//TODO: keep statistics
-	if( chi2 < chi2_interval.first )
+	if( chi2 < chi2_interval.first || chi2 > chi2_interval.second){
+	  cout<<"road failed chi2 test: "<<chi2<<" : "<<chi2_interval.first<<" ~ "<<chi2_interval.second<<endl;
+	  //getchar();
 	  continue;
-	if( chi2 > chi2_interval.second )
-	  continue;
+	}
       }
       fGood = true;
 #ifdef TESTCODE
@@ -878,6 +898,8 @@ Bool_t Road::CollectCoordinates()
     }
 
   }// for n_combinations
+
+  //fModuleOrder.close();
 
   if( !fGood )
     fTrkStat = kNoGoodFit;

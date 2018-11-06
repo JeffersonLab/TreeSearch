@@ -183,7 +183,7 @@ Int_t Projection::Decode( const THaEvData& evdata )
   for( vplsiz_t i = 0; i < GetNallPlanes(); ++i ) {
     Plane* pl = fAllPlanes[i];
     Int_t nhits = pl->Decode( evdata );
-    // cout<<"   "<<pl->GetName()<<": "<<nhits<<endl;
+    //cout<<"   "<<pl->GetName()<<": "<<nhits<<endl;
     if( nhits < 0 ) {
       err = true;
       sum -= nhits;
@@ -343,6 +343,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
   for( UInt_t i = 0; i < GetNallPlanes(); ++i ) {
     Plane* thePlane = fAllPlanes[i];
     assert( thePlane->IsInit() );
+    if(thePlane->IsDummy())
+      continue;
     // Determine the "width" of this projection plane (=width along the
     // projection coordinate).
     // The idea is that all possible hit positions in all planes of a
@@ -358,7 +360,9 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     //Double_t n = static_cast<Double_t>( thePlane->GetNelem() );
     Double_t lo = s - 0.5*d;
     //Double_t hi = s + (n-0.5)*d;
-    Double_t w = TMath::Abs(lo);//
+    Double_t w = TMath::Abs(lo);
+
+    // cout<<thePlane->IsDummy()<<" s: "<<s<<" d: "<<" w: "<<w<<endl;
     // Double_t w = max( TMath::Abs(hi), TMath::Abs(lo) );
     if( w > fWidth )
       fWidth = w;
@@ -775,7 +779,7 @@ Int_t Projection::FillHitpattern()
   n_binhits = fHitpattern->GetNhits();
   maxhits_bin = fHitpattern->GetMaxhitBin();
 #endif
-  cout<<"DD: Number of Hits in Projection "<<" : "<<ntot<<endl;
+  
   return ntot;
 }
 
@@ -827,8 +831,7 @@ Int_t Projection::Track()
 
   timer.Start();
 #endif
-
-  cout<<"DD: Number of patterns in projection "<<this->fName<<" : "<<(UInt_t)fPatternsFound.size()<<endl;
+  
   if( fPatternsFound.empty() ) {
     fTrkStat = kNoPatterns;
     goto quit;
@@ -842,22 +845,9 @@ Int_t Projection::Track()
     goto quit;
   }
 
-
-  //DD: Need to remove invalid patterns in Y due to impossible module order
-  //if(GetType() == kYPlane){
-  //  CheckPatternModuleOrder();
-  //}
-
-  //After FitRoads(), one can apply InElasticDomain Cut and Calo position Cut(Or better move this to dummy plane)
-
-
-
-
-
-
   // Combine patterns with common sets of hits into Roads
   MakeRoads();
-  cout<<"DD: Number of roads in projection "<<" : "<<(UInt_t)GetNroads()<<endl;
+
 #ifdef VERBOSE
   if( fDebug > 0 ) {
     if( !fRoads->IsEmpty() ) {
@@ -898,9 +888,11 @@ Int_t Projection::Track()
 
   // Fit hit positions in the roads to straight lines
   FitRoads();//module order check included
-  cout<<"DD: Number of good roads in projection before "<<" : "<<(UInt_t)GetNgoodRoads()<<endl;
-  if(fDoElTrackSel)RemoveNonElasticTracks();
-  cout<<"DD: Number of good roads in projection after  "<<" : "<<(UInt_t)GetNgoodRoads()<<endl;
+  
+  if(fDoElTrackSel){
+    RemoveNonElasticTracks();
+  }
+  
 
 #ifdef TESTCODE
   t_fit   = 1e6*timer.RealTime();
@@ -1096,7 +1088,7 @@ Int_t Projection::MakeRoads()
 	    break;
 	}
       }
-    }
+     }
     // Repeat in the forward direction along the index
     rd->SetGrow();
     while( rd->HasGrown() ) {

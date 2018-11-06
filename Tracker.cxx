@@ -662,8 +662,9 @@ Int_t Tracker::Decode( const THaEvData& evdata )
 	  phitToWrite = phit;
 	}
       }
-      //cout<<"plane: "<< planeid<<" moduleid: "<<moduleid<<" charge: "<<charge<<endl;
+      
       if(max_prim_ratio>0) {
+	//cout<<"plane: "<< planeid<<" moduleid: "<<moduleid<<" mcpos: "<<xpos<<"  pos: "<<phitToWrite->GetPos()<<" diff: "<<xpos - phitToWrite->GetPos()<<endl;getchar();
 	outfile0<<planeid<<" "
 		<<moduleid<<" "
 		<<1e6*xpos<<" "
@@ -1352,6 +1353,7 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   Double_t d_xp = fit_par.coef[1];
   Double_t d_y  = fit_par.coef[2];
   Double_t d_yp = fit_par.coef[3];
+ 
 
   // Correct the track coordinates for the position offset and rotation of the
   // Tracker system, resulting in "global" reference coordinates, e.g. "tr.x".
@@ -1369,6 +1371,7 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   Double_t xp, yp, x, y;
   TVector3 pos( d_x, d_y, 0.0 );
   TVector3 dir( d_xp, d_yp, 1.0 );
+  
   if( fIsRotated ) {
     // Rotate the TRANSPORT direction vector to global frame
     dir *= fRotation;
@@ -1397,7 +1400,7 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   }
   x = pos.X();
   y = pos.Y();
-
+ 
   THaTrack* newTrack = AddTrack( tracks, x, y, xp, yp );
   assert( newTrack );
   newTrack->SetD( d_x, d_y, d_xp, d_yp );
@@ -1939,8 +1942,10 @@ Bool_t Tracker::PassTrackCuts( const FitRes_t& fit_par ) const
   // Test results of 3D track fit (in fit_par) against hard cuts from
   // database
 
-  if( fit_par.ndof < fMinNdof )
+  if( fit_par.ndof < fMinNdof ){
+    cout<<"ndof failed: "<<fit_par.ndof<<endl;
     return false;
+  }
 
   if( TestBit(kDoChi2) ) {
     pdbl_t chi2_interval = GetChisqLimits(fit_par.ndof);
@@ -2024,6 +2029,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
   timer.Start();
 #endif
 
+  int numberOfTracks = 0;
   // Combine track projections to 3D tracks
   if( nproj >= fMinReqProj ) {
     // Vector holding the results (vectors of roads with good matchval)
@@ -2037,6 +2043,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
     // Find matching combinations of roads
     UInt_t nfits = MatchRoads( roads, road_combos, unique_found );
     // cout<<"##@@ nfits: "<<nfits<<endl;
+    
 
 #ifdef TESTCODE
     t_3dmatch = 1e6*timer.RealTime();
@@ -2053,8 +2060,10 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
       fit_par.roads       = &these_roads;
       fit_par.ndof = FitTrack( these_roads, fit_par.coef, fit_par.chi2 );
       if( fit_par.ndof > 0 ) {
-	if( PassTrackCuts(fit_par) )
+	if( PassTrackCuts(fit_par) ){
+	  numberOfTracks++;
 	  NewTrack( tracks, fit_par );
+	}
 	else
 	  fTrkStat = kFailedTrackCuts;
       }
@@ -2117,6 +2126,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 	  // Retrieve the fit results for this tuple
 	  FitResMap_t::iterator found = fit_results.find(*it);
 	  assert( found != fit_results.end() );
+	  numberOfTracks++;
 	  NewTrack( tracks, (*found).second );
 	}
       }
@@ -2182,7 +2192,8 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
   // Quit here to let detectors CoarseProcess() the approximate tracks,
   // so that they can determine the corrections that we need when we
   // continue in FineTrack
-    cout<<"corseTrack ENds"<<endl;
+  //cout<<"corseTrack ENds: number of tracks: "<<numberOfTracks<<endl;
+  
   return 0;
 }
 

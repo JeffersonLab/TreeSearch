@@ -842,7 +842,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	
 	Int_t istrip = *start;
 	Double_t pos = GetStart() + GetPitch()*(istrip -fDetMap->GetModule(fmStripModule[istrip])->first)+GetModuleOffsets(fmStripModule[istrip]);
-	//	cout<<"##@@"<<pos<<endl;
+	//cout<<"##@@: "<<this->GetName()<<" Z: "<<this->GetZ()<<" : "<<GetStart()<<endl;
 	//	cout<<GetType()<<" "<<fDetMap->GetModule(0)->first<<"= = = "<<(GetPitch()*(fDetMap->GetModule(fmStripModule[istrip])->first)-GetModuleOffsets(fmStripModule[istrip]))<<endl;//getchar();
 	//	static_cast<const SimDecoder*>(&evData)
 
@@ -1145,9 +1145,9 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  outfile.close();
 	}
 #endif
-#ifdef PRINTCLUSTER
-	cout<<"pos: "<<pos<<" adcsum: "<<adcsum<<" peaktime: "<<peaktime<<" size: "<<size<<endl;
-#endif
+	//#ifdef PRINTCLUSTER
+	//cout<<this->GetName()<<" Z: "<<this->GetZ()<<" moduleID: "<<moduleID<<" pos: "<<pos<<" adcsum: "<<adcsum<<" peaktime: "<<peaktime<<" size: "<<size<<endl;
+	//#endif
       }
 #endif // MCDATA
 #ifndef NDEBUG
@@ -1171,7 +1171,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     //  sort(*fHits,(*fHits).end());
     // cout<<"#########: "<<fCoveredPriHit<<"  "<<fTotalPriHit<<"  "<<(Double_t)(fCoveredPriHit)/fTotalPriHit<<endl;//getchar();
     
-    cout<<"DD: Number of hits in plane "<<" : "<<nHits<<endl;
+    //cout<<"DD: Number of hits in plane "<<" : "<<nHits<<endl;
     return nHits;
    
   }
@@ -1198,7 +1198,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
   {
     // Make a dummy hit of the correct type at the given projection coordinate
     // and add it to the hit array
-
+    
+    
     assert( IsDummy() );
 
     GEMHit* theHit = 0;
@@ -1208,7 +1209,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     const Int_t moduleID = 0;
     const Double_t adcsum = 10.*fMinAmpl, adcmax_fit=adcsum/2, prim_ratio=0, p_over_total=0, b_over_total=0, peaktime=0, resolution = fResolution;
     Int_t stripl = 0, striph = 0;
-  
+    //cout<<"addHitImpl run : "<<pos<<" resolution: "<<resolution<<endl;getchar();
 #ifdef MCDATA
     const Int_t mctrack = 1, num_bg = 0;
     const Double_t mcpos = pos, mccharge = 0.0, mctime = 0.0;

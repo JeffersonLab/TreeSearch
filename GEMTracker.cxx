@@ -298,7 +298,7 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 #endif
   assert( not xplanes.empty() and (xplanes.size() == yplanes.size()) );
   assert( xplanes.front()->GetType() != yplanes.front()->GetType() );
-
+  
   UInt_t nplanes = xplanes.size();
   TBits xybits(nplanes), ybits(nplanes);
   // Look at all possible combinations of x-roads and y-roads.
@@ -310,10 +310,11 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
     Road* xroad = *itx;
     const Road::Pvec_t& xpoints = xroad->GetPoints();
     UInt_t xpat = xroad->GetPlanePattern();
+    const vector<std::pair<Road::Pvec_t, Double_t>>& xAllpoints = xroad->GetAllCandidatePoints();
     for( Rvec_t::iterator ity = roads[1].begin(); ity != roads[1].end();
 	 ++ity ) {
       Road* yroad = *ity;
-
+      
       // xpat and ypat are bitpatterns of the plane numbers that have hits.
       // The AND of these patters is the pattern of planes where both read-
       // out directions have hits (matching or not). Check here if there
@@ -322,7 +323,7 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
       UInt_t ypat = yroad->GetPlanePattern();
       xybits.Set( nplanes, &xpat );
       ybits.Set( nplanes, &ypat );
-      xybits &= ybits;
+      xybits |= ybits;//x and y doesn't have to both have hit in a plane 
       assert( xybits.CountBits() <= nplanes );
       if( xybits.CountBits() + fMaxCorrMismatches < nplanes )
 	continue;
@@ -331,9 +332,69 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
       // get the yroad point in the same plane (if available), then check
       // if their ADC amplitudes approximately match (within a hard cut)
       const Road::Pvec_t& ypoints = yroad->GetPoints();
+      const vector<std::pair<Road::Pvec_t, Double_t>>& yAllpoints = yroad->GetAllCandidatePoints();
       Road::Pvec_t::const_iterator ityp = ypoints.begin();
       UInt_t nmatches = 0;
       Double_t matchval = 0.0;
+            
+      double minimum_chi2 = 1e6;
+      for(auto& pointsX : xAllpoints){
+	for(auto& pointsY : yAllpoints){
+	  int temp_adc_x[nplanes], temp_adc_y[nplanes], temp_moduleID_x[nplanes], temp_moduleID_y[nplanes];
+	  Double_t temp_matchval = 0.0;
+	  for(int i=0; i<nplanes; i++){
+	    temp_adc_x[i] = 0;
+	    temp_adc_y[i] = 0;
+	    temp_moduleID_x[i] = -1;
+	    temp_moduleID_y[i] = -1;
+	  }
+	  for(auto& point : pointsX.first){
+	    int planeNum = point->hit->GetPlane()->GetPlaneNum();
+	    temp_adc_x[planeNum] = static_cast<GEMHit*>(point->hit)->GetADCsum();
+	    temp_moduleID_x[planeNum] = point->hit->GetModuleID();
+	  }
+	  for(auto& point : pointsY.first){
+	    int planeNum = point->hit->GetPlane()->GetPlaneNum();
+	    temp_adc_y[planeNum] = static_cast<GEMHit*>(point->hit)->GetADCsum();
+	    temp_moduleID_y[planeNum] = point->hit->GetModuleID();
+	  }
+	  int nMisMatches = 0;
+	  for(int i=0; i<nplanes; i++){
+	    if(temp_adc_x[i]!=0 && temp_adc_y[i]!=0){
+	      double asysmetry = (double)(temp_adc_y[i] - temp_adc_x[i])/(temp_adc_y[i] + temp_adc_x[i]);
+	      if(temp_moduleID_x[i] != temp_moduleID_y[i] || abs(asysmetry) > fMaxCorrNsigma){
+		nMisMatches++;
+	      }else{
+		temp_matchval += abs(asysmetry);
+	      }
+	    }else if(temp_adc_x[i]>1000 || temp_adc_y[i]>1000){
+	      nMisMatches++;
+	    }
+	  }
+
+	  
+	  if(nMisMatches <= fMaxCorrMismatches){
+	    double temp_chi2 = pointsX.second + pointsY.second;
+	    if(temp_chi2 < minimum_chi2){
+	      minimum_chi2 = temp_chi2;
+	      matchval = temp_matchval;
+	      xroad->UpdateFitCoord(pointsX.first);
+	      yroad->UpdateFitCoord(pointsY.first);
+	    }
+	  }
+	}
+      }
+      if(minimum_chi2 < 1e6){
+	
+	selected[0] = xroad;
+	selected[1] = yroad;
+	Add3dMatch( selected, matchval, combos_found, unique_found );
+	++nfound;
+      }
+
+
+      /*
+      cout<<"old below: "<<endl;
       for( Road::Pvec_t::const_iterator itxp = xpoints.begin();
 	   itxp != xpoints.end(); ++itxp ) {
 	const Road::Point* xp = *itxp;
@@ -341,10 +402,17 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	const Plane* xplane = xp->hit->GetPlane();
 	assert( xplane );
 	UInt_t xnum = xplane->GetPlaneNum();
+
 	assert( xnum < xplanes.size() );
 	// No hit in the other readout direction of this plane?
-	if( not ybits.TestBitNumber(xnum) )
+	// allowing missing hit in the other direction if the hit itself is small
+	if( !ybits.TestBitNumber(xnum)){
+	  if(static_cast<GEMHit*>(xp->hit)->GetADCsum() < 500){
+	    nmatches++;
+	  }else{
+	  }
 	  continue;
+	}
 	// Move y-iterator forward until it gets to the same plane
 	assert( ityp == ypoints.end() or
 		(*ityp)->hit->GetPlaneNum() != kMaxUInt );
@@ -371,10 +439,13 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	Double_t xampl = static_cast<GEMHit*>(xp->hit)->GetADCsum();
 	Double_t yampl = static_cast<GEMHit*>(yp->hit)->GetADCsum();
 	assert( xampl > 0.0 and yampl > 0.0 ); // ensured in Decoder
+	cout<<"x plane num: "<<xnum<<"   ";
+	cout<<"xampl: "<<xampl<<" :yampl: "<<yampl<<"  module-> "<<xModuleID<<" "<<yModuleID<<endl;
 	if( xampl < 1.0 or yampl < 1.0 )
 	  continue;
 	Double_t ratio = xampl/yampl;
 	Double_t asym = (xampl - yampl)/(xampl + yampl);
+	//cout<<"asym: "<<asym<<endl;
 	// Compute the cutoff. In general, the sigma of the distribution can
 	// be amplitude-dependent, so we get it via a calibration function
 	// that is a property of each readout plane
@@ -408,18 +479,23 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
       // If enough planes have correlated x/y hit amplitudes, save this
       // x/y road pair as a possible 3D track candidate. The 3D track fit
       // will separate the wheat from the chaff later
+      
       if( nmatches + fMaxCorrMismatches >= nplanes ) {
+	cout<<"Good pair, nmatch: "<<nmatches<<endl;
 	selected[0] = xroad;
 	selected[1] = yroad;
 	Add3dMatch( selected, matchval, combos_found, unique_found );
 	++nfound;
       }
+      */
+
+
 #ifdef VERBOSE
       else if( fDebug > 3 ) { cout << endl; }
 #endif
     } //yroads
   }   //xroads
-
+  
   return nfound;
 }
 
