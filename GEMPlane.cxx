@@ -642,28 +642,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // DoClustering();
     //
 
-    //Draw strips hit from mStrip
-    //  cout<<" ### "<<endl;
-    TH2F *histo = new TH2F("h2","h2",6000,0,6000,6,0,6);
-    histo->Fill(1,1,0.1);
-    for(std::map<Int_t,StripData_t>::iterator it=mStrip.begin();it!=mStrip.end();it++){
-      int samplesize = (*it).second.vADC.size();
-      for(int its=0;its<samplesize;its++){
-	histo->Fill((*it).first, its, (*it).second.vADC[its]);
-      }
-    }
-    //   c1->cd();
-       //   histo->Draw("LEGO1");
-    //histo->Draw("colz");
-    //   c1->Draw();
-    //  c1->Modified();
-    //   c1->Update();
-    //  cout<<histo->GetEntries();
-    //   getchar();
 
-    // c1->Delete();
-     histo->Delete();
-    //
 
 
 
@@ -1136,7 +1115,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	//	cout<<pos<<" ### "<<mcpos<<" type: "<<type<<"charge: "<<adcmax_fit<<" "<<GetType()<<" "<<moduleID<<endl;
 	//cout<<"cluster charge: "<<mccharge<<" adcSum:"<<adcsum<<endl;
 	//printf("hit pos = %1.3f, time = %1.3f, size = %d\n", pos, mctime, size);
-#define PRINTCLUSTER_TO_FILE
+//#define PRINTCLUSTER_TO_FILE
 #ifdef PRINTCLUSTER_TO_FILE
 	if(prim_ratio!=0){
 	  std::ofstream outfile;

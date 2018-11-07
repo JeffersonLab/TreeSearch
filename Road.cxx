@@ -883,8 +883,6 @@ Bool_t Road::CollectCoordinates()
 	// NB: Obviously, this requires accurate hit resolutions
 	//TODO: keep statistics
 	if( chi2 < chi2_interval.first || chi2 > chi2_interval.second){
-	  cout<<"road failed chi2 test: "<<chi2<<" : "<<chi2_interval.first<<" ~ "<<chi2_interval.second<<endl;
-	  //getchar();
 	  continue;
 	}
       }
