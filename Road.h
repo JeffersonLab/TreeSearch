@@ -105,6 +105,7 @@ namespace TreeSearch {
     virtual void   Print( Option_t* opt="" ) const;
     void           SetGrow() { fGrown = true; }
     void           SetTrack( THaTrack* track ) { fTrack = track; }
+    void           SetSigRatio(double ratio) { fSigRatio = ratio; }
     void           Void() { fGood = false; }
     Bool_t   UpdateFitCoord(const Pvec_t& fitCoord);
 
@@ -174,6 +175,8 @@ namespace TreeSearch {
     BuildInfo_t*   fBuild;      //! Working data for building
     Bool_t         fGrown;      //! Add() added hits in front or back plane
     ETrackingStatus fTrkStat;   // Reconstruction status
+    Double_t       fSigRatio;   // number of "signal" hits over total hits in this road, only valid in MC runs 
+
 
     // Only needed for TESTCODE
     UInt_t         fNfits;      // Statistics: num fits with acceptable chi2

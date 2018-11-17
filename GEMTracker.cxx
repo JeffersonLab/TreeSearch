@@ -220,6 +220,7 @@ Int_t GEMTracker::ReadDatabase( const TDatime& date )
     { "do_adc_cut",         &do_adc_cut,         kInt,    0, 1 },
     { "3d_ampcorr_maxmiss", &ampcorr_maxmiss,    kInt,    0, 1 },
     { "3d_ampcorr_nsigma",  &fMaxCorrNsigma,     kDouble, 0, 1 },
+    { "3d_ampcorr_minADC",  &fminAdcToCheck,     kDouble, 0, 1 },
     { 0 }
   };
 
@@ -348,15 +349,20 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	    temp_moduleID_x[i] = -1;
 	    temp_moduleID_y[i] = -1;
 	  }
+	  int nSigHitX = 0, nSigHitY = 0;
 	  for(auto& point : pointsX.first){
 	    int planeNum = point->hit->GetPlane()->GetPlaneNum();
 	    temp_adc_x[planeNum] = static_cast<GEMHit*>(point->hit)->GetADCsum();
 	    temp_moduleID_x[planeNum] = point->hit->GetModuleID();
+	    if(static_cast<MCGEMHit*>(point->hit)->Getp_over_total() != 0)
+	      nSigHitX++;
 	  }
 	  for(auto& point : pointsY.first){
 	    int planeNum = point->hit->GetPlane()->GetPlaneNum();
 	    temp_adc_y[planeNum] = static_cast<GEMHit*>(point->hit)->GetADCsum();
 	    temp_moduleID_y[planeNum] = point->hit->GetModuleID();
+	    if(static_cast<MCGEMHit*>(point->hit)->Getp_over_total() != 0)
+	      nSigHitY++;
 	  }
 	  int nMisMatches = 0;
 	  for(int i=0; i<nplanes; i++){
@@ -367,7 +373,7 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	      }else{
 		temp_matchval += abs(asysmetry);
 	      }
-	    }else if(temp_adc_x[i]>1000 || temp_adc_y[i]>1000){
+	    }else if(temp_adc_x[i]>fminAdcToCheck || temp_adc_y[i]>fminAdcToCheck){
 	      nMisMatches++;
 	    }
 	  }
@@ -380,6 +386,8 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	      matchval = temp_matchval;
 	      xroad->UpdateFitCoord(pointsX.first);
 	      yroad->UpdateFitCoord(pointsY.first);
+	      xroad->SetSigRatio((double)nSigHitX / pointsX.first.size());
+	      yroad->SetSigRatio((double)nSigHitY / pointsY.first.size());
 	    }
 	  }
 	}

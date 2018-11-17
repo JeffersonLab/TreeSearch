@@ -2047,7 +2047,7 @@ Int_t Tracker::CoarseTrack( TClonesArray& tracks )
 
     // Find matching combinations of roads
     UInt_t nfits = MatchRoads( roads, road_combos, unique_found );
-    // cout<<"##@@ nfits: "<<nfits<<endl;
+     cout<<"##@@ nfits: "<<nfits<<endl;
     
 
 #ifdef TESTCODE

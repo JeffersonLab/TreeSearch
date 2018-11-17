@@ -718,6 +718,8 @@ Int_t Projection::DefineVariables( EMode mode )
                                           "fRoads.TreeSearch::Road.fGood" },
     { "rd.trkstat", "Road reconstruction status",
                                        "fRoads.TreeSearch::Road.fTrkStat" },
+    { "rd.fSigRatio", "Road nSignal/nTotal ",
+                                       "fRoads.TreeSearch::Road.fSigRatio" },
 
     { "trkstat", "2D track reconstruction status",  "fTrkStat" },
     { 0 }

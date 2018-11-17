@@ -412,7 +412,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 
 #ifdef TIME_SPLIT
 	
-	if(peaktime<=0 || peaktime>=150 || maxAdc_t<100){
+	if(peaktime<=0 || peaktime>=150 || maxAdc_t<fminPeakADC){
 	  pass = false;
 	  return false;
 	}
@@ -1049,7 +1049,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 
       // Make a new hit
 
-      if(peaktime<30 || peaktime>90){
+      if(peaktime<fPeakTimeMin || peaktime>fPeakTimeMax){
 	continue;
       }
 #ifdef PRINT_CLUSTER_DETAIL
@@ -1376,6 +1376,10 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	{ "maxsamp",        &fMaxSamp,        kUInt,    0, 1, gbl },
 	{ "adc.min",        &fMinAmpl,        kDouble,  0, 1, gbl },
 	{ "split.frac",     &fSplitFrac,      kDouble,  0, 1, gbl },
+	{ "peakTimeMin",   &fPeakTimeMin,    kDouble,  0, 1, gbl },
+	{ "peakTimeMax",   &fPeakTimeMax,    kDouble,  0, 1, gbl },
+	{ "minPeakADC",   &fminPeakADC,     kDouble,  0, 1, gbl },
+	
 	{ "mapping",        &mapping,         kTString, 0, 1, gbl },
 	{ "chanmap",        &fChanMap,        kIntV,    0, 1, gbl },
 	{ "pedestal",       &fPed,            kFloatV,  0, 1 },

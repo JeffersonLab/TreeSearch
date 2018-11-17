@@ -73,6 +73,9 @@ namespace TreeSearch {
     Double_t      fMinAmpl;     // ADC threshold for strips to be active
     Double_t      fSplitFrac;   // Percentage of amplitude swing necessary
                                 // for detecting cluster maximum/minimum
+    Double_t      fminPeakADC;  // Threshold on peak adc within 2-4 time sample
+    Double_t      fPeakTimeMin; // minimum threshold on peak time
+    Double_t      fPeakTimeMax; // maximum threshold on peak time
     UInt_t        fMaxSamp;     // Maximum # ADC samples per channel
 
     Vflt_t        fPed;         // [fNelem] Per-channel pedestal values

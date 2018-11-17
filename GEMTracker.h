@@ -33,6 +33,7 @@ namespace TreeSearch {
     UInt_t         fNPlanePartnerPairs;  // Number of plane pairs available for matching
     UInt_t         fMaxCorrMismatches;   // Max # planes w/o amplitude match
     Double_t       fMaxCorrNsigma;       // Amplitude correlation cutoff (#sig)
+    Double_t       fminAdcToCheck;       // skip adc corr check if one projection has adc less than this value and the other doesn't have hit
 
     UInt_t MatchRoadsCorrAmpl( vector<Rvec_t>& roads, UInt_t ncombos,
 			       std::list<std::pair<Double_t,Rvec_t> >& combos_found,
