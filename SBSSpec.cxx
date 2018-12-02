@@ -156,7 +156,7 @@ Int_t SBSSpec::DefineVariables( EMode mode )
     THaSpectrometer::DefineVariables(mode);
 
   RVarDef vars[] = {
-    { "tr.sect",      "Sector number",
+    { "tr.sect",        "Sector number",
       "fSBSTrackInfo.SBS::SBSTrackInfo.fSector" },
     { "tr.x_t",         "x transport (m)",
       "fSBSTrackInfo.SBS::SBSTrackInfo.fX_T" },
@@ -166,8 +166,10 @@ Int_t SBSSpec::DefineVariables( EMode mode )
       "fSBSTrackInfo.SBS::SBSTrackInfo.fXdir_T" },
     { "tr.ydir_t",      "dy/dz transport",
       "fSBSTrackInfo.SBS::SBSTrackInfo.fYdir_T" },
-    //    { "tr.",      "dy/dz transport",
-    //"fSBSTrackInfo.SBS::SBSTrackInfo.fYdir_T" },
+    { "tr.3dmatchbits", "bits patterns of 3D ampcorr matched 3d hits",
+      "fSBSTrackInfo.SBS::SBSTrackInfo.f3dMatchBits" },
+    { "tr.n3dmatch",    "number of 3D ampcorr matched 3d hits",
+      "fSBSTrackInfo.SBS::SBSTrackInfo.fN3dMatch" },
 #ifdef MCDATA
     { "tr.mchitbits", "Planepattern of true MC hits in this track",
       "fSBSTrackInfo.SBS::SBSTrackInfo.fMCHitBits" },

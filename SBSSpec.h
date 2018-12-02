@@ -24,6 +24,7 @@ namespace SBS {
   public:
     SBSTrackInfo()
       : fSector(-1), fX_T(KBIG), fY_T(KBIG), fXdir_T(KBIG), fYdir_T(KBIG)
+      , f3dMatchBits(0), fN3dMatch(0)
 #ifdef MCDATA
       , fMCHitBits(0), fNMCHits(0)
 #endif
@@ -32,11 +33,17 @@ namespace SBS {
 		  const TVector3& direction)
       : TObject(), fSector(sector), fX_T(point.X()), fY_T(point.Y()),
       fXdir_T(direction.X()/direction.Z()), fYdir_T(direction.Y()/direction.Z())
+      , f3dMatchBits(0), fN3dMatch(0)
 #ifdef MCDATA
       , fMCHitBits(0), fNMCHits(0)
 #endif
     {}
 
+    Int_t    Get3DMatchBits() const     { return f3dMatchBits; }
+    Int_t    GetN3DMatch()    const     { return fN3dMatch; }
+    void     Set3DMatchBits( Int_t bits ) { f3dMatchBits = bits; }
+    void     SetN3DMatch( Int_t nmatch )  { fN3dMatch = nmatch; }
+   
 #ifdef MCDATA
     Int_t    GetMCHitBits() const       { return fMCHitBits; }
     Int_t    GetNMCHits()   const       { return fNMCHits; }
@@ -52,6 +59,8 @@ namespace SBS {
     Double_t  fY_T;        // Y in transport coordinates 
     Double_t  fXdir_T;     // X direction in transport coordinates 
     Double_t  fYdir_T;     // Y direction transport coordinates 
+    Int_t     f3dMatchBits; // Bitpattern of 3D hit ampcorr matches
+    Int_t     fN3dMatch;   // number of 3D hit ampcorr matches
     
 #ifdef MCDATA
     // Diagnostic info derived from Monte Carlo truth data

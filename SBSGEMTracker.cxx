@@ -197,7 +197,12 @@ Int_t GEMTracker::NewTrackCalc( Int_t idx, THaTrack*, const TVector3& pos,
   SBSTrackInfo* theInfo =
 #endif
   new( (*trackInfo)[idx] ) SBSTrackInfo( fSector, pos, dir);
-
+  
+  using TreeSearch::NumberOfSetBits;
+  assert( static_cast<vrsiz_t>(idx) < f3dMatchBits.size() );
+  theInfo->Set3DMatchBits( f3dMatchBits[idx] );
+  theInfo->SetN3DMatch( NumberOfSetBits(theInfo->Get3DMatchBits()) );
+  //cout << idx << " " << f3dMatchBits.size() << " " << theInfo->Get3DMatchBits() << " " << theInfo->GetN3DMatch() << endl;
 #ifdef MCDATA
   using TreeSearch::NumberOfSetBits;
   assert( static_cast<vrsiz_t>(idx) < fMCHitBits.size() );

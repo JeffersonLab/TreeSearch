@@ -167,6 +167,7 @@ namespace TreeSearch {
     UInt_t         fN3dFits;     // # of track fits done (=good road combos)
     Int_t          fEvNum;       // Current event number
     Double_t       t_track, t_3dmatch, t_3dfit, t_coarse; // times in us
+    UInt_t         fN3dMatchs;   // # of hits (amp corr) matched for 3D track reconstruction
 
     void      Add3dMatch( const Rvec_t& selected, Double_t matchval,
 			  std::list<std::pair<Double_t,Rvec_t> >& combos_found,
@@ -226,6 +227,7 @@ namespace TreeSearch {
     MCPointUpdater* fMCPointUpdater;    //! MC track point update (if kMCdata)
     Bool_t          fChecked;           // Configuration checked to be good
     vec_uint_t      fMCHitBits;         // Per-track MC hit planepattern
+    vec_uint_t      f3dMatchBits;       // Per-track MC hit planepattern
 
     virtual Hit*  FindHitForMCPoint( Podd::MCTrackPoint* pt,
 				     MCPointUpdater* updater ) const;

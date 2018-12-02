@@ -439,6 +439,7 @@ void Tracker::Clear( Option_t* opt )
   // Clear tracking status
   fTrkStat = kTrackOK;
 
+  f3dMatchBits.clear();
 #ifdef MCDATA
   fMCHitBits.clear();
 #endif
@@ -1419,7 +1420,12 @@ THaTrack* Tracker::NewTrack( TClonesArray& tracks, const FitRes_t& fit_par )
   UInt_t hitbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef,
 				      SetPlaneBit() ).GetBits();
   newTrack->SetFlag( hitbits );
-
+  
+  // UInt_t matchbits = ForAllTrackPoints( *fit_par.roads, fit_par.coef,
+  // 					  SetPlaneBit() ).GetBits();
+  // f3dMatchBits.resize(idx+1);
+  // f3dMatchBits[idx] = matchbits;
+  
 #ifdef MCDATA
   // For MC data, determine which of the hits that were used for fitting this
   // track are true MC hits, i.e. hits left by the MC track we are trying to
@@ -1948,7 +1954,7 @@ Bool_t Tracker::PassTrackCuts( const FitRes_t& fit_par ) const
   // database
 
   if( fit_par.ndof < fMinNdof ){
-    cout<<"ndof failed: "<<fit_par.ndof<<endl;
+    //cout<<"ndof failed: "<<fit_par.ndof<<endl;
     return false;
   }
 
