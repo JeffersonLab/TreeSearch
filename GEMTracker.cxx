@@ -22,6 +22,9 @@
 
 #include <iostream>
 #include <algorithm>
+// #ifdef MCDATA
+// #include "SimDecoder.h"
+// #endif
 
 using namespace std;
 Double_t      fpulsex[20];
@@ -302,10 +305,13 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
   
   UInt_t nplanes = xplanes.size();
   TBits xybits(nplanes), ybits(nplanes);
+  std::vector<Double_t> coef;
   // Look at all possible combinations of x-roads and y-roads.
   // Try to match them via the ADC amplitudes of the hits in the shared
   // readout planes. Amplitudes should correlate well in the absence
   // of pileup.
+  bool xroad_MC = false;
+  bool yroad_MC = false;
   for( Rvec_t::iterator itx = roads[0].begin(); itx != roads[0].end();
        ++itx ) {
     Road* xroad = *itx;
@@ -315,7 +321,6 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
     for( Rvec_t::iterator ity = roads[1].begin(); ity != roads[1].end();
 	 ++ity ) {
       Road* yroad = *ity;
-      
       // xpat and ypat are bitpatterns of the plane numbers that have hits.
       // The AND of these patters is the pattern of planes where both read-
       // out directions have hits (matching or not). Check here if there
@@ -324,6 +329,8 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
       UInt_t ypat = yroad->GetPlanePattern();
       xybits.Set( nplanes, &xpat );
       ybits.Set( nplanes, &ypat );
+      //cout << "x ";xybits.Print();
+      //cout << "y ";ybits.Print();
       xybits |= ybits;//x and y doesn't have to both have hit in a plane 
       assert( xybits.CountBits() <= nplanes );
       if( xybits.CountBits() + fMaxCorrMismatches < nplanes )
@@ -337,7 +344,9 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
       Road::Pvec_t::const_iterator ityp = ypoints.begin();
       UInt_t nmatches = 0;
       Double_t matchval = 0.0;
-            
+      UInt_t HashBits = 0;
+      UInt_t Xmchits_examined = 0;
+      UInt_t Ymchits_examined = 0;
       double minimum_chi2 = 1e6;
       for(auto& pointsX : xAllpoints){
 	for(auto& pointsY : yAllpoints){
@@ -366,18 +375,25 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	  }
 	  int nMisMatches = 0;
 	  for(int i=0; i<nplanes; i++){
+	    //cout << "i = " << i << " adc_x = " << temp_adc_x[i] << " , adc_y = " << temp_adc_y[i] << endl;
 	    if(temp_adc_x[i]!=0 && temp_adc_y[i]!=0){
 	      double asysmetry = (double)(temp_adc_y[i] - temp_adc_x[i])/(temp_adc_y[i] + temp_adc_x[i]);
 	      if(temp_moduleID_x[i] != temp_moduleID_y[i] || abs(asysmetry) > fMaxCorrNsigma){
+		//cout << "( asym = " << abs(asysmetry) << " >? " << fMaxCorrNsigma << " ) OR (" 
+		//   << " mod_x " << temp_moduleID_x[i] << "!= mod y " << temp_moduleID_y[i] 
+		//   << " ) => Rejected " << endl;
 		nMisMatches++;
 	      }else{
+		//cout << "hits amtched with asymmetry " << asysmetry << endl;getchar();
 		temp_matchval += abs(asysmetry);
+		HashBits |= 1U << i;
 	      }
 	    }else if(temp_adc_x[i]>fminAdcToCheck || temp_adc_y[i]>fminAdcToCheck){
 	      nMisMatches++;
 	    }
+	    //cout << "nmismatches = " << nMisMatches << endl;
 	  }
-
+	  
 	  
 	  if(nMisMatches <= fMaxCorrMismatches){
 	    double temp_chi2 = pointsX.second + pointsY.second;
@@ -389,15 +405,20 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	      xroad->SetSigRatio((double)nSigHitX / pointsX.first.size());
 	      yroad->SetSigRatio((double)nSigHitY / pointsY.first.size());
 	    }
+	    
+
 	  }
 	}
       }
       if(minimum_chi2 < 1e6){
-	
 	selected[0] = xroad;
 	selected[1] = yroad;
 	Add3dMatch( selected, matchval, combos_found, unique_found );
 	++nfound;
+	f3dMatchBits.resize(nfound);
+	f3dMatchBits[nfound-1] = HashBits;
+	//cout << "xy bits " << xybits.CountBits() << " - " << nfound-1 << " " << f3dMatchBits.size() << " " << f3dMatchBits[nfound-1] << " " << HashBits << endl;
+	//cout << "x count bits " << xybits.CountBits() << " y count bits " << xybits.CountBits() << endl;
       }
 
 

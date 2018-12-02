@@ -44,6 +44,7 @@ typedef Hset_t::iterator siter_t;
 // Number of points for trapezoid test
 static const size_t kNcorner = 5;
 static const UInt_t kMaxNhitCombos = 1000;
+static const Int_t fDebug = 0;
 
 //_____________________________________________________________________________
 static inline
@@ -777,6 +778,8 @@ Bool_t Road::CollectCoordinates()
 
   // Loop over all combinations of hits in the planes
   vector<Pvec_t>::size_type npts = fPoints.size();
+  if(fDebug>=3)
+    cout << "Number of points " << npts << endl;
   Pvec_t selected;
   selected.reserve( npts );
   fDof = npts-2;
@@ -820,11 +823,12 @@ Bool_t Road::CollectCoordinates()
     }
    
     // fModuleOrder << curModuleOrder<<" ";
-
-    if(moduleOrder.find(curModuleOrder) == moduleOrder.end()){
+    if(moduleOrder.find(curModuleOrder) == moduleOrder.end() && moduleOrder.size()>1){
       //cout<<"module order not valid"<<endl; getchar();
       continue;
     }
+    if(fDebug>=3)cout << moduleOrder.size() << " current module order "<< curModuleOrder << endl;
+    
     Double_t D   = S11*S22 - S12*S12;
     Double_t iD  = 1.0/D;
     Double_t a1  = (G1*S22 - G2*S12)*iD;  // Intercept
@@ -833,6 +837,8 @@ Bool_t Road::CollectCoordinates()
     Double_t V[3] = { S22*iD, -S12*iD, S11*iD };
     for( Pvec_t::size_type j = 0; j < npts; j++) {
       register Point* p = selected[j];
+      if(fDebug>=3)
+	cout << "EF: kMaxUInt = " << kMaxUInt << ", Point x = " << p->x << ", z = " << p->z << endl;
       Double_t d = a1 + a2*p->z - p->x;
       chi2 += d*d * w[j];
       // Must never use two points in the same plane
@@ -878,6 +884,7 @@ Bool_t Road::CollectCoordinates()
 	fMCTrackPlanePatternFit = mcpat;
       }
 #endif
+      if(fDebug>=3)cout << "EF: Do Chi2 test ?" << fProjection->DoingChisqTest() << endl;
       if( fProjection->DoingChisqTest() ) {
 	// Throw out Chi2's outside of selected confidence interval
 	// NB: Obviously, this requires accurate hit resolutions
@@ -887,6 +894,7 @@ Bool_t Road::CollectCoordinates()
 	}
       }
       fGood = true;
+      if(fDebug>=3)cout << "fGood ? " << fGood << endl;
 #ifdef TESTCODE
       ++fNfits;
 #endif
@@ -901,7 +909,7 @@ Bool_t Road::CollectCoordinates()
 
   if( !fGood )
     fTrkStat = kNoGoodFit;
-
+  if(fDebug>=3)cout << "return fGood = " << fGood << endl;
   return fGood;
 }
 

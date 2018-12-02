@@ -109,6 +109,14 @@ namespace TreeSearch {
     void           Void() { fGood = false; }
     Bool_t   UpdateFitCoord(const Pvec_t& fitCoord);
 
+#ifdef MCDATA
+    // MC truth data, for diagnosing tracking failures
+    UInt_t GetNMCTrackHits()        const {return fNMCTrackHits;}        // # planes with hits from MC track
+    UInt_t GetMCTrackPlanePattern()  const {return fMCTrackPlanePattern;} // Planepattern of MC track hits
+    UInt_t GetNMCTrackHitsFit()       const {return fNMCTrackHitsFit;}     // # MC track hits used in best fit
+    UInt_t GetMCTrackPlanePatternFit() const {return fMCTrackPlanePatternFit;} // Planepattern of fitted MC track hits
+#endif
+
 #ifdef VERBOSE
     const NodeList_t& GetPatterns() const { return fPatterns; }
 #endif
