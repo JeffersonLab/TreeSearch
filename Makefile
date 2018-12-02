@@ -286,6 +286,7 @@ clean:
 
 realclean:	clean
 		rm -f *.d
+		rm -f *.pcm
 
 srcdist:
 		rm -f $(DISTFILE).gz

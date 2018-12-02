@@ -306,7 +306,19 @@ void Hitpattern::Print( Option_t* ) const
 {
   // Print basic info about hitpattern.
 
-  //TODO
+  //TODO !  -\_("J)_/-  Well, let's do it then! pretty basic for the moment
+  cout << "Hit pattern: " << endl;
+  cout << "Nlevels : " << fNlevels << ", Nplanes: " << fNplanes << endl;
+  cout << "Scale (/m) : " << fScale << ", Bin width (m): " << fBinWidth << endl;
+  cout << "Offset (m) : " << fOffset << endl;
+  cout << "array of hits: size " << fHits.size() << endl;
+  for (UInt_t i = 0; i< fHits.size(); i++){
+    if(fHits.at(i).size())cout << "bin = " << i << ": size " << fHits.at(i).size() << endl;
+    for (UInt_t j = 0; j< fHits.at(i).size(); j++){
+      cout << "hit " << j << endl;
+      fHits.at(i).at(j)->Print();
+    }
+  }
 }
 
 

@@ -26,7 +26,9 @@ void GEMHit::Print( Option_t* opt ) const
 
   Hit::Print("C");
   cout << " size="  << GetSize()
-       << " type="  << GetType();
+       << " type="  << GetType()
+       << " time="  << GetPeaktime();
+
   if( *opt != 'C' )
     cout << endl;
 }
