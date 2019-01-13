@@ -14,7 +14,6 @@
 #include <vector>
 #include <map>
 #include "SimDecoder.h"
-#include "TH1.h"
 #include "TH2.h"
 #include "TCanvas.h"
 //#include "GEMHit.h"
@@ -83,10 +82,8 @@ namespace TreeSearch {
     Int_t         fcModeSize;   // Number of strips in same common mode group
     TBits         fBadChan;     // Bad channel map
     Double_t      fAmplSigma;   // Sigma of hit amplitude distribution
-    /* Int_t         fpedestal_sigma; */
-    /* Int_t         ftmp_pedestal_rms; */
-    Double_t         fpedestal_sigma;
-    Double_t         ftmp_pedestal_rms;
+    Int_t         fpedestal_sigma;
+    Int_t         ftmp_pedestal_rms;
     Int_t         ftmp_comm_range;
 
 
@@ -98,7 +95,6 @@ namespace TreeSearch {
     Float_t*      fADCcor;      // [fNelem] fADC corrected for pedestal & noise
     Float_t*      fMCCharge;    // storage for mc charge
     Byte_t*       fGoodHit;     // [fNelem] Strip data passed pulse shape test
-    Float_t*      fPrimFrac;    // [fNelem] Strip data passed pulse shape test
     Double_t      fDnoise;      // Event-by-event noise (avg below fMinAmpl)
     Vint_t        fSigStrips;   // Ordered strip numbers with signal (adccor > minampl)
     std::map<Int_t, Int_t> fmStripModule; // Module ID of the strip;
@@ -119,7 +115,7 @@ namespace TreeSearch {
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
-    
+
     void          AddStrip( Int_t istrip, Int_t module );
 
     // Support functions for dummy planes

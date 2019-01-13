@@ -196,7 +196,6 @@ namespace TreeSearch {
     NodeVec_t        fPatternsFound; // Patterns found by TreeSearch
     TClonesArray*    fRoads;         // Roads found by MakeRoads
     UInt_t           fNgoodRoads;    // Good roads in fRoads
-    UInt_t           fNMCRoads;      // Good roads with all their hits from MC in fRoads
     TClonesArray*    fRoadCorners;   // Road corners, for event display
     ETrackingStatus  fTrkStat;       // Reconstruction status
 
