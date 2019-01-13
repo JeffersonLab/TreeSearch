@@ -61,7 +61,7 @@ namespace TreeSearch {
     : Plane(name,description,parent),
       fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
       fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fMCCharge(0), 
-      fGoodHit(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
+      fGoodHit(0), fPrimFrac(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
       fOccupancy(0), fADCMap(0)
   {
     // Constructor
@@ -107,6 +107,7 @@ namespace TreeSearch {
     delete fHitTime;
     delete fADC;
     delete fADCraw;
+    delete fPrimFrac;
   }
 
   //_____________________________________________________________________________
@@ -142,6 +143,7 @@ namespace TreeSearch {
       memset( fADCcor, 0, fNelem*sizeof(Float_t) );
       memset( fMCCharge, 0, fNelem*sizeof(Float_t) );
       memset( fGoodHit, 0, fNelem*sizeof(Byte_t) );
+      memset( fPrimFrac, 0, fNelem*sizeof(Float_t) );
       fSigStrips.clear();
       fStripsSeen.assign( fNelem, false );
     }
@@ -628,7 +630,19 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	fHitTime[istrip] = stripdata.peaktime;
 	fADCcor[istrip] = stripdata.adcSum;
 	fGoodHit[istrip] = not TestBit(kCheckPulseShape) or stripdata.pass;
-
+#ifdef MCDATA
+	fMCCharge[istrip] = fMCHitInfo[istrip].fMCCharge;
+	//
+	if(fMCHitInfo[istrip].fSigType&0x1){
+	  //cout << "strip " << istrip << " ADC primary ";
+	  for(int i_ts=0;i_ts<fMaxSamp;i_ts++){
+	    //cout << fMCHitInfo[istrip].vClusterADC[i_ts][0] << " " ;
+	    fPrimFrac[istrip]+=fMCHitInfo[istrip].vClusterADC[i_ts][0];
+	  }
+	  fPrimFrac[istrip]/=fADC[istrip];
+	  //cout << "; fPrimFrac[istrip]: " << fPrimFrac[istrip] << endl;
+	}
+#endif
 	AddStrip( istrip , moduleID);
       } // end of loop on chan
       // cout<<GetName()<<" "<<moduleID<<endl;
@@ -1261,11 +1275,11 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       { "nstrips",        "Num strips with hits > adc.min",   "GetNsigStrips()" },
       { "hitocc",         "strips > 0 / n_all_strips",        "fHitOcc" },
       { "occupancy",      "nstrips / n_all_strips",           "fOccupancy" },
-      //   { "strip.adcraw_max","raw strip ADC max",                "fADCraw" },
-      //   { "strip.adc",      "raw strip ADC sum",                "fADC" },
-      //   { "strip.adc_c",    "Pedestal-sub strip ADC sum",       "fADCcor" },
-      //{ "strip.time",     "Leading time of strip signal (ns)","fHitTime" },
-      // { "strip.good",     "Good pulse shape on strip",        "fGoodHit" },
+      { "strip.adcraw_max","raw strip ADC max",                "fADCraw" },
+      { "strip.adc",      "raw strip ADC sum",                "fADC" },
+      //{ "strip.adc_c",    "Pedestal-sub strip ADC sum",       "fADCcor" },
+      { "strip.time",     "Leading time of strip signal (ns)","fHitTime" },
+      { "strip.good",     "Good pulse shape on strip",        "fGoodHit" },
       { "nhits",          "Num hits (clusters of strips)",    "GetNhits()" },
       { "noise",          "Noise level (avg below adc.min)",  "fDnoise" },
       { "ncoords",        "Num fit coords",                   "GetNcoords()" },
@@ -1304,6 +1318,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       // respect to the MCGEMHit class and not just GEMHit - the memory layout
       // of classes under multiple inheritance might be implemetation-dependent
       RVarDef mcvars[] = {
+	{ "strip.primfrac", "Primary strip ",   "fPrimFrac" },
 	{ "hit.pos",   "Hit centroid (m)",      "fHits.TreeSearch::MCGEMHit.fPos" },
 	{ "hit.adc",   "Hit ADC sum",           "fHits.TreeSearch::MCGEMHit.fADCsum" },
 	{ "hit.max",  "Hit ADC max",            "fHits.TreeSearch::GEMHit.fADCmax" },
@@ -1436,6 +1451,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     SafeDelete(fHitTime);
     SafeDelete(fADCcor);
     SafeDelete(fGoodHit);
+    SafeDelete(fPrimFrac);
 #ifdef MCDATA
     delete [] fMCHitInfo; fMCHitInfo = 0;
 #endif
@@ -1450,6 +1466,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     fMCCharge = new Float_t[fNelem];
     fADCcor = new Float_t[fNelem];
     fGoodHit = new Byte_t[fNelem];
+    fPrimFrac = new Float_t[fNelem];
     fSigStrips.reserve(fNelem);
     fStripsSeen.resize(fNelem);
 
