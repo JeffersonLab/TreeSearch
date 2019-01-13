@@ -53,7 +53,7 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
     fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
     fPlaneCombos(0), fAltPlaneCombos(0), fMaxPat(kMaxUInt),
     fFrontMaxBinDist(kMaxUInt), fBackMaxBinDist(kMaxUInt), fHitMaxDist(0),
-    fConfLevel(1e-3), fHitpattern(0), fRoads(0), fNgoodRoads(0), fNMCRoads(0),
+    fConfLevel(1e-3), fHitpattern(0), fRoads(0), fNgoodRoads(0),
     fRoadCorners(0), fTrkStat(kTrackOK)
 {
   // Constructor
@@ -162,7 +162,6 @@ void Projection::Clear( Option_t* )
   fRoads->Delete();
   DeleteContainer( fPatternsFound );
   fNgoodRoads = 0;
-  fNMCRoads = 0;
   fTrkStat = kTrackOK;
 
   if( TestBit(kEventDisplay) )
@@ -468,7 +467,7 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
       return fStatus = kInitError;
     assert( GetNallPlanes() == fHitpattern->GetNplanes() );
 
-    cout<< "Pattern bin width " <<fHitpattern->GetBinWidth()<<endl;//getchar();
+    cout<<fHitpattern->GetBinWidth()<<endl;getchar();
 
     // Determine maximum search distance (in bins) for combining patterns,
     // separately for front and back planes since they can have different
@@ -722,7 +721,6 @@ Int_t Projection::DefineVariables( EMode mode )
     { "rd.fSigRatio", "Road nSignal/nTotal ",
                                        "fRoads.TreeSearch::Road.fSigRatio" },
 
-
     { "trkstat", "2D track reconstruction status",  "fTrkStat" },
     { 0 }
   };
@@ -752,7 +750,6 @@ Int_t Projection::DefineVariables( EMode mode )
   // Additional variables for MC input data
   if( TestBit(kMCdata) ) {
     RVarDef mcvars[] = {
-      { "nmcroads","Number of good roads with all MC info", "fNMCRoads"      },
       { "rd.nmcplanes", "Number of planes with hits from MC track",
                                   "fRoads.TreeSearch::Road.fNMCTrackHits" },
       { "rd.mcpat",     "Bit pattern of plane nums w/hits from MC track",
@@ -777,9 +774,6 @@ Int_t Projection::FillHitpattern()
   // Returns the total number of hits processed.
 
   Int_t ntot = fHitpattern->Fill( fAllPlanes );
-  if(fDebug>=3){
-    cout << "EF: printing pattern";fHitpattern->Print();
-  }
 
 #ifdef TESTCODE
   n_hits = ntot;
@@ -1061,9 +1055,6 @@ Int_t Projection::MakeRoads()
 
     // Start a new road with next unused pattern 
     Road* rd = new( (*fRoads)[GetNroads()] ) Road(nd1,this);
-    if(fDebug>=3){
-      cout << "EF: New road: ";rd->Print();
-    }
 
     // Try to add similar patterns to this road (cf. HitSet::IsSimilarTo)
     // Since only patterns with front bin numbers near the start pattern
@@ -1117,10 +1108,7 @@ Int_t Projection::MakeRoads()
 
     // Update the "used" flags of the road's component patterns
     rd->Finish();
-    if(fDebug>=3){
-      cout << "EF: road completed: ";rd->Print();
-    }
-    
+
     // If event display enabled, export the road's corner coordinates
     if( TestBit(kEventDisplay) ) {
       assert( fRoads->GetLast() == fRoadCorners->GetLast()+1 );
@@ -1195,15 +1183,9 @@ Bool_t Projection::FitRoads()
   for( UInt_t i = 0; i < GetNroads(); ++i ) {
     Road* rd = static_cast<Road*>(fRoads->UncheckedAt(i));
     assert(rd);
-    if( rd->Fit(fmoduleOrder) ){
+    if( rd->Fit(fmoduleOrder) )
       // Count good roads (not void and good fit)
       ++fNgoodRoads;
-#ifdef TESTCODE
-#ifdef MCDATA
-      if(rd->GetPlanePattern()==rd->GetMCTrackPlanePattern())++fNMCRoads;
-#endif
-#endif
-    }
     else {
       changed = true;
 #ifdef TESTCODE
