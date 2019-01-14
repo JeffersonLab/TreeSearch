@@ -83,10 +83,10 @@ namespace TreeSearch {
     Int_t         fcModeSize;   // Number of strips in same common mode group
     TBits         fBadChan;     // Bad channel map
     Double_t      fAmplSigma;   // Sigma of hit amplitude distribution
-    /* Int_t         fpedestal_sigma; */
-    /* Int_t         ftmp_pedestal_rms; */
-    Double_t         fpedestal_sigma;
-    Double_t         ftmp_pedestal_rms;
+    Int_t         fpedestal_sigma;
+    Int_t         ftmp_pedestal_rms;
+    /* Double_t         fpedestal_sigma; */
+    /* Double_t         ftmp_pedestal_rms; */
     Int_t         ftmp_comm_range;
 
 
