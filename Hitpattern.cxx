@@ -206,10 +206,10 @@ Int_t Hitpattern::Fill( const vector<Plane*>& planes )
       assert( proj );
     }
 #endif
-    //cout<<"hitpatterFilling: "<<plane->GetName()<<endl;
+    
   ntot += ScanHits( plane );
   }
-
+  
   return ntot;
 }
 
@@ -246,7 +246,9 @@ void Hitpattern::SetPositionRange( Double_t start, Double_t end,
     lo = 0;
   if( hi >= nbins )
     hi = nbins-1;
-
+  
+  //cout << "plane " << plane << " lo " << lo << " hi " << hi << " nbins " << nbins << endl;
+  
   // Save the hit pointer(s) in the hit array so that we can efficiently
   // retrieve later the hit(s) that caused the bits to be set.
   // NB: This is quite expensive
@@ -287,6 +289,8 @@ Int_t Hitpattern::ScanHits( Plane* pl, Plane* )
 #endif
   while( (phit = static_cast<Hit*>(it->Next())) ) {
     ++nhits;
+    
+    //cout << "Plane " << plane << " pos " << phit->GetPos()+fOffset << " res " << phit->GetResolution() << endl;
     SetPosition( phit->GetPos()+fOffset, phit->GetResolution(), plane,
 		 // Don't record the pseudo-hits in dummy planes
 		 pl->IsDummy() ? 0 : phit );

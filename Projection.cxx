@@ -818,8 +818,12 @@ Int_t Projection::Track()
 
   ComparePattern compare( fHitpattern, fAltPlaneCombos, &fPatternsFound,
 			  fDummyPlanePattern );
+  
   TreeWalk walk( fNlevels );
+  //fPatternTree->GetRoot()->GetPattern()->Print();
+  //cout << "pattern size before walk " << fPatternsFound.size() << endl;
   walk( fPatternTree->GetRoot(), compare );
+  //cout << "pattern size after walk " << fPatternsFound.size() << endl;
 
 #ifdef VERBOSE
   if( fDebug > 0 ) {
@@ -855,7 +859,6 @@ Int_t Projection::Track()
 
   // Combine patterns with common sets of hits into Roads
   MakeRoads();
-
 #ifdef VERBOSE
   if( fDebug > 0 ) {
     if( !fRoads->IsEmpty() ) {

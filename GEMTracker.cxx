@@ -388,13 +388,17 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 		temp_matchval += abs(asysmetry);
 		HashBits |= 1U << i;
 	      }
-	    }else if(temp_adc_x[i]>fminAdcToCheck || temp_adc_y[i]>fminAdcToCheck){
-	      nMisMatches++;
+	    }else{
+	      //cout << "i = " << i << " adc_x = " << temp_adc_x[i] << " , adc_y = " << temp_adc_y[i] << endl;
+	      if(temp_adc_x[i]>=fminAdcToCheck || temp_adc_y[i]>=fminAdcToCheck){
+		nMisMatches++;
+		//cout << " => mismatch counted " << endl;
+	      }
 	    }
-	    //cout << "nmismatches = " << nMisMatches << endl;
+	    
 	  }
 	  
-	  
+	  //cout << "nmismatches = " << nMisMatches << " max mismatches " << fMaxCorrMismatches << endl;
 	  if(nMisMatches <= fMaxCorrMismatches){
 	    double temp_chi2 = pointsX.second + pointsY.second;
 	    if(temp_chi2 < minimum_chi2){

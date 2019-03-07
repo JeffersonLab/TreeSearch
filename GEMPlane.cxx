@@ -62,7 +62,7 @@ namespace TreeSearch {
       fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
       fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fMCCharge(0), 
       fGoodHit(0), fPrimFrac(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
-      fOccupancy(0), fADCMap(0)
+      fOccupancy(0), fStripADCsumMax(-1), fADCMap(0)
   {
     // Constructor
 
@@ -150,6 +150,8 @@ namespace TreeSearch {
 
     fNhitStrips = fNrawStrips = 0;
     fHitOcc = fOccupancy = fDnoise = 0.0;
+    fStripADCsumMax = -1;
+    //fPrimADCsumMax = fPrimADCpeakMax = 0;
   }
 
   //_____________________________________________________________________________
@@ -363,7 +365,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
   }
 
   //_____________________________________________________________________________
-  bool GEMPlane::AnalyzeStrip( const vector<Float_t>& amp, StripData_t &stripdata )
+  bool GEMPlane::AnalyzeStrip( const vector<Float_t>& amp, StripData_t &stripdata, bool print )
   {
     //Deconvolution method is not proper for GEM signals since the "zero" time isn't fixed to a certain sample,
     //Especially with APV-25 chip, no syncronization between 40MHz clock and trigger, 
@@ -402,9 +404,16 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     //if(adcSum<=0){cout<<" AA "<<endl;getchar();}
     
 
+    if(print){
+      cout << " ADC samples: ";
+      for(Int_t isamp=0;isamp<Nsample;isamp++)cout << amp[isamp] << " ";
+      cout << "; sum: " << adcSum << "; max(1,2,3) " << maxAdc_t << " max time sample " << maxTimeSample << endl;
+    }
+	
+
     if(adcAvg>fpedestal_sigma*ftmp_pedestal_rms)// pedestal parameters to be put in data base
       {
-	++fNhitStrips;
+	++fNhitStrips;	
 	if(maxTimeSample==0||maxTimeSample==(Nsample-1))
 	  pass = true;
 	else{
@@ -412,6 +421,10 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  FitPulse(sampleAdc,Nsample, shapingtime, peaktime, adcmax_fit);
 	}
 
+	if(print){
+	  cout << " => time " << peaktime << endl;
+	}
+	
 #ifdef TIME_SPLIT
 	
 	if(peaktime<=0 || peaktime>=150 || maxAdc_t<fminPeakADC){
@@ -428,6 +441,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	stripdata.peaktime = peaktime;
 	stripdata.pass = pass;
 	stripdata.vADC = amp;
+	
 	return true;
       }
     // if(pass){cout<<adcAvg<<" time: "<<peaktime<<endl;getchar();}
@@ -508,8 +522,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       simdata = static_cast<const TSBSSimDecoder*>(&evData);
     }
 #endif
-
-    
+    double ADCsumMax = 0.0;
     // Decode data
     // Each DetMap->Module stands for a MPD
     for( Int_t imod = 0; imod < fDetMap->GetSize(); ++imod ) {
@@ -558,12 +571,22 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 #ifdef MCDATA
 	// If doing MC data, save the truth information for each strip
 	if( mc_data ) {
-	  Double_t fmccharge=0;
+	  //Double_t fmccharge=0;
 	  fMCHitList.push_back(istrip);
 	  fMCHitInfo[istrip] = simdata->GetSBSMCHitInfo(d->crate,d->slot,chan);
 	  //	fMCCharge[istrip]  = fmccharge;
 	  //cout<<fmccharge<<endl;
 	  //fHitTime[istrip] = fMCHitInfo[istrip].fMCTime;
+	  /*
+	    if(strcmp(this->GetName(), "5.y")==0 && 585<=istrip&&istrip<=590){
+	    cout << "Plane " << this->GetName() << " strip " << istrip << ": ";
+	    for(int i_ts=0;i_ts<fMaxSamp;i_ts++){
+	    cout << fMCHitInfo[istrip].vClusterADC[i_ts][0] << " " ;
+	    //fPrimFrac[istrip]+=fMCHitInfo[istrip].vClusterADC[i_ts][0];
+	    }
+	    cout << endl;
+	    }
+	  */
 	}
 #endif
 
@@ -615,14 +638,24 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	    // fsamp-=cMode[ichan/fcModeSize][isamp];
 	    samples.push_back( fsamp );
 	  }
-
+	/*
+	bool print = false;
+	if(strcmp(this->GetName(), "5.y")==0 && 585<=istrip&&istrip<=590)print = true;
+	if(print)cout << "Plane " << this->GetName() << " strip " << istrip << ": ";
+	//if(!AnalyzeStrip(samples, stripdata, print))
+	*/
 	// Do zero suppression and Analyze the pulse shape
 	if(!AnalyzeStrip(samples, stripdata))
 	  continue;// Do nothing for strips not passing zero suppression
 
 	// Save strip information for cluster finding, this struct have all information, in principle we don't need the following fADCraw[], fADC[].......
 	mStrip[istrip] = stripdata;
-      
+	
+	// if(Int_t(stripdata.adcSum)>fADCsumMax){
+	//   fADCsumMax = Int_t(stripdata.adcSum);
+	//   fADCpeakMax = Int_t(stripdata.maxAdc);
+	//   cout <<GetName()<< " " << istrip << " " << fADCsumMax << " " << fADCpeakMax << endl;
+	// }
 	// Save results for cluster finding later
 	// not necessary anymore, still here because some histograms needs it.
 	fADCraw[istrip]  = stripdata.maxAdc;
@@ -634,6 +667,15 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	fMCCharge[istrip] = fMCHitInfo[istrip].fMCCharge;
 	//
 	if(fMCHitInfo[istrip].fSigType&0x1){
+	  if(stripdata.adcSum>ADCsumMax){
+	    fStripADCsumMax = istrip;
+	    ADCsumMax = stripdata.adcSum;
+	  }
+	  
+	  // if(stripdata.adcSum>fPrimADCsumMax){
+	  //   fPrimADCsumMax = stripdata.adcSum;
+	  //   fPrimADCpeakMax = stripdata.maxAdc;
+	  // }
 	  //cout << "strip " << istrip << " ADC primary ";
 	  for(int i_ts=0;i_ts<fMaxSamp;i_ts++){
 	    //cout << fMCHitInfo[istrip].vClusterADC[i_ts][0] << " " ;
@@ -647,7 +689,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       } // end of loop on chan
       // cout<<GetName()<<" "<<moduleID<<endl;
     }    // end of loop modules
-
+    //if(fStripADCsumMax!=fStripADCpeakMax) cout << "strip num sum max: " << fStripADCsumMax << ", peak max " << fStripADCpeakMax << endl;
 
     fHitOcc    = static_cast<Double_t>(fNhitStrips) / fNelem;
     fOccupancy = static_cast<Double_t>(GetNsigStrips()) / fNelem;
@@ -713,12 +755,14 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	++cur;
 	++next;
       }
+      /*
       for( viter_t sstart=start; sstart != next; ++sstart ) {
 	Int_t istrip = *sstart;
 	Double_t pos = GetStart() + istrip * GetPitch();
 	Double_t adc = fADCraw[istrip];
 	//cout<<"XXSTRIP: "<<istrip<<" cc: "<<fMCHitInfo[istrip].fMCCharge<<" : "<<adc<<" : time: "<<fMCHitInfo[istrip].fMCTime<<endl;
       }
+      */
       // Now the cluster candidate is between start and cur
       assert( *cur >= *start );
       // The "type" parameter indicates the result of the cluster analysis:
@@ -840,7 +884,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	//	static_cast<const SimDecoder*>(&evData)
 
 
-	Double_t adc = fADCraw[istrip];
+	//Double_t adc = fADCraw[istrip];
+	Double_t adc = fADC[istrip];
 	//cout<<"STRIP: "<<istrip<<" cc: "<<fMCHitInfo[istrip].fMCCharge<<" : "<<adc<<" : time: "<<fMCHitInfo[istrip].fMCTime<<endl;
 	x_sum   += pos * adc;
 	adcsum += adc;
@@ -1127,7 +1172,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 					     );
 
 	//	cout<<pos<<" ### "<<mcpos<<" type: "<<type<<"charge: "<<adcmax_fit<<" "<<GetType()<<" "<<moduleID<<endl;
-	//cout<<"cluster charge: "<<mccharge<<" adcSum:"<<adcsum<<endl;
+	//cout<<this->GetName()<<": cluster charge: "<<mccharge<<" adcSum:"<<adcsum<<endl;
 	//printf("hit pos = %1.3f, time = %1.3f, size = %d\n", pos, mctime, size);
 //#define PRINTCLUSTER_TO_FILE
 #ifdef PRINTCLUSTER_TO_FILE
@@ -1275,7 +1320,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       { "nstrips",        "Num strips with hits > adc.min",   "GetNsigStrips()" },
       { "hitocc",         "strips > 0 / n_all_strips",        "fHitOcc" },
       { "occupancy",      "nstrips / n_all_strips",           "fOccupancy" },
-      { "strip.adcraw_max","raw strip ADC max",                "fADCraw" },
+      { "maxprimstrip",   "strip id with largest ADC sum",    "fStripADCsumMax" },
+      { "strip.adcraw_max","raw strip ADC max",               "fADCraw" },
       { "strip.adc",      "raw strip ADC sum",                "fADC" },
       //{ "strip.adc_c",    "Pedestal-sub strip ADC sum",       "fADCcor" },
       { "strip.time",     "Leading time of strip signal (ns)","fHitTime" },

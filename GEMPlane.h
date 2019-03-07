@@ -56,7 +56,7 @@ namespace TreeSearch {
     Double_t        GetOccupancy()   const { return fOccupancy; }
     Int_t           GetNsigStrips()  const { return fSigStrips.size(); }
     //StripData_t GEMChargeDep( const vector<Float_t>& amp );
-    bool            AnalyzeStrip(const std::vector<Float_t>& amp, StripData_t &stripdata);
+    bool            AnalyzeStrip(const std::vector<Float_t>& amp, StripData_t &stripdata, bool print = false);
   protected:
     typedef std::vector<bool>  Vbool_t;
 
@@ -114,7 +114,9 @@ namespace TreeSearch {
     //UInt_t        fTotalPriHit=0,fCoveredPriHit=0;
     UInt_t        fTotalPriHit;
     UInt_t        fCoveredPriHit;
-
+    
+    UInt_t fStripADCsumMax;       // max value of ADC sum
+    
     std::map<Int_t,StripData_t> mStrip; //strips passed zero suppression.
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
