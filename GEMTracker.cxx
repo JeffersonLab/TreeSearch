@@ -18,6 +18,7 @@
 
 #include "TString.h"
 #include "TMath.h"
+#include "TH2.h"
 #include "TBits.h"
 
 #include <iostream>
@@ -39,7 +40,7 @@ typedef vector<Plane*>::iterator  vriter_t;
 //_____________________________________________________________________________
 GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
   : Tracker(name,desc,app), fNPlanePartnerPairs(0), fMaxCorrMismatches(0),
-    fMaxCorrNsigma(1.0)
+    fMaxCorrNsigma(1.0), fADCasym(0)
 {
   // Constructor
 
@@ -52,6 +53,20 @@ GEMTracker::GEMTracker( const char* name, const char* desc, THaApparatus* app )
 GEMTracker::~GEMTracker()
 {
   // Destructor - nothing special for standard GEM trackers
+}
+
+//_____________________________________________________________________________
+Int_t GEMTracker::Begin( THaRunBase* run )
+{
+  Tracker::Begin( run );
+  
+#ifdef TESTCODE
+  string hname(fPrefix);
+  hname.append("adc_asym");
+  fADCasym = new TH2F ( hname.c_str(), hname.c_str(), 100, -1.0, 1.0, fPlanes.size()/fProj.size(), 0, fPlanes.size()/fProj.size());
+#endif
+  
+  return 0;
 }
 
 //_____________________________________________________________________________
@@ -197,6 +212,20 @@ THaAnalysisObject::EStatus GEMTracker::PartnerPlanes()
 }
 
 //_____________________________________________________________________________
+Int_t GEMTracker::End( THaRunBase* run )
+{
+  // Write diagnostic histograms to file
+
+  Tracker::End( run );
+  
+#ifdef TESTCODE
+  assert( fADCasym );
+  fADCasym->Write();
+#endif
+  return 0;
+}
+
+//_____________________________________________________________________________
 Int_t GEMTracker::ReadDatabase( const TDatime& date )
 {
   // Read GEM database
@@ -278,6 +307,10 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
   // detectors that measure some sort of amplitude (e.g. energy deposited)
   // for hits in some sort of shared readout plane.
   // Currently requires exactly two projections with identical number of planes.
+  
+#ifdef TESTCODE
+  assert( fADCasym != 0 );
+#endif
 
   vector<Rvec_t>::size_type nproj = roads.size();
   assert( nproj == 2 );
@@ -378,6 +411,9 @@ UInt_t GEMTracker::MatchRoadsCorrAmpl( vector<Rvec_t>& roads,
 	    //cout << "i = " << i << " adc_x = " << temp_adc_x[i] << " , adc_y = " << temp_adc_y[i] << endl;
 	    if(temp_adc_x[i]!=0 && temp_adc_y[i]!=0){
 	      double asysmetry = (double)(temp_adc_y[i] - temp_adc_x[i])/(temp_adc_y[i] + temp_adc_x[i]);
+#ifdef TESTCODE
+	      fADCasym->Fill(asysmetry, i);
+#endif
 	      if(temp_moduleID_x[i] != temp_moduleID_y[i] || abs(asysmetry) > fMaxCorrNsigma){
 		//cout << "( asym = " << abs(asysmetry) << " >? " << fMaxCorrNsigma << " ) OR (" 
 		//   << " mod_x " << temp_moduleID_x[i] << "!= mod y " << temp_moduleID_y[i] 

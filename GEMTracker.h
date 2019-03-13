@@ -11,6 +11,8 @@
 
 #include "Tracker.h"
 
+class TH2;
+
 namespace TreeSearch {
 
   class GEMTracker : public Tracker {
@@ -20,6 +22,9 @@ namespace TreeSearch {
     virtual ~GEMTracker();
 
     virtual EStatus Init( const TDatime& date );
+
+    virtual Int_t   Begin( THaRunBase* r=0 );
+    virtual Int_t   End( THaRunBase* r=0 );
 
     // Analysis control flags. Set via database.
     enum {
@@ -34,6 +39,10 @@ namespace TreeSearch {
     UInt_t         fMaxCorrMismatches;   // Max # planes w/o amplitude match
     Double_t       fMaxCorrNsigma;       // Amplitude correlation cutoff (#sig)
     Double_t       fminAdcToCheck;       // skip adc corr check if one projection has adc less than this value and the other doesn't have hit
+
+#ifdef TESTCODE
+    TH2* fADCasym;
+#endif
 
     UInt_t MatchRoadsCorrAmpl( vector<Rvec_t>& roads, UInt_t ncombos,
 			       std::list<std::pair<Double_t,Rvec_t> >& combos_found,
