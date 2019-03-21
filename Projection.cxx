@@ -53,7 +53,7 @@ Projection::Projection( EProjType type, const char* name, Double_t angle,
     fMinFitPlanes(kMinFitPlanes), fMaxMiss(0), fRequire1of2(false),
     fPlaneCombos(0), fAltPlaneCombos(0), fMaxPat(kMaxUInt),
     fFrontMaxBinDist(kMaxUInt), fBackMaxBinDist(kMaxUInt), fHitMaxDist(0),
-    fConfLevel(1e-3), fHitpattern(0), fRoads(0), fNgoodRoads(0), fNMCRoads(0),
+    fConfLevel(1e-3), fPatNResSig(2.0), fHitpattern(0), fRoads(0), fNgoodRoads(0), fNMCRoads(0),
     fRoadCorners(0), fTrkStat(kTrackOK)
 {
   // Constructor
@@ -467,7 +467,8 @@ THaAnalysisObject::EStatus Projection::Init( const TDatime& date )
     if( !fHitpattern || fHitpattern->IsError() )
       return fStatus = kInitError;
     assert( GetNallPlanes() == fHitpattern->GetNplanes() );
-
+    //Pattern is declared, this is the right moment to set kNResSig
+    fHitpattern->SetNResSigma(fPatNResSig);
     cout<< "Pattern bin width " <<fHitpattern->GetBinWidth()<<endl;//getchar();
 
     // Determine maximum search distance (in bins) for combining patterns,
@@ -595,6 +596,7 @@ Int_t Projection::ReadDatabase( const TDatime& date )
     { "module_order",     moduleOrder,   kIntV,   0, 0, gbl},
     { "cluster_maxdist", &fHitMaxDist,   kUInt,   0, 1, gbl },
     { "chi2_conflevel",  &fConfLevel,    kDouble, 0, 1, gbl },
+    { "n_ressigma",      &fPatNResSig,   kDouble, 0, 1, gbl },
     { "maxmiss",         &fMaxMiss,      kUInt,   0, 1, gbl },
     { "req1of2",         &req1of2,       kInt,    0, 1, gbl },
     { "maxpat",          &fMaxPat,       kUInt,   0, 1, gbl },

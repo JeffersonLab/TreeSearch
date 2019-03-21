@@ -72,7 +72,8 @@ namespace TreeSearch {
 			       Hit* hit );
     void     SetPosition( Double_t pos, Double_t res, UInt_t plane,
 			  Hit* hit )
-    { SetPositionRange( pos-kNResSig*res, pos+kNResSig*res, plane, hit ); }
+    //{ SetPositionRange( pos-kNResSig*res, pos+kNResSig*res, plane, hit ); }
+    { SetPositionRange( pos-fNResSig*res, pos+fNResSig*res, plane, hit ); }
     //Bool_t   TestPosition( Double_t pos, UInt_t plane, UInt_t depth ) const;
     //Bool_t   TestBin( UInt_t bin, UInt_t plane, UInt_t depth ) const;
 
@@ -80,7 +81,8 @@ namespace TreeSearch {
     void     Print( Option_t* opt="" ) const;
 
     void     SetOffset( Double_t off ) { fOffset = off; }
-
+    void     SetNResSigma( Double_t nressig) { fNResSig = nressig; };
+    
 #ifdef TESTCODE
     // Number of bins set at the highest resolution
     UInt_t   GetBinsSet() const;
@@ -123,6 +125,7 @@ namespace TreeSearch {
     UInt_t  fMaxhitBin;  // Maximum depth of hit array per bin
 
     static const Double_t kNResSig;  // Number of sigmas to cover in SetPosition
+    Double_t fNResSig;  // Number of sigmas to cover in SetPosition
 
   private:
     void Init( Double_t width );

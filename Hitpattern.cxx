@@ -32,7 +32,7 @@ const Double_t Hitpattern::kNResSig = 2.0;
 Hitpattern::Hitpattern( const PatternTree& pt )
   : fNlevels(pt.GetNlevels()), fNplanes(pt.GetNplanes()), fScale(0),
     fOffset(0.5*pt.GetWidth()), fPattern(0)
-  , fMaxhitBin(0)
+  , fMaxhitBin(0), fNResSig(kNResSig)
 {
   // Construct Hitpattern using paramaters of pattern tree
 

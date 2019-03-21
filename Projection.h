@@ -192,6 +192,7 @@ namespace TreeSearch {
     vec_pdbl_t       fChisqLimits;   // lo/hi onfidence interval limits on Chi2
 
     // Event-by-event results
+    Double_t         fPatNResSig;    // Number of sigma for hit acceptance in hit pattern
     Hitpattern*      fHitpattern;    // Hitpattern of current event
     NodeVec_t        fPatternsFound; // Patterns found by TreeSearch
     TClonesArray*    fRoads;         // Roads found by MakeRoads
