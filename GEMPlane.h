@@ -121,6 +121,9 @@ namespace TreeSearch {
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
+    TH1*          fPrimHitADC;  // Histogram of ADC sum for primary hit
+    TH1*          fPrimHitTime; // Histogram of ADC fitted time for primary hit
+    TH1*          fPrimHitFrac; // Histogram of primary ADC fraction time for primary hit
     
     void          AddStrip( Int_t istrip, Int_t module );
 

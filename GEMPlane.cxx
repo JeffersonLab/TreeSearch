@@ -62,7 +62,7 @@ namespace TreeSearch {
       fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
       fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fMCCharge(0), 
       fGoodHit(0), fPrimFrac(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
-      fOccupancy(0), fStripADCsumMax(-1), fADCMap(0)
+      fOccupancy(0), fStripADCsumMax(-1), fADCMap(0), fPrimHitADC(0), fPrimHitTime(0), fPrimHitFrac(0)
   {
     // Constructor
 
@@ -123,6 +123,15 @@ namespace TreeSearch {
       string hname(fPrefix);
       hname.append("adcmap");
       fADCMap = new TH1F( hname.c_str(), hname.c_str(), fNelem, 0, fNelem );
+      hname = string(fPrefix);
+      hname.append("primhit_adc");
+      fPrimHitADC = new TH1F( hname.c_str(), hname.c_str(), 1000, 0, 100000 ); 
+      hname = string(fPrefix);
+      hname.append("primhit_time");
+      fPrimHitTime = new TH1F( hname.c_str(), hname.c_str(), 150, 0, 150 ); 
+      hname = string(fPrefix);
+      hname.append("primhit_frac");
+      fPrimHitFrac = new TH1F( hname.c_str(), hname.c_str(), 100, 0, 1.0 ); 
     }
 #endif
     return 0;
@@ -489,6 +498,13 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     
     int flagt=0,flagc=0;// to be removed
     
+    double primhitADCsum = 0.0;
+    double primhitprimADCsum = 0.0;
+    double primhitADCsamples[fMaxSamp];
+    for(int i_ = 0; i_<fMaxSamp; i_++){
+      primhitADCsamples[i_] = 0.0;
+    }
+    
     const char* const here = "GEMPlane::Decode";
 #ifdef PRINTCLUSTER
     cout<<"Decode Plane: "<<this->GetName()<<endl;
@@ -501,8 +517,9 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     assert( fADCraw and fADC and fADCcor and fHitTime and fMCCharge);
 
 #ifdef TESTCODE
-    if( TestBit(kDoHistos) )
-      assert( fHitMap != 0 and fADCMap != 0 );
+    if( TestBit(kDoHistos) ){
+      assert( fHitMap != 0 and fADCMap != 0 and fPrimHitADC != 0 and fPrimHitTime != 0 and fPrimHitFrac != 0 );
+    }
 #endif
     assert( fPed.empty() or
 	    fPed.size() == static_cast<Vflt_t::size_type>(fNelem) );
@@ -637,6 +654,13 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
 	    // fsamp-=cMode[ichan/fcModeSize][isamp];
 	    samples.push_back( fsamp );
+#ifdef MCDATA
+	    if(fMCHitInfo[istrip].fSigType&0x1){
+	      primhitADCsum+=fsamp;
+	      primhitprimADCsum+=fMCHitInfo[istrip].vClusterADC[isamp][0];
+	      primhitADCsamples[isamp]+=fsamp;
+	    }
+#endif
 	  }
 	/*
 	bool print = false;
@@ -645,6 +669,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	//if(!AnalyzeStrip(samples, stripdata, print))
 	*/
 	// Do zero suppression and Analyze the pulse shape
+	
 	if(!AnalyzeStrip(samples, stripdata))
 	  continue;// Do nothing for strips not passing zero suppression
 
@@ -698,6 +723,15 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // DoClustering();
     //
 
+#ifdef TESTCODE
+    if( TestBit(kDoHistos) ) {
+      fPrimHitADC->Fill(primhitADCsum);
+      fPrimHitFrac->Fill(primhitprimADCsum/primhitADCsum);
+      Double_t shapingtime=0, peaktime=0, adcmax_fit=0;
+      FitPulse(primhitADCsamples, fMaxSamp, shapingtime, peaktime, adcmax_fit);
+      fPrimHitTime->Fill(shapingtime);
+    }
+#endif
 
 
 
@@ -1395,6 +1429,12 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     if( TestBit(kDoHistos) ) {
       assert( fADCMap );
       fADCMap->Write();
+      assert( fPrimHitADC );
+      fPrimHitADC->Write();
+      assert( fPrimHitTime );
+      fPrimHitTime->Write();
+      assert( fPrimHitFrac );
+      fPrimHitFrac->Write();
     }
 #endif
     return 0;
