@@ -563,16 +563,16 @@ void Plane::RecordNearestHits( const THaTrack* track, const Rvec_t& roads )
   // search for the road of the type of this readout plane, taking advantage
   // of the fact that the road vector is sorted by type
   Road* rd = 0;
-  Int_t k = min( roads.size(), (Rvec_t::size_type)GetType() );
-  do {
-    if( roads[k]->GetProjection()->GetType() > GetType() )
+  Int_t k = roads.size() - 1;
+  while( k>=0 ) {
+    if( roads[k]->GetProjection()->GetType() != GetType() )
       --k;
     else {
       if( roads[k]->GetProjection() == GetProjection() )
 	rd = roads[k];
       break;
     }
-  } while( k>=0 );
+  }
   Double_t slope2d = rd ? rd->GetSlope() : kBig;
   Double_t pos2d   = rd ? rd->GetPos() + z * slope2d  : kBig;
 
