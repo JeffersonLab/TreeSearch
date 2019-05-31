@@ -968,7 +968,7 @@ Int_t Projection::MakeRoads()
     BinOrdNodes_t::iterator jt = nodelookup.find( &nd1 );
     assert( jt != nodelookup.end() );
 #ifndef NDEBUG
-    Node_t* njt = *jt;
+    const Node_t* njt = *jt;
     assert( njt->first == nd1.first );
 #endif
     // Test patterns in direction of decreasing front bin number index,
