@@ -89,8 +89,6 @@ namespace TreeSearch {
     /* Double_t         ftmp_pedestal_rms; */
     Int_t         ftmp_comm_range;
 
-
-
     // Event data, hits etc.
     Float_t*      fADCraw;      // [fNelem] Integral of raw ADC samples
     Float_t*      fADC;         // [fNelem] Integral of deconvoluted ADC samples
@@ -121,9 +119,25 @@ namespace TreeSearch {
 
     // Optional diagnostics for TESTCODE, keep for binary compatibility
     TH1*          fADCMap;      // Histogram of strip numbers weighted by ADC
+    /*
     TH1*          fPrimHitADC;  // Histogram of ADC sum for primary hit
     TH1*          fPrimHitTime; // Histogram of ADC fitted time for primary hit
     TH1*          fPrimHitFrac; // Histogram of primary ADC fraction time for primary hit
+    TH2*          fPrimHitTimeVsADC; // Histogram of ADC fitted time for primary hit
+    TH2*          fPrimHitFracVsADC; // Histogram of primary ADC fraction vs ADC for primary hits
+    TH2*          fPrimHitFracVsSize; // Histogram of primary ADC fraction vs hit size for primary hits
+    TH1*          fPrimHitTimeFitDiff; //Histogram of primary hit time / ADC fitted time difference
+    TH1*          fPrimHitTimeRecDiff; //Histogram of ADC fitted time prim / rec difference
+    */
+    
+    Short_t*      fADCsamp0;     // [fNelem] Integral of raw ADC samples
+    Short_t*      fADCsamp1;     // [fNelem] Integral of raw ADC samples
+    Short_t*      fADCsamp2;     // [fNelem] Integral of raw ADC samples
+    Short_t*      fADCsamp3;     // [fNelem] Integral of raw ADC samples
+    Short_t*      fADCsamp4;     // [fNelem] Integral of raw ADC samples
+    Short_t*      fADCsamp5;     // [fNelem] Integral of raw ADC samples
+  
+    //bool kDoSamples;
     
     void          AddStrip( Int_t istrip, Int_t module );
 

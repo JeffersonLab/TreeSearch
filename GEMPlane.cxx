@@ -18,6 +18,7 @@
 #include "TClonesArray.h"
 #include "TCollection.h"
 #include "TH1.h"
+#include "TH2.h"
 #include "TError.h"
 #include "TString.h"
 #include <TMinuit.h>
@@ -62,7 +63,9 @@ namespace TreeSearch {
       fMapType(kOneToOne), fMaxClusterSize(0), fMinAmpl(0), fSplitFrac(0),
       fMaxSamp(1), fAmplSigma(0), fADCraw(0), fADC(0), fHitTime(0), fADCcor(0), fMCCharge(0), 
       fGoodHit(0), fPrimFrac(0), fDnoise(0), fNrawStrips(0), fNhitStrips(0), fHitOcc(0),
-      fOccupancy(0), fStripADCsumMax(-1), fADCMap(0), fPrimHitADC(0), fPrimHitTime(0), fPrimHitFrac(0)
+      fOccupancy(0), fStripADCsumMax(-1), fADCMap(0), 
+      //fPrimHitADC(0), fPrimHitTime(0), fPrimHitFrac(0), fPrimHitTimeVsADC(0), fPrimHitFracVsADC(0), fPrimHitTimeFitDiff(0), fPrimHitTimeRecDiff(0), fPrimHitFracVsSize(0)
+      fADCsamp0(0), fADCsamp1(0), fADCsamp2(0), fADCsamp3(0), fADCsamp4(0), fADCsamp5(0)//, kDoSamples(false)
   {
     // Constructor
 
@@ -108,6 +111,14 @@ namespace TreeSearch {
     delete fADC;
     delete fADCraw;
     delete fPrimFrac;
+#ifdef TESTCODE    
+    delete fADCsamp0;
+    delete fADCsamp1;
+    delete fADCsamp2;
+    delete fADCsamp3;
+    delete fADCsamp4;
+    delete fADCsamp5;
+#endif
   }
 
   //_____________________________________________________________________________
@@ -123,15 +134,32 @@ namespace TreeSearch {
       string hname(fPrefix);
       hname.append("adcmap");
       fADCMap = new TH1F( hname.c_str(), hname.c_str(), fNelem, 0, fNelem );
+      /*
+#ifdef MCDATA
       hname = string(fPrefix);
       hname.append("primhit_adc");
-      fPrimHitADC = new TH1F( hname.c_str(), hname.c_str(), 1000, 0, 100000 ); 
+      fPrimHitADC = new TH1F( hname.c_str(), hname.c_str(), 1000, 0, 50000 ); 
       hname = string(fPrefix);
       hname.append("primhit_time");
       fPrimHitTime = new TH1F( hname.c_str(), hname.c_str(), 150, 0, 150 ); 
+      hname.append("_vs_adc");
+      fPrimHitTimeVsADC = new TH2F( hname.c_str(), hname.c_str(), 200, 0, 20000, 150, 0, 150 ); 
       hname = string(fPrefix);
       hname.append("primhit_frac");
-      fPrimHitFrac = new TH1F( hname.c_str(), hname.c_str(), 100, 0, 1.0 ); 
+      fPrimHitFrac = new TH1F( hname.c_str(), hname.c_str(), 100, 0, 2.0 ); 
+      hname.append("_vs_adc");
+      fPrimHitFracVsADC = new TH2F( hname.c_str(), hname.c_str(), 200, 0, 20000, 100, 0, 2.0 ); 
+      hname = string(fPrefix);
+      hname.append("primhit_timefitdiff");
+      fPrimHitTimeFitDiff = new TH1F( hname.c_str(), hname.c_str(), 150, 0, 150 ); 
+      hname = string(fPrefix);
+      hname.append("primhit_timerecdiff");
+      fPrimHitTimeRecDiff = new TH1F( hname.c_str(), hname.c_str(), 100, -100, 100 );
+      hname = string(fPrefix);
+      hname.append("primhit_fracvssize");
+      fPrimHitFracVsSize = new TH2F( hname.c_str(), hname.c_str(), 40, 0, 40, 100, 0, 2.0 ); 
+#endif
+      */
     }
 #endif
     return 0;
@@ -155,6 +183,17 @@ namespace TreeSearch {
       memset( fPrimFrac, 0, fNelem*sizeof(Float_t) );
       fSigStrips.clear();
       fStripsSeen.assign( fNelem, false );
+#ifdef TESTCODE
+      //if(TestBit(kDoSamples)){
+      assert( fADCsamp0 and fADCsamp1 and fADCsamp2 and fADCsamp3 and fADCsamp4 and fADCsamp5 );
+      memset( fADCsamp0, 0, fNelem*sizeof(Short_t) );
+      memset( fADCsamp1, 0, fNelem*sizeof(Short_t) );
+      memset( fADCsamp2, 0, fNelem*sizeof(Short_t) );
+      memset( fADCsamp3, 0, fNelem*sizeof(Short_t) );
+      memset( fADCsamp4, 0, fNelem*sizeof(Short_t) );
+      memset( fADCsamp5, 0, fNelem*sizeof(Short_t) );
+      //}
+#endif
     }
 
     fNhitStrips = fNrawStrips = 0;
@@ -497,13 +536,18 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // computes weighted average of position. Each such cluster makes one "Hit".
     
     int flagt=0,flagc=0;// to be removed
-    
+
+    int primhitsize = 0;
     double primhitADCsum = 0.0;
     double primhitprimADCsum = 0.0;
+    double primhitpeaktime = 0.0;
+    double primhitMCtime = -1.0e9;
     double primhitADCsamples[fMaxSamp];
-    for(int i_ = 0; i_<fMaxSamp; i_++){
-      primhitADCsamples[i_] = 0.0;
-    }
+    bool goodstrip = false;
+    double primhitMaxADC = -10;
+    // for(int i_ = 0; i_<fMaxSamp; i_++){
+    //   primhitADCsamples[i_] = 0.0;
+    // }
     
     const char* const here = "GEMPlane::Decode";
 #ifdef PRINTCLUSTER
@@ -515,10 +559,16 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     assert( !mc_data || dynamic_cast<const SimDecoder*>(&evData) != 0 );
 #endif
     assert( fADCraw and fADC and fADCcor and fHitTime and fMCCharge);
-
 #ifdef TESTCODE
+    //if(TestBit(kDoSamples))
+    assert( fADCsamp0 and fADCsamp1 and fADCsamp2 and fADCsamp3 and fADCsamp4 and fADCsamp5 );
     if( TestBit(kDoHistos) ){
-      assert( fHitMap != 0 and fADCMap != 0 and fPrimHitADC != 0 and fPrimHitTime != 0 and fPrimHitFrac != 0 );
+      assert( fHitMap != 0 and fADCMap != 0);
+      /*
+#ifdef MCDATA
+      assert(fPrimHitADC != 0 and fPrimHitTime != 0 and fPrimHitFrac != 0 and fPrimHitTimeVsADC != 0 and fPrimHitFracVsADC != 0  and fPrimHitTimeFitDiff != 0 and fPrimHitTimeRecDiff!=0 and fPrimHitFracVsSize!=0 );
+#endif
+      */
     }
 #endif
     assert( fPed.empty() or
@@ -647,21 +697,54 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	if( chan < d->lo or chan > d->hi ) continue; // not part of this detector
 	Int_t istrip =
 	  MapChannel( d->first + ((d->reverse) ? d->hi - ichan : ichan - d->lo) );
-	
+
+	//if(strcmp(this->GetName(),"6.x")==0 && 2933<=istrip && istrip<=2944)cout << "N clusters " << fMCHitInfo[istrip].vClusterID.size() << ", MC time: " << fMCHitInfo[istrip].fMCTime << ", samples ";
+									
 	for(UInt_t isamp=0; isamp<fMaxSamp; isamp++)
 	  {
 	    Float_t fsamp = static_cast<Float_t>
 	    ( evData.GetData(d->crate, d->slot, chan, isamp) );
 	    // fsamp-=cMode[ichan/fcModeSize][isamp];
 	    samples.push_back( fsamp );
+	    //if(strcmp(this->GetName(),"6.x")==0 && 2933<=istrip && istrip<=2944)cout << fsamp << " ";
+#ifdef TESTCODE
+	    //if(TestBit(kDoSamples)){
+	    switch(isamp){
+	    case(0):
+	      fADCsamp0[istrip] = Short_t(fsamp);
+	      break;
+	    case(1):
+	      fADCsamp1[istrip] = Short_t(fsamp);
+	      break;
+	    case(2):
+	      fADCsamp2[istrip] = Short_t(fsamp);
+	      break;
+	    case(3):
+	      fADCsamp3[istrip] = Short_t(fsamp);
+	      break;
+	    case(4):
+	      fADCsamp4[istrip] = Short_t(fsamp);
+	      break;
+	    case(5):
+	      fADCsamp5[istrip] = Short_t(fsamp);
+	      break;
+	    default:
+	      break;
+	    }
+	    //}
+#endif
+	    /*
 #ifdef MCDATA
 	    if(fMCHitInfo[istrip].fSigType&0x1){
+	      if(isamp==0)primhitsize++;
 	      primhitADCsum+=fsamp;
 	      primhitprimADCsum+=fMCHitInfo[istrip].vClusterADC[isamp][0];
-	      primhitADCsamples[isamp]+=fsamp;
+	      //primhitADCsamples[isamp]+=fsamp;
 	    }
 #endif
+	    */
 	  }
+	//if(strcmp(this->GetName(),"6.x")==0 && 2933<=istrip && istrip<=2944)cout << endl;
 	/*
 	bool print = false;
 	if(strcmp(this->GetName(), "5.y")==0 && 585<=istrip&&istrip<=590)print = true;
@@ -669,8 +752,49 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	//if(!AnalyzeStrip(samples, stripdata, print))
 	*/
 	// Do zero suppression and Analyze the pulse shape
+	goodstrip = AnalyzeStrip(samples, stripdata);
+	//if(strcmp(this->GetName(),"6.x")==0 && 2933<=istrip && istrip<=2944)cout << "peaktime " << stripdata.peaktime << endl;
+	/*
+#ifdef MCDATA
 	
-	if(!AnalyzeStrip(samples, stripdata))
+	if(fMCHitInfo[istrip].fSigType&0x1 && stripdata.maxAdc>primhitMaxADC){
+	  primhitpeaktime = stripdata.peaktime;
+	  primhitMaxADC = stripdata.maxAdc;
+	}
+#endif
+	*/
+	
+	// we actually want that information no matter what!
+#ifdef MCDATA
+	fMCCharge[istrip] = fMCHitInfo[istrip].fMCCharge;
+	//
+	if(fMCHitInfo[istrip].fSigType&0x1){
+
+	  Float_t ADCsum = 0;
+	  if(primhitMCtime<-1e8)primhitMCtime = fMCHitInfo[istrip].fMCTime;
+	  //if(strcmp(GetName(), "1.x")==0)cout << GetName() << " " << istrip << endl;
+	  for(int i_ts=0;i_ts<fMaxSamp;i_ts++){
+	    //if(strcmp(GetName(), "1.x")==0)cout << " " << samples[i_ts];//<< endl;
+	    //cout << fMCHitInfo[istrip].vClusterADC[i_ts][0] << " " ;
+	    ADCsum+= samples[i_ts];
+	    fPrimFrac[istrip]+=fMCHitInfo[istrip].vClusterADC[i_ts][0];
+	  }
+	  fPrimFrac[istrip]/=ADCsum;
+	  //if(strcmp(GetName(), "1.x")==0)cout << endl << fPrimFrac[istrip] << endl;
+	  if(ADCsum*fPrimFrac[istrip]>ADCsumMax){
+	    fStripADCsumMax = istrip;
+	    ADCsumMax = ADCsum;
+	  }
+	  
+	  // if(stripdata.adcSum>fPrimADCsumMax){
+	  //   fPrimADCsumMax = stripdata.adcSum;
+	  //   fPrimADCpeakMax = stripdata.maxAdc;
+	  // }
+	  //cout << "strip " << istrip << " ADC primary ";
+	  //cout << "; fPrimFrac[istrip]: " << fPrimFrac[istrip] << endl;
+	}
+#endif
+	if(!goodstrip)
 	  continue;// Do nothing for strips not passing zero suppression
 
 	// Save strip information for cluster finding, this struct have all information, in principle we don't need the following fADCraw[], fADC[].......
@@ -688,28 +812,6 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	fHitTime[istrip] = stripdata.peaktime;
 	fADCcor[istrip] = stripdata.adcSum;
 	fGoodHit[istrip] = not TestBit(kCheckPulseShape) or stripdata.pass;
-#ifdef MCDATA
-	fMCCharge[istrip] = fMCHitInfo[istrip].fMCCharge;
-	//
-	if(fMCHitInfo[istrip].fSigType&0x1){
-	  if(stripdata.adcSum>ADCsumMax){
-	    fStripADCsumMax = istrip;
-	    ADCsumMax = stripdata.adcSum;
-	  }
-	  
-	  // if(stripdata.adcSum>fPrimADCsumMax){
-	  //   fPrimADCsumMax = stripdata.adcSum;
-	  //   fPrimADCpeakMax = stripdata.maxAdc;
-	  // }
-	  //cout << "strip " << istrip << " ADC primary ";
-	  for(int i_ts=0;i_ts<fMaxSamp;i_ts++){
-	    //cout << fMCHitInfo[istrip].vClusterADC[i_ts][0] << " " ;
-	    fPrimFrac[istrip]+=fMCHitInfo[istrip].vClusterADC[i_ts][0];
-	  }
-	  fPrimFrac[istrip]/=fADC[istrip];
-	  //cout << "; fPrimFrac[istrip]: " << fPrimFrac[istrip] << endl;
-	}
-#endif
 	AddStrip( istrip , moduleID);
       } // end of loop on chan
       // cout<<GetName()<<" "<<moduleID<<endl;
@@ -722,17 +824,23 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     //
     // DoClustering();
     //
-
+    /*
 #ifdef TESTCODE
+#ifdef MCDATA
     if( TestBit(kDoHistos) ) {
       fPrimHitADC->Fill(primhitADCsum);
       fPrimHitFrac->Fill(primhitprimADCsum/primhitADCsum);
-      Double_t shapingtime=0, peaktime=0, adcmax_fit=0;
-      FitPulse(primhitADCsamples, fMaxSamp, shapingtime, peaktime, adcmax_fit);
-      fPrimHitTime->Fill(shapingtime);
+      //Double_t primshapingtime=0, primadcmax_fit=0;
+      //FitPulse(primhitADCsamples, fMaxSamp, primshapingtime, primhitpeaktime, primadcmax_fit);
+      fPrimHitTime->Fill(primhitpeaktime);
+      fPrimHitTimeVsADC->Fill(primhitADCsum, primhitpeaktime);
+      fPrimHitFracVsADC->Fill(primhitADCsum, primhitprimADCsum/primhitADCsum);
+      fPrimHitTimeFitDiff->Fill(primhitpeaktime-primhitMCtime);
+      fPrimHitFracVsSize->Fill(primhitsize, primhitprimADCsum/primhitADCsum);
     }
 #endif
-
+#endif
+    */
 
 
 
@@ -875,14 +983,30 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
  
       while( *strip_left <= *strip_right ) {
 	if(*strip_left == *strip_right || *strip_left == *strip_right-1){
-	  shapingtime = 56.0; 
-	  peaktime = (fHitTime[ *strip_left] + fHitTime[ *strip_right ])/2;
-	  //  cout<<"apeakTime: "<<peaktime<<endl;
+	  shapingtime = 56.0;
+	  //peaktime = (fHitTime[ *strip_left] + fHitTime[ *strip_right ])/2;
 	  //	  if(peaktime>90 ||peaktime<30)
 	  // getchar();
-	  adcmax_fit = fADCraw[ *strip_left ] > fADCraw[ *strip_right ] ? fADCraw[ *strip_left ] : fADCraw[ *strip_right ];
+	  //Still necessary in case we meet this condition right away
+	  if(fADCraw[ *strip_left]>adcmax_fit || fADCraw[ *strip_right]>adcmax_fit  ){
+	    adcmax_fit = fADCraw[ *strip_left ] > fADCraw[ *strip_right ] ? fADCraw[ *strip_left ] : fADCraw[ *strip_right ];
+	    peaktime = (fHitTime[ *strip_left] + fHitTime[ *strip_right ])/2;
+	  }
+	  //cout << "l " <<*strip_left << " r " << *strip_right << " adcl " << fADCraw[ *strip_left ] << " adcr " << fADCraw[ *strip_right ]  << " tl " << fHitTime[ *strip_left ] << " tr " << fHitTime[ *strip_right ] << " adcmax_fit: " << adcmax_fit << " peakTime: "<< peaktime << endl;
 	  break;
 	}else{
+	  //cout << "l " <<*strip_left << " r " << *strip_right << " adcl " << fADCraw[ *strip_left ] << " adcr " << fADCraw[ *strip_right ]  << " tl " << fHitTime[ *strip_left ] << " tr " << fHitTime[ *strip_right ] << endl;
+	  //Added these conditions otherwise the "peaktime" of the strip would just be the last strips to be scanned.
+	  // with this condition, at least, we make sure that the peaktime is from the strip with the highest "max ADC peak" 
+	  // PS: "max ADC peak" would, I think, be more relevant in the background scenario
+	  if(fADCraw[ *strip_left]>adcmax_fit){
+	    adcmax_fit = fADCraw[ *strip_left];
+	    peaktime = fHitTime[ *strip_left];
+	  }
+	  if(fADCraw[ *strip_right]>adcmax_fit){
+	    adcmax_fit = fADCraw[ *strip_right];
+	    peaktime = fHitTime[ *strip_right];
+	  }
 	  strip_left++;
 	  strip_right--;
 	}
@@ -1108,10 +1232,20 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       }
       //	cout<<"pos: "<<pos<<endl;
       //   cout<<"\n##########################"<<endl;getchar();
+
+      /*
+#ifdef TESTCODE 
+#ifdef MCDATA
+      if( TestBit(kDoHistos) ) {
+	if(prim_ratio>0)fPrimHitTimeRecDiff->Fill(primhitpeaktime-peaktime);
+      }
+#endif
+#endif
+      */
       
       //FitPulse(sampleAdc,nsample, shapingtime, peaktime, adcmax_fit);
       //cout<<"peakTime: "<<peaktime<<endl;
-      if(peaktime>90 ||peaktime<30)
+      //if(peaktime>90 ||peaktime<30)
 	//getchar();
       
 
@@ -1141,7 +1275,8 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       }
 
       // Make a new hit
-
+      //cout << " adcmax_fit " << adcmax_fit << " peaktime " << peaktime << endl;
+      
       if(peaktime<fPeakTimeMin || peaktime>fPeakTimeMax){
 	continue;
       }
@@ -1415,6 +1550,22 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
       ret = DefineVarsFromList( mcvars, mode );
     }
 #endif
+
+#ifdef TESTCODE
+    RVarDef sampvars[] = {
+      { "strip.samp0", "Strips sample 0 ",   "fADCsamp0" },
+      { "strip.samp1", "Strips sample 1 ",   "fADCsamp1" },
+      { "strip.samp2", "Strips sample 2 ",   "fADCsamp2" },
+      { "strip.samp3", "Strips sample 3 ",   "fADCsamp3" },
+      { "strip.samp4", "Strips sample 4 ",   "fADCsamp4" },
+      { "strip.samp5", "Strips sample 5 ",   "fADCsamp5" },
+      { 0 }
+    };
+    ret = DefineVarsFromList( sampvars, mode );
+    
+    if( ret != kOK )
+      return ret;
+#endif
     return ret;
   }
 
@@ -1429,12 +1580,26 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     if( TestBit(kDoHistos) ) {
       assert( fADCMap );
       fADCMap->Write();
+      /*
+#ifdef MCDATA
       assert( fPrimHitADC );
       fPrimHitADC->Write();
       assert( fPrimHitTime );
       fPrimHitTime->Write();
       assert( fPrimHitFrac );
       fPrimHitFrac->Write();
+      assert( fPrimHitTimeVsADC );
+      fPrimHitTimeVsADC->Write();
+      assert( fPrimHitFracVsADC );
+      fPrimHitFracVsADC->Write();
+      assert( fPrimHitTimeFitDiff );
+      fPrimHitTimeFitDiff->Write();
+      assert( fPrimHitTimeRecDiff );
+      fPrimHitTimeRecDiff->Write();
+      assert( fPrimHitFracVsSize );
+      fPrimHitFracVsSize->Write();
+#endif
+      */
     }
 #endif
     return 0;
@@ -1458,6 +1623,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     // Set defaults
     TString mapping;
     Int_t do_noise = 1, check_pulse_shape = 1;
+    Int_t do_samps = 0;
     fMaxClusterSize = kMaxUInt;
     fMinAmpl   = 0.0;
     fSplitFrac = 0.0;
@@ -1491,6 +1657,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	{ "tmp_pedestal_rms",&ftmp_pedestal_rms,  kInt, 0, 1, gbl },
 	{ "tmp_comm_range", &ftmp_comm_range,  kInt,    0, 1, gbl },
 	{ "commonmode_groupsize", &fcModeSize,kInt,     0, 1, gbl },
+	//{ "do_samples", &do_samps, kInt,     0, 1, gbl },
 	{ 0 }
       };
       status = LoadDB( file, date, request, fPrefix );
@@ -1530,6 +1697,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 
     SetBit( kDoNoise, do_noise );
     SetBit( kCheckPulseShape, check_pulse_shape );
+    //SetBit( kDoSamples, do_samps );
 
     SafeDelete(fADCraw);
     SafeDelete(fMCCharge);
@@ -1538,6 +1706,16 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     SafeDelete(fADCcor);
     SafeDelete(fGoodHit);
     SafeDelete(fPrimFrac);
+
+#ifdef TESTCODE
+    SafeDelete(fADCsamp0);
+    SafeDelete(fADCsamp1);
+    SafeDelete(fADCsamp2);
+    SafeDelete(fADCsamp3);
+    SafeDelete(fADCsamp4);
+    SafeDelete(fADCsamp5);
+#endif
+
 #ifdef MCDATA
     delete [] fMCHitInfo; fMCHitInfo = 0;
 #endif
@@ -1555,7 +1733,17 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
     fPrimFrac = new Float_t[fNelem];
     fSigStrips.reserve(fNelem);
     fStripsSeen.resize(fNelem);
-
+#ifdef TESTCODE
+    //if(TestBit(kDoSamples)){
+    fADCsamp0 = new Short_t[fNelem];
+    fADCsamp1 = new Short_t[fNelem];
+    fADCsamp2 = new Short_t[fNelem];
+    fADCsamp3 = new Short_t[fNelem];
+    fADCsamp4 = new Short_t[fNelem];
+    fADCsamp5 = new Short_t[fNelem];
+    //}
+#endif
+    
 #ifdef MCDATA
     if( fTracker->TestBit(Tracker::kMCdata) ) {
       fMCHitInfo = new TSBSMCHitInfo[fNelem];
