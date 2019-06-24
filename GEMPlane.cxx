@@ -772,7 +772,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 
 	  Float_t ADCsum = 0;
 	  if(primhitMCtime<-1e8)primhitMCtime = fMCHitInfo[istrip].fMCTime;
-	  //if(strcmp(GetName(), "1.x")==0)cout << GetName() << " " << istrip << endl;
+	  //if(strcmp(GetName(), "1.x")==0)cout << GetName() << " " << istrip;// << endl;
 	  for(int i_ts=0;i_ts<fMaxSamp;i_ts++){
 	    //if(strcmp(GetName(), "1.x")==0)cout << " " << samples[i_ts];//<< endl;
 	    //cout << fMCHitInfo[istrip].vClusterADC[i_ts][0] << " " ;
@@ -783,9 +783,9 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag)
 	  //if(strcmp(GetName(), "1.x")==0)cout << endl << fPrimFrac[istrip] << endl;
 	  if(ADCsum*fPrimFrac[istrip]>ADCsumMax){
 	    fStripADCsumMax = istrip;
-	    ADCsumMax = ADCsum;
+	    ADCsumMax = ADCsum*fPrimFrac[istrip];
 	  }
-	  
+	  //if(strcmp(GetName(), "1.x")==0)cout << "ADC MC " << ADCsum*fPrimFrac[istrip] << endl;
 	  // if(stripdata.adcSum>fPrimADCsumMax){
 	  //   fPrimADCsumMax = stripdata.adcSum;
 	  //   fPrimADCpeakMax = stripdata.maxAdc;
